@@ -1,10 +1,14 @@
 """Simulation core for the Simulated Reality Engine.
 
-Three sub-engines, pure Python, no engine dependency:
+Seven sub-engines, pure Python, no engine dependency:
 
     decay      -- exponential memory decay with correct sign handling
     gossip     -- rumour mutation through social contact
     ecosystem  -- desperation index and behavioural status flips
+    districts  -- macro dynamics over time, city scars with hysteresis
+    trauma     -- personal stress accumulation and behavioural tiers
+    justice    -- evidence, charges, plea bargaining
+    fixers     -- reputation, willingness, betrayal
 
 Engine-independent on purpose. This is the layer that runs on the background
 thread behind Unreal's render loop; nothing in it may touch a UObject, a UWorld,
@@ -32,6 +36,7 @@ from .ecosystem import (
     apply_district_pressure,
 )
 from .gossip import Conversation, Rumour, converse, police_response, retell
+from . import districts, fixers, justice, trauma
 
 __all__ = [
     "ActionTag",
@@ -58,4 +63,8 @@ __all__ = [
     "converse",
     "police_response",
     "retell",
+    "districts",
+    "fixers",
+    "justice",
+    "trauma",
 ]

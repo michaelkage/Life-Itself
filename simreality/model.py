@@ -289,6 +289,13 @@ class NPC:
     moral_shackle: float = 0.8
     desperation_index: float = 0.0
     trauma_level: TraumaLevel = TraumaLevel.BASELINE
+
+    #: Accumulated personal trauma -- what was done to this person, as opposed to
+    #: what is happening around them. Fed by `trauma.absorb`, unwound by
+    #: `trauma.relieve`. Kept separate from `desperation_index` because the two
+    #: drive different tiers; see `trauma.py`.
+    personal_stress: float = 0.0
+
     memories: list[NPCMemory] = field(default_factory=list)
 
     def remember(self, memory: NPCMemory) -> None:
@@ -300,7 +307,13 @@ class NPC:
 
 @dataclass
 class District:
-    """A neighbourhood. Owns its own environmental pressure."""
+    """A neighbourhood. Owns its own environmental pressure.
+
+    The stress fields are state, not configuration: `districts.tick_day` moves
+    them once per in-game day. The brief gives DI a "daily cycle" but defines no
+    dynamics for its inputs, which left every district permanently frozen and
+    meant the city-scar trigger in 2.B could never fire from an unchanging city.
+    """
 
     district_id: str
     overpopulation: float = 0.3
@@ -308,4 +321,16 @@ class District:
     weather_severity: float = 0.0
     local_corruption: float = 0.2
     security_presence: float = 0.5
+
+    #: Head-count dynamics. `overpopulation` is derived from these rather than set
+    #: directly, so crowding and hunger stay causally linked.
+    population: int = 30
+    capacity: int = 100
+
+    #: City-scar state -- see `districts.py`. Persists across days.
+    days_above_critical: int = 0
+    days_recovering: int = 0
+    scar_active: bool = False
+    scar_intensity: float = 0.0
+
     residents: list[NPC] = field(default_factory=list)
