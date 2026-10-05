@@ -455,3 +455,214 @@ now the **last** field by design, and
 `test_positional_construction_still_maps_to_the_right_fields` pins it. C++
 aggregate initialisation turns this into a compile error, which is the one place
 the port is strictly safer than the prototype.
+
+---
+
+# Part three: closing the two remaining gaps
+
+After part two the core ran, but two things the brief names were still missing:
+reputation had no source, and the "fixer network" was a list of independent
+actors. Both were specified in prose and neither had maths, which meant neither
+had ever been checked. Both broke on contact with numbers.
+
+## 15. Reputation had no source, and the obvious source is wrong three ways
+
+`fixers.willingness_to_deal` gates on `REPUTATION_FLOOR = 0.35`. Reputation was a
+float on `CriminalFile` defaulting to `0.5`. Nothing wrote it, so every player sat
+permanently just above the floor and the fixer route was open to everyone
+equally, forever. The gate was decorative.
+
+Storing a mutable score is the wrong shape in three separate ways, and each is
+invisible until you run the numbers.
+
+**It is global, and the brief's is local.** The brief says *local* reputation, and
+the word is load-bearing: a float on the file means one crime in D4 makes fixers
+in D9 refuse you, having never heard of it. Reputation has to reach you through
+the same gossip network as everything else, or the social layer is exempt from
+the game's central mechanic.
+
+**It drifts.** Any stored score needs a writer, and the systems that would write
+it do not exist. It sat at its default forever.
+
+**Deriving it from present evidence produces the custody paradox.** This is the
+one that actually matters. Reputation computed purely from surviving witness
+memories collapses the moment those memories decay:
+
+```
+five witnesses to an assault, all actionable   -> reputation 0.51
+30 days later, 0 of 5 still actionable         -> reputation 1.00
+```
+
+Thirty days is a realistic sentence. So a player convicted on that evidence walks
+out of custody locally respectable, because the only thing holding their
+reputation down was the same rumour that convicted them. The memory model quietly
+erased the social cost of the crime it had just proven.
+
+Two terms, one from each kind of evidence:
+
+| Term | Source | Decay |
+|---|---|---|
+| accusation | actionable witness memories in this district | with the memories |
+| record | convictions | toward a floor, never to zero |
+
+A conviction is a public record. It stops being current news; it does not
+disappear. `record_penalty` holds at full strength for the length of the
+sentence, then decays at `0.98`/day — a half-life of about 34 days — toward
+`RECORD_FLOOR = 0.15`. An assault conviction from a decade ago still costs about
+0.11 of standing, permanently.
+
+**And they combine with `max`, not a sum.** One act produces both a witness
+memory and a conviction. Summing punished the player twice for one crime, and
+because the sum clamped at 1.0, an innocent who had faced several old theft
+charges landed on a reputation of exactly zero with no way back:
+
+```
+accusation 0.490   record 0.700
+    sum -> penalty 1.190 -> clamp -> reputation 0.000   (punished twice, unrecoverable)
+    max -> penalty 0.700          -> reputation 0.300   (one act, one penalty)
+```
+
+Two further traps, both found by measurement:
+
+- **Corroboration has to be deduplicated per offence.** Five witnesses to one
+  shoplifting is one act. Counting them separately gave a penalty of 0.245 for a
+  single theft and the same 0.245 with five witnesses — but two *different*
+  offences compounded to 0.615, which is correct. The failure appears when the
+  same act is counted once per witness rather than once per act: the
+  corroboration bug from §10, repeating one layer out.
+- **Only the most recent conviction is scored.** Summing convictions across a
+  record made a player with three old thefts permanently unemployable, which
+  turns the fixer route *off* rather than making it expensive. A dead end instead
+  of a cost.
+
+Pinned by `test_conviction_outlives_the_rumour_that_convicted_you`,
+`test_one_act_is_not_punished_twice`,
+`test_five_witnesses_to_one_act_is_one_act`.
+
+## 16. Betrayal was a knife-edge in both directions
+
+Adding the network meant re-checking the exposure term from §12, and it was badly
+miscalibrated in the opposite direction to the one §12 fixed.
+
+```
+p_betray = desperation × greed − EXPOSURE_WEIGHT × standing
+
+at EXPOSURE_WEIGHT = 0.55, desperation 0.75, bribe 0.8, warrants 0.9:
+    standing 0.9 -> 0.000    a well-connected fixer NEVER betrays
+    standing 0.5 -> 0.000
+    standing 0.2 -> 0.104
+```
+
+The exposure term (0.55 × 0.5 = 0.28) exceeded the drive term (desperation ×
+greed ≈ 0.21) almost everywhere in the parameter space, so only fixers with no
+standing at all ever squealed. §12 had made betrayal certain; this made it
+confined to nobodies. Same whiplash, opposite corner, and backwards from the
+fiction — a well-connected fixer under real pressure taking a bribe worth the risk
+is the dramatic case, and it was the one case that could not happen.
+
+At `EXPOSURE_WEIGHT = 0.25` the drive dominates and exposure modulates:
+
+| Desperation | Bribe | Standing | p | |
+|---|---|---|---|---|
+| 0.35 | 1.0 | 0.9 | 0.000 | quiet district, connected: never |
+| 0.35 | 1.0 | 0.2 | 0.067 | quiet district, unknown: rarely |
+| 0.55 | 0.5 | 0.5 | 0.046 | |
+| 0.75 | 1.0 | 0.9 | 0.025 | |
+| 0.75 | 1.0 | 0.2 | 0.200 | stressed, unknown: one in five |
+| 0.95 | 1.0 | 0.9 | 0.092 | peak pressure, connected: sometimes |
+| 0.95 | 1.0 | 0.2 | 0.267 | |
+| 0.95 | 0.05 | 0.9 | 0.000 | nobody risks anything for a trivial bribe |
+
+Pinned by `test_peak_pressure_makes_a_connected_fixer_risky`.
+
+## 17. A list of independent actors is not a network
+
+`FixerProfile` had no links between instances, so the brief's fixer network had
+no collective behaviour: a player could be sold out six times over and the
+seventh fixer would deal exactly as the first did. Only `known_betrayers` touched
+more than one actor, and it just listed names.
+
+Propagation now writes to peers' standing directly. There is deliberately **no
+separate trust score** — trust is the mean standing of the members, so there is
+exactly one source of truth. A parallel `trust` float alongside per-member
+standing would drift out of sync with them and be a second thing to reconcile,
+which is the failure mode this layer exists to avoid.
+
+Three calibration traps, each found by running it:
+
+**One-way ratchet.** Betrayal knocked peers below the standing at which they
+would deal; refusal means no deal; no deal means no betrayal to lose. Measured at
+any cost-per-betrayal from 0.1 upward, twelve betrayals in one district drove
+trust to exactly 0.00 with no path back. A player unlucky in one district could
+never fix anything again. Fixed by flooring peer standing at `FIXER_MIN_STANDING`
+— a burned network can still be worked, just coldly.
+
+**Pegged at perfect.** Reliably dealing walked every member to 1.0, so a player
+could make the network permanently honest, which contradicts the premise that
+fixing is unstable and removes any reason to watch your back. Fixed with a
+ceiling that is a function of desperation rather than a constant:
+
+```
+ceiling = 0.35 + 0.55 × DI
+```
+
+A fixer network in a district with nothing wrong has no reason to exist, let alone
+to be trusted. Peaceful districts cap out at 0.35; desperate ones at 0.90.
+
+**Repair outran damage, and damage vanished inside the play window.** The first
+reversion rate of `0.06` restored the network to full resting standing inside a
+fortnight, so the propagation produced no observable difference between a
+player's first approach and their second — which is the entire point of it. Now
+`0.015`, roughly halving every 46 days: still clearly damaged a month later, which
+is the window that matters, and gone in a year.
+
+One ordering bug found while testing this: the ceiling was enforced in
+`record_outcome` as well as `daily_update`, so a clean deal pushed a member back
+through the ceiling immediately and the network sat permanently above its own
+limit. The ceiling is a daily-state clamp; `record_outcome` applies the floor
+only.
+
+Pinned by `test_a_squealer_costs_their_peers`,
+`test_the_player_is_never_permanently_locked_out`,
+`test_trust_cannot_peg_at_one`,
+`test_damage_outlasts_the_next_few_fixers`.
+
+### An emergent consequence worth keeping
+
+`p_betray` subtracts `EXPOSURE_WEIGHT × standing`, so a fixer with *less* standing
+is more exposed and more likely to squeal. Being burned therefore makes the next
+approach riskier, not safer. Word got around that squealing is safe here.
+
+That is not a bug and it is not designed — it falls out of the exposure term being
+subtracted. It is pinned by `test_a_burned_network_becomes_more_trigger_happy` so
+that nobody later "fixes" it by accident.
+
+### The loop, closed
+
+The gap in one sentence: a fixer could betray the player every single time and
+nothing about it ever stuck, because the reputation the betrayal should have
+damaged was a float nothing wrote. It now runs end to end, verified as a test:
+
+```
+player approaches a fixer, reputation 1.00, network trust 0.60
+  -> BETRAYED, trust falls to 0.40
+  -> the tip reaches clean police, who still hold a witness who can name the player
+  -> charge built, arrest made, conviction recorded
+  -> reputation 0.00
+  -> next fixer: "reputation 0.00 below the floor of 0.35"
+```
+
+Pinned by `test_the_squeal_that_betrays_you_eventually_closes_the_route`.
+
+## What this took
+
+Eighteen bugs, all of the same class: values self-consistent on paper and wrong
+the moment they ran. Six were in systems that existed, six in systems that had
+never been built, four in this implementation, two in the gaps closed here.
+
+The pattern is consistent enough to be worth stating as a rule for the C++ port:
+**every constant in this project was wrong at least once, and in every case the
+error was invisible in the algebra and obvious in the output.** Each was caught
+only because it was swept against a plausible input range before being pinned by
+a test. A constant that has never been swept is a constant that has never been
+tested.

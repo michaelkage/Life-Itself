@@ -8,7 +8,8 @@ Seven sub-engines, pure Python, no engine dependency:
     districts  -- macro dynamics over time, city scars with hysteresis
     trauma     -- personal stress accumulation and behavioural tiers
     justice    -- evidence, charges, plea bargaining
-    fixers     -- reputation, willingness, betrayal
+    fixers     -- reputation, willingness, betrayal, the district network
+    reputation -- local standing derived from evidence
 
 Engine-independent on purpose. This is the layer that runs on the background
 thread behind Unreal's render loop; nothing in it may touch a UObject, a UWorld,
@@ -36,7 +37,7 @@ from .ecosystem import (
     apply_district_pressure,
 )
 from .gossip import Conversation, Rumour, converse, police_response, retell
-from . import districts, fixers, justice, trauma
+from . import districts, fixers, justice, reputation, trauma
 
 __all__ = [
     "ActionTag",
@@ -66,5 +67,6 @@ __all__ = [
     "districts",
     "fixers",
     "justice",
+    "reputation",
     "trauma",
 ]

@@ -236,9 +236,18 @@ class TestUnderworldChain(unittest.TestCase):
         self.assertEqual(ju.CriminalFile("player").is_prosecutable(), False)
 
     def test_betrayal_rate_falls_as_the_network_grows(self):
-        """Exposure is the counterweight the brief never supplied."""
-        d = District("D4", overpopulation=0.9, supply_shortage=0.9,
-                     local_corruption=0.9, security_presence=0.05)
+        """Exposure is the counterweight the brief never supplied.
+
+        One district, one bribe, one warrant depth -- standing is the only
+        variable, so this isolates the effect. The district is stressed but not
+        collapsed (DI 0.55), because at peak desperation the drive term dominates
+        and every connected fixer squelches anyway, which would hide the effect
+        this test exists to pin.
+        """
+        d = District("D4", overpopulation=0.55, supply_shortage=0.55,
+                     local_corruption=0.55, security_presence=0.5)
+        self.assertGreater(desperation_index(d), 0.3)
+
         exposed = fx.negotiate("player", fx.FixerProfile("a", "D4", standing=0.9, warrants=0.9),
                               d, bribe=1.0, reputation=0.9, rng=0.0)
         anonymous = fx.negotiate("player", fx.FixerProfile("b", "D4", standing=fx.FIXER_MIN_STANDING,
@@ -246,6 +255,21 @@ class TestUnderworldChain(unittest.TestCase):
                                  d, bribe=1.0, reputation=0.9, rng=0.0)
         self.assertFalse(exposed.betrayed)
         self.assertTrue(anonymous.betrayed)
+
+    def test_peak_pressure_makes_a_connected_fixer_risky(self):
+        """The dramatic case has to be possible.
+
+        With the exposure term too heavy, a well-connected fixer under real
+        pressure could never betray anybody -- the mechanic only fired for
+        fixers with no standing, which is backwards.
+        """
+        d = District("D4", overpopulation=0.9, supply_shortage=0.9,
+                     local_corruption=0.9, security_presence=0.05)
+        p = fx.betrayal_probability(desperation_index(d), bribe=1.0,
+                                    warrants=0.9, standing=0.9)
+        self.assertGreater(p, 0.0)
+        self.assertGreater(p, fx.betrayal_probability(desperation_index(d), bribe=0.05,
+                                                      warrants=0.9, standing=0.9))
 
 
 if __name__ == "__main__":

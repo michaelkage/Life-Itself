@@ -90,14 +90,41 @@ class Charge:
         return round(30.0 * self.severity * self.strength)
 
 
+@dataclass(frozen=True)
+class Conviction:
+    """A proven offence, on the public record.
+
+    Exists because a conviction outlives the rumour that produced it. See
+    `reputation.record_penalty` -- without this, a player in custody becomes
+    locally respectable as the witness memories decay, because the only thing
+    holding their reputation down was the same evidence that convicted them.
+    """
+
+    action_tag: ActionTag
+    convicted_on_day: int
+    #: Custodial sentence actually imposed, in days. A conviction with a real
+    #: sentence behind it stays legible far longer than a token one.
+    sentence_days: float = 0.0
+
+    @property
+    def severity(self) -> float:
+        return SEVERITY[self.action_tag]
+
+
 @dataclass
 class CriminalFile:
-    """The player's record. Survives arrest, plea, and trial."""
+    """The player's record. Survives arrest, plea, and trial.
+
+    Note there is no `reputation` field. Reputation was one, defaulting to 0.5,
+    and nothing ever read it -- a stored score with no writer, which is the
+    failure mode this whole layer was rebuilt to avoid. It is derived from
+    evidence instead; see `reputation.local_reputation`.
+    """
 
     player_id: str
     charges: list[Charge] = field(default_factory=list)
     confessions: list[ActionTag] = field(default_factory=list)
-    reputation: float = 0.5
+    convictions: list[Conviction] = field(default_factory=list)
     bribe_attempts: int = 0
 
     @property
@@ -112,6 +139,11 @@ class CriminalFile:
 
     def is_prosecutable(self) -> bool:
         return bool(self.provable_charges())
+
+    def most_recent_conviction(self) -> Conviction | None:
+        if not self.convictions:
+            return None
+        return max(self.convictions, key=lambda c: c.convicted_on_day)
 
 
 @dataclass(frozen=True)
@@ -169,7 +201,6 @@ def charge_from_memory(memory: NPCMemory) -> Charge:
 def file_from_memories(
     player_id: str,
     memories: list[NPCMemory],
-    reputation: float = 0.5,
 ) -> CriminalFile:
     """Assemble a file from every witness who saw the player.
 
@@ -183,7 +214,7 @@ def file_from_memories(
             continue
         by_action.setdefault(memory.action_tag, []).append(memory)
 
-    criminal_file = CriminalFile(player_id=player_id, reputation=reputation)
+    criminal_file = CriminalFile(player_id=player_id)
     for action, witnesses in by_action.items():
         best = max(witnesses, key=lambda m: m.retention)
         charge = charge_from_memory(best)
@@ -191,6 +222,27 @@ def file_from_memories(
             charge = Charge(action, "corroborated", CHARGE_STACKING["corroborated"])
         criminal_file.charges.append(charge)
     return criminal_file
+
+
+def convict(
+    criminal_file: CriminalFile,
+    action_tag: ActionTag,
+    current_day: int,
+    sentence_days: float,
+) -> Conviction:
+    """Record a proven offence against the player.
+
+    The charge stays on the file as well; the conviction is a separate, longer-
+    lived fact. A charge is "police think you did this", a conviction is "a court
+    found you did", and only the second one should follow you around for years.
+    """
+    record = Conviction(
+        action_tag=action_tag,
+        convicted_on_day=current_day,
+        sentence_days=sentence_days,
+    )
+    criminal_file.convictions.append(record)
+    return record
 
 
 def register_bribe_attempt(criminal_file: CriminalFile) -> CriminalFile:
