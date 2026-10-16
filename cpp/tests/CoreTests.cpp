@@ -97,6 +97,10 @@ int main() {
     assert(std::abs(armed_after_year - 0.85) < 0.01);
 
     assert(decay_constant(AgeBand::YoungAdult, ActionTag::CrimeTheft, 12.0, Weather::Clear) >= 0.0);
+    assert(visibility_modifier(12.0, Weather::Clear) == visibility_modifier(36.0, Weather::Clear));
+    assert(visibility_modifier(0.0, Weather::Clear) == visibility_modifier(24.0, Weather::Clear));
+    assert(std::abs(visibility_modifier(36.0, Weather::Clear) - 0.8) < 1e-9);
+    assert(std::abs(visibility_modifier(24.0, Weather::Clear) - 1.5) < 1e-9);
     assert(visibility_modifier(12.0, Weather::Clear) < visibility_modifier(0.0, Weather::Rain));
 
     const auto decayed = sweep({theft}, AgeBand::Adult, 36.0, Weather::Clear);
