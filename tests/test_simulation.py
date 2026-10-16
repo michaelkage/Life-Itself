@@ -147,6 +147,15 @@ class TestDecayEquation(unittest.TestCase):
         self.assertEqual(decay.visibility_modifier(36.0, Weather.CLEAR), 0.8)
         self.assertEqual(decay.visibility_modifier(24.0, Weather.CLEAR), 1.5)
 
+    def test_visibility_uses_time_of_day_not_absolute_elapsed_hour(self):
+        """The same time-of-day has the same lighting after each full day."""
+        self.assertEqual(decay.visibility_modifier(12.0, Weather.CLEAR),
+                         decay.visibility_modifier(36.0, Weather.CLEAR))
+        self.assertEqual(decay.visibility_modifier(0.0, Weather.CLEAR),
+                         decay.visibility_modifier(24.0, Weather.CLEAR))
+        self.assertEqual(decay.visibility_modifier(36.0, Weather.CLEAR), 0.8)
+        self.assertEqual(decay.visibility_modifier(24.0, Weather.CLEAR), 1.5)
+
     def test_future_timestamp_does_not_decay(self):
         memory = make_memory(hour=48.0)
         self.assertAlmostEqual(
