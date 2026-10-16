@@ -72,7 +72,7 @@ double retention_after(
     const double floor = retention_floor(memory.action_tag);
     const double retention = memory.initial_impact *
         (floor + (1.0 - floor) * std::exp(-rate * elapsed));
-    return std::clamp(retention, 0.0, 1.0);
+    return retention;
 }
 
 std::vector<NPCMemory> sweep(
@@ -83,7 +83,8 @@ std::vector<NPCMemory> sweep(
     std::optional<double> lambda_base) {
     std::vector<NPCMemory> updated = memories;
     for (auto& memory : updated) {
-        memory.retention = retention_after(memory, age_band, current_hour, weather, lambda_base);
+        memory.retention = std::clamp(
+            retention_after(memory, age_band, current_hour, weather, lambda_base), 0.0, 1.0);
     }
     return updated;
 }
