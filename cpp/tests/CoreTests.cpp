@@ -1,4 +1,5 @@
 #include "simreality/CoreTypes.h"
+#include "simreality/Decay.h"
 #include "simreality/RandomStream.h"
 #include "simreality/SimulationClock.h"
 #include "simreality/SimulationRuntime.h"
@@ -77,6 +78,30 @@ int main() {
     assert(runtime_ticks[23].kind == TickKind::Hourly);
     assert(runtime_ticks[24].kind == TickKind::Daily);
     assert(std::abs(runtime.total_hours() - 24.0) < 1e-9);
+
+    NPCMemory theft;
+    theft.witness_id = "witness";
+    theft.target_entity_id = "target";
+    theft.initial_impact = 1.0;
+    theft.retention = 1.0;
+    theft.timestamp_hour = 12.0;
+    theft.action_tag = ActionTag::CrimeTheft;
+    const double theft_after_day = retention_after(theft, AgeBand::Adult, 36.0, Weather::Clear);
+    assert(theft_after_day < 0.6);
+    assert(theft_after_day >= 0.0);
+
+    NPCMemory armed = theft;
+    armed.action_tag = ActionTag::CrimeArmedAssault;
+    const double armed_after_year = retention_after(
+        armed, AgeBand::YoungAdult, 12.0 + 24.0 * 365.0, Weather::Clear);
+    assert(std::abs(armed_after_year - 0.85) < 0.01);
+
+    assert(decay_constant(AgeBand::YoungAdult, ActionTag::CrimeTheft, 12.0, Weather::Clear) >= 0.0);
+    assert(visibility_modifier(12.0, Weather::Clear) < visibility_modifier(0.0, Weather::Rain));
+
+    const auto decayed = sweep({theft}, AgeBand::Adult, 36.0, Weather::Clear);
+    assert(decayed.size() == 1);
+    assert(decayed[0].retention < theft.retention);
 
     return 0;
 }
