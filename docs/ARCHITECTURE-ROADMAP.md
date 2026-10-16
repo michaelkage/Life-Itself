@@ -53,12 +53,13 @@ The `cpp/` directory is a proposed portable C++20 library:
 - `include/simreality/CoreTypes.h`: first-pass C++ data contract aligned to the visible Python model.
 - `include/simreality/SimulationClock.h` and `src/SimulationClock.cpp`: deterministic elapsed-time clock.
 - `include/simreality/RandomStream.h` and `src/RandomStream.cpp`: fixed-algorithm seeded random stream with bounded integer sampling.
+- `include/simreality/Decay.h` and `src/Decay.cpp`: first C++ domain-system port for visibility modifiers, decay rates, retention curves, and batch memory sweeps.
 - `include/simreality/SimulationScheduler.h` and `src/SimulationScheduler.cpp`: hourly and daily tick generation in chronological order; hourly runs before daily at a shared midnight boundary.
 - `include/simreality/SimulationRuntime.h` and `src/SimulationRuntime.cpp`: combines clock and scheduler into a small orchestration facade.
-- `tests/CoreTests.cpp`: dependency-free tests for clock boundaries, tick order, seeded RNG reproducibility, and memory attribution.
+- `tests/CoreTests.cpp`: dependency-free tests for clock boundaries, tick order, seeded RNG reproducibility, memory attribution, and representative memory-decay cases.
 - `CMakeLists.txt`: portable build definition.
 
-This is an initial port scaffold, not a completed port of all Python behavior. A field-by-field parity audit and actual compiler run remain required. The current C++ records intentionally do not yet reproduce every Python model field or method. The scheduler currently returns due ticks; it does not itself invoke domain systems.
+This is an initial port scaffold, not a completed port of all Python behavior. A field-by-field parity audit and actual compiler run remain required. The decay port is intended to mirror the Python equations; numerical differential tests against Python are still required. The current C++ records intentionally do not yet reproduce every Python model field or method. The scheduler currently returns due ticks; it does not itself invoke domain systems.
 
 ## Roadmap and exit criteria
 
