@@ -40,7 +40,11 @@ double retention_floor(ActionTag action_tag) noexcept {
 } // namespace
 
 double visibility_modifier(double game_hour, Weather weather) noexcept {
-    const double day_factor = (game_hour >= 6.0 && game_hour < 18.0) ? 0.8 : 1.5;
+    double hour_of_day = std::fmod(game_hour, 24.0);
+    if (hour_of_day < 0.0) {
+        hour_of_day += 24.0;
+    }
+    const double day_factor = (hour_of_day >= 6.0 && hour_of_day < 18.0) ? 0.8 : 1.5;
     const double weather_factor = (weather == Weather::Clear) ? 1.0 : 2.5;
     return day_factor * weather_factor;
 }
