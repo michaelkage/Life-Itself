@@ -106,7 +106,7 @@ int main() {
     assert(visibility_modifier(0.0, Weather::Clear) == visibility_modifier(24.0, Weather::Clear));
     assert(std::abs(visibility_modifier(36.0, Weather::Clear) - 0.8) < 1e-9);
     assert(std::abs(visibility_modifier(24.0, Weather::Clear) - 1.5) < 1e-9);
-    assert(visibility_modifier(12.0, Weather::Clear) < visibility_modifier(0.0, Weather::Rain));
+    assert(visibility_modifier(12.0, Weather::Clear) < visibility_modifier(0.0, Weather::HeavyRain));
 
     const auto decayed = sweep({theft}, AgeBand::Adult, 36.0, Weather::Clear);
     assert(decayed.size() == 1);
