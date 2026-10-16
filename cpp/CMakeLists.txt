@@ -3,6 +3,8 @@ project(SimulatedRealityCore VERSION 0.1.0 LANGUAGES CXX)
 
 add_library(simreality_core
     src/SimulationClock.cpp
+    src/RandomStream.cpp
+    src/SimulationScheduler.cpp
 )
 target_include_directories(simreality_core PUBLIC include)
 target_compile_features(simreality_core PUBLIC cxx_std_20)
