@@ -47,15 +47,18 @@ world coordinator -> domain systems
 
 Domain systems must not call Unreal, access wall-clock time, use global random state, or mutate presentation objects.
 
-## Foundational C++ work started
+## Foundational C++ work started on feature/cpp-simulation-foundation
 
 The `cpp/` directory is a proposed portable C++20 library:
 - `include/simreality/CoreTypes.h`: first-pass C++ data contract aligned to the visible Python model.
 - `include/simreality/SimulationClock.h` and `src/SimulationClock.cpp`: deterministic elapsed-time clock.
-- `tests/CoreTests.cpp`: dependency-free smoke tests.
+- `include/simreality/RandomStream.h` and `src/RandomStream.cpp`: fixed-algorithm seeded random stream with bounded integer sampling.
+- `include/simreality/SimulationScheduler.h` and `src/SimulationScheduler.cpp`: hourly and daily tick generation in chronological order; hourly runs before daily at a shared midnight boundary.
+- `include/simreality/SimulationRuntime.h` and `src/SimulationRuntime.cpp`: combines clock and scheduler into a small orchestration facade.
+- `tests/CoreTests.cpp`: dependency-free tests for clock boundaries, tick order, seeded RNG reproducibility, and memory attribution.
 - `CMakeLists.txt`: portable build definition.
 
-This is an initial port scaffold, not a completed port of all Python behavior. A field-by-field parity audit and actual compiler run remain required. In particular, the current C++ records intentionally do not yet reproduce all Python methods or every model field.
+This is an initial port scaffold, not a completed port of all Python behavior. A field-by-field parity audit and actual compiler run remain required. The current C++ records intentionally do not yet reproduce every Python model field or method. The scheduler currently returns due ticks; it does not itself invoke domain systems.
 
 ## Roadmap and exit criteria
 
@@ -73,11 +76,11 @@ This is an initial port scaffold, not a completed port of all Python behavior. A
 **Exit:** clean build; deterministic tests pass; no Unreal dependency in core.
 
 ### Phase 2 — Port domain systems
-Port one module at a time in dependency order: decay, gossip, ecosystem, districts, trauma, justice, fixers. Preserve Python as the reference implementation until differential tests agree across edge cases and parameter sweeps.
+Port one module at a time in dependency order: decay, gossip, ecosystem, districts, trauma, justice, fixers, reputation. Preserve Python as the reference implementation until differential tests agree across edge cases and parameter sweeps.
 **Exit:** each C++ module has equivalent seeded tests and numerical tolerances documented.
 
 ### Phase 3 — World coordinator and persistence
-Add a world-step API, hourly/daily scheduling, versioned save/load, migrations, and replayable event records.
+Add a world-step API, hourly/daily dispatch, versioned save/load, migrations, and replayable event records.
 **Exit:** a seeded scenario produces identical state hashes across repeated runs and save/load continuation.
 
 ### Phase 4 — Unreal integration
@@ -94,4 +97,4 @@ Add simulation levels of detail, spatial/social indexing, profiling budgets, Ble
 
 ## Tooling note
 
-Unreal Engine and Visual Studio are not required to design the architecture or write portable C++ files. They are required later to validate Unreal-specific code, build the actual game target, and test rendering/physics/animation integration. Until then, use Python tests and a portable C++ compiler when available; label all uncompiled Unreal code clearly.
+Unreal Engine and Visual Studio are not required to design the architecture or write portable C++ files. They are required later to validate Unreal-specific code, build the actual game target, and test rendering/physics/animation integration. Until then, use Python tests and a standalone C++ compiler when available; label all uncompiled Unreal code clearly.
