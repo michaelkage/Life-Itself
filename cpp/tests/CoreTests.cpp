@@ -1,5 +1,6 @@
 #include "simreality/CoreTypes.h"
 #include "simreality/Decay.h"
+#include "simreality/Gossip.h"
 #include "simreality/RandomStream.h"
 #include "simreality/SimulationClock.h"
 #include "simreality/SimulationRuntime.h"
@@ -110,6 +111,51 @@ int main() {
     const auto decayed = sweep({theft}, AgeBand::Adult, 36.0, Weather::Clear);
     assert(decayed.size() == 1);
     assert(decayed[0].retention < theft.retention);
+
+
+    // Gossip: attribution fades before the physical description does.
+    NPCMemory sharp = theft;
+    sharp.target_entity_id = "target-42";
+    sharp.retention = 0.9;
+    sharp.description.height_m = 1.82;
+    sharp.description.jacket_colour_weights = {{"black", 0.8}};
+    auto named_rumour = retell(sharp);
+    assert(named_rumour.has_value());
+    assert(named_rumour->target_entity_id == "target-42");
+
+    sharp.retention = 0.5;
+    auto vague_rumour = retell(sharp);
+    assert(vague_rumour.has_value());
+    assert(vague_rumour->target_entity_id.empty());
+
+    sharp.retention = 0.005;
+    assert(!retell(sharp).has_value());
+
+    Rumour rumour_a{"Crime.Theft", "target-42", sharp.description, 0.9, "D1", 1};
+    Rumour rumour_b = rumour_a;
+    rumour_b.target_entity_id = "different-target";
+    const auto conflict = corroborate(rumour_a, rumour_b);
+    assert(conflict.target_entity_id.empty());
+
+    NPC speaker;
+    speaker.entity_id = "speaker";
+    NPC listener;
+    listener.entity_id = "listener";
+    NPCMemory matching = theft;
+    matching.target_entity_id = "target-42";
+    matching.retention = 0.9;
+    NPCMemory unrelated = theft;
+    unrelated.target_entity_id = "other-target";
+    listener.memories = {matching, unrelated};
+    speaker.memories = {matching};
+    const auto conversation = converse(listener, speaker, "D1");
+    assert(conversation.transferred.size() == 1);
+    assert(listener.memories.size() == 2);
+    assert(listener.memories[0].target_entity_id == "target-42");
+    assert(listener.memories[1].target_entity_id == "other-target");
+
+    const auto response = police_response(*vague_rumour, "D1");
+    assert(response.find("stop and search") != std::string::npos);
 
     return 0;
 }
