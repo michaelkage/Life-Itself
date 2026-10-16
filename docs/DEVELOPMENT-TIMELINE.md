@@ -6,7 +6,7 @@ These are planning ranges, not promises. Assumption: one developer learning as t
 |---|---:|---|---|
 | 0. Baseline and repo audit | 2–5 days | Re-run Python tests, map modules, record known issues and contract | Python 3.10+ |
 | 1. Portable C++ foundation | 1–3 weeks | Compile core types, clock, seeded RNG, scheduler, smoke tests | C++20 compiler; CMake recommended |
-| 2. Port domain modules | 4–8 weeks | C++ parity for decay, gossip, ecosystem, districts, trauma, justice, fixers | Phase 1 and differential tests |
+| 2. Port domain modules | 4–8 weeks | C++ parity for decay, gossip, ecosystem, districts, trauma, justice, fixers, reputation | Phase 1 and differential tests |
 | 3. Coordinator and persistence | 3–6 weeks | Repeatable world stepping, save/load, schema versioning, replay diagnostics | Phases 1–2 |
 | 4. Unreal setup and adapter | 2–5 weeks | Build a minimal Unreal project and safely connect simulation snapshots | Supported PC, disk space, Unreal and C++ toolchain |
 | 5. First playable neighborhood | 6–12 weeks | One small district, a limited population, schedules, social propagation, visible changes | Phase 4 |
@@ -24,7 +24,7 @@ A credible first playable neighborhood is likely a **several-month project**, no
 
 ## Current implementation status
 
-- Repository default branch: Python simulation core exists, as described in docs/ARCHITECTURE-ROADMAP.md.
-- Feature branch feature/cpp-simulation-foundation: initial C++20 data contract, deterministic clock, CMake build definition, smoke tests, and architecture roadmap have been added.
-- Validation performed in this session: the authored C++ clock and smoke-test source were mirrored into a temporary local directory, compiled with g++ using C++20 and strict warnings, and the smoke test passed. This is a useful first check, but it is **not** a full build of a checked-out repository, an MSVC build, or an Unreal build.
-- Still required: run CMake/CTest against the actual branch, run the existing Python suite, complete field-by-field model parity, and test on the intended Windows machine before merging.
+- Repository default branch: Python simulation core exists, as described in the architecture roadmap.
+- Feature branch `feature/cpp-simulation-foundation`: initial C++20 data contract, clock, deterministic random stream, hourly/daily scheduler, runtime facade, CMake build definition, smoke tests, and planning documents have been added.
+- A prior version of the initial clock and smoke-test source was compiled locally, but the **latest expanded branch has not been built or tested as a complete checkout**. A fresh Git clone was attempted in the current environment but outbound GitHub access was unavailable.
+- Still required: run CMake/CTest against the current branch, run the existing Python suite, complete field-by-field model parity, and test on the intended Windows machine before merging.
