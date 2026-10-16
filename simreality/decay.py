@@ -86,8 +86,10 @@ def visibility_modifier(game_hour: float, weather: Weather) -> float:
 
     Spec anchors: noon/clear = 0.8, midnight/heavy rain = 2.5. Modelled as
     (day vs night) x (weather) so every combination in between is defined.
+    `game_hour` is absolute elapsed time; reduce it modulo 24 before checking daylight.
     """
-    day_factor = 0.8 if 6.0 <= game_hour < 18.0 else 1.5
+    hour_of_day = game_hour % 24.0
+    day_factor = 0.8 if 6.0 <= hour_of_day < 18.0 else 1.5
     weather_factor = 1.0 if weather is Weather.CLEAR else 2.5
     return day_factor * weather_factor
 
