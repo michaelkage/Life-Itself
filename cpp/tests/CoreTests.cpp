@@ -1,6 +1,7 @@
 #include "simreality/CoreTypes.h"
 #include "simreality/RandomStream.h"
 #include "simreality/SimulationClock.h"
+#include "simreality/SimulationRuntime.h"
 #include "simreality/SimulationScheduler.h"
 
 #include <cassert>
@@ -46,10 +47,8 @@ int main() {
     memory.target_entity_id = "target-1";
     memory.retention = 0.9;
     assert(memory.is_actionable());
-
     memory.retention = 0.5;
     assert(!memory.is_actionable());
-
     memory.retention = 0.9;
     memory.target_entity_id.clear();
     assert(!memory.is_actionable());
@@ -64,7 +63,6 @@ int main() {
     for (int i = 0; i < 1000; ++i) {
         assert(bounded_rng.bounded(7U) < 7U);
     }
-
     bool rejected_empty_range = false;
     try {
         (void)bounded_rng.bounded(0U);
@@ -72,6 +70,13 @@ int main() {
         rejected_empty_range = true;
     }
     assert(rejected_empty_range);
+
+    SimulationRuntime runtime;
+    const auto runtime_ticks = runtime.advance(24.0);
+    assert(runtime_ticks.size() == 25);
+    assert(runtime_ticks[23].kind == TickKind::Hourly);
+    assert(runtime_ticks[24].kind == TickKind::Daily);
+    assert(std::abs(runtime.total_hours() - 24.0) < 1e-9);
 
     return 0;
 }
