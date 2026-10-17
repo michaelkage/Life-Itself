@@ -135,18 +135,26 @@ def converse(listener: NPC, speaker: NPC, district_id: str | None = None) -> Con
             continue
         rumour.district_id = district_id
 
-        existing = listener.memories_of(memory.target_entity_id) if memory.target_entity_id else []
-        if existing:
-            # Listener already has a take -- this is corroboration, not overwrite.
+        match_index = None
+        if memory.target_entity_id:
+            for index, candidate in enumerate(listener.memories):
+                if candidate.target_entity_id == memory.target_entity_id:
+                    match_index = index
+
+        if match_index is not None:
+            # Corroborate the matching event without overwriting an unrelated memory.
+            existing = listener.memories_of(memory.target_entity_id)
+            prior_memory = listener.memories[match_index]
             prior = Rumour(
-                action_tag=existing[-1].action_tag.value,
-                target_entity_id=existing[-1].target_entity_id,
-                description=existing[-1].description,
-                retention=existing[-1].retention,
+                action_tag=prior_memory.action_tag.value,
+                target_entity_id=prior_memory.target_entity_id,
+                description=prior_memory.description,
+                retention=prior_memory.retention,
+                district_id=district_id,
                 corroborations=len(existing) + 1,
             )
             rumour = prior.corroborate(rumour)
-            listener.memories[-1] = NPCMemory(
+            listener.memories[match_index] = NPCMemory(
                 witness_id=listener.entity_id,
                 target_entity_id=rumour.target_entity_id,
                 initial_impact=max(prior.retention, rumour.retention),
