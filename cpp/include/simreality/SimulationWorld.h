@@ -1,0 +1,95 @@
+#pragma once
+
+#include "simreality/CoreTypes.h"
+#include "simreality/Districts.h"
+#include "simreality/Ecosystem.h"
+#include "simreality/Fixers.h"
+#include "simreality/Gossip.h"
+#include "simreality/Justice.h"
+#include "simreality/RandomStream.h"
+#include "simreality/Reputation.h"
+#include "simreality/SimulationRuntime.h"
+#include "simreality/Trauma.h"
+
+#include <cstddef>
+#include <cstdint>
+#include <vector>
+
+namespace simreality {
+
+struct ResidentDayResult {
+    EntityId entity_id{};
+    BehaviourDecision behaviour{};
+    TraumaAssessment trauma{};
+};
+
+struct DistrictDayResult {
+    DistrictId district_id{};
+    ScarState scars{};
+    std::vector<ResidentDayResult> residents{};
+};
+
+struct WorldAdvanceReport {
+    std::vector<ScheduledTick> ticks{};
+    std::vector<DistrictDayResult> daily_results{};
+    std::size_t memories_swept{0};
+};
+
+// Portable coordinator for deterministic, simulation-time-driven world updates.
+// Unreal-facing code should consume snapshots/reports rather than enter this core.
+class SimulationWorld {
+public:
+    explicit SimulationWorld(
+        WorldState initial_state = {}, double initial_hour = 0.0,
+        std::uint64_t random_seed = 1U);
+
+    [[nodiscard]] WorldState& state() noexcept { return state_; }
+    [[nodiscard]] const WorldState& state() const noexcept { return state_; }
+    [[nodiscard]] std::vector<FixerNetwork>& fixer_networks() noexcept {
+        return fixer_networks_;
+    }
+    [[nodiscard]] const std::vector<FixerNetwork>& fixer_networks() const noexcept {
+        return fixer_networks_;
+    }
+    [[nodiscard]] double total_hours() const noexcept { return runtime_.total_hours(); }
+    [[nodiscard]] std::uint64_t day_index() const noexcept { return runtime_.day_index(); }
+    [[nodiscard]] RandomStream& random_stream() noexcept { return random_; }
+    [[nodiscard]] std::uint64_t random_state() const noexcept { return random_.state(); }
+
+    // Advances simulation time in a frame-rate-independent way. All due hourly
+    // memory sweeps and daily district/NPC updates run in chronological order.
+    [[nodiscard]] WorldAdvanceReport advance(
+        double elapsed_hours, Weather visibility_weather = Weather::Clear,
+        double weather_severity = 0.0);
+
+    // Social transfer is allowed only between NPCs currently assigned to the same
+    // district. The resulting conversation mutates the listener's memory state.
+    [[nodiscard]] Conversation talk(const EntityId& listener_id, const EntityId& speaker_id);
+
+    // Records one observed action in the witnesses' local memories and applies
+    // personal stress to witnesses and, when supplied, the victim.
+    [[nodiscard]] std::size_t record_witnessed_action(
+        const EntityId& actor_id, ActionTag action_tag, Description description,
+        const std::vector<EntityId>& witness_ids, const EntityId& victim_id = {});
+    [[nodiscard]] CriminalFile build_criminal_file(const EntityId& player_id) const;
+    [[nodiscard]] ReputationProfile reputation_in_district(
+        const DistrictId& district_id, const EntityId& player_id,
+        const CriminalFile* criminal_file = nullptr) const;
+    [[nodiscard]] Consequence resolve_offence(
+        const DistrictId& district_id, const EntityId& player_id,
+        ActionTag action_tag, const EntityId& officer_id, CriminalFile& criminal_file);
+    [[nodiscard]] Negotiation approach_fixer(
+        const DistrictId& district_id, const EntityId& player_id,
+        const EntityId& fixer_id, double bribe, const CriminalFile* criminal_file = nullptr);
+
+private:
+    [[nodiscard]] NPC& find_npc(const EntityId& entity_id);
+    [[nodiscard]] const NPC& find_npc(const EntityId& entity_id) const;
+
+    WorldState state_{};
+    std::vector<FixerNetwork> fixer_networks_{};
+    SimulationRuntime runtime_;
+    RandomStream random_;
+};
+
+} // namespace simreality

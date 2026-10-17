@@ -4,10 +4,10 @@ A seamless, asynchronous open-world simulation: dynamic NPC memory decay, mutati
 rumour networks, macro-environmental desperation modelling, and zero-cut state
 transitions.
 
-**Status: simulation core complete.** Every system in the brief that can be built
-without the engine is built and tested. See [docs/BLUEPRINT.md](docs/BLUEPRINT.md)
-for the architecture and [Where this is going](#where-this-is-going) for what
-remains.
+**Status: portable simulation core in progress.** The Python reference models the
+engine-independent systems; `feature/cpp-simulation-foundation` ports them into a
+standalone C++20 library and adds a world coordinator. Unreal presentation,
+animation, physics, and asset integration are not implemented.
 
 ## Running it
 
@@ -15,12 +15,22 @@ remains.
 python -m unittest discover -s tests -t .
 ```
 
-100 tests, no dependencies beyond the standard library. Python 3.10+ (needs `X | Y`
-type syntax).
+The Python reference suite currently has 139 tests and no dependencies beyond the
+standard library. Python 3.10+ (needs `X | Y` type syntax).
+
+For the portable C++ core:
+
+```
+cmake -S cpp -B build
+cmake --build build
+ctest --test-dir build --output-on-failure
+```
+
+C++20 and CMake 3.20+ are required.
 
 ## What's here
 
-Seven sub-engines, deliberately free of any engine dependency:
+Engine-independent Python reference systems:
 
 | Module | Brief section | What it does |
 | --- | --- | --- |
@@ -31,10 +41,18 @@ Seven sub-engines, deliberately free of any engine dependency:
 | `simreality/districts.py` | 1.C, 2.B City Scars | Macro dynamics over time, scar hysteresis |
 | `simreality/trauma.py` | 4.A Trauma Levels | Personal stress accumulation, behavioural tiers |
 | `simreality/justice.py` | 2.A Legal | Evidence, charges, plea bargaining |
-| `simreality/fixers.py` | 4.B Fixers | Reputation, willingness, betrayal |
+| `simreality/fixers.py` | 4.B Fixers | Fixer incentives, betrayal, network propagation |
+| `simreality/reputation.py` | 4.A, 4.B | Local reputation from witness memories and convictions |
 
 `simreality/model.py` is the contract for the C++ port — it holds records and
 constants only, no behaviour.
+
+The C++ library under `cpp/` now includes the portable data model, deterministic
+clock/scheduler/RNG, memory decay, gossip, environmental pressure and district
+scars, trauma, legal evidence and plea calculations, local reputation, fixer
+networks, and a `SimulationWorld` coordinator for hourly/daily updates and
+event-driven conversations, witness memories, arrests, fixer approaches, and
+versioned world snapshots that preserve simulation time and RNG state.
 
 ### A rumour, end to end
 
@@ -53,12 +71,11 @@ who only ever saw a silhouette, or was wearing a coat they did not choose to wea
 That same rumour, when it reaches police as an *actionable* memory, does build a
 charge. `tests/test_integration.py` runs both paths end to end.
 
-## Fourteen bugs
+## Model corrections
 
-The brief's equations and prose do not do what they say. Six were in systems
-that existed (1-6), six were in systems that had never been built (7-12), and two
-were faults in this implementation (13-14). All fixed, with derivations and
-measured numbers in [docs/MATH-NOTES.md](docs/MATH-NOTES.md).
+The brief's equations and prose do not always do what they say. The first fourteen
+issues below are documented with derivations and measured numbers in
+[docs/MATH-NOTES.md](docs/MATH-NOTES.md).
 
 In the original design:
 
@@ -102,6 +119,17 @@ Found while building:
 14. **A reordered field silently captured the wrong argument** — a mid-list
     defaulted dataclass field bound a colour dict to `observations`, with no
     error raised.
+15. **Reputation had no source** — a stored default never changed and memory-only
+    reputation disappeared as evidence decayed. Local reputation now derives from
+    actionable accusations and durable conviction records.
+16. **Connected fixers never betrayed** — exposure outweighed betrayal incentives
+    across the useful range. The exposure weight now modulates rather than blocks
+    betrayal.
+17. **Fixer standing did not propagate** — networks now share standing changes,
+    recover gradually, and have a pressure-dependent trust ceiling.
+18. **Burned fixers can become more likely to squeal** — this is a feedback
+    consequence of the incentive model, not an implementation defect; regression
+    tests preserve it intentionally.
 
 ## Where this is going
 
@@ -120,20 +148,16 @@ Not yet built, all of it engine-dependent:
   Parameter Collections that consume it do not exist
 - **Trauma-driven NPC schedules** (brief 4.A) — the tiers exist as data; the
   behaviour trees that consume them do not
-- **Fixer network** (brief 4.B) — the logic is done; `FixerProfile` is a list of
-  independent actors with no propagation of standing between them
+- **Unreal adapter** — the C++ core is portable, but no Unreal worker lifecycle,
+  command queue, or immutable game-thread snapshots have been implemented
 - **Blender → Unreal pipeline** (brief 3) — zero-point pivots, vertex-colour wear
   masks
-- **Reputation has no source** — `fixers` reads it and nothing writes it, so every
-  player sits permanently just above the floor. The one gap that will read as a
-  bug in play rather than an absence.
 
 ### Constraints to resolve before installing the engine
 
 - **Disk.** This needs a separate drive. Unreal 5 alone is 100+ GB, before Visual
   Studio, before a single world partition cell.
-- **Build order.** Install the C++ toolchain *first* and port `model.py` while it
-  is still fresh — the data contract is the thing that has to survive translation,
-  and it is much cheaper to port before the behaviour code lands on top of it.
-  Port each module with its tests, and diff against the Python: the Python is the
-  reference implementation, not a rough draft.
+- **Build order.** Keep the C++ core portable and continue porting one system at a
+  time with regression tests against Python. Install Unreal only when the portable
+  systems and hardware/storage plan are ready; Python remains the behavioral
+  reference until differential parity is established.

@@ -1,0 +1,211 @@
+#include "simreality/SimulationWorld.h"
+
+#include "simreality/Decay.h"
+#include "simreality/Districts.h"
+#include "simreality/Ecosystem.h"
+#include "simreality/Gossip.h"
+#include "simreality/Trauma.h"
+
+#include <algorithm>
+#include <stdexcept>
+#include <utility>
+
+namespace simreality {
+
+SimulationWorld::SimulationWorld(
+    WorldState initial_state, double initial_hour, std::uint64_t random_seed)
+    : state_(std::move(initial_state)),
+      runtime_(initial_hour),
+      random_(random_seed) {}
+
+WorldAdvanceReport SimulationWorld::advance(
+    double elapsed_hours, Weather visibility_weather, double weather_severity) {
+    WorldAdvanceReport report;
+    report.ticks = runtime_.advance(elapsed_hours);
+
+    for (const ScheduledTick& tick : report.ticks) {
+        if (tick.kind == TickKind::Hourly) {
+            for (NPC& npc : state_.npcs) {
+                npc.memories = sweep(
+                    npc.memories, npc.age_band, tick.at_hour, visibility_weather);
+                report.memories_swept += npc.memories.size();
+            }
+            continue;
+        }
+
+        for (District& district : state_.districts) {
+            DistrictDayResult district_result;
+            district_result.district_id = district.district_id;
+            district_result.scars = tick_day(district, weather_severity);
+            for (FixerNetwork& network : fixer_networks_) {
+                if (network.district_id == district.district_id) {
+                    network.daily_update(district);
+                }
+            }
+
+            for (NPC& npc : state_.npcs) {
+                if (npc.district_id != district.district_id) continue;
+                const BehaviourDecision behaviour = apply_district_pressure(npc, district);
+                const TraumaAssessment trauma_result =
+                    daily_update(npc, npc.desperation_index, 1.0);
+                district_result.residents.push_back(
+                    {npc.entity_id, behaviour, trauma_result});
+            }
+            report.daily_results.push_back(std::move(district_result));
+        }
+    }
+    return report;
+}
+
+NPC& SimulationWorld::find_npc(const EntityId& entity_id) {
+    const auto found = std::find_if(state_.npcs.begin(), state_.npcs.end(),
+        [&entity_id](const NPC& npc) { return npc.entity_id == entity_id; });
+    if (found == state_.npcs.end()) {
+        throw std::out_of_range("NPC entity id not found: " + entity_id);
+    }
+    return *found;
+}
+
+const NPC& SimulationWorld::find_npc(const EntityId& entity_id) const {
+    const auto found = std::find_if(state_.npcs.begin(), state_.npcs.end(),
+        [&entity_id](const NPC& npc) { return npc.entity_id == entity_id; });
+    if (found == state_.npcs.end()) {
+        throw std::out_of_range("NPC entity id not found: " + entity_id);
+    }
+    return *found;
+}
+
+Conversation SimulationWorld::talk(
+    const EntityId& listener_id, const EntityId& speaker_id) {
+    NPC& listener = find_npc(listener_id);
+    const NPC& speaker = find_npc(speaker_id);
+    if (listener.district_id != speaker.district_id) {
+        throw std::invalid_argument("NPCs must share a district to converse");
+    }
+    return converse(listener, speaker, listener.district_id);
+}
+
+std::size_t SimulationWorld::record_witnessed_action(
+    const EntityId& actor_id, ActionTag action_tag, Description description,
+    const std::vector<EntityId>& witness_ids, const EntityId& victim_id) {
+    const NPC& actor = find_npc(actor_id);
+    std::vector<NPC*> witnesses;
+    std::vector<EntityId> processed;
+    processed.reserve(witness_ids.size());
+    witnesses.reserve(witness_ids.size());
+
+    for (const EntityId& witness_id : witness_ids) {
+        if (std::find(processed.begin(), processed.end(), witness_id) != processed.end()) {
+            continue;
+        }
+        processed.push_back(witness_id);
+        NPC& witness = find_npc(witness_id);
+        if (witness_id == actor_id) {
+            throw std::invalid_argument("an actor cannot be listed as a witness to their own action");
+        }
+        if (witness.district_id != actor.district_id) {
+            throw std::invalid_argument("witness and actor must share a district");
+        }
+        witnesses.push_back(&witness);
+    }
+
+    NPC* victim = nullptr;
+    if (!victim_id.empty()) {
+        victim = &find_npc(victim_id);
+        if (victim->district_id != actor.district_id) {
+            throw std::invalid_argument("victim and actor must share a district");
+        }
+    }
+
+    for (NPC* witness : witnesses) {
+        NPCMemory memory;
+        memory.witness_id = witness->entity_id;
+        memory.target_entity_id = actor_id;
+        memory.initial_impact = 1.0;
+        memory.retention = 1.0;
+        memory.timestamp_hour = runtime_.total_hours();
+        memory.action_tag = action_tag;
+        memory.description = description;
+        witness->memories.push_back(std::move(memory));
+        (void)absorb(*witness, action_tag, witness->entity_id == victim_id);
+    }
+
+    if (victim != nullptr &&
+        std::find(processed.begin(), processed.end(), victim_id) == processed.end()) {
+        (void)absorb(*victim, action_tag, true);
+    }
+    return witnesses.size();
+}
+
+CriminalFile SimulationWorld::build_criminal_file(const EntityId& player_id) const {
+    std::vector<NPCMemory> memories;
+    for (const NPC& npc : state_.npcs) {
+        memories.insert(memories.end(), npc.memories.begin(), npc.memories.end());
+    }
+    return file_from_memories(player_id, memories);
+}
+
+ReputationProfile SimulationWorld::reputation_in_district(
+    const DistrictId& district_id, const EntityId& player_id,
+    const CriminalFile* criminal_file) const {
+    std::vector<NPCMemory> memories;
+    for (const NPC& npc : state_.npcs) {
+        if (npc.district_id != district_id) continue;
+        memories.insert(memories.end(), npc.memories.begin(), npc.memories.end());
+    }
+    return local_reputation(memories, player_id, criminal_file,
+        static_cast<std::uint32_t>(runtime_.day_index()));
+}
+
+Consequence SimulationWorld::resolve_offence(
+    const DistrictId& district_id, const EntityId& player_id,
+    ActionTag action_tag, const EntityId& officer_id, CriminalFile& criminal_file) {
+    const auto district = std::find_if(state_.districts.begin(), state_.districts.end(),
+        [&district_id](const District& candidate) {
+            return candidate.district_id == district_id;
+        });
+    if (district == state_.districts.end()) {
+        throw std::out_of_range("district id not found: " + district_id);
+    }
+    if (criminal_file.player_id != player_id) {
+        throw std::invalid_argument("criminal file belongs to a different player");
+    }
+    return consequence_for(action_tag, criminal_file, *district, officer_id,
+        district->local_corruption, random_.unit_interval());
+}
+
+Negotiation SimulationWorld::approach_fixer(
+    const DistrictId& district_id, const EntityId& player_id,
+    const EntityId& fixer_id, double bribe, const CriminalFile* criminal_file) {
+    const auto district = std::find_if(state_.districts.begin(), state_.districts.end(),
+        [&district_id](const District& candidate) {
+            return candidate.district_id == district_id;
+        });
+    if (district == state_.districts.end()) {
+        throw std::out_of_range("district id not found: " + district_id);
+    }
+    const auto network = std::find_if(fixer_networks_.begin(), fixer_networks_.end(),
+        [&district_id](const FixerNetwork& candidate) {
+            return candidate.district_id == district_id;
+        });
+    if (network == fixer_networks_.end()) {
+        throw std::out_of_range("fixer network not found for district: " + district_id);
+    }
+    const auto fixer = std::find_if(network->members.begin(), network->members.end(),
+        [&fixer_id](const FixerProfile& candidate) {
+            return candidate.entity_id == fixer_id;
+        });
+    if (fixer == network->members.end()) {
+        throw std::out_of_range("fixer entity id not found: " + fixer_id);
+    }
+
+    const double reputation = reputation_in_district(
+        district_id, player_id, criminal_file).reputation;
+    const auto willingness = willingness_to_deal(reputation, *fixer, *district);
+    const double sample = willingness.first ? random_.unit_interval() : 0.0;
+    const Negotiation result = negotiate(*fixer, *district, bribe, reputation, sample);
+    network->record_outcome(*fixer, result, *district);
+    return result;
+}
+
+} // namespace simreality
