@@ -5,7 +5,7 @@ Status labels:
 - **Proposed** means architecture or work planned in this document.
 - **Not yet verified** means a claim still requires a build, test run, or in-engine check.
 
-## Repository audit (verified from the current feature branch)
+## Repository audit (verified from the default branch)
 
 The Python reference core lives under `simreality/`, with a data contract in
 `simreality/model.py`, a blueprint in `docs/BLUEPRINT.md`, math corrections in
@@ -18,7 +18,7 @@ python -m unittest discover -s tests -t .
 
 The Python core covers memory decay, rumour/gossip propagation, district pressure and city-scar dynamics, trauma tiers, legal evidence/plea calculations, and fixer reputation/betrayal logic. The inspected blueprint explicitly requires the core to avoid Unreal types, inject randomness rather than drawing it globally, keep tuning values named, and separate data records from behaviour.
 
-The C++ core is being ported on `feature/cpp-simulation-foundation`. Unreal
+The portable C++20 core and world coordinator are now on `main`. Unreal
 presentation, physical custody, behavior trees, rendering/material assembly, and
 the Blender-to-Unreal asset pipeline remain outside the portable library.
 
