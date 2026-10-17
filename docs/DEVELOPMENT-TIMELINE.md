@@ -24,7 +24,7 @@ A credible first playable neighborhood is likely a **several-month project**, no
 
 ## Current implementation status
 
-- Repository default branch: Python simulation core exists, as described in the architecture roadmap.
-- Feature branch `feature/cpp-simulation-foundation`: initial C++20 data contract, clock, deterministic random stream, hourly/daily scheduler, runtime facade, CMake build definition, smoke tests, and planning documents have been added.
-- A prior version of the initial clock and smoke-test source was compiled locally, but the **latest expanded branch has not been built or tested as a complete checkout**. A fresh Git clone was attempted in the current environment but outbound GitHub access was unavailable.
-- Still required: run CMake/CTest against the current branch, run the existing Python suite, complete field-by-field model parity, and test on the intended Windows machine before merging.
+- Repository default branch: the Python reference core and portable C++20 simulation library are both present on `main`.
+- The C++ core includes domain modules, a world coordinator, versioned binary snapshots, regression tests, and CMake/CTest integration.
+- CI now has Python tests plus C++ build/test jobs for Linux and Windows. Check the latest CI run before claiming the current commit is verified.
+- Still required: automated numerical differential tests against Python, event journaling/replay, format migration tests, and Unreal adapter/integration validation.
