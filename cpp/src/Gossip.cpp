@@ -147,8 +147,12 @@ Conversation converse(NPC& listener, const NPC& speaker, const DistrictId& distr
 
         if (match) {
             const NPCMemory& existing = listener.memories[*match];
+            std::uint32_t matching_count = 0;
+            for (const auto& candidate_memory : listener.memories) {
+                if (candidate_memory.target_entity_id == memory.target_entity_id) ++matching_count;
+            }
             Rumour prior{action_name(existing.action_tag), existing.target_entity_id,
-                existing.description, existing.retention, district_id, 1};
+                existing.description, existing.retention, district_id, matching_count + 1};
             rumour = corroborate(prior, rumour);
             NPCMemory updated;
             updated.witness_id = listener.entity_id;
