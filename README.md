@@ -51,7 +51,8 @@ The C++ library under `cpp/` now includes the portable data model, deterministic
 clock/scheduler/RNG, memory decay, gossip, environmental pressure and district
 scars, trauma, legal evidence and plea calculations, local reputation, fixer
 networks, and a `SimulationWorld` coordinator for hourly/daily updates and
-event-driven conversations, witness memories, arrests, and fixer approaches.
+event-driven conversations, witness memories, arrests, fixer approaches, and
+versioned world snapshots that preserve simulation time and RNG state.
 
 ### A rumour, end to end
 

@@ -59,8 +59,9 @@ data model, deterministic clock/scheduler/RNG, decay and gossip, environment and
 district dynamics, trauma, justice, reputation, fixer networks, and a
 `SimulationWorld` coordinator. The coordinator dispatches hourly memory sweeps
 and daily district/NPC/fixer updates, and exposes event-driven witness,
-conversation, enforcement, and fixer interactions. The CMake target builds the
-library and dependency-free regression executable.
+conversation, enforcement, and fixer interactions. Versioned snapshots preserve
+world state, simulation time, fixer networks, and RNG continuation. The CMake
+target builds the library and dependency-free regression executable.
 
 The Python reference suite and the C++ regression executable have both passed in
 the current work environment. CMake itself was unavailable, so the C++ target
@@ -87,8 +88,9 @@ Port one module at a time in dependency order: decay, gossip, ecosystem, distric
 **Exit:** each C++ module has equivalent seeded tests and numerical tolerances documented.
 
 ### Phase 3 — World coordinator and persistence
-Add a world-step API, hourly/daily dispatch, versioned save/load, migrations, and replayable event records.
-**Exit:** a seeded scenario produces identical state hashes across repeated runs and save/load continuation.
+The world-step API, hourly/daily dispatch, and versioned save/load are implemented.
+Remaining: format migrations, event journaling, and replayable command records.
+**Exit:** a seeded scenario produces identical state hashes across repeated runs and save/load continuation; recorded events can replay from a known snapshot.
 
 ### Phase 4 — Unreal integration
 Create an Unreal adapter that owns the worker lifecycle, queues commands, and publishes immutable snapshots. Keep UObject access on the game thread. Add cancellation and clean shutdown before enabling background simulation.

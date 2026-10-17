@@ -12,6 +12,8 @@ class RandomStream {
 public:
     explicit RandomStream(std::uint64_t seed) noexcept : state_(seed) {}
 
+    [[nodiscard]] std::uint64_t state() const noexcept { return state_; }
+
     [[nodiscard]] std::uint64_t next_u64() noexcept {
         // SplitMix64: compact, well-tested for non-cryptographic simulation use.
         state_ += 0x9E3779B97F4A7C15ULL;

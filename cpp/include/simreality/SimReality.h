@@ -15,3 +15,4 @@
 #include "simreality/SimulationScheduler.h"
 #include "simreality/SimulationWorld.h"
 #include "simreality/Trauma.h"
+#include "simreality/WorldPersistence.h"

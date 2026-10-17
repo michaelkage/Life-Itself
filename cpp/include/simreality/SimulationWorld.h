@@ -12,6 +12,7 @@
 #include "simreality/Trauma.h"
 
 #include <cstddef>
+#include <cstdint>
 #include <vector>
 
 namespace simreality {
@@ -53,6 +54,7 @@ public:
     [[nodiscard]] double total_hours() const noexcept { return runtime_.total_hours(); }
     [[nodiscard]] std::uint64_t day_index() const noexcept { return runtime_.day_index(); }
     [[nodiscard]] RandomStream& random_stream() noexcept { return random_; }
+    [[nodiscard]] std::uint64_t random_state() const noexcept { return random_.state(); }
 
     // Advances simulation time in a frame-rate-independent way. All due hourly
     // memory sweeps and daily district/NPC updates run in chronological order.

@@ -12,9 +12,11 @@
 #include "simreality/SimulationScheduler.h"
 #include "simreality/SimulationWorld.h"
 #include "simreality/Trauma.h"
+#include "simreality/WorldPersistence.h"
 
 #include <cassert>
 #include <cmath>
+#include <sstream>
 #include <stdexcept>
 #include <utility>
 
@@ -361,6 +363,36 @@ int main() {
     assert(world_report.memories_swept == 48);
     assert(world_report.daily_results.size() == 1);
     assert(world_report.daily_results[0].residents.size() == 3);
+
+    std::stringstream saved_world(std::ios::in | std::ios::out | std::ios::binary);
+    save_world(world, saved_world);
+    const std::uint64_t expected_next_random = world.random_stream().next_u64();
+    saved_world.seekg(0);
+    SimulationWorld restored = load_world(saved_world);
+    assert(restored.total_hours() == world.total_hours());
+    assert(restored.day_index() == world.day_index());
+    assert(restored.state().npcs.size() == world.state().npcs.size());
+    assert(restored.state().npcs[0].memories.size() == world.state().npcs[0].memories.size());
+    assert(restored.fixer_networks().size() == 1);
+    assert(restored.fixer_networks()[0].members[0].standing ==
+        world.fixer_networks()[0].members[0].standing);
+    assert(restored.random_stream().next_u64() == expected_next_random);
+    const WorldAdvanceReport original_continuation = world.advance(1.0);
+    const WorldAdvanceReport restored_continuation = restored.advance(1.0);
+    assert(original_continuation.ticks.size() == restored_continuation.ticks.size());
+    assert(original_continuation.ticks[0].kind == restored_continuation.ticks[0].kind);
+    assert(world.total_hours() == restored.total_hours());
+    assert(world.state().npcs[0].memories[0].retention ==
+        restored.state().npcs[0].memories[0].retention);
+
+    bool rejected_bad_snapshot = false;
+    try {
+        std::stringstream invalid_snapshot("not-a-snapshot");
+        (void)load_world(invalid_snapshot);
+    } catch (const std::runtime_error&) {
+        rejected_bad_snapshot = true;
+    }
+    assert(rejected_bad_snapshot);
 
     return 0;
 }

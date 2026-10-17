@@ -14,6 +14,7 @@ This file tracks the portable C++ core independently from Unreal Engine integrat
 - Local reputation derived from witness memories and convictions.
 - Fixer incentives, betrayal, and shared network standing.
 - `SimulationWorld`, which dispatches hourly memory decay and daily district/NPC/fixer updates, records witnessed actions, and connects gossip, reputation, justice, and fixer interactions.
+- Versioned binary world snapshots that preserve world state, fixer networks, simulation time, and deterministic RNG continuation.
 - Dependency-free C++ regression test executable wired into CMake/CTest.
 
 ## Current validation status
@@ -21,14 +22,15 @@ This file tracks the portable C++ core independently from Unreal Engine integrat
 Regression tests cover clock boundaries, seeded RNG repeatability, decay floors,
 day/night repeatability, rumour attribution, district/trauma thresholds, city-scar
 hysteresis, evidence and plea calculations, local reputation, fixer network
-propagation, and an end-to-end world step with witnessed actions, gossip, arrest
-resolution, and fixer negotiation.
+propagation, end-to-end world stepping, and save/load continuation of time, state,
+networks, and RNG.
 
 The Python reference suite passed: **139 tests**. The C++ test executable compiled
-with C++20 and strict compiler warnings and passed. CMake/CTest could not be run in
-this environment because CMake is unavailable; no Unreal Engine build has been
-performed. Automated numeric differential testing across the Python and C++
-implementations remains future work.
+with C++20, strict compiler warnings, and AddressSanitizer/UndefinedBehaviorSanitizer,
+then passed. CMake/CTest could not be run in this environment because CMake is
+unavailable; no Unreal Engine build has been performed. Automated numeric
+differential testing across the Python and C++ implementations and replay from an
+event log remain future work.
 
 ## Parity rules
 
