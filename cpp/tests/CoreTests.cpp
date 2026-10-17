@@ -141,6 +141,20 @@ int main() {
     sharp.retention = 0.005;
     assert(!retell(sharp).has_value());
 
+    // Exact thresholds are intentional: attribution uses >= 0.6, while
+    // the transmission floors reject values <= their respective cutoffs.
+    sharp.retention = 0.6;
+    auto threshold_rumour = retell(sharp);
+    assert(threshold_rumour.has_value());
+    assert(threshold_rumour->target_entity_id == "target-42");
+    sharp.retention = 0.05;
+    assert(!retell(sharp).has_value());
+    sharp.target_entity_id.clear();
+    sharp.retention = 0.01;
+    assert(!retell(sharp).has_value());
+    sharp.retention = 0.0101;
+    assert(retell(sharp).has_value());
+
     Rumour rumour_a{"Crime.Theft", "target-42", sharp.description, 0.9, "D1", 1};
     Rumour rumour_b = rumour_a;
     rumour_b.target_entity_id = "different-target";
