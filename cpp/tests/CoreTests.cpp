@@ -166,6 +166,28 @@ int main() {
 
     const auto response = police_response(*vague_rumour, "D1");
     assert(response.find("stop and search") != std::string::npos);
+
+    // Corroboration should improve the physical description without inventing certainty.
+    Description first_description;
+    first_description.height_m = 1.80;
+    first_description.height_uncertainty_m = 0.30;
+    first_description.jacket_colour_weights = {{"black", 1.0}, {"brown", 1.0}};
+    first_description.masked = false;
+    first_description.masked_confidence = 0.9;
+    Description second_description = first_description;
+    const auto merged = merge_descriptions(first_description, second_description);
+    assert(std::abs(merged.height_m - 1.80) < 1e-9);
+    assert(merged.height_uncertainty_m < first_description.height_uncertainty_m);
+    assert(jacket_confidence(merged) > jacket_confidence(first_description));
+
+    // Police action is gated by both attribution and description quality.
+    Rumour named = rumour_a;
+    named.retention = 0.9;
+    assert(police_response(named, "D1").find("pursue identification") != std::string::npos);
+    Rumour vague;
+    vague.target_entity_id.clear();
+    vague.retention = 0.4;
+    assert(police_response(vague, "D1").find("logged, insufficient detail") != std::string::npos);
     Description single_observation;
     Description five_observations;
     five_observations.observations = 5;
