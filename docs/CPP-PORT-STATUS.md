@@ -2,7 +2,7 @@
 
 This file tracks the portable C++ core independently from Unreal Engine integration.
 
-## Implemented on `feature/cpp-simulation-foundation`
+## Implemented on `main`
 
 - Shared engine-independent data contracts in `cpp/include/simreality/CoreTypes.h`.
 - Simulation clock, ordered hourly/daily scheduler, runtime facade, and seeded random stream.
@@ -25,12 +25,7 @@ hysteresis, evidence and plea calculations, local reputation, fixer network
 propagation, end-to-end world stepping, and save/load continuation of time, state,
 networks, and RNG.
 
-The Python reference suite passed: **139 tests**. The C++ test executable compiled
-with C++20, strict compiler warnings, and AddressSanitizer/UndefinedBehaviorSanitizer,
-then passed. CMake/CTest could not be run in this environment because CMake is
-unavailable; no Unreal Engine build has been performed. Automated numeric
-differential testing across the Python and C++ implementations and replay from an
-event log remain future work.
+The repository now has CI jobs for the Python reference suite and portable C++ tests on Linux and Windows. Check the latest workflow run before treating either result as current. No Unreal Engine build has been performed. Automated numeric differential testing across Python and C++, plus replay from an event log, remain future work.
 
 ## Parity rules
 
