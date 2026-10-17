@@ -7,11 +7,7 @@ the Python reference before changing the design.
 
 ## Status
 
-The Python reference has 139 passing tests. On
-`feature/cpp-simulation-foundation`, the portable C++20 library now includes the
-core domains and a world coordinator; its regression executable compiles and
-passes with the available compiler. CMake/CTest and Unreal Engine builds have not
-been run in the current environment.
+The Python reference suite has previously been reported at 139 passing tests. The portable C++20 library and world coordinator are on `main`, with a regression executable and CMake/CTest configuration. Check current CI results for the latest status; no Unreal Engine build has been performed.
 
 Not implemented: the Unreal worker/adapter, procedural scene assembly,
 trauma-driven behaviour trees, physical custody and plea dialogue, and the
