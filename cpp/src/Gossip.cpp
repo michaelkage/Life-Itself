@@ -2,10 +2,19 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <sstream>
 
 namespace simreality {
 namespace {
+
+double round_ties_to_even(double value) noexcept {
+    const double lower = std::floor(value);
+    const double fraction = value - lower;
+    if (fraction < 0.5) return lower;
+    if (fraction > 0.5) return lower + 1.0;
+    return std::fmod(std::abs(lower), 2.0) == 0.0 ? lower : lower + 1.0;
+}
 
 std::string action_name(ActionTag tag) {
     switch (tag) {
@@ -33,8 +42,12 @@ double jacket_confidence(const Description& d) noexcept {
 Description merge_descriptions(const Description& a, const Description& b, double fidelity) {
     fidelity = std::clamp(fidelity, 0.0, 1.0);
     const auto na = std::max<std::uint32_t>(1, a.observations);
-    const auto nb = static_cast<std::uint32_t>(std::max(1L, std::lround(
-        static_cast<double>(std::max<std::uint32_t>(1, b.observations)) * fidelity)));
+    const double weighted_observations = static_cast<double>(
+        std::max<std::uint32_t>(1, b.observations)) * fidelity;
+    const double rounded_observations = std::clamp(
+        round_ties_to_even(weighted_observations), 1.0,
+        static_cast<double>(std::numeric_limits<std::uint32_t>::max()));
+    const auto nb = static_cast<std::uint32_t>(rounded_observations);
     const double total = static_cast<double>(na) + static_cast<double>(nb);
 
     Description out;

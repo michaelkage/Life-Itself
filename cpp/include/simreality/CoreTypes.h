@@ -59,6 +59,8 @@ struct NPC {
     TraumaLevel trauma_level{TraumaLevel::Baseline};
     double personal_stress{0.0};
     std::vector<NPCMemory> memories{};
+    // Appended to preserve the existing aggregate field order.
+    DistrictId district_id{};
 };
 
 struct District {

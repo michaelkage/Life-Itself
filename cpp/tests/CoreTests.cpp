@@ -1,14 +1,22 @@
 #include "simreality/CoreTypes.h"
 #include "simreality/Decay.h"
+#include "simreality/Districts.h"
+#include "simreality/Ecosystem.h"
+#include "simreality/Fixers.h"
 #include "simreality/Gossip.h"
+#include "simreality/Justice.h"
 #include "simreality/RandomStream.h"
+#include "simreality/Reputation.h"
 #include "simreality/SimulationClock.h"
 #include "simreality/SimulationRuntime.h"
 #include "simreality/SimulationScheduler.h"
+#include "simreality/SimulationWorld.h"
+#include "simreality/Trauma.h"
 
 #include <cassert>
 #include <cmath>
 #include <stdexcept>
+#include <utility>
 
 int main() {
     using namespace simreality;
@@ -156,6 +164,203 @@ int main() {
 
     const auto response = police_response(*vague_rumour, "D1");
     assert(response.find("stop and search") != std::string::npos);
+    Description single_observation;
+    Description five_observations;
+    five_observations.observations = 5;
+    const Description weighted_merge =
+        merge_descriptions(single_observation, five_observations, 0.5);
+    assert(weighted_merge.observations == 3); // Python round(2.5) is ties-to-even.
+
+    // Environmental pressure and behaviour selection.
+    District pressured;
+    pressured.overpopulation = 0.5;
+    pressured.supply_shortage = 0.6;
+    pressured.weather_severity = 0.5;
+    pressured.local_corruption = 0.5;
+    pressured.security_presence = 0.4;
+    assert(desperation_index(pressured) > 0.53);
+    assert(desperation_index(pressured) < 0.54);
+    NPC citizen;
+    citizen.entity_id = "citizen";
+    citizen.moral_shackle = 0.2;
+    const auto decision = evaluate(citizen, pressured);
+    assert(decision.illegal);
+    assert(decision.branch == IllegalBranch::Shoplift);
+    assert(decision.reason().find("Shoplift") != std::string::npos);
+    pressured.supply_shortage = 0.9;
+    assert(evaluate(citizen, pressured).branch == IllegalBranch::CargoHijack);
+    pressured.supply_shortage = 0.5;
+    pressured.local_corruption = 0.7;
+    pressured.overpopulation = 0.6;
+    assert(evaluate(citizen, pressured).branch == IllegalBranch::BribeOfficial);
+    pressured.overpopulation = 0.8;
+    assert(evaluate(citizen, pressured).branch == IllegalBranch::JoinSyndicate);
+
+    std::vector<NPC> residents{citizen};
+    const auto daily_behaviour = apply_district_pressure(residents, pressured);
+    assert(daily_behaviour.size() == 1);
+    assert(residents[0].desperation_index == daily_behaviour[0].desperation_index);
+
+    // District input dynamics and hysteretic city scars.
+    District evolving;
+    evolving.population = 200;
+    evolving.capacity = 100;
+    assert(target_overpopulation(evolving) == 1.0);
+    evolve_inputs(evolving, 0.6);
+    assert(evolving.weather_severity > 0.0);
+    assert(evolving.overpopulation > 0.3);
+    assert(evolving.supply_shortage > 0.3);
+
+    District scarred;
+    scarred.overpopulation = 1.0;
+    scarred.supply_shortage = 1.0;
+    scarred.weather_severity = 1.0;
+    scarred.local_corruption = 1.0;
+    scarred.security_presence = 0.0;
+    assert(!update_scars(scarred).active);
+    assert(!update_scars(scarred).active);
+    assert(!update_scars(scarred).active);
+    const ScarState scar = update_scars(scarred);
+    assert(scar.active);
+    assert(scar.boarded_windows());
+    assert(scar.police_ignore_minor_offences());
+    scarred.overpopulation = 0.0;
+    scarred.supply_shortage = 0.0;
+    scarred.weather_severity = 0.0;
+    scarred.local_corruption = 0.0;
+    scarred.security_presence = 1.0;
+    for (int day = 0; day < 3; ++day) assert(update_scars(scarred).active);
+    assert(!update_scars(scarred).active);
+
+    // Personal trauma and environmental trauma remain separate axes.
+    NPC victim;
+    assert(absorb(victim, ActionTag::CrimeArmedAssault, true) == 1.0);
+    assert(assess(victim, 0.2).level == TraumaLevel::Paranoid);
+    assert(assess(NPC{}, 0.9).level == TraumaLevel::Vigilante);
+    const auto recovery = daily_update(victim, 0.2, 1.0);
+    assert(victim.personal_stress < 1.0);
+    assert(recovery.level == TraumaLevel::Paranoid);
+    assert(!recovery.permanent());
+
+    // Justice: evidence, corruption, custody outcomes, and plea calculations.
+    NPCMemory witness_one = theft;
+    witness_one.target_entity_id = "player";
+    witness_one.retention = 0.9;
+    NPCMemory witness_two = witness_one;
+    witness_two.witness_id = "witness-2";
+    const CriminalFile corroborated_file =
+        file_from_memories("player", {witness_one, witness_two});
+    assert(corroborated_file.charges.size() == 1);
+    assert(corroborated_file.charges[0].evidence == EvidenceKind::Corroborated);
+    assert(corroborated_file.charges[0].provable());
+    assert(corroborated_file.charges[0].sentence() == 10.0); // Python round(10.5) == 10.
+    const Consequence arrest_result = consequence_for(
+        ActionTag::CrimeTheft, corroborated_file, pressured, "officer", 0.0, 0.0);
+    assert(std::holds_alternative<Arrest>(arrest_result));
+    const CriminalFile empty_file{"player"};
+    const Consequence stop_result = consequence_for(
+        ActionTag::CrimeTheft, empty_file, pressured, "officer", 0.0, 0.0);
+    assert(std::holds_alternative<Stop>(stop_result));
+    const Consequence ignored_result = consequence_for(
+        ActionTag::CrimeTheft, corroborated_file, pressured, "officer", 1.0, 0.5);
+    assert(std::holds_alternative<std::monostate>(ignored_result));
+
+    CriminalFile plea_file = corroborated_file;
+    plea_file.charges.push_back(
+        {ActionTag::CrimeAssault, EvidenceKind::SingleWitness, 0.7});
+    const auto offer = plea_offer(plea_file);
+    assert(offer.has_value());
+    assert(offer->offered_charge.action_tag == ActionTag::CrimeAssault);
+    assert(offer->dropped_charges.size() == 1);
+    assert(offer->days_if_tried >= offer->days_if_accepted);
+    const Conviction conviction = convict(
+        plea_file, ActionTag::CrimeTheft, 10, 30.0);
+    assert(conviction.severity() == 0.35);
+    assert(plea_file.most_recent_conviction() != nullptr);
+    register_bribe_attempt(plea_file);
+    assert(plea_file.bribe_attempts == 1);
+    assert(plea_file.charges.back().evidence == EvidenceKind::Confessed);
+
+    // Local reputation is deduplicated by offence and conviction records outlive rumours.
+    const auto rep = local_reputation({witness_one, witness_two}, "player");
+    assert(std::abs(rep.accusation_penalty - 0.2205) < 1e-9);
+    assert(std::abs(rep.reputation - 0.7795) < 1e-9);
+    const auto convicted_rep = local_reputation(
+        {witness_one}, "player", &plea_file, 10);
+    assert(convicted_rep.record_penalty > convicted_rep.accusation_penalty);
+    assert(std::abs(convicted_rep.reputation - 0.65) < 1e-9);
+    assert(!convicted_rep.clean());
+
+    // Fixer incentive and trust propagation.
+    FixerProfile fixer{"fixer-1", "D1", 0.5, 0.1};
+    FixerProfile peer{"fixer-2", "D1", 0.5, 0.0};
+    FixerNetwork network{"D1", {fixer, peer}};
+    const Negotiation betrayal = negotiate(fixer, pressured, 0.8, 0.8, 0.0);
+    assert(betrayal.accepted && betrayal.bribe_paid && betrayal.betrayed);
+    assert(betrayal.squeal_filed);
+    network.record_outcome(fixer, betrayal, pressured);
+    assert(network.trust() < 0.5);
+    assert(known_betrayers({fixer}).size() == 1);
+    assert(!willingness_to_deal(0.2, fixer, pressured).first);
+    network.daily_update(pressured);
+    assert(network.members[0].standing >= kFixerMinStanding);
+    assert(network.ceiling(pressured) >= network.trust());
+
+    // End-to-end portable world stepping and social transfer.
+    WorldState initial_world;
+    District neighbourhood;
+    neighbourhood.district_id = "D1";
+    neighbourhood.overpopulation = 0.5;
+    neighbourhood.supply_shortage = 0.5;
+    neighbourhood.weather_severity = 0.5;
+    neighbourhood.local_corruption = 0.0;
+    neighbourhood.security_presence = 0.4;
+    initial_world.districts.push_back(neighbourhood);
+    NPC speaker_npc;
+    speaker_npc.entity_id = "speaker";
+    speaker_npc.district_id = "D1";
+    NPC listener_npc;
+    listener_npc.entity_id = "listener";
+    listener_npc.district_id = "D1";
+    NPC player_npc;
+    player_npc.entity_id = "player";
+    player_npc.district_id = "D1";
+    initial_world.npcs = {speaker_npc, listener_npc, player_npc};
+    SimulationWorld world(std::move(initial_world), 0.0, 99U);
+    Description scene_description;
+    scene_description.height_m = 1.82;
+    scene_description.jacket_colour_weights = {{"black", 0.8}};
+    assert(world.record_witnessed_action(
+        "player", ActionTag::CrimeTheft, scene_description,
+        {"speaker", "listener", "speaker"}, "listener") == 2);
+    assert(world.state().npcs[0].personal_stress > 0.0);
+    assert(world.state().npcs[1].personal_stress > world.state().npcs[0].personal_stress);
+    const Conversation world_conversation = world.talk("listener", "speaker");
+    assert(world_conversation.transferred.size() == 1);
+    assert(world.state().npcs[1].memories.size() == 1);
+    CriminalFile world_file = world.build_criminal_file("player");
+    assert(world_file.charges.size() == 1);
+    assert(world_file.charges[0].evidence == EvidenceKind::Corroborated);
+    const auto world_reputation = world.reputation_in_district("D1", "player", &world_file);
+    assert(world_reputation.reputation < 1.0);
+    const Consequence world_arrest =
+        world.resolve_offence("D1", "player", ActionTag::CrimeTheft, "officer", world_file);
+    assert(std::holds_alternative<Arrest>(world_arrest));
+
+    FixerNetwork world_network;
+    world_network.district_id = "D1";
+    world_network.members.push_back(FixerProfile{"world-fixer", "D1", 0.5, 0.1});
+    world.fixer_networks().push_back(world_network);
+    const Negotiation world_negotiation =
+        world.approach_fixer("D1", "player", "world-fixer", 0.8, &world_file);
+    assert(world_negotiation.accepted);
+
+    const WorldAdvanceReport world_report = world.advance(24.0, Weather::Clear, 0.0);
+    assert(world.total_hours() == 24.0);
+    assert(world.day_index() == 1);
+    assert(world_report.memories_swept == 48);
+    assert(world_report.daily_results.size() == 1);
+    assert(world_report.daily_results[0].residents.size() == 3);
 
     return 0;
 }

@@ -5,9 +5,12 @@ Status labels:
 - **Proposed** means architecture or work planned in this document.
 - **Not yet verified** means a claim still requires a build, test run, or in-engine check.
 
-## Repository audit (verified from README and inspected source files)
+## Repository audit (verified from the current feature branch)
 
-The default branch contains an engine-independent Python simulation core under `simreality/`, a data contract in `simreality/model.py`, a blueprint in `docs/BLUEPRINT.md`, math corrections in `docs/MATH-NOTES.md`, and a unittest suite under `tests/`. The README states that the suite contains 100 tests and gives this command:
+The Python reference core lives under `simreality/`, with a data contract in
+`simreality/model.py`, a blueprint in `docs/BLUEPRINT.md`, math corrections in
+`docs/MATH-NOTES.md`, and a unittest suite under `tests/`. The current reference
+suite contains 139 tests and can be run with:
 
 ```bash
 python -m unittest discover -s tests -t .
@@ -15,7 +18,9 @@ python -m unittest discover -s tests -t .
 
 The Python core covers memory decay, rumour/gossip propagation, district pressure and city-scar dynamics, trauma tiers, legal evidence/plea calculations, and fixer reputation/betrayal logic. The inspected blueprint explicitly requires the core to avoid Unreal types, inject randomness rather than drawing it globally, keep tuning values named, and separate data records from behaviour.
 
-The README identifies engine-dependent work still outstanding: physical arrest/custody flow, procedural scene/material assembly, trauma-driven behaviour trees, fixer-network propagation, the Blender-to-Unreal asset pipeline, and a reliable source for reputation updates. The README's claims about test count and passing status are repository claims; they have not been rerun as part of this audit.
+The C++ core is being ported on `feature/cpp-simulation-foundation`. Unreal
+presentation, physical custody, behavior trees, rendering/material assembly, and
+the Blender-to-Unreal asset pipeline remain outside the portable library.
 
 ## Proposed target architecture
 
@@ -47,19 +52,20 @@ world coordinator -> domain systems
 
 Domain systems must not call Unreal, access wall-clock time, use global random state, or mutate presentation objects.
 
-## Foundational C++ work started on feature/cpp-simulation-foundation
+## C++ implementation on feature/cpp-simulation-foundation
 
-The `cpp/` directory is a proposed portable C++20 library:
-- `include/simreality/CoreTypes.h`: first-pass C++ data contract aligned to the visible Python model.
-- `include/simreality/SimulationClock.h` and `src/SimulationClock.cpp`: deterministic elapsed-time clock.
-- `include/simreality/RandomStream.h` and `src/RandomStream.cpp`: fixed-algorithm seeded random stream with bounded integer sampling.
-- `include/simreality/Decay.h` and `src/Decay.cpp`: first C++ domain-system port for visibility modifiers, decay rates, retention curves, and batch memory sweeps.
-- `include/simreality/SimulationScheduler.h` and `src/SimulationScheduler.cpp`: hourly and daily tick generation in chronological order; hourly runs before daily at a shared midnight boundary.
-- `include/simreality/SimulationRuntime.h` and `src/SimulationRuntime.cpp`: combines clock and scheduler into a small orchestration facade.
-- `tests/CoreTests.cpp`: dependency-free tests for clock boundaries, tick order, seeded RNG reproducibility, memory attribution, and representative memory-decay cases.
-- `CMakeLists.txt`: portable build definition.
+The `cpp/` directory is a portable C++20 library. It now contains the shared
+data model, deterministic clock/scheduler/RNG, decay and gossip, environment and
+district dynamics, trauma, justice, reputation, fixer networks, and a
+`SimulationWorld` coordinator. The coordinator dispatches hourly memory sweeps
+and daily district/NPC/fixer updates, and exposes event-driven witness,
+conversation, enforcement, and fixer interactions. The CMake target builds the
+library and dependency-free regression executable.
 
-This is an initial port scaffold, not a completed port of all Python behavior. A field-by-field parity audit and actual compiler run remain required. The decay port is intended to mirror the Python equations; numerical differential tests against Python are still required. The current C++ records intentionally do not yet reproduce every Python model field or method. The scheduler currently returns due ticks; it does not itself invoke domain systems.
+The Python reference suite and the C++ regression executable have both passed in
+the current work environment. CMake itself was unavailable, so the C++ target
+was compiled directly with the available C++20 compiler. Automated numerical
+differential tests across implementations and Unreal-specific validation remain.
 
 ## Roadmap and exit criteria
 
