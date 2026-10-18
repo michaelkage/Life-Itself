@@ -25,7 +25,12 @@ class TestCppPythonDomainParity(unittest.TestCase):
     def setUpClass(cls):
         cls.temp = tempfile.TemporaryDirectory(prefix="simreality-domains-")
         cls.executable = Path(cls.temp.name) / ("domain_probe.exe" if os.name == "nt" else "domain_probe")
-        sources = sorted((ROOT / "cpp" / "src").glob("*.cpp"))
+        sources = [ROOT / "cpp" / "src" / name for name in [
+            "Decay.cpp", "Districts.cpp", "Ecosystem.cpp", "Fixers.cpp", "Gossip.cpp",
+            "Justice.cpp", "RandomStream.cpp", "Reputation.cpp", "SimulationClock.cpp",
+            "SimulationRuntime.cpp", "SimulationScheduler.cpp", "SimulationWorld.cpp",
+            "Trauma.cpp", "WorldPersistence.cpp",
+        ]]
         subprocess.run(
             [COMPILER, "-std=c++20", "-O2", "-I", str(ROOT / "cpp" / "include"),
              str(CPP_PROBE), *(str(source) for source in sources), "-o", str(cls.executable)],
