@@ -389,7 +389,23 @@ int main() {
         world.approach_fixer("D1", "player", "world-fixer", 0.8, &world_file);
     assert(world_negotiation.accepted);
 
+    // Identical snapshots and seeds must produce identical world steps.
+    SimulationWorld deterministic_peer = world;
     const WorldAdvanceReport world_report = world.advance(24.0, Weather::Clear, 0.0);
+    const WorldAdvanceReport peer_report = deterministic_peer.advance(24.0, Weather::Clear, 0.0);
+    assert(world_report.ticks.size() == peer_report.ticks.size());
+    assert(world_report.memories_swept == peer_report.memories_swept);
+    assert(world_report.daily_results.size() == peer_report.daily_results.size());
+    assert(world.state().districts[0].overpopulation ==
+        deterministic_peer.state().districts[0].overpopulation);
+    assert(world.state().districts[0].supply_shortage ==
+        deterministic_peer.state().districts[0].supply_shortage);
+    assert(world.state().districts[0].local_corruption ==
+        deterministic_peer.state().districts[0].local_corruption);
+    assert(world.state().npcs[0].personal_stress ==
+        deterministic_peer.state().npcs[0].personal_stress);
+    assert(world.fixer_networks()[0].members[0].standing ==
+        deterministic_peer.fixer_networks()[0].members[0].standing);
     assert(world.total_hours() == 24.0);
     assert(world.day_index() == 1);
     assert(world_report.memories_swept == 48);
