@@ -1,6 +1,7 @@
-name: Simulation core
+name: Life Itself — Simulation Core
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - main
