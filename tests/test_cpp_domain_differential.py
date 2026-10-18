@@ -10,7 +10,7 @@ import tempfile
 import unittest
 
 from simreality import districts, fixers, gossip, justice, reputation, trauma
-from simreality.model import ActionTag, District, NPC, NPCMemory, Weather
+from simreality.model import ActionTag, Description, District, NPC, NPCMemory
 from simreality.gossip import Rumour
 from simreality.fixers import FixerProfile
 
@@ -50,7 +50,7 @@ class TestCppPythonDomainParity(unittest.TestCase):
                 self.assertAlmostEqual(left, float(right), delta=tolerance)
 
     def test_gossip_propagation_matches(self):
-        description = __import__("simreality.model", fromlist=["Description"]).Description(
+        description = Description(
             height_m=1.82, height_uncertainty_m=0.2,
             jacket_colour_weights={"black": 0.8, "blue": 0.2}, observations=2,
         )
@@ -62,8 +62,8 @@ class TestCppPythonDomainParity(unittest.TestCase):
         self.assertIsNotNone(first)
         second = Rumour(
             action_tag=first.action_tag, target_entity_id="target",
-            description=__import__("simreality.model", fromlist=["Description"]).Description(
-                height_m=1.78, jacket_colour_weights={"black": 0.5, "red": 0.5}, observations=2
+            description=Description(
+                height_m=1.78, height_uncertainty_m=0.2,\n                jacket_colour_weights={"black": 0.5, "red": 0.5}, observations=2
             ),
             retention=0.6,
         )
