@@ -15,7 +15,7 @@ import tempfile
 import unittest
 
 from simreality import decay
-from simreality.model import ActionTag, AgeBand, NPCMemory, Weather
+from simreality.model import ActionTag, AgeBand, Description, NPCMemory, Weather
 
 ROOT = Path(__file__).resolve().parents[1]
 CPP_PROBE = ROOT / "cpp" / "tests" / "DecayDifferentialProbe.cpp"
@@ -51,7 +51,7 @@ class TestCppPythonDecayParity(unittest.TestCase):
             memory = NPCMemory(
                 witness_id="probe-witness", target_entity_id="probe-target",
                 initial_impact=0.73, retention=0.73,
-                timestamp_hour=formed, action_tag=tag,
+                timestamp_hour=formed, action_tag=tag, description=Description(),
             )
             expected.append(decay.retention_after(memory, age, now, weather))
 
