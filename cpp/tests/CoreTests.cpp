@@ -143,8 +143,12 @@ int main() {
     auto threshold_rumour = retell(sharp);
     assert(threshold_rumour.has_value());
     assert(threshold_rumour->target_entity_id == "target-42");
+    // Once retention falls below the attribution threshold, the rumour becomes
+    // appearance-only and uses the lower unattributed transmission floor.
     sharp.retention = 0.05;
-    assert(!retell(sharp).has_value());
+    auto low_retention_rumour = retell(sharp);
+    assert(low_retention_rumour.has_value());
+    assert(low_retention_rumour->target_entity_id.empty());
     sharp.target_entity_id.clear();
     sharp.retention = 0.01;
     assert(!retell(sharp).has_value());
