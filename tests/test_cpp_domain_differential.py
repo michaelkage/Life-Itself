@@ -102,7 +102,7 @@ class TestCppPythonDomainParity(unittest.TestCase):
     def test_justice_matches(self):
         memory = NPCMemory(
             witness_id="witness", target_entity_id="target", retention=0.8,
-            initial_impact=0.8, action_tag=ActionTag.CRIME_THEFT,
+            initial_impact=0.8, action_tag=ActionTag.CRIME_THEFT, description=Description(),
         )
         charge = justice.charge_from_memory(memory)
         self.assert_values_match("justice", [
