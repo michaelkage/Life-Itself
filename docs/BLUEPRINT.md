@@ -1,13 +1,13 @@
-# Blueprint
+# Life Itself — Technical Blueprint
 
-Architecture for the SIMULATED REALITY ENGINE. The Python under `simreality/`
+**Life Itself** is the game/product; **Simulated Reality Engine (SRE)** is the engine and technical code name. This document defines the engine architecture. The Python under `simreality/`
 is the behavioural reference; the portable C++ core is the current implementation
 target. If their behavior disagrees, record the difference and resolve it against
 the Python reference before changing the design.
 
 ## Status
 
-The Python reference suite has previously been reported at 139 passing tests. The portable C++20 library and world coordinator are on `main`, with a regression executable and CMake/CTest configuration. Check current CI results for the latest status; no Unreal Engine build has been performed.
+The Python reference suite and C++/Python differential checks are run in GitHub Actions; the latest verified run should be consulted for the current count and result. The portable C++20 library and world coordinator are on `main`, with a regression executable and CMake/CTest configuration. Check current CI results for the latest status; no Unreal Engine build has been performed.
 
 Not implemented: the Unreal worker/adapter, procedural scene assembly,
 trauma-driven behaviour trees, physical custody and plea dialogue, and the
