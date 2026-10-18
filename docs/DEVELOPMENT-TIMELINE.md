@@ -1,4 +1,6 @@
-# Development Timeline
+# Life Itself — Development Timeline
+
+**Product/game:** Life Itself · **Technical engine:** Simulated Reality Engine (SRE)
 
 These are planning ranges, not promises. Assumption: one developer learning as they go, using AI assistance, working part-time (roughly 8–15 focused hours per week), with existing Python core retained as the reference. Hardware, familiarity with C++, Unreal, and scope can move these estimates substantially.
 
