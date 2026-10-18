@@ -188,7 +188,12 @@ int main() {
     first_description.jacket_colour_weights = {{"black", 1.0}, {"brown", 1.0}};
     first_description.masked = false;
     first_description.masked_confidence = 0.9;
-    Description second_description = first_description;
+    Description second_description;
+    second_description.height_m = 1.80;
+    second_description.height_uncertainty_m = 0.30;
+    second_description.jacket_colour_weights = {{"black", 1.0}};
+    second_description.masked = false;
+    second_description.masked_confidence = 0.9;
     const auto merged = merge_descriptions(first_description, second_description);
     assert(std::abs(merged.height_m - 1.80) < 1e-9);
     assert(merged.height_uncertainty_m < first_description.height_uncertainty_m);
