@@ -63,7 +63,8 @@ class TestCppPythonDomainParity(unittest.TestCase):
         second = Rumour(
             action_tag=first.action_tag, target_entity_id="target",
             description=Description(
-                height_m=1.78, height_uncertainty_m=0.2,\n                jacket_colour_weights={"black": 0.5, "red": 0.5}, observations=2
+                height_m=1.78, height_uncertainty_m=0.2,
+                jacket_colour_weights={"black": 0.5, "red": 0.5}, observations=2
             ),
             retention=0.6,
         )
