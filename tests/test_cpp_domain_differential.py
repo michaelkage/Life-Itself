@@ -89,8 +89,9 @@ class TestCppPythonDomainParity(unittest.TestCase):
         person = NPC("person")
         stress = trauma.absorb(person, ActionTag.CRIME_THEFT, was_victim=True)
         self.assert_values_match("trauma", [
-            stress, trauma.relieve(3.0, stress), int(trauma.personal_level(stress)),
-            int(trauma.assess(person, 0.9).level),
+            stress, trauma.relieve(3.0, stress),
+            {"Baseline": 0, "Anxious": 1, "Paranoid": 2, "Vigilante": 3}[trauma.personal_level(stress).value],
+            {"Baseline": 0, "Anxious": 1, "Paranoid": 2, "Vigilante": 3}[trauma.assess(person, 0.9).level.value],
         ])
 
     def test_justice_matches(self):
