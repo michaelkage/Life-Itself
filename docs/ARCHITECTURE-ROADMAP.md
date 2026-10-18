@@ -54,7 +54,7 @@ world coordinator -> domain systems
 
 Domain systems must not call Unreal, access wall-clock time, use global random state, or mutate presentation objects.
 
-## C++ implementation on feature/cpp-simulation-foundation
+## C++ implementation on `main`
 
 The `cpp/` directory is a portable C++20 library. It now contains the shared
 data model, deterministic clock/scheduler/RNG, decay and gossip, environment and
@@ -65,10 +65,7 @@ conversation, enforcement, and fixer interactions. Versioned snapshots preserve
 world state, simulation time, fixer networks, and RNG continuation. The CMake
 target builds the library and dependency-free regression executable.
 
-The Python reference suite and the C++ regression executable have both passed in
-the current work environment. CMake itself was unavailable, so the C++ target
-was compiled directly with the available C++20 compiler. Automated numerical
-differential tests across implementations and Unreal-specific validation remain.
+The last completed CI run for commit `6b46715954f2d3e72064f466632970962186ddd4` passed all three jobs: the Python regression and differential suite, Linux C++ build/tests, and Windows C++ build/tests. Later commits update branding and CI metadata; check the latest Actions run for the current HEAD before treating those exact commits as validated. Unreal-specific integration remains unbuilt.
 
 ## Roadmap and exit criteria
 
