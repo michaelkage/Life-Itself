@@ -1,13 +1,20 @@
-# SIMULATED-REALITY-ENGINE
+# Life Itself
 
-A seamless, asynchronous open-world simulation: dynamic NPC memory decay, mutating
-rumour networks, macro-environmental desperation modelling, and zero-cut state
-transitions.
+**Life Itself** is the game and product. **Simulated Reality Engine (SRE)** is its technical engine name: a persistent, systemic open-world life simulation where people remember, forget, talk, react, build reputations, experience trauma, navigate justice, and make deals. The long-term ambition is a grounded, reactive open world with the freedom and systemic depth of a real-life crime sandbox, while keeping everyday life—not just crime—at the centre.
 
-**Status: portable simulation core in progress.** The Python reference models the
-engine-independent systems; `feature/cpp-simulation-foundation` ports them into a
+The engine is designed for continuous simulation: dynamic NPC memory decay, mutating rumour networks, district-level pressure, personal stress, local reputation, justice, fixer networks, deterministic world stepping, and save/load continuation.
+
+**Development status: simulation core in progress.** The Python reference models the
+engine-independent systems; the portable C++20 implementation ports them into a
 standalone C++20 library and adds a world coordinator. Unreal presentation,
 animation, physics, and asset integration are not implemented.
+
+## Product and technical naming
+
+- **Product/game:** Life Itself
+- **Engine / code name:** Simulated Reality Engine (SRE)
+- **Python package and C++ namespace:** `simreality` (kept stable for code compatibility)
+- **Repository:** currently `SIMULATED-REALITY-ENGINE`; the README and product-facing documentation use the Life Itself brand.
 
 ## Running it
 
