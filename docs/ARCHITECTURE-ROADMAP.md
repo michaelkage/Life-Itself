@@ -1,4 +1,6 @@
-# Architecture and Development Roadmap
+# Life Itself — Architecture and Development Roadmap
+
+**Product:** Life Itself · **Engine/code name:** Simulated Reality Engine (SRE)
 
 Status labels:
 - **Verified repository content** means files currently present on the repository's default branch.
@@ -10,7 +12,7 @@ Status labels:
 The Python reference core lives under `simreality/`, with a data contract in
 `simreality/model.py`, a blueprint in `docs/BLUEPRINT.md`, math corrections in
 `docs/MATH-NOTES.md`, and a unittest suite under `tests/`. The current reference
-suite contains 139 tests and can be run with:
+suite now includes Python/C++ differential checks in addition to the reference regressions and can be run with:
 
 ```bash
 python -m unittest discover -s tests -t .
