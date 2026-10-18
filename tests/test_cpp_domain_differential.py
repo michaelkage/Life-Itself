@@ -61,7 +61,7 @@ class TestCppPythonDomainParity(unittest.TestCase):
         )
         memory = NPCMemory(
             witness_id="witness", target_entity_id="target", retention=0.8,
-            initial_impact=0.8, action_tag=ActionTag.CRIME_THEFT, description=description,
+            initial_impact=0.8, timestamp_hour=0.0, action_tag=ActionTag.CRIME_THEFT, description=description,
         )
         first = gossip.retell(memory)
         self.assertIsNotNone(first)
@@ -102,7 +102,7 @@ class TestCppPythonDomainParity(unittest.TestCase):
     def test_justice_matches(self):
         memory = NPCMemory(
             witness_id="witness", target_entity_id="target", retention=0.8,
-            initial_impact=0.8, action_tag=ActionTag.CRIME_THEFT, description=Description(),
+            initial_impact=0.8, timestamp_hour=0.0, action_tag=ActionTag.CRIME_THEFT, description=Description(),
         )
         charge = justice.charge_from_memory(memory)
         self.assert_values_match("justice", [
@@ -113,7 +113,7 @@ class TestCppPythonDomainParity(unittest.TestCase):
     def test_reputation_matches(self):
         memory = NPCMemory(
             witness_id="witness", target_entity_id="target", retention=0.8,
-            initial_impact=0.8, action_tag=ActionTag.CRIME_THEFT,
+            initial_impact=0.8, timestamp_hour=0.0, action_tag=ActionTag.CRIME_THEFT, description=Description(),
         )
         profile = reputation.local_reputation([memory], "target")
         self.assert_values_match("reputation", [
