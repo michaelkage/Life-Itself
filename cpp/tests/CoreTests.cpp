@@ -432,6 +432,15 @@ int main() {
     assert(world.total_hours() == restored.total_hours());
     assert(world.state().npcs[0].memories[0].retention ==
         restored.state().npcs[0].memories[0].retention);
+    assert(world.state().districts[0].overpopulation ==
+        restored.state().districts[0].overpopulation);
+    assert(world.state().districts[0].local_corruption ==
+        restored.state().districts[0].local_corruption);
+    assert(world.state().npcs[0].personal_stress ==
+        restored.state().npcs[0].personal_stress);
+    assert(world.fixer_networks()[0].members[0].standing ==
+        restored.fixer_networks()[0].members[0].standing);
+    assert(world.random_stream().next_u64() == restored.random_stream().next_u64());
 
     bool rejected_bad_snapshot = false;
     try {
