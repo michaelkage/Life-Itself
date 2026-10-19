@@ -122,7 +122,14 @@ Conversation SimulationWorld::talk(
     if (listener.district_id != speaker.district_id) {
         throw std::invalid_argument("NPCs must share a district to converse");
     }
-    return converse(listener, speaker, listener.district_id);
+    Conversation conversation = converse(listener, speaker, listener.district_id);
+    // Repeated contact strengthens familiarity; sharing a damaging rumour weakens trust.
+    const double change = conversation.transferred.empty() ? 0.02 : -0.01;
+    auto& listener_tie = listener.relationships[speaker_id];
+    auto& speaker_tie = speaker.relationships[listener_id];
+    listener_tie = std::clamp(listener_tie + change, -1.0, 1.0);
+    speaker_tie = std::clamp(speaker_tie + change, -1.0, 1.0);
+    return conversation;
 }
 
 std::size_t SimulationWorld::record_witnessed_action(
