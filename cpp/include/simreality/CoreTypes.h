@@ -98,9 +98,22 @@ struct District {
     double cash_circulation{1000.0};
 };
 
+struct OngoingEvent {
+    std::string event_id{};
+    DistrictId district_id{};
+    EntityId actor_id{};
+    ActionTag action_tag{ActionTag::InteractionPolite};
+    SimulationHour created_hour{0.0};
+    double severity{0.0};
+    std::vector<EntityId> witness_ids{};
+    double investigation_progress{0.0};
+    bool resolved{false};
+};
+
 struct WorldState {
     std::vector<NPC> npcs{};
     std::vector<District> districts{};
+    std::vector<OngoingEvent> ongoing_events{};
 };
 
 } // namespace simreality
