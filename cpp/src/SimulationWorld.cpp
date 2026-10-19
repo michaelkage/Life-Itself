@@ -25,6 +25,28 @@ WorldAdvanceReport SimulationWorld::advance(
     report.ticks = runtime_.advance(elapsed_hours);
 
     for (const ScheduledTick& tick : report.ticks) {
+        const auto hour = static_cast<std::uint8_t>(
+            static_cast<std::uint64_t>(tick.at_hour) % 24U);
+        for (NPC& npc : state_.npcs) {
+            bool matched_schedule = false;
+            for (const ScheduleEntry& entry : npc.schedule) {
+                const bool in_window = entry.start_hour <= entry.end_hour
+                    ? hour >= entry.start_hour && hour < entry.end_hour
+                    : hour >= entry.start_hour || hour < entry.end_hour;
+                if (in_window) {
+                    npc.current_activity = entry.activity;
+                    matched_schedule = true;
+                    break;
+                }
+            }
+            if (!matched_schedule) {
+                if (hour >= 22U || hour < 6U) npc.current_activity = DailyActivity::Sleep;
+                else if (hour >= 9U && hour < 17U && !npc.job_id.empty()) npc.current_activity = DailyActivity::Work;
+                else if (hour >= 7U && hour < 9U && !npc.job_id.empty()) npc.current_activity = DailyActivity::Commute;
+                else if (npc.trauma_level >= TraumaLevel::Paranoid) npc.current_activity = DailyActivity::Home;
+                else npc.current_activity = DailyActivity::Socialise;
+            }
+        }
         if (tick.kind == TickKind::Hourly) {
             for (NPC& npc : state_.npcs) {
                 npc.memories = sweep(
@@ -32,15 +54,6 @@ WorldAdvanceReport SimulationWorld::advance(
                 report.memories_swept += npc.memories.size();
             }
             continue;
-        }
-
-        for (NPC& npc : state_.npcs) {
-            const auto hour = static_cast<unsigned int>(static_cast<std::uint64_t>(tick.at_hour) % 24U);
-            if (hour >= 22U || hour < 6U) npc.current_activity = DailyActivity::Sleep;
-            else if (hour >= 9U && hour < 17U && !npc.job_id.empty()) npc.current_activity = DailyActivity::Work;
-            else if (hour >= 7U && hour < 9U && !npc.job_id.empty()) npc.current_activity = DailyActivity::Commute;
-            else if (npc.trauma_level >= TraumaLevel::Paranoid) npc.current_activity = DailyActivity::Home;
-            else npc.current_activity = DailyActivity::Socialise;
         }
 
         for (District& district : state_.districts) {
@@ -61,7 +74,11 @@ WorldAdvanceReport SimulationWorld::advance(
                 const double rent = std::min(std::max(0.0, resident.money), std::max(0.0, resident.daily_rent));
                 resident.money -= rent;
                 rent_collected += rent;
-                if (resident.current_activity == DailyActivity::Shop && resident.money > 0.0) {
+                const bool shops_during_day = std::any_of(
+                    resident.schedule.begin(), resident.schedule.end(),
+                    [](const ScheduleEntry& entry) { return entry.activity == DailyActivity::Shop; });
+                if ((resident.current_activity == DailyActivity::Shop || shops_during_day)
+                    && resident.money > 0.0) {
                     const double purchase = std::min(resident.money, 5.0);
                     resident.money -= purchase;
                     district.shop_stock = std::max(0.0, district.shop_stock - purchase / 100.0);
