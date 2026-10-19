@@ -13,7 +13,7 @@
 
 namespace simreality {
 namespace {
-constexpr std::array<char, 8> kMagic{{'S', 'R', 'E', 'C', 'O', 'R', 'E', '3'}};
+constexpr std::array<char, 8> kMagic{{'S', 'R', 'E', 'C', 'O', 'R', 'E', '4'}};
 constexpr std::uint32_t kMaxCollectionItems = 1'000'000;
 constexpr std::uint32_t kMaxStringBytes = 16U * 1024U * 1024U;
 static_assert(sizeof(double) == sizeof(std::uint64_t));
@@ -282,6 +282,18 @@ void write_world_state(std::ostream& out, const WorldState& value) {
         write_double(out, event.investigation_progress);
         write_u8(out, event.resolved ? 1U : 0U);
     }
+    write_count(out, value.businesses.size());
+    for (const Business& business : value.businesses) {
+        write_string(out, business.business_id);
+        write_string(out, business.district_id);
+        write_double(out, business.stock);
+        write_double(out, business.stock_capacity);
+        write_double(out, business.cash);
+        write_double(out, business.restock_cost_per_unit);
+        write_double(out, business.hourly_wage);
+        write_u32(out, business.job_slots);
+        write_u8(out, business.open ? 1U : 0U);
+    }
 }
 
 WorldState read_world_state(std::istream& in) {
@@ -309,6 +321,23 @@ WorldState read_world_state(std::istream& in) {
         if (resolved > 1U) throw std::runtime_error("invalid event resolution flag");
         event.resolved = resolved != 0U;
         value.ongoing_events.push_back(std::move(event));
+    }
+    const std::uint32_t businesses = read_count(in);
+    value.businesses.reserve(businesses);
+    for (std::uint32_t i = 0; i < businesses; ++i) {
+        Business business;
+        business.business_id = read_string(in);
+        business.district_id = read_string(in);
+        business.stock = read_double(in);
+        business.stock_capacity = read_double(in);
+        business.cash = read_double(in);
+        business.restock_cost_per_unit = read_double(in);
+        business.hourly_wage = read_double(in);
+        business.job_slots = read_u32(in);
+        const std::uint8_t open = read_u8(in);
+        if (open > 1U) throw std::runtime_error("invalid business-open flag");
+        business.open = open != 0U;
+        value.businesses.push_back(std::move(business));
     }
     return value;
 }
