@@ -118,7 +118,7 @@ const NPC& SimulationWorld::find_npc(const EntityId& entity_id) const {
 Conversation SimulationWorld::talk(
     const EntityId& listener_id, const EntityId& speaker_id) {
     NPC& listener = find_npc(listener_id);
-    const NPC& speaker = find_npc(speaker_id);
+    NPC& speaker = find_npc(speaker_id);
     if (listener.district_id != speaker.district_id) {
         throw std::invalid_argument("NPCs must share a district to converse");
     }
