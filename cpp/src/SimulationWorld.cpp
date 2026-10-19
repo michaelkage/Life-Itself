@@ -95,6 +95,31 @@ WorldAdvanceReport SimulationWorld::advance(
                     if (event.investigation_progress >= 1.0) event.resolved = true;
                 }
             }
+            for (Business& business : state_.businesses) {
+                if (business.district_id != district.district_id || !business.open) continue;
+                business.stock = std::clamp(business.stock, 0.0, std::max(0.0, business.stock_capacity));
+                business.cash = std::max(0.0, business.cash);
+                const double delivery_capacity = std::max(0.0, district.service_capacity) * 20.0;
+                const double wanted = std::min(std::max(0.0, business.stock_capacity - business.stock),
+                    delivery_capacity * std::clamp(district.transport_reliability, 0.0, 1.0));
+                const double affordable = business.restock_cost_per_unit > 0.0
+                    ? business.cash / business.restock_cost_per_unit : wanted;
+                const double delivered = std::min(wanted, affordable);
+                business.stock += delivered;
+                business.cash -= delivered * std::max(0.0, business.restock_cost_per_unit);
+                std::size_t employed = 0;
+                for (const NPC& resident : state_.npcs)
+                    if (resident.district_id == district.district_id && resident.job_id == business.business_id) ++employed;
+                for (NPC& resident : state_.npcs) {
+                    if (employed >= business.job_slots) break;
+                    if (resident.district_id != district.district_id || !resident.job_id.empty()) continue;
+                    resident.job_id = business.business_id;
+                    resident.hourly_wage = std::max(0.0, business.hourly_wage);
+                    resident.goals.erase(std::remove(resident.goals.begin(), resident.goals.end(), "find_work"),
+                        resident.goals.end());
+                    ++employed;
+                }
+            }
             double payroll = 0.0;
             double rent_collected = 0.0;
             std::size_t resident_count = 0;
@@ -103,20 +128,40 @@ WorldAdvanceReport SimulationWorld::advance(
                 ++resident_count;
                 if (!resident.job_id.empty()) {
                     const double wage = std::max(0.0, resident.hourly_wage) * 8.0;
-                    resident.money += wage;
-                    payroll += wage;
+                    auto employer = std::find_if(state_.businesses.begin(), state_.businesses.end(),
+                        [&resident, &district](const Business& business) {
+                            return business.business_id == resident.job_id
+                                && business.district_id == district.district_id && business.open;
+                        });
+                    if (employer == state_.businesses.end()) {
+                        resident.money += wage;
+                        payroll += wage;
+                    } else if (employer->cash >= wage) {
+                        employer->cash -= wage;
+                        resident.money += wage;
+                        payroll += wage;
+                    } else {
+                        resident.job_id.clear();
+                        resident.hourly_wage = 0.0;
+                        if (std::find(resident.goals.begin(), resident.goals.end(), "find_work") == resident.goals.end())
+                            resident.goals.push_back("find_work");
+                    }
                 }
                 const double rent = std::min(std::max(0.0, resident.money), std::max(0.0, resident.daily_rent));
                 resident.money -= rent;
                 rent_collected += rent;
-                const bool shops_during_day = std::any_of(
-                    resident.schedule.begin(), resident.schedule.end(),
-                    [](const ScheduleEntry& entry) { return entry.activity == DailyActivity::Shop; });
-                if ((resident.current_activity == DailyActivity::Shop || shops_during_day)
-                    && resident.money > 0.0) {
-                    const double purchase = std::min(resident.money, 5.0);
-                    resident.money -= purchase;
-                    district.shop_stock = std::max(0.0, district.shop_stock - purchase / 100.0);
+                if (resident.current_activity == DailyActivity::Shop && resident.money > 0.0) {
+                    auto shop = std::find_if(state_.businesses.begin(), state_.businesses.end(),
+                        [&district](const Business& business) {
+                            return business.district_id == district.district_id && business.open && business.stock > 0.0;
+                        });
+                    if (shop != state_.businesses.end()) {
+                        const double purchase = std::min({resident.money, 5.0, shop->stock});
+                        resident.money -= purchase;
+                        shop->stock -= purchase;
+                        shop->cash += purchase;
+                    }
+                    district.shop_stock = std::max(0.0, district.shop_stock - 0.01);
                 }
             }
             district.cash_circulation = std::max(0.0, district.cash_circulation + payroll - rent_collected);
