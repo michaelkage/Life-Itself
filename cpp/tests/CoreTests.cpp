@@ -365,11 +365,21 @@ int main() {
     neighbourhood.service_capacity = 0.9;
     neighbourhood.cash_circulation = 2500.0;
     initial_world.districts.push_back(neighbourhood);
+    Business shop;
+    shop.business_id = "shop-1";
+    shop.district_id = "D1";
+    shop.stock = 60.0;
+    shop.stock_capacity = 100.0;
+    shop.cash = 1000.0;
+    shop.restock_cost_per_unit = 0.5;
+    shop.hourly_wage = 12.5;
+    shop.job_slots = 1;
+    initial_world.businesses.push_back(shop);
     NPC speaker_npc;
     speaker_npc.entity_id = "speaker";
     speaker_npc.district_id = "D1";
     speaker_npc.home_id = "home-speaker";
-    speaker_npc.job_id = "job-shop";
+    speaker_npc.job_id = "shop-1";
     speaker_npc.hourly_wage = 12.5;
     speaker_npc.daily_rent = 4.0;
     speaker_npc.money = 50.0;
@@ -391,6 +401,9 @@ int main() {
         "player", ActionTag::CrimeTheft, scene_description,
         {"speaker", "listener", "speaker"}, "listener") == 2);
     assert(world.state().ongoing_events.size() == 1);
+    assert(world.state().businesses.size() == 1);
+    assert(world.state().businesses[0].stock >= 0.0);
+    assert(world.state().businesses[0].cash >= 0.0);
     assert(world.state().ongoing_events[0].actor_id == "player");
     assert(world.state().ongoing_events[0].witness_ids.size() == 2);
     assert(world.state().ongoing_events[0].severity == 0.4);
