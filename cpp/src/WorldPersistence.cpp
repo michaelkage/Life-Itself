@@ -13,7 +13,7 @@
 
 namespace simreality {
 namespace {
-constexpr std::array<char, 8> kMagic{{'S', 'R', 'E', 'C', 'O', 'R', 'E', '1'}};
+constexpr std::array<char, 8> kMagic{{'S', 'R', 'E', 'C', 'O', 'R', 'E', '2'}};
 constexpr std::uint32_t kMaxCollectionItems = 1'000'000;
 constexpr std::uint32_t kMaxStringBytes = 16U * 1024U * 1024U;
 static_assert(sizeof(double) == sizeof(std::uint64_t));
@@ -176,6 +176,21 @@ void write_npc(std::ostream& out, const NPC& value) {
     write_count(out, value.memories.size());
     for (const NPCMemory& memory : value.memories) write_memory(out, memory);
     write_string(out, value.district_id);
+    write_string(out, value.home_id); write_string(out, value.job_id);
+    write_u8(out, static_cast<std::uint8_t>(value.current_activity));
+    write_count(out, value.schedule.size());
+    for (const ScheduleEntry& entry : value.schedule) {
+        write_u8(out, static_cast<std::uint8_t>(entry.activity));
+        write_u8(out, entry.start_hour); write_u8(out, entry.end_hour);
+    }
+    write_count(out, value.relationships.size());
+    for (const auto& item : value.relationships) {
+        write_string(out, item.first); write_double(out, item.second);
+    }
+    write_count(out, value.goals.size());
+    for (const std::string& goal : value.goals) write_string(out, goal);
+    write_double(out, value.money); write_double(out, value.hourly_wage);
+    write_double(out, value.daily_rent);
 }
 
 NPC read_npc(std::istream& in) {
@@ -190,6 +205,24 @@ NPC read_npc(std::istream& in) {
     value.memories.reserve(memories);
     for (std::uint32_t i = 0; i < memories; ++i) value.memories.push_back(read_memory(in));
     value.district_id = read_string(in);
+    value.home_id = read_string(in); value.job_id = read_string(in);
+    value.current_activity = read_enum<DailyActivity>(in, 7U, "daily activity");
+    const std::uint32_t schedules = read_count(in);
+    for (std::uint32_t i = 0; i < schedules; ++i) {
+        ScheduleEntry entry;
+        entry.activity = read_enum<DailyActivity>(in, 7U, "scheduled activity");
+        entry.start_hour = read_u8(in); entry.end_hour = read_u8(in);
+        if (entry.start_hour > 23U || entry.end_hour > 23U) throw std::runtime_error("invalid schedule hour");
+        value.schedule.push_back(entry);
+    }
+    const std::uint32_t relationships = read_count(in);
+    for (std::uint32_t i = 0; i < relationships; ++i) {
+        auto id = read_string(in); auto strength = read_double(in);
+        if (!value.relationships.emplace(id, strength).second) throw std::runtime_error("duplicate relationship");
+    }
+    const std::uint32_t goals = read_count(in);
+    for (std::uint32_t i = 0; i < goals; ++i) value.goals.push_back(read_string(in));
+    value.money = read_double(in); value.hourly_wage = read_double(in); value.daily_rent = read_double(in);
     return value;
 }
 
@@ -206,6 +239,9 @@ void write_district(std::ostream& out, const District& value) {
     write_u32(out, value.days_recovering);
     write_u8(out, value.scar_active ? 1U : 0U);
     write_double(out, value.scar_intensity);
+    write_double(out, value.shop_stock); write_double(out, value.employment_rate);
+    write_double(out, value.housing_availability); write_double(out, value.transport_reliability);
+    write_double(out, value.service_capacity); write_double(out, value.cash_circulation);
 }
 
 District read_district(std::istream& in) {
@@ -224,6 +260,9 @@ District read_district(std::istream& in) {
     if (scar_active > 1U) throw std::runtime_error("invalid scar-active flag");
     value.scar_active = scar_active != 0U;
     value.scar_intensity = read_double(in);
+    value.shop_stock = read_double(in); value.employment_rate = read_double(in);
+    value.housing_availability = read_double(in); value.transport_reliability = read_double(in);
+    value.service_capacity = read_double(in); value.cash_circulation = read_double(in);
     return value;
 }
 
