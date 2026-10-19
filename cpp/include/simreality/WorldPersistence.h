@@ -7,7 +7,7 @@
 
 namespace simreality {
 
-inline constexpr std::uint32_t kWorldSaveVersion = 2;
+inline constexpr std::uint32_t kWorldSaveVersion = 3;
 
 // Portable, versioned binary snapshots for deterministic continuation. The format
 // uses fixed-width little-endian integers and IEEE-754 doubles; it contains no
