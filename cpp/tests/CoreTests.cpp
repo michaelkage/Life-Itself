@@ -395,6 +395,8 @@ int main() {
     const Conversation world_conversation = world.talk("listener", "speaker");
     assert(world_conversation.transferred.size() == 1);
     assert(world.state().npcs[1].memories.size() == 1);
+    assert(std::abs(world.state().npcs[0].relationships.at("listener") - 0.74) < 1e-9);
+    assert(std::abs(world.state().npcs[1].relationships.at("speaker") + 0.01) < 1e-9);
     CriminalFile world_file = world.build_criminal_file("player");
     assert(world_file.charges.size() == 1);
     assert(world_file.charges[0].evidence == EvidenceKind::Corroborated);
@@ -427,6 +429,11 @@ int main() {
         deterministic_peer.state().districts[0].local_corruption);
     assert(world.state().npcs[0].personal_stress ==
         deterministic_peer.state().npcs[0].personal_stress);
+    assert(world.state().npcs[0].money > 50.0);
+    assert(world.state().districts[0].cash_circulation > 2500.0);
+    assert(world.state().npcs[1].desperation_index > 0.0);
+    assert(world.state().npcs[1].personal_stress ==
+        deterministic_peer.state().npcs[1].personal_stress);
     assert(world.fixer_networks()[0].members[0].standing ==
         deterministic_peer.fixer_networks()[0].members[0].standing);
     assert(world.total_hours() == 24.0);
@@ -472,6 +479,23 @@ int main() {
     assert(world.fixer_networks()[0].members[0].standing ==
         restored.fixer_networks()[0].members[0].standing);
     assert(world.random_stream().next_u64() == restored.random_stream().next_u64());
+
+    // Low transport reliability can disrupt a scheduled commute and increase stress.
+    WorldState commute_state;
+    District disrupted_district;
+    disrupted_district.district_id = "commute-district";
+    disrupted_district.transport_reliability = 0.1;
+    commute_state.districts.push_back(disrupted_district);
+    NPC commuter;
+    commuter.entity_id = "commuter";
+    commuter.district_id = "commute-district";
+    commuter.job_id = "job-1";
+    commuter.schedule = {{DailyActivity::Commute, 7, 9}};
+    commute_state.npcs.push_back(commuter);
+    SimulationWorld commute_world(std::move(commute_state));
+    (void)commute_world.advance(8.0);
+    assert(commute_world.state().npcs[0].current_activity == DailyActivity::Home);
+    assert(commute_world.state().npcs[0].personal_stress > 0.0);
 
     bool rejected_bad_snapshot = false;
     try {
