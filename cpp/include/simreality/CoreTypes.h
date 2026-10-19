@@ -51,6 +51,10 @@ struct NPCMemory {
     }
 };
 
+enum class DailyActivity : std::uint8_t { Home, Commute, Work, Shop, Socialise, Service, Leisure, Sleep };
+
+struct ScheduleEntry { DailyActivity activity{DailyActivity::Sleep}; std::uint8_t start_hour{22}; std::uint8_t end_hour{6}; };
+
 struct NPC {
     EntityId entity_id{};
     AgeBand age_band{AgeBand::Adult};
@@ -61,6 +65,15 @@ struct NPC {
     std::vector<NPCMemory> memories{};
     // Appended to preserve the existing aggregate field order.
     DistrictId district_id{};
+    EntityId home_id{};
+    EntityId job_id{};
+    DailyActivity current_activity{DailyActivity::Sleep};
+    std::vector<ScheduleEntry> schedule{};
+    std::map<EntityId, double> relationships{};
+    std::vector<std::string> goals{};
+    double money{100.0};
+    double hourly_wage{0.0};
+    double daily_rent{0.0};
 };
 
 struct District {
@@ -77,6 +90,12 @@ struct District {
     std::uint32_t days_recovering{0};
     bool scar_active{false};
     double scar_intensity{0.0};
+    double shop_stock{1.0};
+    double employment_rate{0.65};
+    double housing_availability{0.25};
+    double transport_reliability{0.8};
+    double service_capacity{0.7};
+    double cash_circulation{1000.0};
 };
 
 struct WorldState {
