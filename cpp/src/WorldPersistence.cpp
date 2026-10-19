@@ -13,7 +13,7 @@
 
 namespace simreality {
 namespace {
-constexpr std::array<char, 8> kMagic{{'S', 'R', 'E', 'C', 'O', 'R', 'E', '2'}};
+constexpr std::array<char, 8> kMagic{{'S', 'R', 'E', 'C', 'O', 'R', 'E', '3'}};
 constexpr std::uint32_t kMaxCollectionItems = 1'000'000;
 constexpr std::uint32_t kMaxStringBytes = 16U * 1024U * 1024U;
 static_assert(sizeof(double) == sizeof(std::uint64_t));
@@ -271,6 +271,17 @@ void write_world_state(std::ostream& out, const WorldState& value) {
     for (const NPC& npc : value.npcs) write_npc(out, npc);
     write_count(out, value.districts.size());
     for (const District& district : value.districts) write_district(out, district);
+    write_count(out, value.ongoing_events.size());
+    for (const OngoingEvent& event : value.ongoing_events) {
+        write_string(out, event.event_id); write_string(out, event.district_id);
+        write_string(out, event.actor_id);
+        write_u8(out, static_cast<std::uint8_t>(event.action_tag));
+        write_double(out, event.created_hour); write_double(out, event.severity);
+        write_count(out, event.witness_ids.size());
+        for (const EntityId& witness : event.witness_ids) write_string(out, witness);
+        write_double(out, event.investigation_progress);
+        write_u8(out, event.resolved ? 1U : 0U);
+    }
 }
 
 WorldState read_world_state(std::istream& in) {
@@ -282,6 +293,22 @@ WorldState read_world_state(std::istream& in) {
     value.districts.reserve(districts);
     for (std::uint32_t i = 0; i < districts; ++i) {
         value.districts.push_back(read_district(in));
+    }
+    const std::uint32_t events = read_count(in);
+    value.ongoing_events.reserve(events);
+    for (std::uint32_t i = 0; i < events; ++i) {
+        OngoingEvent event;
+        event.event_id = read_string(in); event.district_id = read_string(in);
+        event.actor_id = read_string(in);
+        event.action_tag = read_enum<ActionTag>(in, 4U, "event action");
+        event.created_hour = read_double(in); event.severity = read_double(in);
+        const std::uint32_t witnesses = read_count(in);
+        for (std::uint32_t j = 0; j < witnesses; ++j) event.witness_ids.push_back(read_string(in));
+        event.investigation_progress = read_double(in);
+        const std::uint8_t resolved = read_u8(in);
+        if (resolved > 1U) throw std::runtime_error("invalid event resolution flag");
+        event.resolved = resolved != 0U;
+        value.ongoing_events.push_back(std::move(event));
     }
     return value;
 }
