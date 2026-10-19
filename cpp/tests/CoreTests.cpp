@@ -390,6 +390,10 @@ int main() {
     assert(world.record_witnessed_action(
         "player", ActionTag::CrimeTheft, scene_description,
         {"speaker", "listener", "speaker"}, "listener") == 2);
+    assert(world.state().ongoing_events.size() == 1);
+    assert(world.state().ongoing_events[0].actor_id == "player");
+    assert(world.state().ongoing_events[0].witness_ids.size() == 2);
+    assert(world.state().ongoing_events[0].severity == 0.4);
     assert(world.state().npcs[0].personal_stress > 0.0);
     assert(world.state().npcs[1].personal_stress > world.state().npcs[0].personal_stress);
     const Conversation world_conversation = world.talk("listener", "speaker");
@@ -459,6 +463,12 @@ int main() {
     assert(restored.state().npcs[0].money == world.state().npcs[0].money);
     assert(restored.state().districts[0].shop_stock == world.state().districts[0].shop_stock);
     assert(restored.state().districts[0].cash_circulation == world.state().districts[0].cash_circulation);
+    assert(restored.state().ongoing_events.size() == world.state().ongoing_events.size());
+    assert(restored.state().ongoing_events[0].event_id == world.state().ongoing_events[0].event_id);
+    assert(restored.state().ongoing_events[0].witness_ids == world.state().ongoing_events[0].witness_ids);
+    assert(restored.state().ongoing_events[0].investigation_progress ==
+        world.state().ongoing_events[0].investigation_progress);
+    assert(restored.state().ongoing_events[0].resolved == world.state().ongoing_events[0].resolved);
     assert(restored.fixer_networks().size() == 1);
     assert(restored.fixer_networks()[0].members[0].standing ==
         world.fixer_networks()[0].members[0].standing);
