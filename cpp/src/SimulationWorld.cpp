@@ -46,6 +46,14 @@ WorldAdvanceReport SimulationWorld::advance(
                 else if (npc.trauma_level >= TraumaLevel::Paranoid) npc.current_activity = DailyActivity::Home;
                 else npc.current_activity = DailyActivity::Socialise;
             }
+            const auto district = std::find_if(state_.districts.begin(), state_.districts.end(),
+                [&npc](const District& candidate) { return candidate.district_id == npc.district_id; });
+            if (district != state_.districts.end() && npc.current_activity == DailyActivity::Commute
+                && district->transport_reliability < 0.3) {
+                npc.current_activity = DailyActivity::Home;
+                npc.personal_stress = std::clamp(npc.personal_stress
+                    + (0.3 - district->transport_reliability) * 0.2, 0.0, 1.0);
+            }
         }
         if (tick.kind == TickKind::Hourly) {
             for (NPC& npc : state_.npcs) {
@@ -103,6 +111,19 @@ WorldAdvanceReport SimulationWorld::advance(
             for (NPC& npc : state_.npcs) {
                 if (npc.district_id != district.district_id) continue;
                 const BehaviourDecision behaviour = apply_district_pressure(npc, district);
+                const double housing_pressure = npc.home_id.empty()
+                    ? 0.25 * (1.0 - district.housing_availability) : 0.0;
+                const double unemployment_pressure = npc.job_id.empty()
+                    ? 0.15 * (1.0 - district.employment_rate) : 0.0;
+                const double supply_pressure = 0.2 * district.supply_shortage;
+                const double service_relief = npc.current_activity == DailyActivity::Service
+                    ? 0.1 * district.service_capacity : 0.0;
+                npc.desperation_index = std::clamp(npc.desperation_index
+                    + housing_pressure + unemployment_pressure + supply_pressure
+                    - service_relief, 0.0, 1.0);
+                npc.personal_stress = std::clamp(npc.personal_stress
+                    + housing_pressure * 0.2 + unemployment_pressure * 0.2
+                    + supply_pressure * 0.1 - service_relief * 0.2, 0.0, 1.0);
                 const TraumaAssessment trauma_result =
                     daily_update(npc, npc.desperation_index, 1.0);
                 district_result.residents.push_back(
