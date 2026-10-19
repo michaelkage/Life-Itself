@@ -68,6 +68,33 @@ WorldAdvanceReport SimulationWorld::advance(
             DistrictDayResult district_result;
             district_result.district_id = district.district_id;
             district_result.scars = tick_day(district, weather_severity);
+            for (OngoingEvent& event : state_.ongoing_events) {
+                if (event.district_id != district.district_id || event.resolved) continue;
+                std::size_t actionable_witnesses = 0;
+                for (const EntityId& witness_id : event.witness_ids) {
+                    const auto witness = std::find_if(state_.npcs.begin(), state_.npcs.end(),
+                        [&witness_id](const NPC& candidate) { return candidate.entity_id == witness_id; });
+                    if (witness == state_.npcs.end()) continue;
+                    const bool has_actionable_memory = std::any_of(
+                        witness->memories.begin(), witness->memories.end(),
+                        [&event](const NPCMemory& memory) {
+                            return memory.target_entity_id == event.actor_id
+                                && memory.action_tag == event.action_tag
+                                && memory.is_actionable();
+                        });
+                    if (has_actionable_memory) ++actionable_witnesses;
+                }
+                if (actionable_witnesses > 0U) {
+                    const double evidence = std::min(1.0,
+                        static_cast<double>(actionable_witnesses) / 2.0);
+                    const double local_response = district.security_presence
+                        * (1.0 - district.local_corruption);
+                    event.investigation_progress = std::clamp(
+                        event.investigation_progress + 0.1 * evidence * local_response,
+                        0.0, 1.0);
+                    if (event.investigation_progress >= 1.0) event.resolved = true;
+                }
+            }
             double payroll = 0.0;
             double rent_collected = 0.0;
             std::size_t resident_count = 0;
@@ -219,6 +246,22 @@ std::size_t SimulationWorld::record_witnessed_action(
         std::find(processed.begin(), processed.end(), victim_id) == processed.end()) {
         (void)absorb(*victim, action_tag, true);
     }
+
+    OngoingEvent event;
+    event.event_id = "event-" + std::to_string(state_.ongoing_events.size() + 1U);
+    event.district_id = actor.district_id;
+    event.actor_id = actor_id;
+    event.action_tag = action_tag;
+    event.created_hour = runtime_.total_hours();
+    switch (action_tag) {
+        case ActionTag::InteractionPolite: event.severity = 0.05; break;
+        case ActionTag::CrimeTheft: event.severity = 0.4; break;
+        case ActionTag::CrimeVandalism: event.severity = 0.45; break;
+        case ActionTag::CrimeAssault: event.severity = 0.7; break;
+        case ActionTag::CrimeArmedAssault: event.severity = 1.0; break;
+    }
+    for (const NPC* witness : witnesses) event.witness_ids.push_back(witness->entity_id);
+    state_.ongoing_events.push_back(std::move(event));
     return witnesses.size();
 }
 
