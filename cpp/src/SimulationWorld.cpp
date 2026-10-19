@@ -138,6 +138,15 @@ WorldAdvanceReport SimulationWorld::advance(
             for (NPC& npc : state_.npcs) {
                 if (npc.district_id != district.district_id) continue;
                 const BehaviourDecision behaviour = apply_district_pressure(npc, district);
+                const auto ensure_goal = [&npc](const std::string& goal, bool needed) {
+                    const auto found = std::find(npc.goals.begin(), npc.goals.end(), goal);
+                    if (needed && found == npc.goals.end()) npc.goals.push_back(goal);
+                    else if (!needed && found != npc.goals.end()) npc.goals.erase(found);
+                };
+                ensure_goal("find_housing", npc.home_id.empty());
+                ensure_goal("find_work", npc.job_id.empty());
+                ensure_goal("stabilise_finances",
+                    npc.money < std::max(1.0, npc.daily_rent * 5.0));
                 const double housing_pressure = npc.home_id.empty()
                     ? 0.25 * (1.0 - district.housing_availability) : 0.0;
                 const double unemployment_pressure = npc.job_id.empty()
