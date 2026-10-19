@@ -98,6 +98,18 @@ struct District {
     double cash_circulation{1000.0};
 };
 
+struct Business {
+    EntityId business_id{};
+    DistrictId district_id{};
+    double stock{100.0};
+    double stock_capacity{200.0};
+    double cash{1000.0};
+    double restock_cost_per_unit{1.0};
+    double hourly_wage{12.0};
+    std::uint32_t job_slots{4};
+    bool open{true};
+};
+
 struct OngoingEvent {
     std::string event_id{};
     DistrictId district_id{};
@@ -114,6 +126,7 @@ struct WorldState {
     std::vector<NPC> npcs{};
     std::vector<District> districts{};
     std::vector<OngoingEvent> ongoing_events{};
+    std::vector<Business> businesses{};
 };
 
 } // namespace simreality
