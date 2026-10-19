@@ -7,6 +7,7 @@
 #include "simreality/Trauma.h"
 
 #include <algorithm>
+#include <cmath>
 #include <stdexcept>
 #include <utility>
 
@@ -33,10 +34,49 @@ WorldAdvanceReport SimulationWorld::advance(
             continue;
         }
 
+        for (NPC& npc : state_.npcs) {
+            const auto hour = static_cast<unsigned int>(static_cast<std::uint64_t>(tick.at_hour) % 24U);
+            if (hour >= 22U || hour < 6U) npc.current_activity = DailyActivity::Sleep;
+            else if (hour >= 9U && hour < 17U && !npc.job_id.empty()) npc.current_activity = DailyActivity::Work;
+            else if (hour >= 7U && hour < 9U && !npc.job_id.empty()) npc.current_activity = DailyActivity::Commute;
+            else if (npc.trauma_level >= TraumaLevel::Paranoid) npc.current_activity = DailyActivity::Home;
+            else npc.current_activity = DailyActivity::Socialise;
+        }
+
         for (District& district : state_.districts) {
             DistrictDayResult district_result;
             district_result.district_id = district.district_id;
             district_result.scars = tick_day(district, weather_severity);
+            double payroll = 0.0;
+            double rent_collected = 0.0;
+            std::size_t resident_count = 0;
+            for (NPC& resident : state_.npcs) {
+                if (resident.district_id != district.district_id) continue;
+                ++resident_count;
+                if (!resident.job_id.empty()) {
+                    const double wage = std::max(0.0, resident.hourly_wage) * 8.0;
+                    resident.money += wage;
+                    payroll += wage;
+                }
+                const double rent = std::min(std::max(0.0, resident.money), std::max(0.0, resident.daily_rent));
+                resident.money -= rent;
+                rent_collected += rent;
+                if (resident.current_activity == DailyActivity::Shop && resident.money > 0.0) {
+                    const double purchase = std::min(resident.money, 5.0);
+                    resident.money -= purchase;
+                    district.shop_stock = std::max(0.0, district.shop_stock - purchase / 100.0);
+                }
+            }
+            district.cash_circulation = std::max(0.0, district.cash_circulation + payroll - rent_collected);
+            const double population_factor = std::min(1.0,
+                static_cast<double>(resident_count) / static_cast<double>(std::max(1U, district.capacity)));
+            district.supply_shortage = std::clamp(district.supply_shortage
+                + population_factor * (1.0 - district.shop_stock) * 0.02
+                - district.shop_stock * 0.005, 0.0, 1.0);
+            district.employment_rate = std::clamp(district.employment_rate, 0.0, 1.0);
+            district.housing_availability = std::clamp(district.housing_availability, 0.0, 1.0);
+            district.transport_reliability = std::clamp(district.transport_reliability, 0.0, 1.0);
+            district.service_capacity = std::clamp(district.service_capacity, 0.0, 1.0);
             for (FixerNetwork& network : fixer_networks_) {
                 if (network.district_id == district.district_id) {
                     network.daily_update(district);
