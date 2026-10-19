@@ -503,6 +503,33 @@ int main() {
         restored.fixer_networks()[0].members[0].standing);
     assert(world.random_stream().next_u64() == restored.random_stream().next_u64());
 
+    // A multi-week save/load in the middle must match uninterrupted simulation.
+    SimulationWorld multiweek_reference = world;
+    SimulationWorld multiweek_resumed = world;
+    (void)multiweek_reference.advance(21.0 * 24.0);
+    (void)multiweek_resumed.advance(7.0 * 24.0);
+    std::stringstream midweek_snapshot(std::ios::in | std::ios::out | std::ios::binary);
+    save_world(multiweek_resumed, midweek_snapshot);
+    midweek_snapshot.seekg(0);
+    multiweek_resumed = load_world(midweek_snapshot);
+    (void)multiweek_resumed.advance(14.0 * 24.0);
+    assert(multiweek_reference.total_hours() == multiweek_resumed.total_hours());
+    assert(multiweek_reference.state().businesses.size() == multiweek_resumed.state().businesses.size());
+    assert(multiweek_reference.state().businesses[0].stock == multiweek_resumed.state().businesses[0].stock);
+    assert(multiweek_reference.state().businesses[0].cash == multiweek_resumed.state().businesses[0].cash);
+    assert(multiweek_reference.state().npcs.size() == multiweek_resumed.state().npcs.size());
+    for (std::size_t i = 0; i < multiweek_reference.state().npcs.size(); ++i) {
+        assert(multiweek_reference.state().npcs[i].money == multiweek_resumed.state().npcs[i].money);
+        assert(multiweek_reference.state().npcs[i].job_id == multiweek_resumed.state().npcs[i].job_id);
+        assert(multiweek_reference.state().npcs[i].goals == multiweek_resumed.state().npcs[i].goals);
+        assert(multiweek_reference.state().npcs[i].memories.size() == multiweek_resumed.state().npcs[i].memories.size());
+    }
+    assert(multiweek_reference.state().districts[0].supply_shortage ==
+        multiweek_resumed.state().districts[0].supply_shortage);
+    assert(multiweek_reference.state().ongoing_events[0].investigation_progress ==
+        multiweek_resumed.state().ongoing_events[0].investigation_progress);
+    assert(multiweek_reference.random_stream().next_u64() == multiweek_resumed.random_stream().next_u64());
+
     // Low transport reliability can disrupt a scheduled commute and increase stress.
     WorldState commute_state;
     District disrupted_district;
