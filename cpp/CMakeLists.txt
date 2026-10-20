@@ -17,6 +17,7 @@ add_library(simreality_core
     src/Reputation.cpp
     src/Fixers.cpp
     src/SimulationWorld.cpp
+    src/LifeSystems.cpp
     src/WorldPersistence.cpp
 )
 target_include_directories(simreality_core PUBLIC include)
