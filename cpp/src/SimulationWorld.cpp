@@ -134,7 +134,7 @@ WorldAdvanceReport SimulationWorld::advance(
             continue;
         }
 
-        life_.advance_day(state_, tick.day_index);
+        for (const NPC& npc : state_.npcs) {\n            if (!life_.characters().contains(npc.entity_id)) life_.register_character(npc.entity_id);\n        }\n        life_.advance_day(state_, tick.day_index);
         for (District& district : state_.districts) {
             DistrictDayResult district_result;
             district_result.district_id = district.district_id;
