@@ -95,6 +95,12 @@ public:
     [[nodiscard]] const std::vector<LifeObligation>& obligations() const noexcept {
         return obligations_;
     }
+    [[nodiscard]] const std::vector<GhostTimeWindow>& ghost_windows() const noexcept {
+        return ghost_windows_;
+    }
+    void restore_snapshot(std::map<EntityId, LifeCharacter> characters,
+                          std::vector<LifeObligation> obligations,
+                          std::vector<GhostTimeWindow> ghost_windows);
     [[nodiscard]] RecoveryRange estimate_recovery(
         const EntityId& id, const std::string& condition_id) const;
 
