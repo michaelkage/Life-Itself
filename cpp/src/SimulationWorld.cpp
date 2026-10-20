@@ -164,7 +164,10 @@ WorldAdvanceReport SimulationWorld::advance(
                 if (resident.district_id != district.district_id) continue;
                 ++resident_count;
                 if (!resident.job_id.empty()) {
-                    const double wage = std::max(0.0, resident.hourly_wage) * 8.0;
+                    const double expected_income = std::max(0.0, resident.hourly_wage) * 8.0;
+                    const double attended_hours = resident.commute_disrupted_today ? 0.0
+                        : std::clamp(resident.work_hours_today, 0.0, 8.0);
+                    const double wage = std::max(0.0, resident.hourly_wage) * attended_hours;
                     auto employer = std::find_if(state_.businesses.begin(), state_.businesses.end(),
                         [&resident, &district](const Business& business) {
                             return business.business_id == resident.job_id
@@ -183,10 +186,31 @@ WorldAdvanceReport SimulationWorld::advance(
                         if (std::find(resident.goals.begin(), resident.goals.end(), "find_work") == resident.goals.end())
                             resident.goals.push_back("find_work");
                     }
+                    const double lost = std::max(0.0, expected_income - wage);
+                    resident.lost_income += lost;
+                    if (lost > 0.0) {
+                        ++resident.missed_work_days;
+                        resident.personal_stress = std::clamp(resident.personal_stress + 0.03, 0.0, 1.0);
+                    }
                 }
-                const double rent = std::min(std::max(0.0, resident.money), std::max(0.0, resident.daily_rent));
+                const auto home = std::find_if(state_.housing_units.begin(), state_.housing_units.end(),
+                    [&resident, &district](const HousingUnit& unit) {
+                        return unit.unit_id == resident.home_id && unit.district_id == district.district_id;
+                    });
+                const double rent_due = home != state_.housing_units.end()
+                    ? std::max(0.0, home->daily_rent) : std::max(0.0, resident.daily_rent);
+                const double rent = std::min(std::max(0.0, resident.money), rent_due + resident.rent_arrears);
                 resident.money -= rent;
                 rent_collected += rent;
+                resident.rent_arrears = std::max(0.0, resident.rent_arrears + rent_due - rent);
+                if (rent_due > 0.0 && resident.rent_arrears >= rent_due * 3.0 && !resident.home_id.empty()) {
+                    resident.home_id.clear();
+                    resident.daily_rent = 0.0;
+                    resident.personal_stress = std::clamp(resident.personal_stress + 0.15, 0.0, 1.0);
+                    resident.desperation_index = std::clamp(resident.desperation_index + 0.2, 0.0, 1.0);
+                    if (std::find(resident.goals.begin(), resident.goals.end(), "find_housing") == resident.goals.end())
+                        resident.goals.push_back("find_housing");
+                }
                 if (resident.current_activity == DailyActivity::Shop && resident.money > 0.0) {
                     auto shop = std::find_if(state_.businesses.begin(), state_.businesses.end(),
                         [&district](const Business& business) {
