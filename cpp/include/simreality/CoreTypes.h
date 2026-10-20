@@ -74,6 +74,13 @@ struct NPC {
     double money{100.0};
     double hourly_wage{0.0};
     double daily_rent{0.0};
+    double work_hours_today{0.0};
+    bool commute_disrupted_today{false};
+    std::uint32_t missed_work_days{0};
+    double lost_income{0.0};
+    double rent_arrears{0.0};
+    double social_need{0.25};
+    double isolation{0.0};
 };
 
 struct District {
@@ -96,6 +103,14 @@ struct District {
     double transport_reliability{0.8};
     double service_capacity{0.7};
     double cash_circulation{1000.0};
+};
+
+struct HousingUnit {
+    EntityId unit_id{};
+    DistrictId district_id{};
+    std::uint32_t capacity{1};
+    double daily_rent{10.0};
+    double condition{1.0};
 };
 
 struct Business {
@@ -127,6 +142,7 @@ struct WorldState {
     std::vector<District> districts{};
     std::vector<OngoingEvent> ongoing_events{};
     std::vector<Business> businesses{};
+    std::vector<HousingUnit> housing_units{};
 };
 
 } // namespace simreality
