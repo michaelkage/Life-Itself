@@ -560,7 +560,7 @@ void save_world(const SimulationWorld& world, std::ostream& output) {
 }
 
 SimulationWorld load_world(std::istream& input) {
-    std::array<char, kMagic.size()> magic{};
+    std::array<char, kMagicV6.size()> magic{};
     input.read(magic.data(), static_cast<std::streamsize>(magic.size()));
     if (!input) throw std::runtime_error("truncated world snapshot header");
     const bool is_v5 = magic == kMagicV5;
