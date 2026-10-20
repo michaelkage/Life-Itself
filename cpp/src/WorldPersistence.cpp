@@ -13,7 +13,8 @@
 
 namespace simreality {
 namespace {
-constexpr std::array<char, 8> kMagic{{'S', 'R', 'E', 'C', 'O', 'R', 'E', '5'}};
+constexpr std::array<char, 8> kMagicV5{{'S', 'R', 'E', 'C', 'O', 'R', 'E', '5'}};
+constexpr std::array<char, 8> kMagicV6{{'S', 'R', 'E', 'C', 'O', 'R', 'E', '6'}};
 constexpr std::uint32_t kMaxCollectionItems = 1'000'000;
 constexpr std::uint32_t kMaxStringBytes = 16U * 1024U * 1024U;
 static_assert(sizeof(double) == sizeof(std::uint64_t));
@@ -407,10 +408,147 @@ FixerNetwork read_network(std::istream& in) {
     return value;
 }
 
+
+void write_life_state(std::ostream& out, const LifeCoordinator& life) {
+    write_count(out, life.characters().size());
+    for (const auto& [id, character] : life.characters()) {
+        write_string(out, id);
+        write_u8(out, static_cast<std::uint8_t>(character.status));
+        write_u64(out, character.death_day);
+        write_string(out, character.death_cause);
+        write_count(out, character.conditions.size());
+        for (const MedicalCondition& condition : character.conditions) {
+            write_string(out, condition.condition_id);
+            write_double(out, condition.severity);
+            write_double(out, condition.recovery_per_day);
+            write_double(out, condition.work_capacity_at_full_severity);
+            write_u8(out, condition.lasting_impairment ? 1U : 0U);
+            write_double(out, condition.impairment_floor);
+            write_double(out, condition.care_hours_per_severity);
+        }
+        write_count(out, character.treatments.size());
+        for (const MedicalTreatment& treatment : character.treatments) {
+            write_string(out, treatment.treatment_id);
+            write_string(out, treatment.condition_id);
+            write_double(out, treatment.effectiveness);
+            write_double(out, treatment.daily_cost);
+            write_double(out, treatment.complication_risk);
+            write_u8(out, treatment.active ? 1U : 0U);
+        }
+        write_double(out, character.care_need_hours);
+        write_double(out, character.lost_income);
+        write_u32(out, character.missed_work_days);
+        write_count(out, character.personality.size());
+        for (const auto& [target, value] : character.personality) {
+            write_string(out, target); write_double(out, value);
+        }
+        write_count(out, character.memories.size());
+        for (const auto& [target, value] : character.memories) {
+            write_string(out, target); write_double(out, value);
+        }
+    }
+    write_count(out, life.obligations().size());
+    for (const LifeObligation& obligation : life.obligations()) {
+        write_string(out, obligation.obligation_id);
+        write_string(out, obligation.debtor_id);
+        write_string(out, obligation.creditor_id);
+        write_double(out, obligation.amount_due);
+        write_u64(out, obligation.due_day);
+        write_u8(out, obligation.settled ? 1U : 0U);
+        write_u8(out, obligation.missed ? 1U : 0U);
+    }
+    write_count(out, life.ghost_windows().size());
+    for (const GhostTimeWindow& window : life.ghost_windows()) {
+        write_double(out, window.start_hour);
+        write_double(out, window.end_hour);
+        write_double(out, window.strength);
+    }
+}
+
+void read_life_state(std::istream& in, LifeCoordinator& life) {
+    std::map<EntityId, LifeCharacter> characters;
+    const std::uint32_t character_count = read_count(in);
+    for (std::uint32_t i = 0; i < character_count; ++i) {
+        LifeCharacter character;
+        character.entity_id = read_string(in);
+        character.status = read_enum<LifeStatus>(in, 3U, "life status");
+        character.death_day = read_u64(in);
+        character.death_cause = read_string(in);
+        const std::uint32_t conditions = read_count(in);
+        for (std::uint32_t j = 0; j < conditions; ++j) {
+            MedicalCondition condition;
+            condition.condition_id = read_string(in);
+            condition.severity = read_double(in);
+            condition.recovery_per_day = read_double(in);
+            condition.work_capacity_at_full_severity = read_double(in);
+            const std::uint8_t lasting = read_u8(in);
+            if (lasting > 1U) throw std::runtime_error("invalid lasting-impairment flag");
+            condition.lasting_impairment = lasting != 0U;
+            condition.impairment_floor = read_double(in);
+            condition.care_hours_per_severity = read_double(in);
+            character.conditions.push_back(std::move(condition));
+        }
+        const std::uint32_t treatments = read_count(in);
+        for (std::uint32_t j = 0; j < treatments; ++j) {
+            MedicalTreatment treatment;
+            treatment.treatment_id = read_string(in);
+            treatment.condition_id = read_string(in);
+            treatment.effectiveness = read_double(in);
+            treatment.daily_cost = read_double(in);
+            treatment.complication_risk = read_double(in);
+            const std::uint8_t active = read_u8(in);
+            if (active > 1U) throw std::runtime_error("invalid treatment-active flag");
+            treatment.active = active != 0U;
+            character.treatments.push_back(std::move(treatment));
+        }
+        character.care_need_hours = read_double(in);
+        character.lost_income = read_double(in);
+        character.missed_work_days = read_u32(in);
+        const std::uint32_t personality = read_count(in);
+        for (std::uint32_t j = 0; j < personality; ++j) {
+            const std::string target = read_string(in);
+            if (!character.personality.emplace(target, read_double(in)).second)
+                throw std::runtime_error("duplicate life personality entry");
+        }
+        const std::uint32_t memories = read_count(in);
+        for (std::uint32_t j = 0; j < memories; ++j) {
+            const std::string target = read_string(in);
+            if (!character.memories.emplace(target, read_double(in)).second)
+                throw std::runtime_error("duplicate life memory entry");
+        }
+        const EntityId id = character.entity_id;
+        if (id.empty() || !characters.emplace(id, std::move(character)).second)
+            throw std::runtime_error("duplicate or empty life character id");
+    }
+    std::vector<LifeObligation> obligations;
+    const std::uint32_t obligation_count = read_count(in);
+    obligations.reserve(obligation_count);
+    for (std::uint32_t i = 0; i < obligation_count; ++i) {
+        LifeObligation obligation;
+        obligation.obligation_id = read_string(in);
+        obligation.debtor_id = read_string(in);
+        obligation.creditor_id = read_string(in);
+        obligation.amount_due = read_double(in);
+        obligation.due_day = read_u64(in);
+        const std::uint8_t settled = read_u8(in);
+        const std::uint8_t missed = read_u8(in);
+        if (settled > 1U || missed > 1U) throw std::runtime_error("invalid obligation flags");
+        obligation.settled = settled != 0U;
+        obligation.missed = missed != 0U;
+        obligations.push_back(std::move(obligation));
+    }
+    std::vector<GhostTimeWindow> windows;
+    const std::uint32_t window_count = read_count(in);
+    windows.reserve(window_count);
+    for (std::uint32_t i = 0; i < window_count; ++i)
+        windows.push_back({read_double(in), read_double(in), read_double(in)});
+    life.restore_snapshot(std::move(characters), std::move(obligations), std::move(windows));
+}
+
 } // namespace
 
 void save_world(const SimulationWorld& world, std::ostream& output) {
-    output.write(kMagic.data(), static_cast<std::streamsize>(kMagic.size()));
+    output.write(kMagicV6.data(), static_cast<std::streamsize>(kMagicV6.size()));
     if (!output) throw std::runtime_error("failed writing world snapshot header");
     write_u32(output, kWorldSaveVersion);
     write_double(output, world.total_hours());
@@ -418,15 +556,19 @@ void save_world(const SimulationWorld& world, std::ostream& output) {
     write_world_state(output, world.state());
     write_count(output, world.fixer_networks().size());
     for (const FixerNetwork& network : world.fixer_networks()) write_network(output, network);
+    write_life_state(output, world.life_system());
 }
 
 SimulationWorld load_world(std::istream& input) {
     std::array<char, kMagic.size()> magic{};
     input.read(magic.data(), static_cast<std::streamsize>(magic.size()));
     if (!input) throw std::runtime_error("truncated world snapshot header");
-    if (magic != kMagic) throw std::runtime_error("invalid world snapshot magic");
+    const bool is_v5 = magic == kMagicV5;
+    const bool is_v6 = magic == kMagicV6;
+    if (!is_v5 && !is_v6) throw std::runtime_error("invalid world snapshot magic");
     const std::uint32_t version = read_u32(input);
-    if (version != kWorldSaveVersion) {
+    if ((version == 5U && !is_v5) || (version == 6U && !is_v6)
+        || (version != 5U && version != 6U)) {
         throw std::runtime_error("unsupported world snapshot version");
     }
 
@@ -443,6 +585,7 @@ SimulationWorld load_world(std::istream& input) {
 
     SimulationWorld world(std::move(state), total_hours, random_state);
     world.fixer_networks() = std::move(fixer_networks);
+    if (version >= 6U) read_life_state(input, world.life_system());
     return world;
 }
 
