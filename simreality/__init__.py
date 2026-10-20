@@ -70,3 +70,24 @@ __all__ = [
     "reputation",
     "trauma",
 ]
+
+# Persistent health, social obligations, and finite campaign-life lifecycle.
+from .health_life import (
+    CampaignLife,
+    CharacterHealth,
+    HealthCondition,
+    LifeState,
+    PersistentWorld,
+    SocialObligation,
+    WorldArchive,
+)
+
+__all__ += [
+    "CampaignLife",
+    "CharacterHealth",
+    "HealthCondition",
+    "LifeState",
+    "PersistentWorld",
+    "SocialObligation",
+    "WorldArchive",
+]
