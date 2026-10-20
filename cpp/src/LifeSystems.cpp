@@ -163,7 +163,7 @@ RecoveryRange LifeCoordinator::estimate_recovery(
 
 GhostInfluenceResult LifeCoordinator::attempt_ghost_influence(
     const EntityId& ghost_id, const EntityId& npc_id, const std::string& action,
-    double hour_of_day, const WorldState& state, std::uint64_t random_sample) const {
+    double hour_of_day, WorldState& state, std::uint64_t random_sample) {
     const auto ghost = characters_.find(ghost_id);
     const NPC* npc = find_npc(state, npc_id);
     if (ghost == characters_.end() || ghost->second.status != LifeStatus::Ghost)
