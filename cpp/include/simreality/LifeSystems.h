@@ -66,6 +66,7 @@ struct GhostTimeWindow {
     double start_hour{0.0};
     double end_hour{0.0};
     double strength{1.0};
+    std::vector<std::string> permitted_actions{"sign", "sound", "dream"};
 };
 
 struct GhostInfluenceResult {
@@ -88,7 +89,7 @@ public:
     [[nodiscard]] bool archive_character(const EntityId& id);
     [[nodiscard]] GhostInfluenceResult attempt_ghost_influence(
         const EntityId& ghost_id, const EntityId& npc_id, const std::string& action,
-        double hour_of_day, const WorldState& state, std::uint64_t random_sample) const;
+        double hour_of_day, WorldState& state, std::uint64_t random_sample);
     void advance_day(WorldState& state, std::uint64_t day);
     [[nodiscard]] const std::map<EntityId, LifeCharacter>& characters() const noexcept {
         return characters_;

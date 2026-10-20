@@ -15,6 +15,7 @@ namespace simreality {
 namespace {
 constexpr std::array<char, 8> kMagicV5{{'S', 'R', 'E', 'C', 'O', 'R', 'E', '5'}};
 constexpr std::array<char, 8> kMagicV6{{'S', 'R', 'E', 'C', 'O', 'R', 'E', '6'}};
+constexpr std::array<char, 8> kMagicV7{{'S', 'R', 'E', 'C', 'O', 'R', 'E', '7'}};
 constexpr std::uint32_t kMaxCollectionItems = 1'000'000;
 constexpr std::uint32_t kMaxStringBytes = 16U * 1024U * 1024U;
 static_assert(sizeof(double) == sizeof(std::uint64_t));
@@ -462,10 +463,12 @@ void write_life_state(std::ostream& out, const LifeCoordinator& life) {
         write_double(out, window.start_hour);
         write_double(out, window.end_hour);
         write_double(out, window.strength);
+        write_count(out, window.permitted_actions.size());
+        for (const std::string& action : window.permitted_actions) write_string(out, action);
     }
 }
 
-void read_life_state(std::istream& in, LifeCoordinator& life) {
+void read_life_state(std::istream& in, LifeCoordinator& life, std::uint32_t version) {
     std::map<EntityId, LifeCharacter> characters;
     const std::uint32_t character_count = read_count(in);
     for (std::uint32_t i = 0; i < character_count; ++i) {
@@ -540,15 +543,24 @@ void read_life_state(std::istream& in, LifeCoordinator& life) {
     std::vector<GhostTimeWindow> windows;
     const std::uint32_t window_count = read_count(in);
     windows.reserve(window_count);
-    for (std::uint32_t i = 0; i < window_count; ++i)
-        windows.push_back({read_double(in), read_double(in), read_double(in)});
+    for (std::uint32_t i = 0; i < window_count; ++i) {
+        GhostTimeWindow window{read_double(in), read_double(in), read_double(in)};
+        if (version >= 7U) {
+            const std::uint32_t action_count = read_count(in);
+            window.permitted_actions.clear();
+            window.permitted_actions.reserve(action_count);
+            for (std::uint32_t j = 0; j < action_count; ++j)
+                window.permitted_actions.push_back(read_string(in));
+        }
+        windows.push_back(std::move(window));
+    }
     life.restore_snapshot(std::move(characters), std::move(obligations), std::move(windows));
 }
 
 } // namespace
 
 void save_world(const SimulationWorld& world, std::ostream& output) {
-    output.write(kMagicV6.data(), static_cast<std::streamsize>(kMagicV6.size()));
+    output.write(kMagicV7.data(), static_cast<std::streamsize>(kMagicV7.size()));
     if (!output) throw std::runtime_error("failed writing world snapshot header");
     write_u32(output, kWorldSaveVersion);
     write_double(output, world.total_hours());
@@ -560,15 +572,17 @@ void save_world(const SimulationWorld& world, std::ostream& output) {
 }
 
 SimulationWorld load_world(std::istream& input) {
-    std::array<char, kMagicV6.size()> magic{};
+    std::array<char, kMagicV7.size()> magic{};
     input.read(magic.data(), static_cast<std::streamsize>(magic.size()));
     if (!input) throw std::runtime_error("truncated world snapshot header");
     const bool is_v5 = magic == kMagicV5;
     const bool is_v6 = magic == kMagicV6;
-    if (!is_v5 && !is_v6) throw std::runtime_error("invalid world snapshot magic");
+    const bool is_v7 = magic == kMagicV7;
+    if (!is_v5 && !is_v6 && !is_v7) throw std::runtime_error("invalid world snapshot magic");
     const std::uint32_t version = read_u32(input);
     if ((version == 5U && !is_v5) || (version == 6U && !is_v6)
-        || (version != 5U && version != 6U)) {
+        || (version == 7U && !is_v7)
+        || (version != 5U && version != 6U && version != 7U)) {
         throw std::runtime_error("unsupported world snapshot version");
     }
 
@@ -585,7 +599,7 @@ SimulationWorld load_world(std::istream& input) {
 
     SimulationWorld world(std::move(state), total_hours, random_state);
     world.fixer_networks() = std::move(fixer_networks);
-    if (version >= 6U) read_life_state(input, world.life_system());
+    if (version >= 6U) read_life_state(input, world.life_system(), version);
     return world;
 }
 

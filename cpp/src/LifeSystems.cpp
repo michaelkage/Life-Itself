@@ -64,8 +64,11 @@ void LifeCoordinator::restore_snapshot(
         if (!std::isfinite(window.start_hour) || !std::isfinite(window.end_hour)
             || !std::isfinite(window.strength) || window.start_hour < 0.0
             || window.end_hour > 24.0 || window.start_hour >= window.end_hour
-            || window.strength < 0.0)
+            || window.strength < 0.0 || window.permitted_actions.empty())
             throw std::invalid_argument("invalid ghost window snapshot");
+        for (const std::string& action : window.permitted_actions)
+            if (action != "sign" && action != "sound" && action != "dream")
+                throw std::invalid_argument("unsupported ghost action in snapshot");
     }
     characters_ = std::move(characters);
     obligations_ = std::move(obligations);
