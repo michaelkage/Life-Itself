@@ -25,4 +25,4 @@ The C++ lifecycle coordinator is not yet encoded inside the existing binary `Wor
 
 ## Verification
 
-GitHub Actions is configured to run the complete Python unittest suite and Linux/Windows C++ configure, build, and CTest jobs on pushes to `main`. Build/test success is claimed only after the latest run completes successfully.
+The run at commit `ff2cdca4f8a7cb0c44c710e7b131ad307a976236` passed the complete Python unittest suite and Linux/Windows C++ configure, build, and CTest jobs. Lifecycle binary save/load changes were added afterward and are awaiting their own CI run; do not treat those newer changes as verified until that run succeeds.
