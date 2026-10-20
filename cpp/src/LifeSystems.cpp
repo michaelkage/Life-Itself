@@ -1,6 +1,7 @@
 #include "simreality/LifeSystems.h"
 
 #include <cmath>
+#include <functional>
 #include <stdexcept>
 
 namespace simreality {
@@ -168,13 +169,9 @@ void LifeCoordinator::advance_day(WorldState& state, std::uint64_t day) {
                 ? condition.impairment_floor : condition.work_capacity_at_full_severity;
             capacity = std::min(capacity, 1.0 - condition.severity * (1.0 - limitation));
         }
-        const double expected_hours = 8.0;
-        const double effective_hours = std::min(expected_hours, npc->work_hours_today) * capacity;
-        const double expected_income = expected_hours * std::max(0.0, npc->hourly_wage);
-        const double earned = effective_hours * std::max(0.0, npc->hourly_wage);
-        character.lost_income += std::max(0.0, expected_income - earned);
-        npc->money += earned;
-        if (effective_hours < 4.0) ++character.missed_work_days;
+        // The existing world coordinator settles wages and missed-work penalties.
+        // Reduce recorded attendance here so its established economic path applies them once.
+        npc->work_hours_today = std::clamp(npc->work_hours_today * capacity, 0.0, 8.0);
     }
 
     for (LifeObligation& obligation : obligations_) {
