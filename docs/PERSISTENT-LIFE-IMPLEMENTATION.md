@@ -1,26 +1,28 @@
 # Persistent Life & Legacy — Implementation Status
 
-This document distinguishes the portable Python reference implementation from integration that is still pending.
+This subsystem is being connected to the existing simulation, rather than treated as an isolated design document.
 
-## Implemented in the reference core
+## Python reference systems
 
-- Health conditions carry severity, recovery rate, persistence, duration and per-activity limits.
-- Daily advancement applies gradual recovery.
-- Social obligations can be settled once, charge available funds, and update stress and directed trust.
-- Missed obligations apply stress and trust consequences.
-- Campaign life states enforce active -> spectator -> ghost transitions; death records a cause and simulation day.
-- Ghost influence requires an explicitly allowed window and respects a cooldown.
-- Death snapshots preserve a detached copy of the world.
-- A campaign manager can archive an ended timeline, start a separate day-zero world for a new life, and visit an archived timeline through a detached copy.
-- Versioned JSON serialization supports save/load of the active world and archived timelines.
-- Regression tests cover health recovery, obligation settlement and default consequences, death/ghost rules, world separation, archive immutability, and save/load continuation.
+- Health conditions persist severity, duration, activity limitations, and gradual recovery.
+- Daily life now models treatment costs/effectiveness, bounded uncertain recovery estimates, work capacity, missed wages, stress, and care hours.
+- NPC support transfers money, reduces recipient stress, records care providers, and improves directed reciprocal trust.
+- Obligations can be settled or missed with money/stress/trust consequences. After death, outstanding debt is considered against the estate, then possible supporters are evaluated using relationships and personality traits; unresolved amounts remain explicit.
+- Ghost influence is restricted to authored time windows and allowed action types. The receiving NPC's spiritual openness, fearfulness, stubbornness, memories, and relationships determine receptivity; decisions are logged.
+- Campaign life states enforce active -> spectator -> ghost transitions. Death snapshots preserve a world, and starting another life creates a separate day-zero world with read-only archived timelines.
+- JSON save/load is versioned for the base world and campaign archives.
 
-## Important boundaries
+## C++ world integration
 
-The current code is a deterministic, engine-independent reference layer. It does not yet simulate clinical diagnosis, uncertain prognoses, treatment availability/cost, work attendance, household care, NPC decision-making under ghost influence, or inheritance and resolution of obligations after a debtor dies. Those require explicit domain rules and connections to the existing NPC, economy, scheduler, and world coordinator rather than invented effects in the lifecycle module.
+- `LifeCoordinator` is now part of the portable C++ core and is exposed through `SimulationWorld::life_system()`.
+- The world coordinator invokes lifecycle processing on scheduler daily ticks. Medical recovery/treatment costs are applied, and health-adjusted work hours feed the existing wage/missed-work system rather than paying wages twice.
+- C++ interfaces cover life state, conditions/treatments, recovery ranges, obligations, death/ghost transitions, time-windowed ghost decisions based on NPC memories and relationships, and support resolution after death.
+- CMake includes the new source. C++ regression coverage checks recovery ranges, life/ghost transitions, and window gating; Python tests cover treatment/work effects, support/trust, estate handling, and personality-aware ghost influence.
 
-The portable C++ core and Unreal adapter are also not yet integrated with these Python lifecycle types. The next integration phase should port the same contracts to C++, connect daily health/obligation processing to the world scheduler, and add cross-language differential tests.
+## Known integration boundary
+
+The C++ lifecycle coordinator is not yet encoded inside the existing binary `WorldPersistence` snapshot; lifecycle state is currently persisted by the Python campaign JSON layer. Before treating C++ saves as full-fidelity campaign saves, the lifecycle records and random/decision state must be added to that binary format with a versioned migration and round-trip tests. The C++ core is engine-independent; this does not yet wire Unreal UI/animation/game-thread code to the lifecycle API.
 
 ## Verification
 
-The GitHub Actions workflow runs Python regression tests and Linux/Windows C++ builds on pushes to main. A commit is not treated as verified until the corresponding workflow reports success.
+GitHub Actions is configured to run the complete Python unittest suite and Linux/Windows C++ configure, build, and CTest jobs on pushes to `main`. Build/test success is claimed only after the latest run completes successfully.
