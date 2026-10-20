@@ -171,29 +171,54 @@ GhostInfluenceResult LifeCoordinator::attempt_ghost_influence(
     const EntityId& ghost_id, const EntityId& npc_id, const std::string& action,
     double hour_of_day, WorldState& state, std::uint64_t random_sample) {
     const auto ghost = characters_.find(ghost_id);
-    const NPC* npc = find_npc(state, npc_id);
+    NPC* npc = find_npc(state, npc_id);
     if (ghost == characters_.end() || ghost->second.status != LifeStatus::Ghost)
         return {false, 0.0, "no active ghost"};
     if (npc == nullptr) return {false, 0.0, "NPC not found"};
+    if (!std::isfinite(hour_of_day) || hour_of_day < 0.0 || hour_of_day >= 24.0)
+        return {false, 0.0, "invalid hour of day"};
     const auto window = std::find_if(ghost_windows_.begin(), ghost_windows_.end(),
-        [hour_of_day](const GhostTimeWindow& value) {
-            return hour_of_day >= value.start_hour && hour_of_day < value.end_hour;
+        [hour_of_day, &action](const GhostTimeWindow& value) {
+            return hour_of_day >= value.start_hour && hour_of_day < value.end_hour
+                && std::find(value.permitted_actions.begin(), value.permitted_actions.end(), action)
+                    != value.permitted_actions.end();
         });
-    if (window == ghost_windows_.end()) return {false, 0.0, "outside ghost time window"};
+    if (window == ghost_windows_.end())
+        return {false, 0.0, "outside permitted time/action window"};
+
     const auto relationship = npc->relationships.find(ghost_id);
     const double trust = relationship == npc->relationships.end() ? 0.0 : relationship->second;
     double memory = 0.0;
     for (const NPCMemory& item : npc->memories) {
         if (item.target_entity_id == ghost_id)
-            memory = std::max(memory, item.retention * (item.action_tag == ActionTag::InteractionPolite ? 0.5 : 1.0));
+            memory = std::max(memory, item.retention
+                * (item.action_tag == ActionTag::InteractionPolite ? 0.5 : 1.0));
     }
     const auto trait = ghost->second.personality.find(npc_id);
     const double openness = trait == ghost->second.personality.end() ? 0.5 : clamp01(trait->second);
-    const double score = clamp01(window->strength * (0.4 * openness + 0.3 * (trust + 1.0) / 2.0 + 0.3 * memory));
+    const double score = clamp01(window->strength
+        * (0.4 * openness + 0.3 * (trust + 1.0) / 2.0 + 0.3 * memory));
     const double sample = static_cast<double>(random_sample % 1000000U) / 1000000.0;
-    (void)action; // Action type is supplied to the event layer; this method decides NPC receptivity.
-    return {sample < score, score, sample < score ? "NPC accepted influence" :
-        "NPC resisted based on personality, memory, and relationship"};
+    const bool accepted = sample < score;
+    if (accepted) {
+        auto remembered = std::find_if(npc->memories.begin(), npc->memories.end(),
+            [&ghost_id](const NPCMemory& item) { return item.target_entity_id == ghost_id; });
+        if (remembered == npc->memories.end()) {
+            NPCMemory new_memory;
+            new_memory.witness_id = npc_id;
+            new_memory.target_entity_id = ghost_id;
+            new_memory.initial_impact = 0.1;
+            new_memory.retention = 0.03;
+            new_memory.timestamp_hour = hour_of_day;
+            new_memory.action_tag = ActionTag::InteractionPolite;
+            npc->memories.push_back(std::move(new_memory));
+        } else {
+            remembered->retention = clamp01(remembered->retention + 0.03);
+            remembered->timestamp_hour = hour_of_day;
+        }
+    }
+    return {accepted, score, accepted ? "NPC accepted influence"
+        : "NPC resisted based on personality, memory, and relationship"};
 }
 
 void LifeCoordinator::advance_day(WorldState& state, std::uint64_t day) {
