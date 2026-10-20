@@ -64,8 +64,11 @@ void LifeCoordinator::restore_snapshot(
         if (!std::isfinite(window.start_hour) || !std::isfinite(window.end_hour)
             || !std::isfinite(window.strength) || window.start_hour < 0.0
             || window.end_hour > 24.0 || window.start_hour >= window.end_hour
-            || window.strength < 0.0)
+            || window.strength < 0.0 || window.permitted_actions.empty())
             throw std::invalid_argument("invalid ghost window snapshot");
+        for (const std::string& action : window.permitted_actions)
+            if (action != "sign" && action != "sound" && action != "dream")
+                throw std::invalid_argument("unsupported ghost action in snapshot");
     }
     characters_ = std::move(characters);
     obligations_ = std::move(obligations);
@@ -160,7 +163,7 @@ RecoveryRange LifeCoordinator::estimate_recovery(
 
 GhostInfluenceResult LifeCoordinator::attempt_ghost_influence(
     const EntityId& ghost_id, const EntityId& npc_id, const std::string& action,
-    double hour_of_day, const WorldState& state, std::uint64_t random_sample) const {
+    double hour_of_day, WorldState& state, std::uint64_t random_sample) {
     const auto ghost = characters_.find(ghost_id);
     const NPC* npc = find_npc(state, npc_id);
     if (ghost == characters_.end() || ghost->second.status != LifeStatus::Ghost)
