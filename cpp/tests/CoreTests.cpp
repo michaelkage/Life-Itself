@@ -870,5 +870,54 @@ int main() {
     assert(allowed_ghost.accepted);
     assert(allowed_ghost.score > 0.7);
 
+    // Lifecycle state survives the versioned binary world snapshot.
+    SimulationWorld lifecycle_save_world;
+    LifeCoordinator& saved_life = lifecycle_save_world.life_system();
+    saved_life.register_character("persistent-life");
+    MedicalCondition persistent_condition;
+    persistent_condition.condition_id = "long-injury";
+    persistent_condition.severity = 0.65;
+    persistent_condition.recovery_per_day = 0.08;
+    persistent_condition.lasting_impairment = true;
+    persistent_condition.impairment_floor = 0.12;
+    saved_life.add_condition("persistent-life", persistent_condition);
+    MedicalTreatment persistent_treatment;
+    persistent_treatment.treatment_id = "rehab";
+    persistent_treatment.condition_id = "long-injury";
+    persistent_treatment.effectiveness = 0.25;
+    persistent_treatment.daily_cost = 3.5;
+    persistent_treatment.complication_risk = 0.1;
+    saved_life.add_treatment("persistent-life", persistent_treatment);
+    saved_life.add_obligation(LifeObligation{
+        "unpaid-debt", "persistent-life", "creditor", 42.5, 17U, false, false});
+    saved_life.set_ghost_windows({GhostTimeWindow{1.5, 3.5, 0.7}});
+    assert(saved_life.kill("persistent-life", 4U, "complications"));
+    assert(saved_life.enter_ghost("persistent-life"));
+    std::stringstream lifecycle_snapshot(std::ios::in | std::ios::out | std::ios::binary);
+    save_world(lifecycle_save_world, lifecycle_snapshot);
+    lifecycle_snapshot.seekg(0);
+    SimulationWorld lifecycle_restored = load_world(lifecycle_snapshot);
+    const auto& restored_life = lifecycle_restored.life_system();
+    assert(restored_life.characters().size() == 1);
+    const LifeCharacter& restored_character = restored_life.characters().at("persistent-life");
+    assert(restored_character.status == LifeStatus::Ghost);
+    assert(restored_character.death_day == 4U);
+    assert(restored_character.death_cause == "complications");
+    assert(restored_character.conditions.size() == 1);
+    assert(restored_character.conditions[0].severity == 0.65);
+    assert(restored_character.conditions[0].lasting_impairment);
+    assert(restored_character.conditions[0].impairment_floor == 0.12);
+    assert(restored_character.treatments.size() == 1);
+    assert(restored_character.treatments[0].daily_cost == 3.5);
+    assert(restored_character.treatments[0].complication_risk == 0.1);
+    assert(restored_life.obligations().size() == 1);
+    assert(restored_life.obligations()[0].obligation_id == "unpaid-debt");
+    assert(restored_life.obligations()[0].amount_due == 42.5);
+    assert(restored_life.obligations()[0].due_day == 17U);
+    assert(restored_life.ghost_windows().size() == 1);
+    assert(restored_life.ghost_windows()[0].start_hour == 1.5);
+    assert(restored_life.ghost_windows()[0].end_hour == 3.5);
+    assert(restored_life.ghost_windows()[0].strength == 0.7);
+
     return 0;
 }
