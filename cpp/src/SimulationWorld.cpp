@@ -51,9 +51,12 @@ WorldAdvanceReport SimulationWorld::advance(
             if (district != state_.districts.end() && npc.current_activity == DailyActivity::Commute
                 && district->transport_reliability < 0.3) {
                 npc.current_activity = DailyActivity::Home;
+                npc.commute_disrupted_today = true;
                 npc.personal_stress = std::clamp(npc.personal_stress
                     + (0.3 - district->transport_reliability) * 0.2, 0.0, 1.0);
             }
+            if (npc.current_activity == DailyActivity::Work && !npc.commute_disrupted_today)
+                npc.work_hours_today = std::min(8.0, npc.work_hours_today + 1.0);
         }
         if (tick.kind == TickKind::Hourly) {
             for (NPC& npc : state_.npcs) {
