@@ -389,6 +389,7 @@ int main() {
     NPC listener_npc;
     listener_npc.entity_id = "listener";
     listener_npc.district_id = "D1";
+    listener_npc.relationships["speaker"] = 0.75;
     NPC player_npc;
     player_npc.entity_id = "player";
     player_npc.district_id = "D1";
@@ -418,8 +419,8 @@ int main() {
     const Conversation world_conversation = world.talk("listener", "speaker");
     assert(world_conversation.transferred.size() == 1);
     assert(world.state().npcs[1].memories.size() == 1);
-    assert(std::abs(world.state().npcs[0].relationships.at("listener") - 0.74) < 1e-9);
-    assert(std::abs(world.state().npcs[1].relationships.at("speaker") + 0.01) < 1e-9);
+    assert(std::abs(world.state().npcs[0].relationships.at("listener") - 0.755) < 1e-9);
+    assert(std::abs(world.state().npcs[1].relationships.at("speaker") - 0.755) < 1e-9);
     CriminalFile world_file = world.build_criminal_file("player");
     assert(world_file.charges.size() == 1);
     assert(world_file.charges[0].evidence == EvidenceKind::Corroborated);
