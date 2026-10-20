@@ -26,7 +26,7 @@ class TestCppPythonDomainParity(unittest.TestCase):
         cls.temp = tempfile.TemporaryDirectory(prefix="simreality-domains-")
         cls.executable = Path(cls.temp.name) / ("domain_probe.exe" if os.name == "nt" else "domain_probe")
         sources = [ROOT / "cpp" / "src" / name for name in [
-            "Decay.cpp", "DecisionSystem.cpp", "Districts.cpp", "Ecosystem.cpp", "Fixers.cpp", "Gossip.cpp",
+            "Decay.cpp", "DecisionSystem.cpp", "Districts.cpp", "Ecosystem.cpp", "Fixers.cpp", "Gossip.cpp", "LifeSystems.cpp",
             "Justice.cpp", "RandomStream.cpp", "Reputation.cpp", "SimulationClock.cpp",
             "SimulationRuntime.cpp", "SimulationScheduler.cpp", "SimulationWorld.cpp",
             "Trauma.cpp", "WorldPersistence.cpp",
