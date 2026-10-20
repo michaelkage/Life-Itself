@@ -3,6 +3,8 @@ project(SimulatedRealityCore VERSION 0.1.0 LANGUAGES CXX)
 
 add_library(simreality_core
     src/SimulationClock.cpp
+    src/DecisionSystem.cpp
+    src/WorldDiagnostics.cpp
     src/RandomStream.cpp
     src/SimulationScheduler.cpp
     src/SimulationRuntime.cpp

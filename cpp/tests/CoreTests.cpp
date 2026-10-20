@@ -1,5 +1,7 @@
 #include "simreality/CoreTypes.h"
 #include "simreality/Decay.h"
+#include "simreality/DecisionSystem.h"
+#include "simreality/WorldDiagnostics.h"
 #include "simreality/Districts.h"
 #include "simreality/Ecosystem.h"
 #include "simreality/Fixers.h"
@@ -758,6 +760,66 @@ int main() {
     (void)untrusted_gossip_world.talk("untrusted-listener", "untrusted-speaker");
     assert(untrusted_gossip_world.state().npcs[0].memories[0].retention < 0.8);
     assert(untrusted_gossip_world.state().npcs[0].memories[0].description.height_uncertainty_m > 0.2);
+
+    // Utility-based fallback decisions respond to needs, time and available options.
+    NPC decision_npc;
+    decision_npc.entity_id = "decision-npc";
+    decision_npc.social_need = 0.9;
+    decision_npc.isolation = 0.8;
+    ActivityContext social_context;
+    social_context.hour = 14;
+    const ActivityDecision social_decision = choose_activity(decision_npc, nullptr, social_context);
+    assert(social_decision.activity == DailyActivity::Socialise);
+    assert(!social_decision.reason.empty());
+    decision_npc.job_id = "legacy-job";
+    ActivityContext work_context;
+    work_context.hour = 12;
+    assert(choose_activity(decision_npc, nullptr, work_context).activity == DailyActivity::Work);
+    work_context.hour = 23;
+    assert(choose_activity(decision_npc, nullptr, work_context).activity == DailyActivity::Sleep);
+
+    // Read-only diagnostics expose whole-world health and reject broken references.
+    WorldState diagnostic_state;
+    District diagnostic_district;
+    diagnostic_district.district_id = "diagnostic-district";
+    diagnostic_state.districts.push_back(diagnostic_district);
+    HousingUnit diagnostic_home;
+    diagnostic_home.unit_id = "diagnostic-home";
+    diagnostic_home.district_id = "diagnostic-district";
+    diagnostic_home.capacity = 1;
+    diagnostic_state.housing_units.push_back(diagnostic_home);
+    Business diagnostic_shop;
+    diagnostic_shop.business_id = "diagnostic-shop";
+    diagnostic_shop.district_id = "diagnostic-district";
+    diagnostic_shop.stock = 25.0;
+    diagnostic_shop.stock_capacity = 30.0;
+    diagnostic_shop.cash = 40.0;
+    diagnostic_state.businesses.push_back(diagnostic_shop);
+    NPC diagnostic_resident;
+    diagnostic_resident.entity_id = "diagnostic-resident";
+    diagnostic_resident.district_id = "diagnostic-district";
+    diagnostic_resident.home_id = "diagnostic-home";
+    diagnostic_resident.job_id = "diagnostic-shop";
+    diagnostic_resident.money = 75.0;
+    diagnostic_resident.personal_stress = 0.4;
+    diagnostic_state.npcs.push_back(diagnostic_resident);
+    OngoingEvent diagnostic_event;
+    diagnostic_event.event_id = "diagnostic-event";
+    diagnostic_event.district_id = "diagnostic-district";
+    diagnostic_state.ongoing_events.push_back(diagnostic_event);
+    const WorldMetrics metrics = collect_world_metrics(diagnostic_state);
+    assert(metrics.residents == 1);
+    assert(metrics.housed_residents == 1);
+    assert(metrics.employed_residents == 1);
+    assert(metrics.open_businesses == 1);
+    assert(metrics.unresolved_events == 1);
+    assert(metrics.resident_cash == 75.0);
+    assert(metrics.business_cash == 40.0);
+    assert(metrics.available_business_stock == 25.0);
+    assert(std::abs(metrics.average_stress - 0.4) < 1e-9);
+    assert(validate_world_state(diagnostic_state).valid());
+    diagnostic_state.npcs[0].home_id = "missing-home";
+    assert(!validate_world_state(diagnostic_state).valid());
 
     bool rejected_bad_snapshot = false;
     try {

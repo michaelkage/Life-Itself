@@ -1,6 +1,7 @@
 #include "simreality/SimulationWorld.h"
 
 #include "simreality/Decay.h"
+#include "simreality/DecisionSystem.h"
 #include "simreality/Districts.h"
 #include "simreality/Ecosystem.h"
 #include "simreality/Gossip.h"
@@ -40,11 +41,34 @@ WorldAdvanceReport SimulationWorld::advance(
                 }
             }
             if (!matched_schedule) {
-                if (hour >= 22U || hour < 6U) npc.current_activity = DailyActivity::Sleep;
-                else if (hour >= 9U && hour < 17U && !npc.job_id.empty()) npc.current_activity = DailyActivity::Work;
-                else if (hour >= 7U && hour < 9U && !npc.job_id.empty()) npc.current_activity = DailyActivity::Commute;
-                else if (npc.trauma_level >= TraumaLevel::Paranoid) npc.current_activity = DailyActivity::Home;
-                else npc.current_activity = DailyActivity::Socialise;
+                const auto decision_district = std::find_if(
+                    state_.districts.begin(), state_.districts.end(),
+                    [&npc](const District& candidate) { return candidate.district_id == npc.district_id; });
+                const bool has_open_shop = std::any_of(
+                    state_.businesses.begin(), state_.businesses.end(),
+                    [&npc](const Business& business) {
+                        return business.district_id == npc.district_id && business.open && business.stock > 0.0;
+                    });
+                const bool trusted_contact = std::any_of(
+                    npc.relationships.begin(), npc.relationships.end(),
+                    [this, &npc](const auto& relationship) {
+                        if (relationship.second < 0.25) return false;
+                        return std::any_of(state_.npcs.begin(), state_.npcs.end(),
+                            [&npc, &relationship](const NPC& other) {
+                                return other.entity_id == relationship.first
+                                    && other.district_id == npc.district_id
+                                    && other.entity_id != npc.entity_id;
+                            });
+                    });
+                const ActivityContext context{
+                    hour,
+                    has_open_shop,
+                    decision_district != state_.districts.end()
+                        && decision_district->service_capacity > 0.2,
+                    trusted_contact};
+                npc.current_activity = choose_activity(
+                    npc, decision_district == state_.districts.end() ? nullptr : &*decision_district,
+                    context).activity;
             }
             const auto district = std::find_if(state_.districts.begin(), state_.districts.end(),
                 [&npc](const District& candidate) { return candidate.district_id == npc.district_id; });
@@ -393,6 +417,9 @@ WorldAdvanceReport SimulationWorld::advance(
                     daily_update(npc, npc.desperation_index, 1.0);
                 district_result.residents.push_back(
                     {npc.entity_id, behaviour, trauma_result});
+                // Work attendance and commute disruption are daily inputs, not lifetime flags.
+                npc.work_hours_today = 0.0;
+                npc.commute_disrupted_today = false;
             }
             report.daily_results.push_back(std::move(district_result));
         }

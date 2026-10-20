@@ -2,7 +2,7 @@
 
 **Life Itself** is the game and product. **Simulated Reality Engine (SRE)** is its technical engine name: a persistent, systemic open-world life simulation where people remember, forget, talk, react, build reputations, experience trauma, navigate justice, and make deals. The long-term ambition is a grounded, reactive open world with the freedom and systemic depth of a real-life crime sandbox, while keeping everyday life—not just crime—at the centre.
 
-The engine is designed for continuous simulation: dynamic NPC memory decay, mutating rumour networks, district-level pressure, personal stress, local reputation, justice, fixer networks, deterministic world stepping, and save/load continuation.
+The engine is designed for continuous simulation: dynamic NPC memory decay, mutating rumour networks, district-level pressure, personal stress, local reputation, justice, fixer networks, deterministic world stepping, utility-based fallback activity selection, read-only world diagnostics, and save/load continuation.
 
 **Development status: simulation core in progress.** The Python reference models the
 engine-independent systems; the portable C++20 implementation ports them into a
@@ -168,3 +168,22 @@ Not yet built, all of it engine-dependent:
   time with regression tests against Python. Install Unreal only when the portable
   systems and hardware/storage plan are ready; Python remains the behavioral
   reference until differential parity is established.
+
+### Decision-making and world diagnostics
+
+Unscheduled NPC hours now use a deterministic utility-based activity selector. It
+considers time of day, employment, transport reliability, stress, social need,
+isolation, available shops, service capacity and trusted local contacts. Explicit
+schedule entries still take precedence. The selected activity includes a score
+and human-readable reason for debugging and future tooling.
+
+The portable diagnostics module provides read-only world metrics (housing,
+employment, resident and business cash, stock, unresolved events and average
+wellbeing proxies) plus invariant checks for duplicate IDs, broken district/home
+references, housing capacity, numeric ranges and business inventory. These tools
+are intended for regression tests, scenario telemetry and a future Unreal adapter;
+they do not mutate authoritative world state.
+
+Daily work hours and commute disruption are reset after the daily payroll and
+resident update, preventing yesterday's attendance from being counted again on
+subsequent days.
