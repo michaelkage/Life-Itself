@@ -127,7 +127,7 @@ WorldAdvanceReport SimulationWorld::advance(
                 if (occupied < unit.capacity) vacant_housing_slots += unit.capacity - occupied;
             }
             if (total_housing_slots > 0U)
-                district.housing_availability = static_cast<double>(vacant_housing_slots) / total_housing_slots;
+                district.housing_availability = static_cast<double>(vacant_housing_slots) / static_cast<double>(total_housing_slots);
             else
                 district.housing_availability = std::any_of(state_.npcs.begin(), state_.npcs.end(),
                     [&district](const NPC& resident) { return resident.district_id == district.district_id && resident.home_id.empty(); })
@@ -279,7 +279,7 @@ WorldAdvanceReport SimulationWorld::advance(
                     npc.isolation = std::clamp(npc.isolation + (trusted_ties > 0.0 || household_contacts > 0U ? 0.005 : 0.035), 0.0, 1.0);
                 }
                 const double social_strain = npc.social_need * 0.04 + npc.isolation * 0.05;
-                const double social_support = std::min(0.08, trusted_ties * 0.015 + household_contacts * 0.02);
+                const double social_support = std::min(0.08, trusted_ties * 0.015 + static_cast<double>(household_contacts) * 0.02);
                 // Financial and housing shocks hurt more when isolated; trusted ties and shared homes buffer them.
                 const double isolation_multiplier = 1.0 + npc.isolation * 0.5;
                 npc.desperation_index = std::clamp(npc.desperation_index
