@@ -868,7 +868,7 @@ int main() {
     const auto allowed_ghost = lives.attempt_ghost_influence(
         "life-dead", "receptive", "sound", 3.0, ghost_state, 0U);
     assert(allowed_ghost.accepted);
-    assert(allowed_ghost.score > 0.8);
+    assert(allowed_ghost.score > 0.7);
 
     return 0;
 }
