@@ -91,3 +91,7 @@ __all__ += [
     "SocialObligation",
     "WorldArchive",
 ]
+
+from .campaign import ArchivedTimeline, LifeItselfCampaign
+
+__all__ += ["ArchivedTimeline", "LifeItselfCampaign"]
