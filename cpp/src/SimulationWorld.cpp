@@ -260,12 +260,32 @@ WorldAdvanceReport SimulationWorld::advance(
                 const double supply_pressure = 0.2 * district.supply_shortage;
                 const double service_relief = npc.current_activity == DailyActivity::Service
                     ? 0.1 * district.service_capacity : 0.0;
+                std::size_t household_contacts = 0;
+                for (const NPC& other : state_.npcs) {
+                    if (other.entity_id == npc.entity_id || other.district_id != npc.district_id) continue;
+                    if (!npc.home_id.empty() && other.home_id == npc.home_id) ++household_contacts;
+                }
+                double trusted_ties = 0.0;
+                for (const auto& [other_id, strength] : npc.relationships)
+                    if (strength > 0.25) trusted_ties += strength;
+                if (npc.current_activity == DailyActivity::Socialise) {
+                    npc.social_need = std::max(0.0, npc.social_need - 0.12);
+                    npc.isolation = std::max(0.0, npc.isolation - 0.08);
+                } else {
+                    npc.social_need = std::min(1.0, npc.social_need + 0.025);
+                    npc.isolation = std::clamp(npc.isolation + (trusted_ties > 0.0 || household_contacts > 0U ? 0.005 : 0.035), 0.0, 1.0);
+                }
+                const double social_strain = npc.social_need * 0.04 + npc.isolation * 0.05;
+                const double social_support = std::min(0.08, trusted_ties * 0.015 + household_contacts * 0.02);
+                // Financial and housing shocks hurt more when isolated; trusted ties and shared homes buffer them.
+                const double isolation_multiplier = 1.0 + npc.isolation * 0.5;
                 npc.desperation_index = std::clamp(npc.desperation_index
-                    + housing_pressure + unemployment_pressure + supply_pressure
-                    - service_relief, 0.0, 1.0);
+                    + housing_pressure + unemployment_pressure + supply_pressure * isolation_multiplier
+                    + social_strain - service_relief - social_support, 0.0, 1.0);
                 npc.personal_stress = std::clamp(npc.personal_stress
                     + housing_pressure * 0.2 + unemployment_pressure * 0.2
-                    + supply_pressure * 0.1 - service_relief * 0.2, 0.0, 1.0);
+                    + supply_pressure * 0.1 * isolation_multiplier + social_strain
+                    - service_relief * 0.2 - social_support, 0.0, 1.0);
                 const TraumaAssessment trauma_result =
                     daily_update(npc, npc.desperation_index, 1.0);
                 district_result.residents.push_back(
@@ -309,6 +329,15 @@ Conversation SimulationWorld::talk(
     auto& speaker_tie = speaker.relationships[listener_id];
     listener_tie = std::clamp(listener_tie + change, -1.0, 1.0);
     speaker_tie = std::clamp(speaker_tie + change, -1.0, 1.0);
+    // Contact meets social needs; damaging rumours can erode trust and raise strain.
+    listener.social_need = std::clamp(listener.social_need - 0.12, 0.0, 1.0);
+    speaker.social_need = std::clamp(speaker.social_need - 0.08, 0.0, 1.0);
+    listener.isolation = std::clamp(listener.isolation - 0.1, 0.0, 1.0);
+    speaker.isolation = std::clamp(speaker.isolation - 0.08, 0.0, 1.0);
+    if (!conversation.transferred.empty()) {
+        listener.personal_stress = std::clamp(listener.personal_stress + 0.01, 0.0, 1.0);
+        speaker.personal_stress = std::clamp(speaker.personal_stress + 0.01, 0.0, 1.0);
+    }
     return conversation;
 }
 
