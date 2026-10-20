@@ -929,17 +929,17 @@ int main() {
     NPC creditor;
     creditor.entity_id = "creditor";
     creditor.money = 0.0;
-    NPC supporter;
-    supporter.entity_id = "supporter";
-    supporter.money = 100.0;
-    supporter.relationships["former-player"] = 0.9;
+    NPC ghost_supporter;
+    ghost_supporter.entity_id = "ghost_supporter";
+    ghost_supporter.money = 100.0;
+    ghost_supporter.relationships["former-player"] = 0.9;
     NPCMemory remembered_ghost;
-    remembered_ghost.witness_id = "supporter";
+    remembered_ghost.witness_id = "ghost_supporter";
     remembered_ghost.target_entity_id = "former-player";
     remembered_ghost.retention = 0.9;
     remembered_ghost.action_tag = ActionTag::InteractionPolite;
-    supporter.memories.push_back(remembered_ghost);
-    campaign_state.npcs = {former_player, creditor, supporter};
+    ghost_supporter.memories.push_back(remembered_ghost);
+    campaign_state.npcs = {former_player, creditor, ghost_supporter};
 
     CampaignCoordinator campaign(SimulationWorld(std::move(campaign_state), 0.0, 987U));
     campaign.begin_first_life("former-player");
@@ -960,17 +960,17 @@ int main() {
 
     const GhostInfluenceResult uninterrupted_influence =
         uninterrupted.active_world().life_system().attempt_ghost_influence(
-            "former-player", "supporter", "comfort", 9.0,
+            "former-player", "ghost_supporter", "comfort", 9.0,
             uninterrupted.active_world().state(), 100000U);
     const GhostInfluenceResult resumed_influence =
         save_resume.active_world().life_system().attempt_ghost_influence(
-            "former-player", "supporter", "comfort", 9.0,
+            "former-player", "ghost_supporter", "comfort", 9.0,
             save_resume.active_world().state(), 100000U);
     assert(uninterrupted_influence.accepted == resumed_influence.accepted);
     assert(uninterrupted_influence.score == resumed_influence.score);
     assert(uninterrupted_influence.accepted);
     assert(!save_resume.active_world().life_system().attempt_ghost_influence(
-        "former-player", "supporter", "comfort", 12.0,
+        "former-player", "ghost_supporter", "comfort", 12.0,
         save_resume.active_world().state(), 100000U).accepted);
 
     (void)uninterrupted.advance(15.5);
