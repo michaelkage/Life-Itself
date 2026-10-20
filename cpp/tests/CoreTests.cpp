@@ -1,4 +1,5 @@
 #include "simreality/CoreTypes.h"
+#include "simreality/Campaign.h"
 #include "simreality/Decay.h"
 #include "simreality/DecisionSystem.h"
 #include "simreality/WorldDiagnostics.h"
@@ -918,6 +919,103 @@ int main() {
     assert(restored_life.ghost_windows()[0].start_hour == 1.5);
     assert(restored_life.ghost_windows()[0].end_hour == 3.5);
     assert(restored_life.ghost_windows()[0].strength == 0.7);
+
+    // Campaign-level save/resume remains identical after death, debt settlement,
+    // ghost-window decisions, and the transition into a new archived timeline.
+    WorldState campaign_state;
+    NPC former_player;
+    former_player.entity_id = "former-player";
+    former_player.money = 20.0;
+    NPC creditor;
+    creditor.entity_id = "creditor";
+    creditor.money = 0.0;
+    NPC supporter;
+    supporter.entity_id = "supporter";
+    supporter.money = 100.0;
+    supporter.relationships["former-player"] = 0.9;
+    NPCMemory remembered_ghost;
+    remembered_ghost.witness_id = "supporter";
+    remembered_ghost.target_entity_id = "former-player";
+    remembered_ghost.retention = 0.9;
+    remembered_ghost.action_tag = ActionTag::InteractionPolite;
+    supporter.memories.push_back(remembered_ghost);
+    campaign_state.npcs = {former_player, creditor, supporter};
+
+    CampaignCoordinator campaign(SimulationWorld(std::move(campaign_state), 0.0, 987U));
+    campaign.begin_first_life("former-player");
+    campaign.active_world().life_system().add_obligation(
+        LifeObligation{"family-debt", "former-player", "creditor", 40.0, 30U, false, false});
+    campaign.active_world().life_system().set_ghost_windows({GhostTimeWindow{8.0, 10.0, 1.0}});
+    assert(campaign.record_death("complications"));
+    assert(campaign.enter_ghost());
+
+    CampaignCoordinator uninterrupted = campaign;
+    CampaignCoordinator save_resume = campaign;
+    (void)uninterrupted.advance(8.5);
+    (void)save_resume.advance(8.5);
+    std::stringstream campaign_snapshot(std::ios::in | std::ios::out | std::ios::binary);
+    save_campaign(save_resume, campaign_snapshot);
+    campaign_snapshot.seekg(0);
+    save_resume = load_campaign(campaign_snapshot);
+
+    const GhostInfluenceResult uninterrupted_influence =
+        uninterrupted.active_world().life_system().attempt_ghost_influence(
+            "former-player", "supporter", "comfort", 9.0,
+            uninterrupted.active_world().state(), 100000U);
+    const GhostInfluenceResult resumed_influence =
+        save_resume.active_world().life_system().attempt_ghost_influence(
+            "former-player", "supporter", "comfort", 9.0,
+            save_resume.active_world().state(), 100000U);
+    assert(uninterrupted_influence.accepted == resumed_influence.accepted);
+    assert(uninterrupted_influence.score == resumed_influence.score);
+    assert(uninterrupted_influence.accepted);
+    assert(!save_resume.active_world().life_system().attempt_ghost_influence(
+        "former-player", "supporter", "comfort", 12.0,
+        save_resume.active_world().state(), 100000U).accepted);
+
+    (void)uninterrupted.advance(15.5);
+    (void)save_resume.advance(15.5);
+    const auto& reference_obligation = uninterrupted.active_world().life_system().obligations().at(0);
+    const auto& resumed_obligation = save_resume.active_world().life_system().obligations().at(0);
+    assert(reference_obligation.settled && resumed_obligation.settled);
+    assert(reference_obligation.amount_due == resumed_obligation.amount_due);
+    assert(uninterrupted.active_world().state().npcs[1].money ==
+        save_resume.active_world().state().npcs[1].money);
+    assert(uninterrupted.active_world().state().npcs[2].money ==
+        save_resume.active_world().state().npcs[2].money);
+    assert(uninterrupted.active_world().state().npcs[0].money ==
+        save_resume.active_world().state().npcs[0].money);
+    assert(uninterrupted.active_world().life_system().characters().at("former-player").status ==
+        save_resume.active_world().life_system().characters().at("former-player").status);
+    std::stringstream reference_bytes(std::ios::in | std::ios::out | std::ios::binary);
+    std::stringstream resumed_bytes(std::ios::in | std::ios::out | std::ios::binary);
+    save_campaign(uninterrupted, reference_bytes);
+    save_campaign(save_resume, resumed_bytes);
+    assert(reference_bytes.str() == resumed_bytes.str());
+
+    uninterrupted.start_new_life("next-life", WorldState{}, 123U);
+    save_resume.start_new_life("next-life", WorldState{}, 123U);
+    assert(uninterrupted.archives().size() == 1U);
+    assert(save_resume.archives().size() == 1U);
+    assert(uninterrupted.active_world().total_hours() == 0.0);
+    assert(uninterrupted.active_world().day_index() == 0U);
+    assert(uninterrupted.active_character_id() == "next-life");
+    const SimulationWorld archived_timeline =
+        uninterrupted.inspect_archive(uninterrupted.archives().front().archive_id);
+    assert(archived_timeline.life_system().characters().at("former-player").status == LifeStatus::Archived);
+    assert(archived_timeline.life_system().obligations().at(0).settled);
+    std::stringstream final_campaign_snapshot(std::ios::in | std::ios::out | std::ios::binary);
+    save_campaign(uninterrupted, final_campaign_snapshot);
+    final_campaign_snapshot.seekg(0);
+    CampaignCoordinator final_campaign_restored = load_campaign(final_campaign_snapshot);
+    assert(final_campaign_restored.archives().size() == 1U);
+    assert(final_campaign_restored.active_world().total_hours() == 0.0);
+    assert(final_campaign_restored.active_character_id() == "next-life");
+    std::stringstream final_bytes_a(std::ios::in | std::ios::out | std::ios::binary);
+    std::stringstream final_bytes_b(std::ios::in | std::ios::out | std::ios::binary);
+    save_campaign(uninterrupted, final_bytes_a);
+    save_campaign(final_campaign_restored, final_bytes_b);
+    assert(final_bytes_a.str() == final_bytes_b.str());
 
     return 0;
 }

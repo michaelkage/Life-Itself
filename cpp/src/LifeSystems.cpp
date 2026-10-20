@@ -8,6 +8,15 @@ namespace simreality {
 namespace {
 double clamp01(double value) { return std::clamp(value, 0.0, 1.0); }
 
+std::uint64_t stable_string_hash(const std::string& value) {
+    std::uint64_t hash = 14695981039346656037ULL;
+    for (const unsigned char byte : value) {
+        hash ^= static_cast<std::uint64_t>(byte);
+        hash *= 1099511628211ULL;
+    }
+    return hash;
+}
+
 const NPC* find_npc(const WorldState& state, const EntityId& id) {
     for (const NPC& npc : state.npcs) if (npc.entity_id == id) return &npc;
     return nullptr;
@@ -123,6 +132,13 @@ bool LifeCoordinator::enter_ghost(const EntityId& id) {
     return true;
 }
 
+bool LifeCoordinator::archive_character(const EntityId& id) {
+    LifeCharacter& character = find_character(id);
+    if (character.status == LifeStatus::Active || character.status == LifeStatus::Archived) return false;
+    character.status = LifeStatus::Archived;
+    return true;
+}
+
 RecoveryRange LifeCoordinator::estimate_recovery(
     const EntityId& id, const std::string& condition_id) const {
     const LifeCharacter& character = find_character(id);
@@ -186,7 +202,7 @@ void LifeCoordinator::advance_day(WorldState& state, std::uint64_t day) {
             const RecoveryRange estimate = estimate_recovery(id, condition.condition_id);
             // A reproducible sample inside the uncertainty interval, keyed by day and condition.
             const std::uint64_t mix = day * 2654435761ULL
-                + static_cast<std::uint64_t>(std::hash<std::string>{}(condition.condition_id));
+                + stable_string_hash(condition.condition_id);
             const double unit = static_cast<double>(mix % 10000ULL) / 10000.0;
             condition.severity = std::max(0.0, condition.severity
                 - (estimate.lower + (estimate.upper - estimate.lower) * unit));
