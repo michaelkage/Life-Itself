@@ -646,7 +646,7 @@ int main() {
     NPC new_housemate;
     new_housemate.entity_id = "new-housemate";
     new_housemate.district_id = "shared-home-district";
-    new_housemate.money = 20.0;
+    new_housemate.money = 50.0; // Can afford half the rent, not the whole unit.
     new_housemate.relationships["existing-housemate"] = 0.8;
     shared_home_state.npcs = {existing_housemate, new_housemate};
     SimulationWorld shared_home_world(std::move(shared_home_state), 0.0, 21U);
