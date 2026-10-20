@@ -563,6 +563,69 @@ int main() {
         multiweek_resumed.state().ongoing_events[0].investigation_progress);
     assert(multiweek_reference.random_stream().next_u64() == multiweek_resumed.random_stream().next_u64());
 
+    // Repeated shared social hours strengthen reciprocal ties and reduce isolation.
+    WorldState social_state;
+    District social_district;
+    social_district.district_id = "social-district";
+    social_state.districts.push_back(social_district);
+    NPC social_a;
+    social_a.entity_id = "social-a";
+    social_a.district_id = "social-district";
+    social_a.schedule = {{DailyActivity::Socialise, 9, 17}};
+    social_a.isolation = 0.5;
+    NPC social_b;
+    social_b.entity_id = "social-b";
+    social_b.district_id = "social-district";
+    social_b.schedule = {{DailyActivity::Socialise, 9, 17}};
+    social_b.isolation = 0.5;
+    social_state.npcs = {social_a, social_b};
+    SimulationWorld social_world(std::move(social_state), 0.0, 12U);
+    (void)social_world.advance(12.0);
+    assert(social_world.state().npcs[0].relationships.at("social-b") > 0.1);
+    assert(social_world.state().npcs[1].relationships.at("social-a") > 0.1);
+    assert(social_world.state().npcs[0].isolation < 0.5);
+    assert(social_world.state().npcs[1].social_need < 0.25);
+
+    // A scheduled shopping hour transfers money into a real shop and consumes stock.
+    WorldState shopping_state;
+    District shopping_district;
+    shopping_district.district_id = "shopping-district";
+    shopping_state.districts.push_back(shopping_district);
+    NPC shopper;
+    shopper.entity_id = "shopper";
+    shopper.district_id = "shopping-district";
+    shopper.money = 100.0;
+    shopper.schedule = {{DailyActivity::Shop, 9, 10}};
+    shopping_state.npcs.push_back(shopper);
+    Business test_shop;
+    test_shop.business_id = "test-shop";
+    test_shop.district_id = "shopping-district";
+    test_shop.stock = 20.0;
+    test_shop.stock_capacity = 20.0;
+    test_shop.cash = 50.0;
+    shopping_state.businesses.push_back(test_shop);
+    SimulationWorld shopping_world(std::move(shopping_state), 0.0, 13U);
+    (void)shopping_world.advance(12.0);
+    assert(shopping_world.state().npcs[0].money == 95.0);
+    assert(shopping_world.state().businesses[0].stock == 15.0);
+    assert(shopping_world.state().businesses[0].cash == 55.0);
+
+    // Service attendance provides an actual wellbeing benefit.
+    WorldState service_state;
+    District service_district;
+    service_district.district_id = "service-district";
+    service_district.service_capacity = 1.0;
+    service_state.districts.push_back(service_district);
+    NPC service_user;
+    service_user.entity_id = "service-user";
+    service_user.district_id = "service-district";
+    service_user.personal_stress = 0.5;
+    service_user.schedule = {{DailyActivity::Service, 9, 11}};
+    service_state.npcs.push_back(service_user);
+    SimulationWorld service_world(std::move(service_state), 0.0, 14U);
+    (void)service_world.advance(12.0);
+    assert(service_world.state().npcs[0].personal_stress < 0.5);
+
     bool rejected_bad_snapshot = false;
     try {
         std::stringstream invalid_snapshot("not-a-snapshot");
