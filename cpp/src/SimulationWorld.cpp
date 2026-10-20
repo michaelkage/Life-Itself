@@ -425,9 +425,47 @@ Conversation SimulationWorld::talk(
     if (listener.district_id != speaker.district_id) {
         throw std::invalid_argument("NPCs must share a district to converse");
     }
+    const auto prior_listener_tie = listener.relationships.find(speaker_id);
+    const auto prior_speaker_tie = speaker.relationships.find(listener_id);
+    const double prior_trust = std::min(
+        prior_listener_tie == listener.relationships.end() ? 0.0 : prior_listener_tie->second,
+        prior_speaker_tie == speaker.relationships.end() ? 0.0 : prior_speaker_tie->second);
     Conversation conversation = converse(listener, speaker, listener.district_id);
-    // Repeated contact strengthens familiarity; sharing a damaging rumour weakens trust.
-    const double change = conversation.transferred.empty() ? 0.02 : -0.01;
+    // Trust changes the quality of what travels: trusted sources reinforce a memory;
+    // hostile or unreliable sources leave weaker, less certain impressions.
+    const auto action_name = [](ActionTag tag) {
+        switch (tag) {
+            case ActionTag::InteractionPolite: return std::string("Interaction.Polite");
+            case ActionTag::CrimeTheft: return std::string("Crime.Theft");
+            case ActionTag::CrimeAssault: return std::string("Crime.Assault");
+            case ActionTag::CrimeArmedAssault: return std::string("Crime.ArmedAssault");
+            case ActionTag::CrimeVandalism: return std::string("Crime.Vandalism");
+        }
+        return std::string("Unknown");
+    };
+    for (const Rumour& rumour : conversation.transferred) {
+        const std::string expected_action = rumour.action_tag;
+        for (NPCMemory& received : listener.memories) {
+            if (received.target_entity_id != rumour.target_entity_id
+                || action_name(received.action_tag) != expected_action) continue;
+            if (prior_trust >= 0.5) {
+                received.retention = std::clamp(received.retention + 0.05, 0.0, 1.0);
+                received.initial_impact = std::max(received.initial_impact, received.retention);
+                received.description.observations = std::min<std::uint32_t>(
+                    received.description.observations + 1U, 1000000U);
+            } else if (prior_trust < 0.0) {
+                received.retention *= 0.65;
+                received.initial_impact = std::min(received.initial_impact, received.retention);
+                received.description.height_uncertainty_m += 0.15;
+                for (auto& [colour, weight] : received.description.jacket_colour_weights) {
+                    (void)colour;
+                    weight *= 0.7;
+                }
+            }
+        }
+    }
+    const double change = conversation.transferred.empty() ? 0.02
+        : (prior_trust >= 0.5 ? 0.005 : (prior_trust < 0.0 ? -0.02 : -0.01));
     auto& listener_tie = listener.relationships[speaker_id];
     auto& speaker_tie = speaker.relationships[listener_id];
     listener_tie = std::clamp(listener_tie + change, -1.0, 1.0);
