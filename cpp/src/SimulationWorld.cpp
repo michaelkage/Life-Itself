@@ -59,10 +59,53 @@ WorldAdvanceReport SimulationWorld::advance(
                 npc.work_hours_today = std::min(8.0, npc.work_hours_today + 1.0);
         }
         if (tick.kind == TickKind::Hourly) {
+            // Schedules drive hourly economic and social behaviour, not just a label.
             for (NPC& npc : state_.npcs) {
                 npc.memories = sweep(
                     npc.memories, npc.age_band, tick.at_hour, visibility_weather);
                 report.memories_swept += npc.memories.size();
+                const auto district = std::find_if(state_.districts.begin(), state_.districts.end(),
+                    [&npc](const District& candidate) { return candidate.district_id == npc.district_id; });
+                if (district == state_.districts.end()) continue;
+                if (npc.current_activity == DailyActivity::Shop && npc.money > 0.0) {
+                    auto shop = std::find_if(state_.businesses.begin(), state_.businesses.end(),
+                        [&npc](const Business& business) {
+                            return business.district_id == npc.district_id && business.open && business.stock > 0.0;
+                        });
+                    if (shop != state_.businesses.end()) {
+                        const double purchase = std::min({npc.money, 5.0, shop->stock});
+                        npc.money -= purchase;
+                        shop->stock -= purchase;
+                        shop->cash += purchase;
+                        district->shop_stock = std::max(0.0, district->shop_stock - purchase * 0.01);
+                    }
+                } else if (npc.current_activity == DailyActivity::Service
+                    && district->service_capacity > 0.0) {
+                    const double access = std::clamp(district->service_capacity, 0.0, 1.0);
+                    npc.personal_stress = std::clamp(npc.personal_stress - 0.02 * access, 0.0, 1.0);
+                    npc.desperation_index = std::clamp(npc.desperation_index - 0.01 * access, 0.0, 1.0);
+                    npc.social_need = std::clamp(npc.social_need - 0.015 * access, 0.0, 1.0);
+                }
+            }
+            // Shared social time creates reciprocal ties and support over repeated encounters.
+            for (std::size_t i = 0; i < state_.npcs.size(); ++i) {
+                NPC& first = state_.npcs[i];
+                if (first.current_activity != DailyActivity::Socialise) continue;
+                for (std::size_t j = i + 1; j < state_.npcs.size(); ++j) {
+                    NPC& second = state_.npcs[j];
+                    if (second.current_activity != DailyActivity::Socialise
+                        || first.district_id != second.district_id) continue;
+                    double& first_tie = first.relationships[second.entity_id];
+                    double& second_tie = second.relationships[first.entity_id];
+                    first_tie = std::clamp(first_tie + 0.015, -1.0, 1.0);
+                    second_tie = std::clamp(second_tie + 0.015, -1.0, 1.0);
+                    first.social_need = std::max(0.0, first.social_need - 0.05);
+                    second.social_need = std::max(0.0, second.social_need - 0.05);
+                    first.isolation = std::max(0.0, first.isolation - 0.04);
+                    second.isolation = std::max(0.0, second.isolation - 0.04);
+                    first.personal_stress = std::max(0.0, first.personal_stress - 0.005);
+                    second.personal_stress = std::max(0.0, second.personal_stress - 0.005);
+                }
             }
             continue;
         }
@@ -214,19 +257,6 @@ WorldAdvanceReport SimulationWorld::advance(
                     if (std::find(resident.goals.begin(), resident.goals.end(), "find_housing") == resident.goals.end())
                         resident.goals.push_back("find_housing");
                 }
-                if (resident.current_activity == DailyActivity::Shop && resident.money > 0.0) {
-                    auto shop = std::find_if(state_.businesses.begin(), state_.businesses.end(),
-                        [&district](const Business& business) {
-                            return business.district_id == district.district_id && business.open && business.stock > 0.0;
-                        });
-                    if (shop != state_.businesses.end()) {
-                        const double purchase = std::min({resident.money, 5.0, shop->stock});
-                        resident.money -= purchase;
-                        shop->stock -= purchase;
-                        shop->cash += purchase;
-                    }
-                    district.shop_stock = std::max(0.0, district.shop_stock - 0.01);
-                }
             }
             district.cash_circulation = std::max(0.0, district.cash_circulation + payroll - rent_collected);
             const double population_factor = std::min(1.0,
@@ -283,10 +313,10 @@ WorldAdvanceReport SimulationWorld::advance(
                 // Financial and housing shocks hurt more when isolated; trusted ties and shared homes buffer them.
                 const double isolation_multiplier = 1.0 + npc.isolation * 0.5;
                 npc.desperation_index = std::clamp(npc.desperation_index
-                    + housing_pressure + unemployment_pressure + supply_pressure * isolation_multiplier
-                    + social_strain - service_relief - social_support, 0.0, 1.0);
+                    + (housing_pressure + unemployment_pressure) * isolation_multiplier
+                    + supply_pressure * isolation_multiplier + social_strain - service_relief - social_support, 0.0, 1.0);
                 npc.personal_stress = std::clamp(npc.personal_stress
-                    + housing_pressure * 0.2 + unemployment_pressure * 0.2
+                    + (housing_pressure * 0.2 + unemployment_pressure * 0.2) * isolation_multiplier
                     + supply_pressure * 0.1 * isolation_multiplier + social_strain
                     - service_relief * 0.2 - social_support, 0.0, 1.0);
                 const TraumaAssessment trauma_result =
