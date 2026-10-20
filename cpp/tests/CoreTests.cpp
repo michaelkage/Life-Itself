@@ -870,6 +870,13 @@ int main() {
         "life-dead", "receptive", "sound", 3.0, ghost_state, 0U);
     assert(allowed_ghost.accepted);
     assert(allowed_ghost.score > 0.7);
+    assert(ghost_state.npcs.back().memories.back().retention > 0.9);
+    const std::size_t memories_after_success = ghost_state.npcs.back().memories.size();
+    const auto forbidden_ghost = lives.attempt_ghost_influence(
+        "life-dead", "receptive", "comfort", 3.0, ghost_state, 0U);
+    assert(!forbidden_ghost.accepted);
+    assert(forbidden_ghost.reason == "outside permitted time/action window");
+    assert(ghost_state.npcs.back().memories.size() == memories_after_success);
 
     // Lifecycle state survives the versioned binary world snapshot.
     SimulationWorld lifecycle_save_world;
@@ -919,6 +926,8 @@ int main() {
     assert(restored_life.ghost_windows()[0].start_hour == 1.5);
     assert(restored_life.ghost_windows()[0].end_hour == 3.5);
     assert(restored_life.ghost_windows()[0].strength == 0.7);
+    assert(restored_life.ghost_windows()[0].permitted_actions
+        == std::vector<std::string>({"sign", "sound", "dream"}));
 
     // Campaign-level save/resume remains identical after death, debt settlement,
     // ghost-window decisions, and the transition into a new archived timeline.
@@ -959,19 +968,26 @@ int main() {
     save_resume = load_campaign(campaign_snapshot);
 
     const GhostInfluenceResult uninterrupted_influence =
-        uninterrupted.active_world().life_system().attempt_ghost_influence(
-            "former-player", "ghost_supporter", "comfort", 9.0,
-            uninterrupted.active_world().state(), 100000U);
+        uninterrupted.attempt_ghost_influence("ghost_supporter", "sound", 9.0);
     const GhostInfluenceResult resumed_influence =
-        save_resume.active_world().life_system().attempt_ghost_influence(
-            "former-player", "ghost_supporter", "comfort", 9.0,
-            save_resume.active_world().state(), 100000U);
+        save_resume.attempt_ghost_influence("ghost_supporter", "sound", 9.0);
     assert(uninterrupted_influence.accepted == resumed_influence.accepted);
     assert(uninterrupted_influence.score == resumed_influence.score);
     assert(uninterrupted_influence.accepted);
-    assert(!save_resume.active_world().life_system().attempt_ghost_influence(
-        "former-player", "ghost_supporter", "comfort", 12.0,
-        save_resume.active_world().state(), 100000U).accepted);
+    assert(uninterrupted.active_world().random_state() == save_resume.active_world().random_state());
+    const auto& reference_memories = uninterrupted.active_world().state().npcs[2].memories;
+    const auto& resumed_memories = save_resume.active_world().state().npcs[2].memories;
+    assert(reference_memories.size() == resumed_memories.size());
+    assert(reference_memories.back().target_entity_id == "former-player");
+    assert(reference_memories.back().retention == resumed_memories.back().retention);
+    const GhostInfluenceResult uninterrupted_forbidden =
+        uninterrupted.attempt_ghost_influence("ghost_supporter", "comfort", 9.0);
+    const GhostInfluenceResult resumed_forbidden =
+        save_resume.attempt_ghost_influence("ghost_supporter", "comfort", 9.0);
+    assert(!uninterrupted_forbidden.accepted && !resumed_forbidden.accepted);
+    assert(uninterrupted_forbidden.reason == resumed_forbidden.reason);
+    assert(!uninterrupted.attempt_ghost_influence("ghost_supporter", "sound", 12.0).accepted);
+    assert(!save_resume.attempt_ghost_influence("ghost_supporter", "sound", 12.0).accepted);
 
     (void)uninterrupted.advance(15.5);
     (void)save_resume.advance(15.5);

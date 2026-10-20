@@ -16,7 +16,7 @@ This subsystem is being connected to the existing simulation, rather than treate
 
 - `LifeCoordinator` is now part of the portable C++ core and is exposed through `SimulationWorld::life_system()`.
 - The world coordinator invokes lifecycle processing on scheduler daily ticks. Medical recovery/treatment costs are applied, and health-adjusted work hours feed the existing wage/missed-work system rather than paying wages twice.
-- C++ interfaces cover life state, conditions/treatments, recovery ranges, obligations, death/ghost transitions, time-windowed ghost decisions based on NPC memories and relationships, and support resolution after death. Ghost windows restrict action types to authored `sign`, `sound`, and `dream` actions; accepted influence reinforces the target NPC's memory of the ghost.
+- C++ interfaces cover life state, conditions/treatments, recovery ranges, obligations, death/ghost transitions, time-windowed ghost decisions based on NPC memories and relationships, and support resolution after death. Ghost windows restrict action types to authored `sign`, `sound`, and `dream` actions; accepted influence reinforces the target NPC's memory of the ghost. `CampaignCoordinator` now exposes the player-facing influence call and draws its decision sample from the world's saved random stream.
 - CMake includes the new source. C++ regression coverage checks recovery ranges, life/ghost transitions, and window gating; Python tests cover treatment/work effects, support/trust, estate handling, and personality-aware ghost influence.
 
 ## C++ campaign and archive integration
@@ -28,6 +28,6 @@ This subsystem is being connected to the existing simulation, rather than treate
 
 ## Determinism regression coverage
 
-The C++ regression compares a continuous campaign with a campaign saved at hour 8.5 and resumed through the first post-death day. Ghost actions are validated against each window's permitted action list, accepted influence changes NPC memory, and that memory state round-trips through save/load. It checks ghost influence inside and outside its time window, estate/supporter debt settlement, NPC balances, life status, byte-identical campaign snapshots, archive immutability semantics, and a new life in a fresh day-zero world. The C++ core remains engine-independent; Unreal UI/animation/game-thread code is not yet wired to this API.
+The C++ regression compares a continuous campaign with a campaign saved at hour 8.5 and resumed through the first post-death day. Ghost actions are validated against each window's permitted action list, accepted influence changes NPC memory, and the campaign-level API consumes the saved world random stream so an influence decision matches across save/resume. It checks ghost influence inside and outside its time window, estate/supporter debt settlement, NPC balances, life status, byte-identical campaign snapshots, archive immutability semantics, and a new life in a fresh day-zero world. The C++ core remains engine-independent; Unreal UI/animation/game-thread code is not yet wired to this API.
 
 CI for this branch is the verification authority; report only the checks that have actually completed successfully.

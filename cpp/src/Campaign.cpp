@@ -107,6 +107,12 @@ bool CampaignCoordinator::enter_ghost() {
     return active_world_.life_system().enter_ghost(active_character_id_);
 }
 
+GhostInfluenceResult CampaignCoordinator::attempt_ghost_influence(
+    const EntityId& npc_id, const std::string& action, double hour_of_day) {
+    if (active_character_id_.empty()) throw std::logic_error("campaign has no current life");
+    return active_world_.attempt_ghost_influence(active_character_id_, npc_id, action, hour_of_day);
+}
+
 WorldAdvanceReport CampaignCoordinator::advance(
     double elapsed_hours, Weather visibility_weather, double weather_severity) {
     return active_world_.advance(elapsed_hours, visibility_weather, weather_severity);

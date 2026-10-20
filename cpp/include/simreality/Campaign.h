@@ -34,6 +34,8 @@ public:
     void begin_first_life(const EntityId& character_id);
     [[nodiscard]] bool record_death(std::string cause);
     [[nodiscard]] bool enter_ghost();
+    [[nodiscard]] GhostInfluenceResult attempt_ghost_influence(
+        const EntityId& npc_id, const std::string& action, double hour_of_day);
     [[nodiscard]] WorldAdvanceReport advance(
         double elapsed_hours, Weather visibility_weather = Weather::Clear,
         double weather_severity = 0.0);
