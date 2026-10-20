@@ -5,6 +5,7 @@
 #include "simreality/Ecosystem.h"
 #include "simreality/Fixers.h"
 #include "simreality/Gossip.h"
+#include "simreality/LifeSystems.h"
 #include "simreality/Justice.h"
 #include "simreality/RandomStream.h"
 #include "simreality/Reputation.h"
@@ -54,6 +55,8 @@ public:
     [[nodiscard]] double total_hours() const noexcept { return runtime_.total_hours(); }
     [[nodiscard]] std::uint64_t day_index() const noexcept { return runtime_.day_index(); }
     [[nodiscard]] RandomStream& random_stream() noexcept { return random_; }
+    [[nodiscard]] LifeCoordinator& life_system() noexcept { return life_; }
+    [[nodiscard]] const LifeCoordinator& life_system() const noexcept { return life_; }
     [[nodiscard]] std::uint64_t random_state() const noexcept { return random_.state(); }
 
     // Advances simulation time in a frame-rate-independent way. All due hourly
@@ -90,6 +93,7 @@ private:
     std::vector<FixerNetwork> fixer_networks_{};
     SimulationRuntime runtime_;
     RandomStream random_;
+    LifeCoordinator life_{};
 };
 
 } // namespace simreality
