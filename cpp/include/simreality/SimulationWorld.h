@@ -64,6 +64,9 @@ public:
     [[nodiscard]] WorldAdvanceReport advance(
         double elapsed_hours, Weather visibility_weather = Weather::Clear,
         double weather_severity = 0.0);
+    [[nodiscard]] GhostInfluenceResult attempt_ghost_influence(
+        const EntityId& ghost_id, const EntityId& npc_id,
+        const std::string& action, double hour_of_day);
 
     // Social transfer is allowed only between NPCs currently assigned to the same
     // district. The resulting conversation mutates the listener's memory state.

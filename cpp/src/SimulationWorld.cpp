@@ -20,6 +20,13 @@ SimulationWorld::SimulationWorld(
       runtime_(initial_hour),
       random_(random_seed) {}
 
+GhostInfluenceResult SimulationWorld::attempt_ghost_influence(
+    const EntityId& ghost_id, const EntityId& npc_id,
+    const std::string& action, double hour_of_day) {
+    return life_.attempt_ghost_influence(ghost_id, npc_id, action, hour_of_day,
+        state_, random_.next_u64());
+}
+
 WorldAdvanceReport SimulationWorld::advance(
     double elapsed_hours, Weather visibility_weather, double weather_severity) {
     WorldAdvanceReport report;

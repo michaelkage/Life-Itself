@@ -112,10 +112,16 @@ void LifeCoordinator::add_obligation(LifeObligation obligation) {
 }
 
 void LifeCoordinator::set_ghost_windows(std::vector<GhostTimeWindow> windows) {
-    for (const GhostTimeWindow& window : windows)
-        if (window.start_hour < 0.0 || window.end_hour > 24.0
-            || window.start_hour >= window.end_hour || window.strength < 0.0)
+    for (const GhostTimeWindow& window : windows) {
+        if (!std::isfinite(window.start_hour) || !std::isfinite(window.end_hour)
+            || !std::isfinite(window.strength) || window.start_hour < 0.0
+            || window.end_hour > 24.0 || window.start_hour >= window.end_hour
+            || window.strength < 0.0 || window.permitted_actions.empty())
             throw std::invalid_argument("invalid ghost time window");
+        for (const std::string& action : window.permitted_actions)
+            if (action != "sign" && action != "sound" && action != "dream")
+                throw std::invalid_argument("unsupported ghost influence action: " + action);
+    }
     ghost_windows_ = std::move(windows);
 }
 
