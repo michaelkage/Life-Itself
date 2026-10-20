@@ -147,17 +147,47 @@ WorldAdvanceReport SimulationWorld::advance(
                 if (unit.district_id == district.district_id) total_housing_slots += unit.capacity;
             for (NPC& resident : state_.npcs) {
                 if (resident.district_id != district.district_id || !resident.home_id.empty()) continue;
+                const HousingUnit* selected_unit = nullptr;
+                std::size_t selected_occupancy = 0;
+                double selected_trust = -1.0;
                 for (const HousingUnit& unit : state_.housing_units) {
                     if (unit.district_id != district.district_id || unit.capacity == 0U) continue;
                     std::size_t occupied = 0;
-                    for (const NPC& other : state_.npcs)
-                        if (other.district_id == district.district_id && other.home_id == unit.unit_id) ++occupied;
+                    double best_housemate_trust = -1.0;
+                    for (const NPC& other : state_.npcs) {
+                        if (other.district_id != district.district_id || other.home_id != unit.unit_id) continue;
+                        ++occupied;
+                        const auto forward = resident.relationships.find(other.entity_id);
+                        const auto reverse = other.relationships.find(resident.entity_id);
+                        const double trust = std::min(
+                            forward == resident.relationships.end() ? 0.0 : forward->second,
+                            reverse == other.relationships.end() ? 0.0 : reverse->second);
+                        best_housemate_trust = std::max(best_housemate_trust, trust);
+                    }
+                    if (occupied >= unit.capacity) continue;
                     const double rent = std::max(0.0, unit.daily_rent);
-                    if (occupied < unit.capacity && resident.money >= rent * 3.0) {
-                        resident.home_id = unit.unit_id;
-                        resident.daily_rent = rent;
-                        resident.rent_arrears = 0.0;
-                        break;
+                    const bool can_afford_alone = occupied == 0U && resident.money >= rent * 3.0;
+                    const bool can_share_with_trusted_person = occupied > 0U
+                        && best_housemate_trust >= 0.5
+                        && resident.money >= (rent / static_cast<double>(occupied + 1U)) * 3.0;
+                    if (!can_afford_alone && !can_share_with_trusted_person) continue;
+                    const double trust_score = occupied == 0U ? 0.0 : best_housemate_trust;
+                    if (selected_unit == nullptr || trust_score > selected_trust) {
+                        selected_unit = &unit;
+                        selected_occupancy = occupied;
+                        selected_trust = trust_score;
+                    }
+                }
+                if (selected_unit != nullptr) {
+                    resident.home_id = selected_unit->unit_id;
+                    resident.daily_rent = std::max(0.0, selected_unit->daily_rent)
+                        / static_cast<double>(selected_occupancy + 1U);
+                    resident.rent_arrears = 0.0;
+                    for (NPC& housemate : state_.npcs) {
+                        if (housemate.entity_id == resident.entity_id
+                            || housemate.home_id != selected_unit->unit_id) continue;
+                        housemate.daily_rent = std::max(0.0, selected_unit->daily_rent)
+                            / static_cast<double>(selected_occupancy + 1U);
                     }
                 }
             }
@@ -190,13 +220,31 @@ WorldAdvanceReport SimulationWorld::advance(
                 std::size_t employed = 0;
                 for (const NPC& resident : state_.npcs)
                     if (resident.district_id == district.district_id && resident.job_id == business.business_id) ++employed;
-                for (NPC& resident : state_.npcs) {
-                    if (employed >= business.job_slots) break;
-                    if (resident.district_id != district.district_id || !resident.job_id.empty()) continue;
-                    resident.job_id = business.business_id;
-                    resident.hourly_wage = std::max(0.0, business.hourly_wage);
-                    resident.goals.erase(std::remove(resident.goals.begin(), resident.goals.end(), "find_work"),
-                        resident.goals.end());
+                while (employed < business.job_slots) {
+                    NPC* candidate = nullptr;
+                    double best_referral = -1.0;
+                    for (NPC& resident : state_.npcs) {
+                        if (resident.district_id != district.district_id || !resident.job_id.empty()) continue;
+                        double referral = 0.0;
+                        for (const NPC& employee : state_.npcs) {
+                            if (employee.job_id != business.business_id || employee.district_id != district.district_id) continue;
+                            const auto tie = employee.relationships.find(resident.entity_id);
+                            const auto reciprocal = resident.relationships.find(employee.entity_id);
+                            const double trust = std::min(
+                                tie == employee.relationships.end() ? 0.0 : tie->second,
+                                reciprocal == resident.relationships.end() ? 0.0 : reciprocal->second);
+                            if (trust >= 0.5) referral = std::max(referral, trust);
+                        }
+                        if (candidate == nullptr || referral > best_referral) {
+                            candidate = &resident;
+                            best_referral = referral;
+                        }
+                    }
+                    if (candidate == nullptr) break;
+                    candidate->job_id = business.business_id;
+                    candidate->hourly_wage = std::max(0.0, business.hourly_wage);
+                    candidate->goals.erase(std::remove(candidate->goals.begin(), candidate->goals.end(), "find_work"),
+                        candidate->goals.end());
                     ++employed;
                 }
             }
@@ -239,12 +287,34 @@ WorldAdvanceReport SimulationWorld::advance(
                         resident.personal_stress = std::clamp(resident.personal_stress + 0.03, 0.0, 1.0);
                     }
                 }
+                // Trusted friends can bridge a temporary income shock before rent is collected.
+                if (resident.lost_income > 0.0 || resident.money < std::max(1.0, resident.daily_rent * 2.0)) {
+                    const double need = std::min(10.0, std::max(0.0, resident.daily_rent + resident.rent_arrears - resident.money));
+                    if (need > 0.0) {
+                        for (NPC& helper : state_.npcs) {
+                            if (helper.entity_id == resident.entity_id || helper.district_id != district.district_id) continue;
+                            const auto forward = resident.relationships.find(helper.entity_id);
+                            const auto reverse = helper.relationships.find(resident.entity_id);
+                            const double trust = std::min(
+                                forward == resident.relationships.end() ? 0.0 : forward->second,
+                                reverse == helper.relationships.end() ? 0.0 : reverse->second);
+                            const double reserve = std::max(20.0, helper.daily_rent * 3.0);
+                            if (trust < 0.5 || helper.money <= reserve) continue;
+                            const double gift = std::min({need, helper.money - reserve, 10.0});
+                            if (gift <= 0.0) continue;
+                            helper.money -= gift;
+                            resident.money += gift;
+                            resident.personal_stress = std::clamp(resident.personal_stress - 0.04, 0.0, 1.0);
+                            resident.desperation_index = std::clamp(resident.desperation_index - 0.05, 0.0, 1.0);
+                            break;
+                        }
+                    }
+                }
                 const auto home = std::find_if(state_.housing_units.begin(), state_.housing_units.end(),
                     [&resident, &district](const HousingUnit& unit) {
                         return unit.unit_id == resident.home_id && unit.district_id == district.district_id;
                     });
-                const double rent_due = home != state_.housing_units.end()
-                    ? std::max(0.0, home->daily_rent) : std::max(0.0, resident.daily_rent);
+                const double rent_due = std::max(0.0, resident.daily_rent);
                 const double rent = std::min(std::max(0.0, resident.money), rent_due + resident.rent_arrears);
                 resident.money -= rent;
                 rent_collected += rent;
