@@ -7,6 +7,7 @@
 #include "simreality/Fixers.h"
 #include "simreality/Gossip.h"
 #include "simreality/Justice.h"
+#include "simreality/LifeSystems.h"
 #include "simreality/RandomStream.h"
 #include "simreality/Reputation.h"
 #include "simreality/SimulationClock.h"
@@ -829,6 +830,45 @@ int main() {
         rejected_bad_snapshot = true;
     }
     assert(rejected_bad_snapshot);
+
+    // Persistent health, medical uncertainty, death and personality-aware ghost windows.
+    LifeCoordinator lives;
+    lives.register_character("life-dead");
+    MedicalCondition injury;
+    injury.condition_id = "injury";
+    injury.severity = 0.8;
+    injury.recovery_per_day = 0.1;
+    injury.work_capacity_at_full_severity = 0.2;
+    lives.add_condition("life-dead", injury);
+    MedicalTreatment care;
+    care.treatment_id = "rest";
+    care.condition_id = "injury";
+    care.effectiveness = 0.5;
+    care.daily_cost = 2.0;
+    lives.add_treatment("life-dead", care);
+    const RecoveryRange range = lives.estimate_recovery("life-dead", "injury");
+    assert(range.lower <= range.expected);
+    assert(range.upper >= range.expected);
+    assert(lives.kill("life-dead", 2U, "illness"));
+    assert(lives.enter_ghost("life-dead"));
+    lives.set_ghost_windows({GhostTimeWindow{2.0, 4.0, 1.0}});
+    WorldState ghost_state;
+    NPC receptive_npc;
+    receptive_npc.entity_id = "receptive";
+    receptive_npc.relationships["life-dead"] = 1.0;
+    NPCMemory remembered;
+    remembered.target_entity_id = "life-dead";
+    remembered.retention = 0.9;
+    remembered.action_tag = ActionTag::CrimeAssault;
+    receptive_npc.memories.push_back(remembered);
+    ghost_state.npcs.push_back(receptive_npc);
+    const auto blocked_ghost = lives.attempt_ghost_influence(
+        "life-dead", "receptive", "sound", 1.0, ghost_state, 0U);
+    assert(!blocked_ghost.accepted);
+    const auto allowed_ghost = lives.attempt_ghost_influence(
+        "life-dead", "receptive", "sound", 3.0, ghost_state, 0U);
+    assert(allowed_ghost.accepted);
+    assert(allowed_ghost.score > 0.8);
 
     return 0;
 }
