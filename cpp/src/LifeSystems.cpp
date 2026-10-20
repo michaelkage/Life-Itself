@@ -29,6 +29,40 @@ const LifeCharacter& LifeCoordinator::find_character(const EntityId& id) const {
     return found->second;
 }
 
+void LifeCoordinator::restore_snapshot(
+    std::map<EntityId, LifeCharacter> characters,
+    std::vector<LifeObligation> obligations,
+    std::vector<GhostTimeWindow> ghost_windows) {
+    for (const auto& [id, character] : characters) {
+        if (id.empty() || character.entity_id != id
+            || static_cast<std::uint8_t>(character.status) > static_cast<std::uint8_t>(LifeStatus::Archived))
+            throw std::invalid_argument("invalid lifecycle character snapshot");
+        for (const MedicalCondition& condition : character.conditions) {
+            if (condition.condition_id.empty() || !std::isfinite(condition.severity)
+                || condition.severity < 0.0 || condition.severity > 1.0
+                || !std::isfinite(condition.recovery_per_day) || condition.recovery_per_day < 0.0
+                || !std::isfinite(condition.impairment_floor) || condition.impairment_floor < 0.0
+                || condition.impairment_floor > 1.0)
+                throw std::invalid_argument("invalid medical condition snapshot");
+        }
+    }
+    for (const LifeObligation& obligation : obligations) {
+        if (obligation.obligation_id.empty() || !std::isfinite(obligation.amount_due)
+            || obligation.amount_due < 0.0)
+            throw std::invalid_argument("invalid obligation snapshot");
+    }
+    for (const GhostTimeWindow& window : ghost_windows) {
+        if (!std::isfinite(window.start_hour) || !std::isfinite(window.end_hour)
+            || !std::isfinite(window.strength) || window.start_hour < 0.0
+            || window.end_hour > 24.0 || window.start_hour >= window.end_hour
+            || window.strength < 0.0)
+            throw std::invalid_argument("invalid ghost window snapshot");
+    }
+    characters_ = std::move(characters);
+    obligations_ = std::move(obligations);
+    ghost_windows_ = std::move(ghost_windows);
+}
+
 void LifeCoordinator::register_character(const EntityId& id) {
     if (id.empty()) throw std::invalid_argument("character id cannot be empty");
     characters_.try_emplace(id, LifeCharacter{.entity_id = id});
