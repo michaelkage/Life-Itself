@@ -19,10 +19,15 @@ This subsystem is being connected to the existing simulation, rather than treate
 - C++ interfaces cover life state, conditions/treatments, recovery ranges, obligations, death/ghost transitions, time-windowed ghost decisions based on NPC memories and relationships, and support resolution after death.
 - CMake includes the new source. C++ regression coverage checks recovery ranges, life/ghost transitions, and window gating; Python tests cover treatment/work effects, support/trust, estate handling, and personality-aware ghost influence.
 
-## Known integration boundary
+## C++ campaign and archive integration
 
-The C++ lifecycle coordinator is not yet encoded inside the existing binary `WorldPersistence` snapshot; lifecycle state is currently persisted by the Python campaign JSON layer. Before treating C++ saves as full-fidelity campaign saves, the lifecycle records and random/decision state must be added to that binary format with a versioned migration and round-trip tests. The C++ core is engine-independent; this does not yet wire Unreal UI/animation/game-thread code to the lifecycle API.
+- `CampaignCoordinator` owns the active `SimulationWorld`, tracks the current life, records death, and allows the dead world to continue running while NPCs settle obligations.
+- Starting another life snapshots the old world as an immutable archive, marks the prior character `Archived`, and creates a separate day-zero world. Archive inspection returns a detached world copy, so inspection cannot mutate the preserved snapshot.
+- Versioned campaign save/load stores the active world and archive snapshots together. World lifecycle persistence remains versioned separately (world format v6 reads legacy v5 snapshots).
+- Recovery sampling uses stable FNV-1a condition IDs rather than implementation-defined `std::hash`, avoiding compiler-library-dependent outcomes.
 
-## Verification
+## Determinism regression coverage
 
-The run at commit `ff2cdca4f8a7cb0c44c710e7b131ad307a976236` passed the complete Python unittest suite and Linux/Windows C++ configure, build, and CTest jobs. Lifecycle binary save/load changes were added afterward and are awaiting their own CI run; do not treat those newer changes as verified until that run succeeds.
+The C++ regression compares a continuous campaign with a campaign saved at hour 8.5 and resumed through the first post-death day. It checks ghost influence inside and outside its time window, estate/supporter debt settlement, NPC balances, life status, byte-identical campaign snapshots, archive immutability semantics, and a new life in a fresh day-zero world. The C++ core remains engine-independent; Unreal UI/animation/game-thread code is not yet wired to this API.
+
+CI for this branch is the verification authority; report only the checks that have actually completed successfully.

@@ -85,6 +85,7 @@ public:
     void set_ghost_windows(std::vector<GhostTimeWindow> windows);
     [[nodiscard]] bool kill(const EntityId& id, std::uint64_t day, std::string cause);
     [[nodiscard]] bool enter_ghost(const EntityId& id);
+    [[nodiscard]] bool archive_character(const EntityId& id);
     [[nodiscard]] GhostInfluenceResult attempt_ghost_influence(
         const EntityId& ghost_id, const EntityId& npc_id, const std::string& action,
         double hour_of_day, const WorldState& state, std::uint64_t random_sample) const;

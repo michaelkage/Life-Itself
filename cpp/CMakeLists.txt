@@ -19,6 +19,7 @@ add_library(simreality_core
     src/SimulationWorld.cpp
     src/LifeSystems.cpp
     src/WorldPersistence.cpp
+    src/Campaign.cpp
 )
 target_include_directories(simreality_core PUBLIC include)
 target_compile_features(simreality_core PUBLIC cxx_std_20)
