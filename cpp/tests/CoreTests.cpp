@@ -626,6 +626,88 @@ int main() {
     (void)service_world.advance(12.0);
     assert(service_world.state().npcs[0].personal_stress < 0.5);
 
+    // Trusted ties make affordable shared housing possible and split rent.
+    WorldState shared_home_state;
+    District shared_home_district;
+    shared_home_district.district_id = "shared-home-district";
+    shared_home_state.districts.push_back(shared_home_district);
+    HousingUnit shared_unit;
+    shared_unit.unit_id = "trusted-home";
+    shared_unit.district_id = "shared-home-district";
+    shared_unit.capacity = 2;
+    shared_unit.daily_rent = 30.0;
+    shared_home_state.housing_units.push_back(shared_unit);
+    NPC existing_housemate;
+    existing_housemate.entity_id = "existing-housemate";
+    existing_housemate.district_id = "shared-home-district";
+    existing_housemate.home_id = "trusted-home";
+    existing_housemate.money = 50.0;
+    existing_housemate.relationships["new-housemate"] = 0.8;
+    NPC new_housemate;
+    new_housemate.entity_id = "new-housemate";
+    new_housemate.district_id = "shared-home-district";
+    new_housemate.money = 20.0;
+    new_housemate.relationships["existing-housemate"] = 0.8;
+    shared_home_state.npcs = {existing_housemate, new_housemate};
+    SimulationWorld shared_home_world(std::move(shared_home_state), 0.0, 21U);
+    (void)shared_home_world.advance(24.0);
+    assert(shared_home_world.state().npcs[1].home_id == "trusted-home");
+    assert(shared_home_world.state().npcs[0].daily_rent == 15.0);
+    assert(shared_home_world.state().npcs[1].daily_rent == 15.0);
+
+    // Trusted friends provide a small bridge loan when income loss threatens rent.
+    WorldState aid_state;
+    District aid_district;
+    aid_district.district_id = "aid-district";
+    aid_state.districts.push_back(aid_district);
+    NPC struggling;
+    struggling.entity_id = "struggling";
+    struggling.district_id = "aid-district";
+    struggling.money = 0.0;
+    struggling.daily_rent = 5.0;
+    struggling.lost_income = 20.0;
+    struggling.relationships["supporter"] = 0.8;
+    NPC supporter;
+    supporter.entity_id = "supporter";
+    supporter.district_id = "aid-district";
+    supporter.money = 100.0;
+    supporter.relationships["struggling"] = 0.8;
+    aid_state.npcs = {struggling, supporter};
+    SimulationWorld aid_world(std::move(aid_state), 0.0, 22U);
+    (void)aid_world.advance(24.0);
+    assert(aid_world.state().npcs[1].money < 100.0);
+    assert(aid_world.state().npcs[0].rent_arrears == 0.0);
+
+    // Employers prefer a candidate recommended by a trusted existing employee.
+    WorldState referral_state;
+    District referral_district;
+    referral_district.district_id = "referral-district";
+    referral_state.districts.push_back(referral_district);
+    NPC employee;
+    employee.entity_id = "employee";
+    employee.district_id = "referral-district";
+    employee.job_id = "referral-shop";
+    employee.hourly_wage = 1.0;
+    employee.relationships["recommended"] = 0.9;
+    NPC recommended;
+    recommended.entity_id = "recommended";
+    recommended.district_id = "referral-district";
+    recommended.relationships["employee"] = 0.9;
+    NPC stranger;
+    stranger.entity_id = "stranger";
+    stranger.district_id = "referral-district";
+    referral_state.npcs = {employee, stranger, recommended};
+    Business referral_shop;
+    referral_shop.business_id = "referral-shop";
+    referral_shop.district_id = "referral-district";
+    referral_shop.cash = 1000.0;
+    referral_shop.job_slots = 2;
+    referral_state.businesses.push_back(referral_shop);
+    SimulationWorld referral_world(std::move(referral_state), 0.0, 23U);
+    (void)referral_world.advance(24.0);
+    assert(referral_world.state().npcs[2].job_id == "referral-shop");
+    assert(referral_world.state().npcs[1].job_id.empty());
+
     bool rejected_bad_snapshot = false;
     try {
         std::stringstream invalid_snapshot("not-a-snapshot");
