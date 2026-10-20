@@ -177,12 +177,10 @@ void LifeCoordinator::advance_day(WorldState& state, std::uint64_t day) {
         if (npc == nullptr || character.status != LifeStatus::Active) continue;
         double care_hours = 0.0;
         for (MedicalCondition& condition : character.conditions) {
-            double factor = 1.0;
             for (const MedicalTreatment& treatment : character.treatments) {
                 if (!treatment.active || treatment.condition_id != condition.condition_id) continue;
                 if (npc->money < treatment.daily_cost) continue;
                 npc->money -= treatment.daily_cost;
-                factor += treatment.effectiveness;
                 care_hours += std::max(0.0, treatment.daily_cost > 0.0 ? 1.0 : 0.0);
             }
             const RecoveryRange estimate = estimate_recovery(id, condition.condition_id);
@@ -191,7 +189,7 @@ void LifeCoordinator::advance_day(WorldState& state, std::uint64_t day) {
                 + static_cast<std::uint64_t>(std::hash<std::string>{}(condition.condition_id));
             const double unit = static_cast<double>(mix % 10000ULL) / 10000.0;
             condition.severity = std::max(0.0, condition.severity
-                - (estimate.lower + (estimate.upper - estimate.lower) * unit) * factor);
+                - (estimate.lower + (estimate.upper - estimate.lower) * unit));
             care_hours += condition.severity * condition.care_hours_per_severity;
             if (condition.lasting_impairment && condition.severity <= 0.0)
                 condition.severity = clamp01(condition.impairment_floor);
