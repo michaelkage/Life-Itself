@@ -393,6 +393,12 @@ int main() {
     player_npc.entity_id = "player";
     player_npc.district_id = "D1";
     initial_world.npcs = {speaker_npc, listener_npc, player_npc};
+    HousingUnit shared_home;
+    shared_home.unit_id = "home-speaker";
+    shared_home.district_id = "D1";
+    shared_home.capacity = 3;
+    shared_home.daily_rent = 4.0;
+    initial_world.housing_units.push_back(shared_home);
     SimulationWorld world(std::move(initial_world), 0.0, 99U);
     Description scene_description;
     scene_description.height_m = 1.82;
@@ -431,6 +437,25 @@ int main() {
         world.approach_fixer("D1", "player", "world-fixer", 0.8, &world_file);
     assert(world_negotiation.accepted);
 
+    // Poor transport prevents attendance, turning an unreliable commute into lost wages.
+    WorldState commute_state;
+    District commute_district;
+    commute_district.district_id = "commute-district";
+    commute_district.transport_reliability = 0.1;
+    commute_state.districts.push_back(commute_district);
+    NPC commuter;
+    commuter.entity_id = "commuter";
+    commuter.district_id = "commute-district";
+    commuter.job_id = "legacy-employer";
+    commuter.hourly_wage = 10.0;
+    commuter.schedule = {{DailyActivity::Commute, 7, 9}, {DailyActivity::Work, 9, 17}, {DailyActivity::Sleep, 22, 6}};
+    commute_state.npcs.push_back(commuter);
+    SimulationWorld commute_world(std::move(commute_state), 0.0, 11U);
+    (void)commute_world.advance(24.0);
+    assert(commute_world.state().npcs[0].missed_work_days == 1U);
+    assert(commute_world.state().npcs[0].lost_income == 80.0);
+    assert(commute_world.state().npcs[0].money == 0.0);
+
     // Identical snapshots and seeds must produce identical world steps.
     SimulationWorld deterministic_peer = world;
     const WorldAdvanceReport world_report = world.advance(24.0, Weather::Clear, 0.0);
@@ -449,6 +474,9 @@ int main() {
     assert(world.state().npcs[0].money > 50.0);
     assert(world.state().districts[0].cash_circulation > 2500.0);
     assert(world.state().npcs[1].desperation_index > 0.0);
+    assert(world.state().npcs[1].home_id == "home-speaker");
+    assert(world.state().npcs[2].home_id == "home-speaker");
+    assert(world.state().districts[0].housing_availability == 0.0);
     assert(world.state().npcs[1].personal_stress ==
         deterministic_peer.state().npcs[1].personal_stress);
     assert(world.fixer_networks()[0].members[0].standing ==
@@ -474,6 +502,10 @@ int main() {
     assert(restored.state().npcs[0].relationships.at("listener") == world.state().npcs[0].relationships.at("listener"));
     assert(restored.state().npcs[0].goals == world.state().npcs[0].goals);
     assert(restored.state().npcs[0].money == world.state().npcs[0].money);
+    assert(restored.state().npcs[0].lost_income == world.state().npcs[0].lost_income);
+    assert(restored.state().npcs[0].rent_arrears == world.state().npcs[0].rent_arrears);
+    assert(restored.state().housing_units.size() == world.state().housing_units.size());
+    assert(restored.state().housing_units[0].unit_id == world.state().housing_units[0].unit_id);
     assert(restored.state().districts[0].shop_stock == world.state().districts[0].shop_stock);
     assert(restored.state().districts[0].cash_circulation == world.state().districts[0].cash_circulation);
     assert(restored.state().ongoing_events.size() == world.state().ongoing_events.size());
