@@ -191,6 +191,13 @@ void write_npc(std::ostream& out, const NPC& value) {
     for (const std::string& goal : value.goals) write_string(out, goal);
     write_double(out, value.money); write_double(out, value.hourly_wage);
     write_double(out, value.daily_rent);
+    write_double(out, value.work_hours_today);
+    write_u8(out, value.commute_disrupted_today ? 1U : 0U);
+    write_u32(out, value.missed_work_days);
+    write_double(out, value.lost_income);
+    write_double(out, value.rent_arrears);
+    write_double(out, value.social_need);
+    write_double(out, value.isolation);
 }
 
 NPC read_npc(std::istream& in) {
@@ -223,6 +230,13 @@ NPC read_npc(std::istream& in) {
     const std::uint32_t goals = read_count(in);
     for (std::uint32_t i = 0; i < goals; ++i) value.goals.push_back(read_string(in));
     value.money = read_double(in); value.hourly_wage = read_double(in); value.daily_rent = read_double(in);
+    value.work_hours_today = read_double(in);
+    const std::uint8_t commute_disrupted = read_u8(in);
+    if (commute_disrupted > 1U) throw std::runtime_error("invalid commute-disrupted flag");
+    value.commute_disrupted_today = commute_disrupted != 0U;
+    value.missed_work_days = read_u32(in); value.lost_income = read_double(in);
+    value.rent_arrears = read_double(in); value.social_need = read_double(in);
+    value.isolation = read_double(in);
     return value;
 }
 
@@ -294,6 +308,12 @@ void write_world_state(std::ostream& out, const WorldState& value) {
         write_u32(out, business.job_slots);
         write_u8(out, business.open ? 1U : 0U);
     }
+    write_count(out, value.housing_units.size());
+    for (const HousingUnit& unit : value.housing_units) {
+        write_string(out, unit.unit_id); write_string(out, unit.district_id);
+        write_u32(out, unit.capacity); write_double(out, unit.daily_rent);
+        write_double(out, unit.condition);
+    }
 }
 
 WorldState read_world_state(std::istream& in) {
@@ -338,6 +358,15 @@ WorldState read_world_state(std::istream& in) {
         if (open > 1U) throw std::runtime_error("invalid business-open flag");
         business.open = open != 0U;
         value.businesses.push_back(std::move(business));
+    }
+    const std::uint32_t housing_units = read_count(in);
+    value.housing_units.reserve(housing_units);
+    for (std::uint32_t i = 0; i < housing_units; ++i) {
+        HousingUnit unit;
+        unit.unit_id = read_string(in); unit.district_id = read_string(in);
+        unit.capacity = read_u32(in); unit.daily_rent = read_double(in);
+        unit.condition = read_double(in);
+        value.housing_units.push_back(std::move(unit));
     }
     return value;
 }
