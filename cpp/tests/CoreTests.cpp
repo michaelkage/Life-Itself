@@ -708,6 +708,52 @@ int main() {
     assert(referral_world.state().npcs[2].job_id == "referral-shop");
     assert(referral_world.state().npcs[1].job_id.empty());
 
+    // Trusted sources reinforce retained information; hostile sources spread weaker, less certain rumours.
+    WorldState trusted_gossip_state;
+    District trusted_gossip_district;
+    trusted_gossip_district.district_id = "gossip-district";
+    trusted_gossip_state.districts.push_back(trusted_gossip_district);
+    NPC trusted_listener;
+    trusted_listener.entity_id = "trusted-listener";
+    trusted_listener.district_id = "gossip-district";
+    trusted_listener.relationships["trusted-speaker"] = 0.8;
+    NPC trusted_speaker;
+    trusted_speaker.entity_id = "trusted-speaker";
+    trusted_speaker.district_id = "gossip-district";
+    trusted_speaker.relationships["trusted-listener"] = 0.8;
+    NPCMemory trusted_memory = theft;
+    trusted_memory.target_entity_id = "rumour-target";
+    trusted_memory.retention = 0.8;
+    trusted_memory.description.height_uncertainty_m = 0.2;
+    trusted_speaker.memories.push_back(trusted_memory);
+    trusted_gossip_state.npcs = {trusted_listener, trusted_speaker};
+    SimulationWorld trusted_gossip_world(std::move(trusted_gossip_state), 0.0, 24U);
+    (void)trusted_gossip_world.talk("trusted-listener", "trusted-speaker");
+    assert(trusted_gossip_world.state().npcs[0].memories[0].retention > 0.8);
+
+    WorldState untrusted_gossip_state;
+    District untrusted_gossip_district;
+    untrusted_gossip_district.district_id = "gossip-district";
+    untrusted_gossip_state.districts.push_back(untrusted_gossip_district);
+    NPC untrusted_listener;
+    untrusted_listener.entity_id = "untrusted-listener";
+    untrusted_listener.district_id = "gossip-district";
+    untrusted_listener.relationships["untrusted-speaker"] = -0.6;
+    NPC untrusted_speaker;
+    untrusted_speaker.entity_id = "untrusted-speaker";
+    untrusted_speaker.district_id = "gossip-district";
+    untrusted_speaker.relationships["untrusted-listener"] = -0.6;
+    NPCMemory untrusted_memory = theft;
+    untrusted_memory.target_entity_id = "uncertain-target";
+    untrusted_memory.retention = 0.8;
+    untrusted_memory.description.height_uncertainty_m = 0.2;
+    untrusted_speaker.memories.push_back(untrusted_memory);
+    untrusted_gossip_state.npcs = {untrusted_listener, untrusted_speaker};
+    SimulationWorld untrusted_gossip_world(std::move(untrusted_gossip_state), 0.0, 25U);
+    (void)untrusted_gossip_world.talk("untrusted-listener", "untrusted-speaker");
+    assert(untrusted_gossip_world.state().npcs[0].memories[0].retention < 0.8);
+    assert(untrusted_gossip_world.state().npcs[0].memories[0].description.height_uncertainty_m > 0.2);
+
     bool rejected_bad_snapshot = false;
     try {
         std::stringstream invalid_snapshot("not-a-snapshot");
