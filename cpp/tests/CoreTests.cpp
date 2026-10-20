@@ -448,6 +448,7 @@ int main() {
     commuter.district_id = "commute-district";
     commuter.job_id = "legacy-employer";
     commuter.hourly_wage = 10.0;
+    commuter.money = 0.0;
     commuter.schedule = {{DailyActivity::Commute, 7, 9}, {DailyActivity::Work, 9, 17}, {DailyActivity::Sleep, 22, 6}};
     commute_state.npcs.push_back(commuter);
     SimulationWorld commute_world(std::move(commute_state), 0.0, 11U);
