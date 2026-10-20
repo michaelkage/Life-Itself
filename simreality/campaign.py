@@ -84,3 +84,29 @@ class LifeItselfCampaign:
             "active_world": encode(self.active_world),
             "archived_worlds": [encode(item) for item in self.archived_worlds],
         }, sort_keys=True)
+
+    @classmethod
+    def from_json(cls, payload: str) -> "LifeItselfCampaign":
+        raw = json.loads(payload)
+        if raw.get("schema_version") != 1:
+            raise ValueError("unsupported campaign schema version")
+
+        def load_world(data: dict[str, Any]) -> PersistentWorld:
+            return PersistentWorld.from_json(json.dumps({
+                "schema_version": 1,
+                "world": data,
+            }))
+
+        archived = []
+        for item in raw.get("archived_worlds", []):
+            archived.append(ArchivedTimeline(
+                archive_id=item["archive_id"],
+                label=item["label"],
+                archived_day=item["archived_day"],
+                reason=item["reason"],
+                world=load_world(item["world"]),
+            ))
+        return cls(
+            active_world=load_world(raw["active_world"]),
+            archived_worlds=archived,
+        )
