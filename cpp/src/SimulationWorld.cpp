@@ -98,6 +98,40 @@ WorldAdvanceReport SimulationWorld::advance(
                     if (event.investigation_progress >= 1.0) event.resolved = true;
                 }
             }
+            // Housing occupancy is capacity-constrained and move-ins require an affordable rent buffer.
+            std::size_t total_housing_slots = 0;
+            for (const HousingUnit& unit : state_.housing_units)
+                if (unit.district_id == district.district_id) total_housing_slots += unit.capacity;
+            for (NPC& resident : state_.npcs) {
+                if (resident.district_id != district.district_id || !resident.home_id.empty()) continue;
+                for (const HousingUnit& unit : state_.housing_units) {
+                    if (unit.district_id != district.district_id || unit.capacity == 0U) continue;
+                    std::size_t occupied = 0;
+                    for (const NPC& other : state_.npcs)
+                        if (other.district_id == district.district_id && other.home_id == unit.unit_id) ++occupied;
+                    const double rent = std::max(0.0, unit.daily_rent);
+                    if (occupied < unit.capacity && resident.money >= rent * 3.0) {
+                        resident.home_id = unit.unit_id;
+                        resident.daily_rent = rent;
+                        resident.rent_arrears = 0.0;
+                        break;
+                    }
+                }
+            }
+            std::size_t vacant_housing_slots = 0;
+            for (const HousingUnit& unit : state_.housing_units) {
+                if (unit.district_id != district.district_id) continue;
+                std::size_t occupied = 0;
+                for (const NPC& resident : state_.npcs)
+                    if (resident.district_id == district.district_id && resident.home_id == unit.unit_id) ++occupied;
+                if (occupied < unit.capacity) vacant_housing_slots += unit.capacity - occupied;
+            }
+            if (total_housing_slots > 0U)
+                district.housing_availability = static_cast<double>(vacant_housing_slots) / total_housing_slots;
+            else
+                district.housing_availability = std::any_of(state_.npcs.begin(), state_.npcs.end(),
+                    [&district](const NPC& resident) { return resident.district_id == district.district_id && resident.home_id.empty(); })
+                    ? 0.0 : 1.0;
             for (Business& business : state_.businesses) {
                 if (business.district_id != district.district_id || !business.open) continue;
                 business.stock = std::clamp(business.stock, 0.0, std::max(0.0, business.stock_capacity));
