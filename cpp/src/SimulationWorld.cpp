@@ -168,6 +168,7 @@ WorldAdvanceReport SimulationWorld::advance(
                     const double attended_hours = resident.commute_disrupted_today ? 0.0
                         : std::clamp(resident.work_hours_today, 0.0, 8.0);
                     const double wage = std::max(0.0, resident.hourly_wage) * attended_hours;
+                    double paid_income = 0.0;
                     auto employer = std::find_if(state_.businesses.begin(), state_.businesses.end(),
                         [&resident, &district](const Business& business) {
                             return business.business_id == resident.job_id
@@ -176,17 +177,19 @@ WorldAdvanceReport SimulationWorld::advance(
                     if (employer == state_.businesses.end()) {
                         resident.money += wage;
                         payroll += wage;
+                        paid_income = wage;
                     } else if (employer->cash >= wage) {
                         employer->cash -= wage;
                         resident.money += wage;
                         payroll += wage;
+                        paid_income = wage;
                     } else {
                         resident.job_id.clear();
                         resident.hourly_wage = 0.0;
                         if (std::find(resident.goals.begin(), resident.goals.end(), "find_work") == resident.goals.end())
                             resident.goals.push_back("find_work");
                     }
-                    const double lost = std::max(0.0, expected_income - wage);
+                    const double lost = std::max(0.0, expected_income - paid_income);
                     resident.lost_income += lost;
                     if (lost > 0.0) {
                         ++resident.missed_work_days;
