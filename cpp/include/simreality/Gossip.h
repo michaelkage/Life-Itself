@@ -18,6 +18,9 @@ struct Rumour {
     double retention{1.0};
     DistrictId district_id{};
     std::uint32_t corroborations{1};
+    SimulationHour timestamp_hour{0.0};
+    EntityId source_entity_id{};
+    double source_reliability{0.5};
 
     [[nodiscard]] bool is_attributable() const noexcept {
         return !target_entity_id.empty();
