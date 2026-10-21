@@ -870,7 +870,10 @@ int main() {
         "life-dead", "receptive", "sound", 3.0, ghost_state, 0U);
     assert(allowed_ghost.accepted);
     assert(allowed_ghost.score > 0.7);
-    assert(ghost_state.npcs.back().memories.back().retention > 0.9);
+    assert(ghost_state.npcs.back().memories.size() == 2U);
+    assert(ghost_state.npcs.back().memories.front().retention == 0.9);
+    assert(ghost_state.npcs.back().memories.back().action_tag == ActionTag::GhostSound);
+    assert(ghost_state.npcs.back().memories.back().retention == 0.03);
     const std::size_t memories_after_success = ghost_state.npcs.back().memories.size();
     const auto forbidden_ghost = lives.attempt_ghost_influence(
         "life-dead", "receptive", "comfort", 3.0, ghost_state, 0U);
