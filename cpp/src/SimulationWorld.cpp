@@ -23,8 +23,51 @@ SimulationWorld::SimulationWorld(
 GhostInfluenceResult SimulationWorld::attempt_ghost_influence(
     const EntityId& ghost_id, const EntityId& npc_id,
     const std::string& action, double hour_of_day) {
-    return life_.attempt_ghost_influence(ghost_id, npc_id, action, hour_of_day,
-        state_, random_.next_u64());
+    const GhostInfluenceResult result = life_.attempt_ghost_influence(
+        ghost_id, npc_id, action, hour_of_day, state_, random_.next_u64());
+    if (!result.accepted) return result;
+
+    // Accepted ghost actions become part of the same event stream as other
+    // witnessed interactions, while remaining resolved social events rather
+    // than entering the criminal-investigation path.
+    NPC* witness = nullptr;
+    for (NPC& candidate : state_.npcs) {
+        if (candidate.entity_id == npc_id) {
+            witness = &candidate;
+            break;
+        }
+    }
+    if (witness == nullptr) return result;
+
+    const double day_start = std::floor(runtime_.total_hours() / 24.0) * 24.0;
+    const double event_hour = day_start + hour_of_day;
+    const auto hour_key = static_cast<std::uint64_t>(std::llround(event_hour * 1000.0));
+    OngoingEvent event;
+    event.event_id = "ghost-influence:" + ghost_id + ":" + npc_id + ":"
+        + action + ":" + std::to_string(hour_key) + ":"
+        + std::to_string(state_.ongoing_events.size());
+    event.district_id = witness->district_id;
+    event.actor_id = ghost_id;
+    event.action_tag = ActionTag::InteractionPolite;
+    event.created_hour = event_hour;
+    event.severity = result.score;
+    event.witness_ids.push_back(npc_id);
+    event.resolved = true;
+    state_.ongoing_events.push_back(std::move(event));
+
+    // Different manifestations leave different social traces in the witness.
+    // Memory reinforcement is applied by LifeCoordinator before these effects.
+    if (action == "sound") {
+        witness->personal_stress = std::clamp(
+            witness->personal_stress + 0.03 * result.score, 0.0, 1.0);
+    } else if (action == "dream") {
+        witness->isolation = std::max(0.0, witness->isolation - 0.02 * result.score);
+        witness->social_need = std::max(0.0, witness->social_need - 0.015 * result.score);
+    } else if (action == "sign") {
+        double& tie = witness->relationships[ghost_id];
+        tie = std::clamp(tie + 0.02 * result.score, -1.0, 1.0);
+    }
+    return result;
 }
 
 WorldAdvanceReport SimulationWorld::advance(
