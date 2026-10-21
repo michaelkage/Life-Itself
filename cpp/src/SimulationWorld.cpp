@@ -66,17 +66,68 @@ GhostInfluenceResult SimulationWorld::attempt_ghost_influence(
     event.resolved = true;
     state_.ongoing_events.push_back(std::move(event));
 
-    // Different manifestations leave different social traces in the witness.
-    // Memory reinforcement is applied by LifeCoordinator before these effects.
+    // Personality and shared history change how the same event is interpreted.
+    // All inputs are already persisted world state; no extra RNG is consumed here.
+    const auto relationship = witness->relationships.find(ghost_id);
+    const double prior_tie = relationship == witness->relationships.end()
+        ? 0.0 : relationship->second;
+    double memory_confidence = 0.0;
+    for (const NPCMemory& memory : witness->memories) {
+        if (memory.target_entity_id == ghost_id) {
+            memory_confidence = std::max(memory_confidence, memory.retention);
+        }
+    }
+    const double trauma = static_cast<double>(witness->trauma_level) / 3.0;
+    const double fearfulness = std::clamp(
+        0.55 * witness->personal_stress + 0.25 * trauma
+            + 0.20 * witness->desperation_index, 0.0, 1.0);
+    const double closeness = std::clamp((prior_tie + 1.0) * 0.5, 0.0, 1.0);
+    const double skepticism = std::clamp(
+        1.0 - 0.65 * memory_confidence - 0.35 * closeness, 0.0, 1.0);
+    const auto prior_events = static_cast<double>(std::count_if(
+        state_.ongoing_events.begin(), state_.ongoing_events.end(),
+        [&ghost_id, &npc_id](const OngoingEvent& previous) {
+            return previous.actor_id == ghost_id
+                && std::find(previous.witness_ids.begin(), previous.witness_ids.end(), npc_id)
+                    != previous.witness_ids.end()
+                && previous.event_id.find("ghost-influence:") == 0U;
+        }));
+    const double history = std::min(1.0, prior_events / 5.0);
+    const double belief = std::clamp(
+        result.score * (1.0 - 0.45 * skepticism) * (0.75 + 0.25 * closeness),
+        0.0, 1.0);
     if (action == "sound") {
-        witness->personal_stress = std::clamp(
-            witness->personal_stress + 0.03 * result.score, 0.0, 1.0);
+        const double alarm = fearfulness * (1.0 - 0.55 * closeness);
+        witness->personal_stress = std::clamp(witness->personal_stress
+            + belief * (0.012 + 0.028 * alarm + 0.012 * history), 0.0, 1.0);
+        if (alarm > 0.55 && history >= 0.4) {
+            if (std::find(witness->goals.begin(), witness->goals.end(), "avoid_ghost") == witness->goals.end())
+                witness->goals.push_back("avoid_ghost");
+        } else if (closeness >= 0.65 && belief >= 0.35) {
+            if (std::find(witness->goals.begin(), witness->goals.end(), "seek_ghost_contact") == witness->goals.end())
+                witness->goals.push_back("seek_ghost_contact");
+        }
     } else if (action == "dream") {
-        witness->isolation = std::max(0.0, witness->isolation - 0.02 * result.score);
-        witness->social_need = std::max(0.0, witness->social_need - 0.015 * result.score);
+        const double comfort = belief * (0.45 + 0.55 * closeness);
+        witness->isolation = std::max(0.0, witness->isolation - 0.008 * comfort);
+        witness->social_need = std::max(0.0, witness->social_need - 0.006 * comfort);
+        witness->personal_stress = std::clamp(witness->personal_stress
+            - 0.004 * comfort + 0.004 * fearfulness * skepticism, 0.0, 1.0);
+        if (closeness >= 0.6 && history >= 0.4
+            && std::find(witness->goals.begin(), witness->goals.end(), "seek_ghost_contact") == witness->goals.end())
+            witness->goals.push_back("seek_ghost_contact");
     } else if (action == "sign") {
         double& tie = witness->relationships[ghost_id];
-        tie = std::clamp(tie + 0.02 * result.score, -1.0, 1.0);
+        const double response = belief * (0.012 + 0.018 * closeness)
+            - skepticism * fearfulness * (0.008 + 0.012 * history);
+        tie = std::clamp(tie + response, -1.0, 1.0);
+        if (history >= 0.6 && skepticism >= 0.65) {
+            if (std::find(witness->goals.begin(), witness->goals.end(), "investigate_ghost") == witness->goals.end())
+                witness->goals.push_back("investigate_ghost");
+        } else if (closeness >= 0.65 && belief >= 0.35) {
+            if (std::find(witness->goals.begin(), witness->goals.end(), "seek_ghost_contact") == witness->goals.end())
+                witness->goals.push_back("seek_ghost_contact");
+        }
     }
     return result;
 }
@@ -550,15 +601,45 @@ Conversation SimulationWorld::talk(
                         && action_name(prior.action_tag) == expected_action;
                 });
         if (ghost_manifestation && !already_knew_manifestation) {
-            // The saved memory is the durable gate against repeating the reaction.
+            // The saved memory is the durable gate against repeating the same story.
+            const auto ghost_tie_it = listener.relationships.find(rumour.target_entity_id);
+            const double ghost_tie = ghost_tie_it == listener.relationships.end()
+                ? 0.0 : ghost_tie_it->second;
+            const double closeness = std::clamp((ghost_tie + 1.0) * 0.5, 0.0, 1.0);
+            const double fearfulness = std::clamp(
+                0.55 * listener.personal_stress
+                    + 0.25 * static_cast<double>(listener.trauma_level) / 3.0
+                    + 0.20 * listener.desperation_index, 0.0, 1.0);
+            const double confidence = std::clamp(rumour.retention, 0.0, 1.0);
+            const double skepticism = 1.0 - 0.65 * confidence - 0.35 * closeness;
+            const double interpretation = std::clamp(
+                confidence * (1.0 - 0.45 * skepticism), 0.0, 1.0);
             if (expected_action == "Ghost.Sound") {
-                listener.personal_stress = std::clamp(listener.personal_stress + 0.025, 0.0, 1.0);
+                const double alarm = fearfulness * (1.0 - 0.55 * closeness);
+                listener.personal_stress = std::clamp(listener.personal_stress
+                    + 0.008 + 0.025 * alarm * interpretation, 0.0, 1.0);
+                if (alarm > 0.55
+                    && std::find(listener.goals.begin(), listener.goals.end(), "avoid_ghost") == listener.goals.end())
+                    listener.goals.push_back("avoid_ghost");
+                else if (closeness >= 0.65
+                    && std::find(listener.goals.begin(), listener.goals.end(), "seek_ghost_contact") == listener.goals.end())
+                    listener.goals.push_back("seek_ghost_contact");
             } else if (expected_action == "Ghost.Dream") {
-                listener.isolation = std::max(0.0, listener.isolation - 0.02);
-                listener.social_need = std::max(0.0, listener.social_need - 0.015);
+                const double comfort = interpretation * (0.45 + 0.55 * closeness);
+                listener.isolation = std::max(0.0, listener.isolation - 0.008 * comfort);
+                listener.social_need = std::max(0.0, listener.social_need - 0.006 * comfort);
+                listener.personal_stress = std::clamp(listener.personal_stress
+                    - 0.004 * comfort + 0.004 * fearfulness * skepticism, 0.0, 1.0);
             } else {
                 double& tie = listener.relationships[rumour.target_entity_id];
-                tie = std::clamp(tie + 0.02, -1.0, 1.0);
+                tie = std::clamp(tie + 0.012 * interpretation * (0.5 + 0.5 * closeness)
+                    - 0.008 * skepticism * fearfulness, -1.0, 1.0);
+                if (skepticism >= 0.65
+                    && std::find(listener.goals.begin(), listener.goals.end(), "investigate_ghost") == listener.goals.end())
+                    listener.goals.push_back("investigate_ghost");
+                else if (closeness >= 0.65
+                    && std::find(listener.goals.begin(), listener.goals.end(), "seek_ghost_contact") == listener.goals.end())
+                    listener.goals.push_back("seek_ghost_contact");
             }
         }
         for (NPCMemory& received : listener.memories) {
