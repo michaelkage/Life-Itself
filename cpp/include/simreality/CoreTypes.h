@@ -20,7 +20,11 @@ enum class ActionTag {
     CrimeTheft,
     CrimeAssault,
     CrimeArmedAssault,
-    CrimeVandalism
+    CrimeVandalism,
+    // Ghost manifestations are social memories, not criminal evidence.
+    GhostSign,
+    GhostSound,
+    GhostDream
 };
 
 enum class AgeBand { YoungAdult, Adult, Senior };

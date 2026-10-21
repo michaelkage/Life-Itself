@@ -48,7 +48,8 @@ GhostInfluenceResult SimulationWorld::attempt_ghost_influence(
         + std::to_string(state_.ongoing_events.size());
     event.district_id = witness->district_id;
     event.actor_id = ghost_id;
-    event.action_tag = ActionTag::InteractionPolite;
+    event.action_tag = action == "sign" ? ActionTag::GhostSign
+        : (action == "sound" ? ActionTag::GhostSound : ActionTag::GhostDream);
     event.created_hour = event_hour;
     event.severity = result.score;
     event.witness_ids.push_back(npc_id);
@@ -514,9 +515,13 @@ Conversation SimulationWorld::talk(
     Conversation conversation = converse(listener, speaker, listener.district_id);
     // Trust changes the quality of what travels: trusted sources reinforce a memory;
     // hostile or unreliable sources leave weaker, less certain impressions.
+    const std::vector<NPCMemory> memories_before_conversation = listener.memories;
     const auto action_name = [](ActionTag tag) {
         switch (tag) {
             case ActionTag::InteractionPolite: return std::string("Interaction.Polite");
+            case ActionTag::GhostSign: return std::string("Ghost.Sign");
+            case ActionTag::GhostSound: return std::string("Ghost.Sound");
+            case ActionTag::GhostDream: return std::string("Ghost.Dream");
             case ActionTag::CrimeTheft: return std::string("Crime.Theft");
             case ActionTag::CrimeAssault: return std::string("Crime.Assault");
             case ActionTag::CrimeArmedAssault: return std::string("Crime.ArmedAssault");
@@ -526,6 +531,26 @@ Conversation SimulationWorld::talk(
     };
     for (const Rumour& rumour : conversation.transferred) {
         const std::string expected_action = rumour.action_tag;
+        const bool ghost_manifestation = expected_action == "Ghost.Sign"
+            || expected_action == "Ghost.Sound" || expected_action == "Ghost.Dream";
+        const bool already_knew_manifestation = ghost_manifestation
+            && std::any_of(memories_before_conversation.begin(), memories_before_conversation.end(),
+                [&rumour, &action_name, &expected_action](const NPCMemory& prior) {
+                    return prior.target_entity_id == rumour.target_entity_id
+                        && action_name(prior.action_tag) == expected_action;
+                });
+        if (ghost_manifestation && !already_knew_manifestation) {
+            // The saved memory is the durable gate against repeating the reaction.
+            if (expected_action == "Ghost.Sound") {
+                listener.personal_stress = std::clamp(listener.personal_stress + 0.025, 0.0, 1.0);
+            } else if (expected_action == "Ghost.Dream") {
+                listener.isolation = std::max(0.0, listener.isolation - 0.02);
+                listener.social_need = std::max(0.0, listener.social_need - 0.015);
+            } else {
+                double& tie = listener.relationships[rumour.target_entity_id];
+                tie = std::clamp(tie + 0.02, -1.0, 1.0);
+            }
+        }
         for (NPCMemory& received : listener.memories) {
             if (received.target_entity_id != rumour.target_entity_id
                 || action_name(received.action_tag) != expected_action) continue;
@@ -621,6 +646,9 @@ std::size_t SimulationWorld::record_witnessed_action(
     event.created_hour = runtime_.total_hours();
     switch (action_tag) {
         case ActionTag::InteractionPolite: event.severity = 0.05; break;
+        case ActionTag::GhostSign:
+        case ActionTag::GhostSound:
+        case ActionTag::GhostDream: event.severity = 0.0; break;
         case ActionTag::CrimeTheft: event.severity = 0.4; break;
         case ActionTag::CrimeVandalism: event.severity = 0.45; break;
         case ActionTag::CrimeAssault: event.severity = 0.7; break;
