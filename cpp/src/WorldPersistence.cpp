@@ -16,6 +16,7 @@ namespace {
 constexpr std::array<char, 8> kMagicV5{{'S', 'R', 'E', 'C', 'O', 'R', 'E', '5'}};
 constexpr std::array<char, 8> kMagicV6{{'S', 'R', 'E', 'C', 'O', 'R', 'E', '6'}};
 constexpr std::array<char, 8> kMagicV7{{'S', 'R', 'E', 'C', 'O', 'R', 'E', '7'}};
+constexpr std::array<char, 8> kMagicV8{{'S', 'R', 'E', 'C', 'O', 'R', 'E', '8'}};
 constexpr std::uint32_t kMaxCollectionItems = 1'000'000;
 constexpr std::uint32_t kMaxStringBytes = 16U * 1024U * 1024U;
 static_assert(sizeof(double) == sizeof(std::uint64_t));
@@ -200,9 +201,20 @@ void write_npc(std::ostream& out, const NPC& value) {
     write_double(out, value.rent_arrears);
     write_double(out, value.social_need);
     write_double(out, value.isolation);
+    write_count(out, value.beliefs.size());
+    for (const NPCBelief& belief : value.beliefs) {
+        write_string(out, belief.target_entity_id);
+        write_u8(out, static_cast<std::uint8_t>(belief.action_tag));
+        write_double(out, belief.timestamp_hour);
+        write_double(out, belief.confidence);
+        write_string(out, belief.source_entity_id);
+        write_u8(out, belief.directly_observed ? 1U : 0U);
+        write_u32(out, belief.corroborations);
+        write_u32(out, belief.contradictions);
+    }
 }
 
-NPC read_npc(std::istream& in) {
+NPC read_npc(std::istream& in, std::uint32_t version) {
     NPC value;
     value.entity_id = read_string(in);
     value.age_band = read_enum<AgeBand>(in, 2U, "age band");
@@ -239,6 +251,26 @@ NPC read_npc(std::istream& in) {
     value.missed_work_days = read_u32(in); value.lost_income = read_double(in);
     value.rent_arrears = read_double(in); value.social_need = read_double(in);
     value.isolation = read_double(in);
+    if (version >= 8U) {
+        const std::uint32_t beliefs = read_count(in);
+        value.beliefs.reserve(beliefs);
+        for (std::uint32_t i = 0; i < beliefs; ++i) {
+            NPCBelief belief;
+            belief.target_entity_id = read_string(in);
+            belief.action_tag = read_enum<ActionTag>(in, 7U, "belief action");
+            belief.timestamp_hour = read_double(in);
+            belief.confidence = read_double(in);
+            if (belief.confidence < 0.0 || belief.confidence > 1.0)
+                throw std::runtime_error("invalid belief confidence");
+            belief.source_entity_id = read_string(in);
+            const std::uint8_t direct = read_u8(in);
+            if (direct > 1U) throw std::runtime_error("invalid direct-observation flag");
+            belief.directly_observed = direct != 0U;
+            belief.corroborations = read_u32(in);
+            belief.contradictions = read_u32(in);
+            value.beliefs.push_back(std::move(belief));
+        }
+    }
     return value;
 }
 
@@ -318,11 +350,11 @@ void write_world_state(std::ostream& out, const WorldState& value) {
     }
 }
 
-WorldState read_world_state(std::istream& in) {
+WorldState read_world_state(std::istream& in, std::uint32_t version) {
     WorldState value;
     const std::uint32_t npcs = read_count(in);
     value.npcs.reserve(npcs);
-    for (std::uint32_t i = 0; i < npcs; ++i) value.npcs.push_back(read_npc(in));
+    for (std::uint32_t i = 0; i < npcs; ++i) value.npcs.push_back(read_npc(in, version));
     const std::uint32_t districts = read_count(in);
     value.districts.reserve(districts);
     for (std::uint32_t i = 0; i < districts; ++i) {
@@ -560,7 +592,7 @@ void read_life_state(std::istream& in, LifeCoordinator& life, std::uint32_t vers
 } // namespace
 
 void save_world(const SimulationWorld& world, std::ostream& output) {
-    output.write(kMagicV7.data(), static_cast<std::streamsize>(kMagicV7.size()));
+    output.write(kMagicV8.data(), static_cast<std::streamsize>(kMagicV8.size()));
     if (!output) throw std::runtime_error("failed writing world snapshot header");
     write_u32(output, kWorldSaveVersion);
     write_double(output, world.total_hours());
@@ -572,24 +604,25 @@ void save_world(const SimulationWorld& world, std::ostream& output) {
 }
 
 SimulationWorld load_world(std::istream& input) {
-    std::array<char, kMagicV7.size()> magic{};
+    std::array<char, kMagicV8.size()> magic{};
     input.read(magic.data(), static_cast<std::streamsize>(magic.size()));
     if (!input) throw std::runtime_error("truncated world snapshot header");
     const bool is_v5 = magic == kMagicV5;
     const bool is_v6 = magic == kMagicV6;
     const bool is_v7 = magic == kMagicV7;
-    if (!is_v5 && !is_v6 && !is_v7) throw std::runtime_error("invalid world snapshot magic");
+    const bool is_v8 = magic == kMagicV8;
+    if (!is_v5 && !is_v6 && !is_v7 && !is_v8) throw std::runtime_error("invalid world snapshot magic");
     const std::uint32_t version = read_u32(input);
     if ((version == 5U && !is_v5) || (version == 6U && !is_v6)
-        || (version == 7U && !is_v7)
-        || (version != 5U && version != 6U && version != 7U)) {
+        || (version == 7U && !is_v7) || (version == 8U && !is_v8)
+        || (version != 5U && version != 6U && version != 7U && version != 8U)) {
         throw std::runtime_error("unsupported world snapshot version");
     }
 
     const double total_hours = read_double(input);
     if (total_hours < 0.0) throw std::runtime_error("snapshot has negative simulation time");
     const std::uint64_t random_state = read_u64(input);
-    WorldState state = read_world_state(input);
+    WorldState state = read_world_state(input, version);
     const std::uint32_t networks = read_count(input);
     std::vector<FixerNetwork> fixer_networks;
     fixer_networks.reserve(networks);
