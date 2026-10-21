@@ -905,7 +905,7 @@ int main() {
     trusted_history.action_tag = ActionTag::InteractionPolite;
     close_friend.memories.push_back(trusted_history);
     interpretation_state.npcs = {fearful, skeptic, close_friend};
-    SimulationWorld interpretation_world(std::move(interpretation_state), 0.0, 24U);
+    SimulationWorld interpretation_world(std::move(interpretation_state), 0.0, 9U);
     LifeCoordinator& interpretation_life = interpretation_world.life_system();
     interpretation_life.register_character("deceased");
     assert(interpretation_life.kill("deceased", 0U, "illness"));
