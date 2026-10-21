@@ -466,8 +466,13 @@ int main() {
     assert(std::abs(world.state().npcs[0].relationships.at("listener") - 0.755) < 1e-9);
     assert(std::abs(world.state().npcs[1].relationships.at("speaker") - 0.755) < 1e-9);
     CriminalFile world_file = world.build_criminal_file("player");
-    assert(world_file.charges.size() == 1);
-    assert(world_file.charges[0].evidence == EvidenceKind::Corroborated);
+    // The conflicting assault account is also a separate observed action in the
+    // fixture, so it creates a second charge; the original theft remains corroborated.
+    assert(world_file.charges.size() == 2);
+    const auto theft_charge = std::find_if(world_file.charges.begin(), world_file.charges.end(),
+        [](const Charge& charge) { return charge.action_tag == ActionTag::CrimeTheft; });
+    assert(theft_charge != world_file.charges.end());
+    assert(theft_charge->evidence == EvidenceKind::Corroborated);
     const auto world_reputation = world.reputation_in_district("D1", "player", &world_file);
     assert(world_reputation.reputation < 1.0);
     const Consequence world_arrest =
