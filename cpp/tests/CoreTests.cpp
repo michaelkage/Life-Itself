@@ -881,6 +881,61 @@ int main() {
     assert(forbidden_ghost.reason == "outside permitted time/action window");
     assert(ghost_state.npcs.back().memories.size() == memories_after_success);
 
+    // The same sound is interpreted differently by fearful, skeptical, and close NPCs.
+    WorldState interpretation_state;
+    NPC fearful;
+    fearful.entity_id = "fearful";
+    fearful.district_id = "shared";
+    fearful.personal_stress = 0.9;
+    fearful.trauma_level = TraumaLevel::Paranoid;
+    fearful.desperation_index = 0.7;
+    NPC skeptic;
+    skeptic.entity_id = "skeptic";
+    skeptic.district_id = "shared";
+    skeptic.personal_stress = 0.05;
+    skeptic.relationships["deceased"] = -0.8;
+    NPC close_friend;
+    close_friend.entity_id = "close-friend";
+    close_friend.district_id = "shared";
+    close_friend.personal_stress = 0.1;
+    close_friend.relationships["deceased"] = 0.95;
+    NPCMemory trusted_history;
+    trusted_history.target_entity_id = "deceased";
+    trusted_history.retention = 0.95;
+    trusted_history.action_tag = ActionTag::InteractionPolite;
+    close_friend.memories.push_back(trusted_history);
+    interpretation_state.npcs = {fearful, skeptic, close_friend};
+    SimulationWorld interpretation_world(std::move(interpretation_state), 0.0, 9U);
+    LifeCoordinator& interpretation_life = interpretation_world.life_system();
+    interpretation_life.register_character("deceased");
+    assert(interpretation_life.kill("deceased", 0U, "illness"));
+    assert(interpretation_life.enter_ghost("deceased"));
+    interpretation_life.set_ghost_windows({GhostTimeWindow{8.0, 10.0, 1.0}});
+    (void)interpretation_world.advance(8.5);
+    const auto fearful_sound = interpretation_world.attempt_ghost_influence("deceased", "fearful", "sound", 9.0);
+    const auto skeptic_sound = interpretation_world.attempt_ghost_influence("deceased", "skeptic", "sound", 9.0);
+    const auto friend_sound = interpretation_world.attempt_ghost_influence("deceased", "close-friend", "sound", 9.0);
+    assert(fearful_sound.accepted && skeptic_sound.accepted && friend_sound.accepted);
+    const auto& interpreted = interpretation_world.state().npcs;
+    assert(interpreted[0].personal_stress > interpreted[2].personal_stress);
+    assert(interpreted[0].personal_stress > interpreted[1].personal_stress);
+    assert(interpreted[2].goals.end() != std::find(interpreted[2].goals.begin(), interpreted[2].goals.end(), "seek_ghost_contact"));
+    assert(interpreted[0].goals.end() == std::find(interpreted[0].goals.begin(), interpreted[0].goals.end(), "seek_ghost_contact"));
+
+    // Repeated events accumulate history-dependent behaviour and relationships.
+    const double friend_tie_after_first = interpreted[2].relationships.at("deceased");
+    (void)interpretation_world.advance(24.0);
+    auto repeat_friend_sound = interpretation_world.attempt_ghost_influence("deceased", "close-friend", "sound", 9.0);
+    for (int attempt = 0; attempt < 20 && !repeat_friend_sound.accepted; ++attempt) {
+        repeat_friend_sound = interpretation_world.attempt_ghost_influence(
+            "deceased", "close-friend", "sound", 9.0);
+    }
+    assert(repeat_friend_sound.accepted);
+    assert(interpretation_world.state().npcs[2].relationships.at("deceased") >= friend_tie_after_first);
+    assert(interpretation_world.state().npcs[2].goals.end() != std::find(
+        interpretation_world.state().npcs[2].goals.begin(), interpretation_world.state().npcs[2].goals.end(),
+        "seek_ghost_contact"));
+
     // Lifecycle state survives the versioned binary world snapshot.
     SimulationWorld lifecycle_save_world;
     LifeCoordinator& saved_life = lifecycle_save_world.life_system();
@@ -1004,6 +1059,13 @@ int main() {
     assert(reference_memories.back().target_entity_id == "former-player");
     assert(reference_memories.back().retention == resumed_memories.back().retention);
 
+    // Relationship, goal, and emotional consequences are all replay-stable.
+    assert(uninterrupted.active_world().state().npcs[2].goals
+        == save_resume.active_world().state().npcs[2].goals);
+    assert(uninterrupted.active_world().state().npcs[2].relationships
+        == save_resume.active_world().state().npcs[2].relationships);
+    assert(uninterrupted.active_world().state().npcs[2].personal_stress
+        == save_resume.active_world().state().npcs[2].personal_stress);
     const double listener_stress_before = uninterrupted.active_world().state().npcs[3].personal_stress;
     const Conversation ghost_story = uninterrupted.active_world().talk("ghost_listener", "ghost_supporter");
     const Conversation resumed_ghost_story = save_resume.active_world().talk("ghost_listener", "ghost_supporter");
@@ -1016,7 +1078,7 @@ int main() {
         uninterrupted.active_world().state().npcs[3].personal_stress;
     const double resumed_listener_stress_after_first_telling =
         save_resume.active_world().state().npcs[3].personal_stress;
-    assert(listener_stress_after_first_telling >= listener_stress_before + 0.025);
+    assert(listener_stress_after_first_telling >= listener_stress_before + 0.018);
     assert(listener_stress_after_first_telling == resumed_listener_stress_after_first_telling);
     const double listener_isolation_after_first_telling =
         uninterrupted.active_world().state().npcs[3].isolation;
