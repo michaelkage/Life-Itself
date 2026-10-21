@@ -870,7 +870,10 @@ int main() {
         "life-dead", "receptive", "sound", 3.0, ghost_state, 0U);
     assert(allowed_ghost.accepted);
     assert(allowed_ghost.score > 0.7);
-    assert(ghost_state.npcs.back().memories.back().retention > 0.9);
+    assert(ghost_state.npcs.back().memories.size() == 2U);
+    assert(ghost_state.npcs.back().memories.front().retention == 0.9);
+    assert(ghost_state.npcs.back().memories.back().action_tag == ActionTag::GhostSound);
+    assert(ghost_state.npcs.back().memories.back().retention == 0.03);
     const std::size_t memories_after_success = ghost_state.npcs.back().memories.size();
     const auto forbidden_ghost = lives.attempt_ghost_influence(
         "life-dead", "receptive", "comfort", 3.0, ghost_state, 0U);
@@ -942,13 +945,18 @@ int main() {
     ghost_supporter.entity_id = "ghost_supporter";
     ghost_supporter.money = 100.0;
     ghost_supporter.relationships["former-player"] = 0.9;
+    NPC ghost_listener;
+    ghost_listener.entity_id = "ghost_listener";
+    ghost_listener.personal_stress = 0.2;
+    ghost_listener.isolation = 0.4;
+    ghost_listener.social_need = 0.5;
     NPCMemory remembered_ghost;
     remembered_ghost.witness_id = "ghost_supporter";
     remembered_ghost.target_entity_id = "former-player";
     remembered_ghost.retention = 0.9;
     remembered_ghost.action_tag = ActionTag::InteractionPolite;
     ghost_supporter.memories.push_back(remembered_ghost);
-    campaign_state.npcs = {former_player, creditor, ghost_supporter};
+    campaign_state.npcs = {former_player, creditor, ghost_supporter, ghost_listener};
 
     CampaignCoordinator campaign(SimulationWorld(std::move(campaign_state), 0.0, 987U));
     campaign.begin_first_life("former-player");
@@ -985,14 +993,42 @@ int main() {
     assert(ghost_event.witness_ids == std::vector<EntityId>({"ghost_supporter"}));
     assert(ghost_event.resolved);
     assert(ghost_event.created_hour == 9.0);
-    assert(ghost_event.action_tag == ActionTag::InteractionPolite);
+    assert(ghost_event.action_tag == ActionTag::GhostSound);
     assert(uninterrupted.active_world().state().npcs[2].personal_stress
         == save_resume.active_world().state().npcs[2].personal_stress);
     const auto& reference_memories = uninterrupted.active_world().state().npcs[2].memories;
     const auto& resumed_memories = save_resume.active_world().state().npcs[2].memories;
     assert(reference_memories.size() == resumed_memories.size());
+    assert(reference_memories.back().action_tag == ActionTag::GhostSound);
     assert(reference_memories.back().target_entity_id == "former-player");
     assert(reference_memories.back().retention == resumed_memories.back().retention);
+
+    const double listener_stress_before = uninterrupted.active_world().state().npcs[3].personal_stress;
+    const Conversation ghost_story = uninterrupted.active_world().talk("ghost_listener", "ghost_supporter");
+    const Conversation resumed_ghost_story = save_resume.active_world().talk("ghost_listener", "ghost_supporter");
+    const auto heard_ghost_sound = [](const Conversation& story) {
+        return std::any_of(story.transferred.begin(), story.transferred.end(),
+            [](const Rumour& rumour) { return rumour.action_tag == "Ghost.Sound"; });
+    };
+    assert(heard_ghost_sound(ghost_story) && heard_ghost_sound(resumed_ghost_story));
+    const double listener_stress_after_first_telling =
+        uninterrupted.active_world().state().npcs[3].personal_stress;
+    const double resumed_listener_stress_after_first_telling =
+        save_resume.active_world().state().npcs[3].personal_stress;
+    assert(listener_stress_after_first_telling >= listener_stress_before + 0.025);
+    assert(listener_stress_after_first_telling == resumed_listener_stress_after_first_telling);
+    const double listener_isolation_after_first_telling =
+        uninterrupted.active_world().state().npcs[3].isolation;
+    (void)uninterrupted.active_world().talk("ghost_listener", "ghost_supporter");
+    (void)save_resume.active_world().talk("ghost_listener", "ghost_supporter");
+    assert(std::abs(uninterrupted.active_world().state().npcs[3].personal_stress
+        - listener_stress_after_first_telling - 0.01) < 1e-9);
+    assert(uninterrupted.active_world().state().npcs[3].personal_stress
+        == save_resume.active_world().state().npcs[3].personal_stress);
+    assert(uninterrupted.active_world().state().npcs[3].isolation == listener_isolation_after_first_telling);
+    assert(uninterrupted.active_world().state().npcs[3].isolation
+        == save_resume.active_world().state().npcs[3].isolation);
+
     const GhostInfluenceResult uninterrupted_forbidden =
         uninterrupted.attempt_ghost_influence("ghost_supporter", "comfort", 9.0);
     const GhostInfluenceResult resumed_forbidden =

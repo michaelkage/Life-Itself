@@ -192,7 +192,10 @@ GhostInfluenceResult LifeCoordinator::attempt_ghost_influence(
     for (const NPCMemory& item : npc->memories) {
         if (item.target_entity_id == ghost_id)
             memory = std::max(memory, item.retention
-                * (item.action_tag == ActionTag::InteractionPolite ? 0.5 : 1.0));
+                * (item.action_tag == ActionTag::InteractionPolite
+                    || item.action_tag == ActionTag::GhostSign
+                    || item.action_tag == ActionTag::GhostSound
+                    || item.action_tag == ActionTag::GhostDream ? 0.5 : 1.0));
     }
     const auto trait = ghost->second.personality.find(npc_id);
     const double openness = trait == ghost->second.personality.end() ? 0.5 : clamp01(trait->second);
@@ -201,8 +204,12 @@ GhostInfluenceResult LifeCoordinator::attempt_ghost_influence(
     const double sample = static_cast<double>(random_sample % 1000000U) / 1000000.0;
     const bool accepted = sample < score;
     if (accepted) {
+        const ActionTag manifestation_tag = action == "sign" ? ActionTag::GhostSign
+            : (action == "sound" ? ActionTag::GhostSound : ActionTag::GhostDream);
         auto remembered = std::find_if(npc->memories.begin(), npc->memories.end(),
-            [&ghost_id](const NPCMemory& item) { return item.target_entity_id == ghost_id; });
+            [&ghost_id, manifestation_tag](const NPCMemory& item) {
+                return item.target_entity_id == ghost_id && item.action_tag == manifestation_tag;
+            });
         if (remembered == npc->memories.end()) {
             NPCMemory new_memory;
             new_memory.witness_id = npc_id;
@@ -210,7 +217,7 @@ GhostInfluenceResult LifeCoordinator::attempt_ghost_influence(
             new_memory.initial_impact = 0.1;
             new_memory.retention = 0.03;
             new_memory.timestamp_hour = hour_of_day;
-            new_memory.action_tag = ActionTag::InteractionPolite;
+            new_memory.action_tag = manifestation_tag;
             npc->memories.push_back(std::move(new_memory));
         } else {
             remembered->retention = clamp01(remembered->retention + 0.03);

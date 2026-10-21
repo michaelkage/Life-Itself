@@ -17,7 +17,10 @@ double age_multiplier(AgeBand age_band) noexcept {
 
 double decay_rate_multiplier(ActionTag action_tag) noexcept {
     switch (action_tag) {
-    case ActionTag::InteractionPolite: return 4.0;
+    case ActionTag::InteractionPolite:
+    case ActionTag::GhostSign:
+    case ActionTag::GhostSound:
+    case ActionTag::GhostDream: return 4.0;
     case ActionTag::CrimeVandalism: return 2.5;
     case ActionTag::CrimeTheft: return 2.0;
     case ActionTag::CrimeAssault: return 0.4;
@@ -28,7 +31,10 @@ double decay_rate_multiplier(ActionTag action_tag) noexcept {
 
 double retention_floor(ActionTag action_tag) noexcept {
     switch (action_tag) {
-    case ActionTag::InteractionPolite: return 0.0;
+    case ActionTag::InteractionPolite:
+    case ActionTag::GhostSign:
+    case ActionTag::GhostSound:
+    case ActionTag::GhostDream: return 0.0;
     case ActionTag::CrimeVandalism: return 0.0;
     case ActionTag::CrimeTheft: return 0.0;
     case ActionTag::CrimeAssault: return 0.4;

@@ -163,7 +163,7 @@ NPCMemory read_memory(std::istream& in) {
     value.initial_impact = read_double(in);
     value.retention = read_double(in);
     value.timestamp_hour = read_double(in);
-    value.action_tag = read_enum<ActionTag>(in, 4U, "action tag");
+    value.action_tag = read_enum<ActionTag>(in, 7U, "action tag");
     value.description = read_description(in);
     return value;
 }
@@ -334,7 +334,7 @@ WorldState read_world_state(std::istream& in) {
         OngoingEvent event;
         event.event_id = read_string(in); event.district_id = read_string(in);
         event.actor_id = read_string(in);
-        event.action_tag = read_enum<ActionTag>(in, 4U, "event action");
+        event.action_tag = read_enum<ActionTag>(in, 7U, "event action");
         event.created_hour = read_double(in); event.severity = read_double(in);
         const std::uint32_t witnesses = read_count(in);
         for (std::uint32_t j = 0; j < witnesses; ++j) event.witness_ids.push_back(read_string(in));

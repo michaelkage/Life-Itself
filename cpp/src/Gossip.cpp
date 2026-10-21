@@ -19,6 +19,9 @@ double round_ties_to_even(double value) noexcept {
 std::string action_name(ActionTag tag) {
     switch (tag) {
     case ActionTag::InteractionPolite: return "Interaction.Polite";
+    case ActionTag::GhostSign: return "Ghost.Sign";
+    case ActionTag::GhostSound: return "Ghost.Sound";
+    case ActionTag::GhostDream: return "Ghost.Dream";
     case ActionTag::CrimeTheft: return "Crime.Theft";
     case ActionTag::CrimeAssault: return "Crime.Assault";
     case ActionTag::CrimeArmedAssault: return "Crime.ArmedAssault";
