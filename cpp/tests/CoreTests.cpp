@@ -1000,6 +1000,7 @@ int main() {
     const auto& resumed_memories = save_resume.active_world().state().npcs[2].memories;
     assert(reference_memories.size() == resumed_memories.size());
     assert(reference_memories.back().action_tag == ActionTag::GhostSound);
+    assert(reference_memories.back().timestamp_hour == ghost_event.created_hour);
     assert(reference_memories.back().target_entity_id == "former-player");
     assert(reference_memories.back().retention == resumed_memories.back().retention);
 
@@ -1078,6 +1079,16 @@ int main() {
         const WorldState& reference_state = uninterrupted.active_world().state();
         const WorldState& resumed_state = save_resume.active_world().state();
         assert(reference_state.ongoing_events.size() == resumed_state.ongoing_events.size());
+        assert(!reference_state.ongoing_events.empty());
+        const OngoingEvent& latest_ghost_event = reference_state.ongoing_events.back();
+        const auto latest_manifestation_memory = std::find_if(
+            reference_state.npcs[2].memories.rbegin(), reference_state.npcs[2].memories.rend(),
+            [&latest_ghost_event](const NPCMemory& memory) {
+                return memory.target_entity_id == latest_ghost_event.actor_id
+                    && memory.action_tag == latest_ghost_event.action_tag;
+            });
+        assert(latest_manifestation_memory != reference_state.npcs[2].memories.rend());
+        assert(latest_manifestation_memory->timestamp_hour == latest_ghost_event.created_hour);
         assert(reference_state.npcs[2].memories.size() == resumed_state.npcs[2].memories.size());
         assert(reference_state.npcs[2].isolation == resumed_state.npcs[2].isolation);
         assert(reference_state.npcs[2].social_need == resumed_state.npcs[2].social_need);

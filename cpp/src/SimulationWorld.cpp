@@ -41,6 +41,16 @@ GhostInfluenceResult SimulationWorld::attempt_ghost_influence(
 
     const double day_start = std::floor(runtime_.total_hours() / 24.0) * 24.0;
     const double event_hour = day_start + hour_of_day;
+    // LifeCoordinator receives a clock-hour for window gating; memory decay and
+    // replay require the absolute hour on the world's timeline.
+    const ActionTag manifestation_tag = action == "sign" ? ActionTag::GhostSign
+        : (action == "sound" ? ActionTag::GhostSound : ActionTag::GhostDream);
+    for (NPCMemory& memory : witness->memories) {
+        if (memory.target_entity_id == ghost_id && memory.action_tag == manifestation_tag) {
+            memory.timestamp_hour = event_hour;
+            break;
+        }
+    }
     const auto hour_key = static_cast<std::uint64_t>(std::llround(event_hour * 1000.0));
     OngoingEvent event;
     event.event_id = "ghost-influence:" + ghost_id + ":" + npc_id + ":"
