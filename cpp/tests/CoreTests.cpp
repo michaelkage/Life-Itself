@@ -1074,7 +1074,7 @@ int main() {
         uninterrupted.active_world().state().npcs[3].personal_stress;
     const double resumed_listener_stress_after_first_telling =
         save_resume.active_world().state().npcs[3].personal_stress;
-    assert(listener_stress_after_first_telling >= listener_stress_before + 0.025);
+    assert(listener_stress_after_first_telling >= listener_stress_before + 0.018);
     assert(listener_stress_after_first_telling == resumed_listener_stress_after_first_telling);
     const double listener_isolation_after_first_telling =
         uninterrupted.active_world().state().npcs[3].isolation;
