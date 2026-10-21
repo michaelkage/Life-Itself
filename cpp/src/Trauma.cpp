@@ -13,7 +13,10 @@ double event_stress(ActionTag action_tag, bool was_victim) noexcept {
     case ActionTag::CrimeAssault: return was_victim ? 0.60 : 0.30;
     case ActionTag::CrimeTheft: return was_victim ? 0.15 : 0.08;
     case ActionTag::CrimeVandalism: return was_victim ? 0.08 : 0.04;
-    case ActionTag::InteractionPolite: return 0.0;
+    case ActionTag::InteractionPolite:
+    case ActionTag::GhostSign:
+    case ActionTag::GhostSound:
+    case ActionTag::GhostDream: return 0.0;
     }
     return 0.0;
 }

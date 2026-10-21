@@ -991,12 +991,12 @@ int main() {
     assert(ghost_event.resolved);
     assert(ghost_event.created_hour == 9.0);
     assert(ghost_event.action_tag == ActionTag::GhostSound);
-    assert(reference_memories.back().action_tag == ActionTag::GhostSound);
     assert(uninterrupted.active_world().state().npcs[2].personal_stress
         == save_resume.active_world().state().npcs[2].personal_stress);
     const auto& reference_memories = uninterrupted.active_world().state().npcs[2].memories;
     const auto& resumed_memories = save_resume.active_world().state().npcs[2].memories;
     assert(reference_memories.size() == resumed_memories.size());
+    assert(reference_memories.back().action_tag == ActionTag::GhostSound);
     assert(reference_memories.back().target_entity_id == "former-player");
     assert(reference_memories.back().retention == resumed_memories.back().retention);
 
