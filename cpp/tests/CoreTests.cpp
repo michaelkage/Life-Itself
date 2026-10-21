@@ -975,6 +975,19 @@ int main() {
     assert(uninterrupted_influence.score == resumed_influence.score);
     assert(uninterrupted_influence.accepted);
     assert(uninterrupted.active_world().random_state() == save_resume.active_world().random_state());
+    assert(uninterrupted.active_world().state().ongoing_events.size()
+        == save_resume.active_world().state().ongoing_events.size());
+    assert(!uninterrupted.active_world().state().ongoing_events.empty());
+    const OngoingEvent& ghost_event =
+        uninterrupted.active_world().state().ongoing_events.back();
+    assert(ghost_event.event_id.find("ghost-influence:") == 0U);
+    assert(ghost_event.actor_id == "former-player");
+    assert(ghost_event.witness_ids == std::vector<EntityId>({"ghost_supporter"}));
+    assert(ghost_event.resolved);
+    assert(ghost_event.created_hour == 9.0);
+    assert(ghost_event.action_tag == ActionTag::InteractionPolite);
+    assert(uninterrupted.active_world().state().npcs[2].personal_stress
+        == save_resume.active_world().state().npcs[2].personal_stress);
     const auto& reference_memories = uninterrupted.active_world().state().npcs[2].memories;
     const auto& resumed_memories = save_resume.active_world().state().npcs[2].memories;
     assert(reference_memories.size() == resumed_memories.size());
@@ -1008,6 +1021,38 @@ int main() {
     save_campaign(uninterrupted, reference_bytes);
     save_campaign(save_resume, resumed_bytes);
     assert(reference_bytes.str() == resumed_bytes.str());
+
+    // Replay across multiple days and save points. Each resumed branch must
+    // produce the same next ghost decision, memory/event effects, and final bytes.
+    for (int checkpoint_day = 1; checkpoint_day <= 3; ++checkpoint_day) {
+        (void)uninterrupted.advance(24.0);
+        (void)save_resume.advance(24.0);
+        std::stringstream checkpoint_bytes(std::ios::in | std::ios::out | std::ios::binary);
+        save_campaign(save_resume, checkpoint_bytes);
+        checkpoint_bytes.seekg(0);
+        save_resume = load_campaign(checkpoint_bytes);
+
+        const GhostInfluenceResult next_reference =
+            uninterrupted.attempt_ghost_influence("ghost_supporter", "dream", 9.0);
+        const GhostInfluenceResult next_resumed =
+            save_resume.attempt_ghost_influence("ghost_supporter", "dream", 9.0);
+        assert(next_reference.accepted == next_resumed.accepted);
+        assert(next_reference.score == next_resumed.score);
+        assert(uninterrupted.active_world().random_state() == save_resume.active_world().random_state());
+        const WorldState& reference_state = uninterrupted.active_world().state();
+        const WorldState& resumed_state = save_resume.active_world().state();
+        assert(reference_state.ongoing_events.size() == resumed_state.ongoing_events.size());
+        assert(reference_state.npcs[2].memories.size() == resumed_state.npcs[2].memories.size());
+        assert(reference_state.npcs[2].isolation == resumed_state.npcs[2].isolation);
+        assert(reference_state.npcs[2].social_need == resumed_state.npcs[2].social_need);
+        assert(reference_state.npcs[2].personal_stress == resumed_state.npcs[2].personal_stress);
+
+        std::stringstream checkpoint_reference(std::ios::in | std::ios::out | std::ios::binary);
+        std::stringstream checkpoint_resumed(std::ios::in | std::ios::out | std::ios::binary);
+        save_campaign(uninterrupted, checkpoint_reference);
+        save_campaign(save_resume, checkpoint_resumed);
+        assert(checkpoint_reference.str() == checkpoint_resumed.str());
+    }
 
     uninterrupted.start_new_life("next-life", WorldState{}, 123U);
     save_resume.start_new_life("next-life", WorldState{}, 123U);
