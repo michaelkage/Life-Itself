@@ -429,10 +429,20 @@ int main() {
     assert(world.state().npcs[1].memories.size() == 1);
     assert(world.state().npcs[0].beliefs.size() == 1);
     assert(world.state().npcs[0].beliefs[0].directly_observed);
+    // The listener was also present at the event, so their belief is first-hand.
     assert(world.state().npcs[1].beliefs.size() == 1);
-    assert(!world.state().npcs[1].beliefs[0].directly_observed);
-    assert(world.state().npcs[1].beliefs[0].source_entity_id == "speaker");
+    assert(world.state().npcs[1].beliefs[0].directly_observed);
     const double first_account_confidence = world.state().npcs[1].beliefs[0].confidence;
+    NPC newcomer;
+    newcomer.entity_id = "newcomer";
+    newcomer.district_id = "D1";
+    world.state().npcs.push_back(newcomer);
+    const Conversation hearsay_story = world.talk("newcomer", "speaker");
+    assert(hearsay_story.transferred.size() == 1);
+    const NPC& hearsay_listener = world.state().npcs.back();
+    assert(hearsay_listener.beliefs.size() == 1);
+    assert(!hearsay_listener.beliefs[0].directly_observed);
+    assert(hearsay_listener.beliefs[0].source_entity_id == "speaker");
     NPC contradictor;
     contradictor.entity_id = "contradictor";
     contradictor.district_id = "D1";
