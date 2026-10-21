@@ -427,6 +427,11 @@ int main() {
     const Conversation world_conversation = world.talk("listener", "speaker");
     assert(world_conversation.transferred.size() == 1);
     assert(world.state().npcs[1].memories.size() == 1);
+    assert(world.state().npcs[0].beliefs.size() == 1);
+    assert(world.state().npcs[0].beliefs[0].directly_observed);
+    assert(world.state().npcs[1].beliefs.size() == 1);
+    assert(!world.state().npcs[1].beliefs[0].directly_observed);
+    assert(world.state().npcs[1].beliefs[0].source_entity_id == "speaker");
     assert(std::abs(world.state().npcs[0].relationships.at("listener") - 0.755) < 1e-9);
     assert(std::abs(world.state().npcs[1].relationships.at("speaker") - 0.755) < 1e-9);
     CriminalFile world_file = world.build_criminal_file("player");
@@ -511,6 +516,9 @@ int main() {
     assert(restored.state().npcs[0].schedule.size() == world.state().npcs[0].schedule.size());
     assert(restored.state().npcs[0].relationships.at("listener") == world.state().npcs[0].relationships.at("listener"));
     assert(restored.state().npcs[0].goals == world.state().npcs[0].goals);
+    assert(restored.state().npcs[0].beliefs.size() == world.state().npcs[0].beliefs.size());
+    assert(restored.state().npcs[0].beliefs[0].confidence == world.state().npcs[0].beliefs[0].confidence);
+    assert(restored.state().npcs[0].beliefs[0].directly_observed == world.state().npcs[0].beliefs[0].directly_observed);
     assert(restored.state().npcs[0].money == world.state().npcs[0].money);
     assert(restored.state().npcs[0].lost_income == world.state().npcs[0].lost_income);
     assert(restored.state().npcs[0].rent_arrears == world.state().npcs[0].rent_arrears);
