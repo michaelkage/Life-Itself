@@ -1002,17 +1002,29 @@ int main() {
 
     const double listener_stress_before = uninterrupted.active_world().state().npcs[3].personal_stress;
     const Conversation ghost_story = uninterrupted.active_world().talk("ghost_listener", "ghost_supporter");
-    assert(std::any_of(ghost_story.transferred.begin(), ghost_story.transferred.end(),
-        [](const Rumour& rumour) { return rumour.action_tag == "Ghost.Sound"; }));
+    const Conversation resumed_ghost_story = save_resume.active_world().talk("ghost_listener", "ghost_supporter");
+    const auto heard_ghost_sound = [](const Conversation& story) {
+        return std::any_of(story.transferred.begin(), story.transferred.end(),
+            [](const Rumour& rumour) { return rumour.action_tag == "Ghost.Sound"; });
+    };
+    assert(heard_ghost_sound(ghost_story) && heard_ghost_sound(resumed_ghost_story));
     const double listener_stress_after_first_telling =
         uninterrupted.active_world().state().npcs[3].personal_stress;
+    const double resumed_listener_stress_after_first_telling =
+        save_resume.active_world().state().npcs[3].personal_stress;
     assert(listener_stress_after_first_telling >= listener_stress_before + 0.025);
+    assert(listener_stress_after_first_telling == resumed_listener_stress_after_first_telling);
     const double listener_isolation_after_first_telling =
         uninterrupted.active_world().state().npcs[3].isolation;
     (void)uninterrupted.active_world().talk("ghost_listener", "ghost_supporter");
+    (void)save_resume.active_world().talk("ghost_listener", "ghost_supporter");
     assert(std::abs(uninterrupted.active_world().state().npcs[3].personal_stress
         - listener_stress_after_first_telling - 0.01) < 1e-9);
+    assert(uninterrupted.active_world().state().npcs[3].personal_stress
+        == save_resume.active_world().state().npcs[3].personal_stress);
     assert(uninterrupted.active_world().state().npcs[3].isolation == listener_isolation_after_first_telling);
+    assert(uninterrupted.active_world().state().npcs[3].isolation
+        == save_resume.active_world().state().npcs[3].isolation);
 
     const GhostInfluenceResult uninterrupted_forbidden =
         uninterrupted.attempt_ghost_influence("ghost_supporter", "comfort", 9.0);
