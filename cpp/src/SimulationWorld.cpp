@@ -512,10 +512,10 @@ Conversation SimulationWorld::talk(
     const double prior_trust = std::min(
         prior_listener_tie == listener.relationships.end() ? 0.0 : prior_listener_tie->second,
         prior_speaker_tie == speaker.relationships.end() ? 0.0 : prior_speaker_tie->second);
+    const std::vector<NPCMemory> memories_before_conversation = listener.memories;
     Conversation conversation = converse(listener, speaker, listener.district_id);
     // Trust changes the quality of what travels: trusted sources reinforce a memory;
     // hostile or unreliable sources leave weaker, less certain impressions.
-    const std::vector<NPCMemory> memories_before_conversation = listener.memories;
     const auto action_name = [](ActionTag tag) {
         switch (tag) {
             case ActionTag::InteractionPolite: return std::string("Interaction.Polite");
