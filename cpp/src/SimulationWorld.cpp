@@ -715,13 +715,22 @@ Conversation SimulationWorld::talk(
         const double received_evidence_strength =
             information_.independent_evidence_strength_for_recipient(
                 rumour.target_entity_id, proposition_key, listener_id);
-        double source_reliability = 0.5;
-        if (!speaker.beliefs.empty()) {
-            double total = 0.0;
-            for (const NPCBelief& belief : speaker.beliefs) {
-                total += belief.directly_observed ? 1.0 : belief.confidence;
-            }
-            source_reliability = total / static_cast<double>(speaker.beliefs.size());
+        // Reliability is claim-specific: confidence about unrelated events must
+        // not make a source more or less credible about this target and action.
+        // A matching first-hand belief is strongest; a matching second-hand
+        // belief contributes its own confidence. If the speaker has no matching
+        // belief, retain the reliability supplied by the underlying memory.
+        double source_reliability = std::clamp(rumour.source_reliability, 0.0, 1.0);
+        const auto source_belief = std::find_if(
+            speaker.beliefs.begin(), speaker.beliefs.end(),
+            [&rumour, &believed_action](const NPCBelief& belief) {
+                return belief.target_entity_id == rumour.target_entity_id
+                    && belief.action_tag == believed_action
+                    && belief.timestamp_hour == rumour.timestamp_hour;
+            });
+        if (source_belief != speaker.beliefs.end()) {
+            source_reliability = source_belief->directly_observed
+                ? 1.0 : std::clamp(source_belief->confidence, 0.0, 1.0);
         }
         // Personality affects interpretation, not the underlying event record.
         // Neutral traits (0.5) preserve the pre-bias calculation exactly.
