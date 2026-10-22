@@ -1918,11 +1918,15 @@ int main() {
     const double confidence_before_same_lineage_return = before_same_lineage_return.confidence;
     const std::uint32_t corroborations_before_same_lineage_return =
         before_same_lineage_return.corroborations;
+    const double relationship_before_same_lineage_return =
+        witnessed_information_world.state().npcs[2].relationships["observed-actor"];
     (void)witnessed_information_world.talk("listening-npc", "third-npc");
     const NPCBelief& after_same_lineage_return = find_observed_theft_belief(
         witnessed_information_world.state().npcs[2]);
     assert(after_same_lineage_return.confidence == confidence_before_same_lineage_return);
     assert(after_same_lineage_return.corroborations == corroborations_before_same_lineage_return);
+    assert(witnessed_information_world.state().npcs[2].relationships["observed-actor"]
+        == relationship_before_same_lineage_return);
     assert(witnessed_information_world.information_ledger().independent_evidence_count(
         "observed-actor", std::to_string(static_cast<unsigned int>(ActionTag::CrimeTheft))) == 1U);
 
