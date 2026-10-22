@@ -1742,5 +1742,46 @@ int main() {
     save_world(bias_restored, bias_bytes_b);
     assert(bias_bytes_a.str() == bias_bytes_b.str());
 
+
+    // The same trade-off is scored differently by NPCs with different values.
+    NPC urgency_focused;
+    urgency_focused.entity_id = "urgency-focused";
+    urgency_focused.compassion = 1.0;
+    urgency_focused.fairness_value = 0.1;
+    urgency_focused.safety_value = 0.2;
+    urgency_focused.freedom_value = 0.2;
+    urgency_focused.self_interest_value = 0.1;
+    NPC fairness_focused = urgency_focused;
+    fairness_focused.entity_id = "fairness-focused";
+    fairness_focused.compassion = 0.1;
+    fairness_focused.fairness_value = 1.0;
+    fairness_focused.safety_value = 0.2;
+    fairness_focused.freedom_value = 0.2;
+    fairness_focused.self_interest_value = 0.1;
+    const MoralChoiceOption urgent_aid{"urgent-aid", 1.0, 0.4, 0.2, 0.4, 0.3, 0.8, 0.8};
+    const MoralChoiceOption fair_distribution{"fair-distribution", 0.4, 0.7, 1.0, 0.5, 0.5, 0.2, 0.2};
+    assert(evaluate_moral_choice(urgency_focused, urgent_aid).score
+        > evaluate_moral_choice(urgency_focused, fair_distribution).score);
+    assert(evaluate_moral_choice(fairness_focused, urgent_aid).score
+        < evaluate_moral_choice(fairness_focused, fair_distribution).score);
+    assert(evaluate_moral_choice(fairness_focused, fair_distribution).score
+        == evaluate_moral_choice(fairness_focused, fair_distribution).score);
+    fairness_focused.fairness_value = 1.2;
+    std::stringstream moral_snapshot(std::ios::in | std::ios::out | std::ios::binary);
+    WorldState moral_state;
+    fairness_focused.fairness_value = 1.0;
+    fairness_focused.safety_value = 0.8;
+    fairness_focused.freedom_value = 0.3;
+    fairness_focused.self_interest_value = 0.7;
+    moral_state.npcs.push_back(fairness_focused);
+    SimulationWorld moral_world(moral_state, 0.0, 181U);
+    save_world(moral_world, moral_snapshot);
+    moral_snapshot.seekg(0);
+    SimulationWorld moral_restored = load_world(moral_snapshot);
+    assert(moral_restored.state().npcs.front().fairness_value == 1.0);
+    assert(moral_restored.state().npcs.front().safety_value == 0.8);
+    assert(moral_restored.state().npcs.front().freedom_value == 0.3);
+    assert(moral_restored.state().npcs.front().self_interest_value == 0.7);
+
     return 0;
 }
