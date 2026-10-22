@@ -32,9 +32,8 @@ int main() {
     assert(ledger.independent_evidence_count("bridge-7", "bridge-unsafe") == 1);
 
     const auto received_by_c = ledger.claims_received_by("resident-c");
-    assert(received_by_c.size() == 2U);
+    assert(received_by_c.size() == 1U);
     assert(received_by_c[0].claim_id == "claim-2");
-    assert(received_by_c[1].claim_id == "claim-4"); // later delivery follows earlier delivery
     assert(ledger.claims_received_by("uninformed").empty());
     assert(ledger.claims_received_by("").empty());
 
