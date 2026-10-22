@@ -19,6 +19,29 @@ struct ActivityDecision {
     std::string reason{};
 };
 
+// Each option dimension is normalized to [0, 1]. These are scenario features,
+// not moral labels: higher values mean more of the named property.
+struct MoralChoiceOption {
+    std::string option_id{};
+    double urgency{0.0};
+    double people_helped{0.0};
+    double fairness{0.0};
+    double safety{0.0};
+    double freedom{0.0};
+    double loyalty{0.0};
+    double personal_cost{0.0};
+};
+
+struct MoralChoiceEvaluation {
+    std::string option_id{};
+    double score{0.0};
+};
+
+// Deterministic value-weighted evaluation. It scores options but does not
+// dictate a universal good/bad answer or mutate the NPC/world.
+[[nodiscard]] MoralChoiceEvaluation evaluate_moral_choice(
+    const NPC& npc, const MoralChoiceOption& option);
+
 // Deterministic utility-based choice for unscheduled NPC hours. Explicit schedule
 // entries always take precedence; this function supplies an explainable fallback.
 [[nodiscard]] ActivityDecision choose_activity(
