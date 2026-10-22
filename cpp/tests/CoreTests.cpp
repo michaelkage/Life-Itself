@@ -1835,15 +1835,16 @@ int main() {
     assert(std::abs(constrained_result.relationship_deltas_applied.at("neighbor") - 0.1) < 1e-9);
 
     bool rejected_duplicate_options = false;
+    NPC invalid_scenario_npc;
     try {
-        (void)resolve_moral_choice(NPC{}, {urgent_aid, urgent_aid}, {});
+        (void)resolve_moral_choice(invalid_scenario_npc, {urgent_aid, urgent_aid}, {});
     } catch (const std::invalid_argument&) {
         rejected_duplicate_options = true;
     }
     assert(rejected_duplicate_options);
     bool rejected_unknown_consequence = false;
     try {
-        (void)resolve_moral_choice(NPC{}, {urgent_aid},
+        (void)resolve_moral_choice(invalid_scenario_npc, {urgent_aid},
             {{"not-an-option", 1.0, 0.0, {}}});
     } catch (const std::invalid_argument&) {
         rejected_unknown_consequence = true;
