@@ -81,6 +81,35 @@ std::vector<NPCBelief> SimulationWorld::beliefs_about_event(
     return accounts;
 }
 
+
+std::vector<BeliefAccountExplanation> SimulationWorld::belief_account_explanations_for(
+    const EntityId& npc_id, const EntityId& target_id,
+    SimulationHour event_timestamp_hour) const {
+    const std::vector<NPCBelief> accounts =
+        beliefs_about_event(npc_id, target_id, event_timestamp_hour);
+    std::vector<BeliefAccountExplanation> explanations;
+    explanations.reserve(accounts.size());
+    if (accounts.empty()) return explanations;
+
+    const std::vector<BeliefRevisionExplanation> history =
+        belief_explanations_for(npc_id, target_id);
+    for (const NPCBelief& account : accounts) {
+        BeliefAccountExplanation explanation;
+        explanation.current_belief = account;
+        for (const BeliefRevisionExplanation& revision : history) {
+            if (revision.revision.target_entity_id == account.target_entity_id
+                && revision.revision.action_tag == account.action_tag
+                && revision.revision.event_timestamp_hour == account.timestamp_hour) {
+                explanation.revisions.push_back(revision);
+            }
+        }
+        explanations.push_back(std::move(explanation));
+    }
+    // Account order follows beliefs_about_event; each account's revisions retain
+    // the chronological ordering supplied by belief_explanations_for.
+    return explanations;
+}
+
 GhostInfluenceResult SimulationWorld::attempt_ghost_influence(
     const EntityId& ghost_id, const EntityId& npc_id,
     const std::string& action, double hour_of_day) {
