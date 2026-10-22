@@ -3,6 +3,7 @@
 #include "simreality/CoreTypes.h"
 
 #include <string>
+#include <vector>
 
 namespace simreality {
 
@@ -41,6 +42,12 @@ struct MoralChoiceEvaluation {
 // dictate a universal good/bad answer or mutate the NPC/world.
 [[nodiscard]] MoralChoiceEvaluation evaluate_moral_choice(
     const NPC& npc, const MoralChoiceOption& option);
+
+// Returns the highest-scoring option. Equal scores preserve input order, so
+// callers can make replay-stable choices without a random tie-breaker.
+// An empty option list is a caller error and throws std::invalid_argument.
+[[nodiscard]] MoralChoiceEvaluation choose_moral_option(
+    const NPC& npc, const std::vector<MoralChoiceOption>& options);
 
 // Deterministic utility-based choice for unscheduled NPC hours. Explicit schedule
 // entries always take precedence; this function supplies an explainable fallback.
