@@ -285,8 +285,21 @@ WorldAdvanceReport SimulationWorld::advance(
             std::size_t total_housing_slots = 0;
             for (const HousingUnit& unit : state_.housing_units)
                 if (unit.district_id == district.district_id) total_housing_slots += unit.capacity;
+            // When homes are scarce, residents with stronger local standing are
+            // considered first. This is a soft ordering only: reputation does not
+            // change affordability rules or permanently disqualify anyone.
+            std::vector<NPC*> housing_candidates;
             for (NPC& resident : state_.npcs) {
-                if (resident.district_id != district.district_id || !resident.home_id.empty()) continue;
+                if (resident.district_id == district.district_id && resident.home_id.empty())
+                    housing_candidates.push_back(&resident);
+            }
+            std::stable_sort(housing_candidates.begin(), housing_candidates.end(),
+                [this, &district](const NPC* left, const NPC* right) {
+                    return community_reputation(left->entity_id, district.district_id)
+                        > community_reputation(right->entity_id, district.district_id);
+                });
+            for (NPC* resident_ptr : housing_candidates) {
+                NPC& resident = *resident_ptr;
                 const HousingUnit* selected_unit = nullptr;
                 std::size_t selected_occupancy = 0;
                 double selected_trust = -1.0;
