@@ -6,6 +6,7 @@
 #include "simreality/Fixers.h"
 #include "simreality/Gossip.h"
 #include "simreality/LifeSystems.h"
+#include "simreality/Information.h"
 #include "simreality/Justice.h"
 #include "simreality/RandomStream.h"
 #include "simreality/Reputation.h"
@@ -58,6 +59,8 @@ public:
     [[nodiscard]] LifeCoordinator& life_system() noexcept { return life_; }
     [[nodiscard]] const LifeCoordinator& life_system() const noexcept { return life_; }
     [[nodiscard]] std::uint64_t random_state() const noexcept { return random_.state(); }
+    [[nodiscard]] InformationLedger& information_ledger() noexcept { return information_; }
+    [[nodiscard]] const InformationLedger& information_ledger() const noexcept { return information_; }
 
     // Advances simulation time in a frame-rate-independent way. All due hourly
     // memory sweeps and daily district/NPC updates run in chronological order.
@@ -107,6 +110,7 @@ private:
     SimulationRuntime runtime_;
     RandomStream random_;
     LifeCoordinator life_{};
+    InformationLedger information_{};
 };
 
 } // namespace simreality
