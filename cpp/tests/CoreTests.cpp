@@ -1800,5 +1800,55 @@ int main() {
     }
     assert(rejected_empty_moral_options);
 
+    // Moral decisions apply only scenario-authored effects for the selected
+    // option; bounds and reported deltas match the actual state changes.
+    NPC dilemma_npc;
+    dilemma_npc.entity_id = "dilemma-npc";
+    dilemma_npc.money = 5.0;
+    dilemma_npc.personal_stress = 0.9;
+    dilemma_npc.relationships["neighbor"] = 0.8;
+    const auto dilemma_result = resolve_moral_choice(
+        dilemma_npc, {urgent_aid, fair_distribution},
+        {{"urgent-aid", -8.0, 0.3, {{"neighbor", 0.5}, {"stranger", -0.4}}},
+         {"fair-distribution", 2.0, -0.2, {{"neighbor", -0.2}}}});
+    assert(dilemma_result.choice.option_id == "fair-distribution");
+    assert(dilemma_npc.money == 7.0);
+    assert(std::abs(dilemma_npc.personal_stress - 0.7) < 1e-9);
+    assert(std::abs(dilemma_npc.relationships["neighbor"] - 0.6) < 1e-9);
+    assert(dilemma_npc.relationships.find("stranger") == dilemma_npc.relationships.end());
+    assert(std::abs(dilemma_result.money_delta_applied - 2.0) < 1e-9);
+    assert(std::abs(dilemma_result.stress_delta_applied + 0.2) < 1e-9);
+    assert(std::abs(dilemma_result.relationship_deltas_applied.at("neighbor") + 0.2) < 1e-9);
+
+    NPC constrained_npc;
+    constrained_npc.money = 1.0;
+    constrained_npc.personal_stress = 0.95;
+    constrained_npc.relationships["neighbor"] = 0.9;
+    const auto constrained_result = resolve_moral_choice(
+        constrained_npc, {urgent_aid},
+        {{"urgent-aid", -10.0, 0.5, {{"neighbor", 0.5}}}});
+    assert(constrained_npc.money == 0.0);
+    assert(constrained_npc.personal_stress == 1.0);
+    assert(constrained_npc.relationships["neighbor"] == 1.0);
+    assert(constrained_result.money_delta_applied == -1.0);
+    assert(std::abs(constrained_result.stress_delta_applied - 0.05) < 1e-9);
+    assert(std::abs(constrained_result.relationship_deltas_applied.at("neighbor") - 0.1) < 1e-9);
+
+    bool rejected_duplicate_options = false;
+    try {
+        (void)resolve_moral_choice(NPC{}, {urgent_aid, urgent_aid}, {});
+    } catch (const std::invalid_argument&) {
+        rejected_duplicate_options = true;
+    }
+    assert(rejected_duplicate_options);
+    bool rejected_unknown_consequence = false;
+    try {
+        (void)resolve_moral_choice(NPC{}, {urgent_aid},
+            {{"not-an-option", 1.0, 0.0, {}}});
+    } catch (const std::invalid_argument&) {
+        rejected_unknown_consequence = true;
+    }
+    assert(rejected_unknown_consequence);
+
     return 0;
 }
