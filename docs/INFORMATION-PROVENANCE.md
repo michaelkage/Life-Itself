@@ -45,6 +45,8 @@ The proposition key is a stable domain key, not free-form dialogue. Generated di
 
 `InformationLedger::lineage_for_claim(claim_id)` returns a copied, source-to-recipient chain in oldest-first order; an unknown claim or incomplete chain returns an empty result. This is for investigation and explanation: it exposes how a claim travelled, but does not declare the claim true or make repeated relays independent evidence.
 
+`InformationLedger::claims_received_by(recipient_entity_id)` returns copied claims that were delivered to that recipient, ordered by creation tick and then claim ID for deterministic presentation. An empty recipient ID returns no claims. This lets an investigation begin from what a specific NPC actually received, rather than accidentally querying world-wide information.
+
 ## What this does not yet do
 
 This is an engine-independent provenance primitive, not a complete media or belief system. It does not yet:
