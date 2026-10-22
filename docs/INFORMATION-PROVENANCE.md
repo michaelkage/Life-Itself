@@ -45,13 +45,13 @@ The proposition key is a stable domain key, not free-form dialogue. Generated di
 
 This is an engine-independent provenance primitive, not a complete media or belief system. It does not yet:
 - Decide whether a proposition is objectively true
-- Automatically update NPC beliefs
+- Decide whether a proposition is objectively true
 - Model news organizations, private channels, access control, or publication incentives
 - Automatically update NPC beliefs from claims
 - Replace the existing gossip/rumour implementation
 - Guarantee that two differently named root IDs truly represent independent evidence; evidence identity must be assigned by the event/evidence creation layer
 
-The ledger is now owned by `SimulationWorld` and included in version 11 C++ snapshots. Older versions 5–10 remain readable and restore with an empty ledger. Automatic NPC-belief and gossip integration remains a separate step.
+The ledger is owned by `SimulationWorld` and included in version 11 C++ snapshots. Older versions 5–10 remain readable and restore with an empty ledger. `record_witnessed_action` now creates an observation claim for each witness, and conversations relay matching claims when the speaker has a recorded parent claim. The existing belief update remains authoritative for NPC interpretation; automatic belief updates from ledger records and full gossip replacement remain separate steps.
 
 ## Tests
 
