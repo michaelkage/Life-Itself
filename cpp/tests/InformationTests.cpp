@@ -31,6 +31,13 @@ int main() {
     assert(ledger.size() == 3);
     assert(ledger.independent_evidence_count("bridge-7", "bridge-unsafe") == 1);
 
+    const auto received_by_c = ledger.claims_received_by("resident-c");
+    assert(received_by_c.size() == 2U);
+    assert(received_by_c[0].claim_id == "claim-2");
+    assert(received_by_c[1].claim_id == "claim-4"); // equal ticks break ties by claim ID
+    assert(ledger.claims_received_by("uninformed").empty());
+    assert(ledger.claims_received_by("").empty());
+
     const InformationClaim* relayed = ledger.find("claim-3");
     assert(relayed != nullptr);
     assert(relayed->root_evidence_id == "evidence-witness-a");
