@@ -1,6 +1,7 @@
 #pragma once
 
 #include "simreality/CoreTypes.h"
+#include "simreality/DecisionSystem.h"
 #include "simreality/Districts.h"
 #include "simreality/Ecosystem.h"
 #include "simreality/Fixers.h"
@@ -81,6 +82,13 @@ public:
         const EntityId& from_id, const EntityId& to_id) const;
     [[nodiscard]] bool offer_support(
         const EntityId& from_id, const EntityId& to_id, double amount);
+
+    // Resolves a scenario-authored moral choice and records the outcome in the
+    // persistent world history. Scenario IDs are stable caller-provided labels.
+    [[nodiscard]] MoralChoiceResolution resolve_moral_choice(
+        const EntityId& npc_id, const std::string& scenario_id,
+        const std::vector<MoralChoiceOption>& options,
+        const std::vector<MoralChoiceConsequence>& consequences);
 
     // Records one observed action in the witnesses' local memories and applies
     // personal stress to witnesses and, when supplied, the victim.
