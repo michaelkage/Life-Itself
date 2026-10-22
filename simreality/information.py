@@ -132,6 +132,24 @@ class InformationLedger:
             if claim.subject_key == subject_key and claim.proposition_key == proposition_key
         })
 
+    def independent_evidence_strength(self, subject_key: str, proposition_key: str) -> float:
+        """Combine distinct roots without allowing relays to amplify one root.
+
+        This bounded support estimate is evidence strength, not objective truth.
+        Each root contributes only its strongest recorded confidence.
+        """
+        strongest_by_root: dict[str, float] = {}
+        for claim in self._claims.values():
+            if claim.subject_key != subject_key or claim.proposition_key != proposition_key:
+                continue
+            strongest_by_root[claim.root_evidence_id] = max(
+                strongest_by_root.get(claim.root_evidence_id, 0.0), claim.confidence
+            )
+        remaining = 1.0
+        for confidence in strongest_by_root.values():
+            remaining *= 1.0 - confidence
+        return min(1.0, max(0.0, 1.0 - remaining))
+
     def __len__(self) -> int:
         return len(self._claims)
 
