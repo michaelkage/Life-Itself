@@ -56,6 +56,9 @@ public:
     // Missing claims return an empty chain; stored claims are append-only.
     [[nodiscard]] std::vector<InformationClaim> lineage_for_claim(
         const std::string& claim_id) const;
+    // Returns only claims delivered to this recipient, ordered by tick then claim ID.
+    [[nodiscard]] std::vector<InformationClaim> claims_received_by(
+        const std::string& recipient_entity_id) const;
     [[nodiscard]] std::size_t independent_evidence_count(
         const std::string& subject_key,
         const std::string& proposition_key) const;
