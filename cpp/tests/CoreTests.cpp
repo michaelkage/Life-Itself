@@ -2087,7 +2087,7 @@ int main() {
     NPC history_query_npc;
     history_query_npc.entity_id = "history-query-npc";
     history_query_npc.belief_revision_history = {
-        BeliefRevision{"target-a", ActionTag::CrimeTheft, 8.0, 0.2, 0.4,
+        BeliefRevision{"target-a", ActionTag::CrimeTheft, 8.0, 0.4, 0.2,
             BeliefRevisionReason::Contradiction, "source-c", 9.0},
         BeliefRevision{"target-b", ActionTag::SocialAid, 2.0, 0.1, 0.3,
             BeliefRevisionReason::IndependentEvidence, "source-a", 3.0},
