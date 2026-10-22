@@ -665,24 +665,36 @@ Conversation SimulationWorld::talk(
                     && candidate.timestamp_hour == rumour.timestamp_hour
                     && candidate.action_tag == believed_action;
             });
+        // A speaker repeating the same account is not an independent witness.
+        // Keep the existing source attribution and do not let repetition inflate
+        // confidence, corroboration counts, or the confidence penalty on rivals.
+        const bool repeated_source_report = belief != listener.beliefs.end()
+            && !belief->directly_observed && belief->source_entity_id == speaker_id;
         bool contradicted = false;
-        for (NPCBelief& prior : listener.beliefs) {
-            if (prior.target_entity_id != rumour.target_entity_id
-                || prior.timestamp_hour != rumour.timestamp_hour
-                || prior.action_tag == believed_action) continue;
-            contradicted = true;
-            prior.confidence = std::clamp(prior.confidence - 0.20 * account_confidence, 0.0, 1.0);
-            ++prior.contradictions;
+        if (!repeated_source_report) {
+            for (NPCBelief& prior : listener.beliefs) {
+                if (prior.target_entity_id != rumour.target_entity_id
+                    || prior.timestamp_hour != rumour.timestamp_hour
+                    || prior.action_tag == believed_action) continue;
+                contradicted = true;
+                prior.confidence = std::clamp(
+                    prior.confidence - 0.20 * account_confidence, 0.0, 1.0);
+                ++prior.contradictions;
+            }
         }
         if (belief == listener.beliefs.end()) {
             listener.beliefs.push_back(NPCBelief{rumour.target_entity_id, believed_action,
                 rumour.timestamp_hour, account_confidence, speaker_id, false,
                 rumour.corroborations, contradicted ? 1U : 0U});
         } else {
-            belief->confidence = std::clamp(belief->confidence
-                + (1.0 - belief->confidence) * account_confidence * 0.25, 0.0, 1.0);
-            belief->source_entity_id = speaker_id;
-            ++belief->corroborations;
+            // A first-hand belief keeps its provenance. Only a distinct source
+            // can strengthen an existing second-hand account.
+            if (!belief->directly_observed && !repeated_source_report) {
+                belief->confidence = std::clamp(belief->confidence
+                    + (1.0 - belief->confidence) * account_confidence * 0.25, 0.0, 1.0);
+                belief->source_entity_id = speaker_id;
+                ++belief->corroborations;
+            }
             if (contradicted) ++belief->contradictions;
         }
         if (contradicted) {
