@@ -540,10 +540,10 @@ int main() {
     assert(social_bytes_a.str() == social_bytes_b.str());
     // Keep the later criminal-evidence fixture independent of this aid test's
     // deliberately initialized emotional state.
-    world.state().npcs[2].personal_stress = original_stress - 0.02;
-    social_resumed.state().npcs[2].personal_stress = original_stress - 0.02;
-    world.state().npcs[2].desperation_index = original_desperation - 0.01;
-    social_resumed.state().npcs[2].desperation_index = original_desperation - 0.01;
+    world.state().npcs[2].personal_stress = original_stress;
+    social_resumed.state().npcs[2].personal_stress = original_stress;
+    world.state().npcs[2].desperation_index = original_desperation;
+    social_resumed.state().npcs[2].desperation_index = original_desperation;
     assert(std::abs(world.state().npcs[0].relationships.at("listener") - 0.755) < 1e-9);
     assert(std::abs(world.state().npcs[1].relationships.at("speaker") - 0.755) < 1e-9);
     CriminalFile world_file = world.build_criminal_file("player");
