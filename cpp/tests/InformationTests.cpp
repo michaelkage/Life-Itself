@@ -56,6 +56,11 @@ int main() {
     const std::size_t before_invalid = ledger.size();
     assert(!ledger.record(first).accepted); // duplicate claim ID
 
+    InformationClaim missing_recipient = first;
+    missing_recipient.claim_id = "missing-recipient";
+    missing_recipient.recipient_entity_id.clear();
+    assert(!ledger.record(missing_recipient).accepted);
+
     InformationClaim orphan = first;
     orphan.claim_id = "orphan";
     orphan.parent_claim_id = "missing-parent";
