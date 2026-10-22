@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <stdexcept>
 
 namespace simreality {
@@ -38,6 +39,78 @@ MoralChoiceEvaluation choose_moral_option(
         }
     }
     return best;
+}
+
+MoralChoiceResolution resolve_moral_choice(
+    NPC& npc, const std::vector<MoralChoiceOption>& options,
+    const std::vector<MoralChoiceConsequence>& consequences) {
+    const auto finite = [](double value) { return std::isfinite(value); };
+    std::vector<std::string> option_ids;
+    option_ids.reserve(options.size());
+    for (const MoralChoiceOption& option : options) {
+        if (option.option_id.empty()
+            || std::find(option_ids.begin(), option_ids.end(), option.option_id) != option_ids.end()) {
+            throw std::invalid_argument("moral choice option IDs must be non-empty and unique");
+        }
+        option_ids.push_back(option.option_id);
+    }
+
+    const MoralChoiceConsequence* selected_consequence = nullptr;
+    std::vector<std::string> consequence_ids;
+    consequence_ids.reserve(consequences.size());
+    for (const MoralChoiceConsequence& consequence : consequences) {
+        if (consequence.option_id.empty()
+            || std::find(consequence_ids.begin(), consequence_ids.end(), consequence.option_id)
+                != consequence_ids.end()) {
+            throw std::invalid_argument("moral consequence IDs must be non-empty and unique");
+        }
+        consequence_ids.push_back(consequence.option_id);
+        if (!finite(consequence.money_delta) || !finite(consequence.stress_delta)) {
+            throw std::invalid_argument("moral consequences must be finite");
+        }
+        for (const auto& [entity_id, delta] : consequence.relationship_deltas) {
+            if (entity_id.empty() || !finite(delta)) {
+                throw std::invalid_argument("relationship consequences require an entity and finite delta");
+            }
+        }
+        if (std::find(option_ids.begin(), option_ids.end(), consequence.option_id) == option_ids.end()) {
+            throw std::invalid_argument("moral consequence references an unknown option");
+        }
+    }
+
+    const MoralChoiceEvaluation choice = choose_moral_option(npc, options);
+    for (const MoralChoiceConsequence& consequence : consequences) {
+        if (consequence.option_id == choice.option_id) {
+            selected_consequence = &consequence;
+            break;
+        }
+    }
+
+    MoralChoiceResolution resolution;
+    resolution.choice = choice;
+    if (selected_consequence == nullptr) return resolution;
+
+    const double next_money = std::max(0.0, npc.money + selected_consequence->money_delta);
+    const double next_stress = std::clamp(
+        npc.personal_stress + selected_consequence->stress_delta, 0.0, 1.0);
+    resolution.money_delta_applied = next_money - npc.money;
+    resolution.stress_delta_applied = next_stress - npc.personal_stress;
+
+    std::map<EntityId, double> next_relationships;
+    for (const auto& [entity_id, delta] : selected_consequence->relationship_deltas) {
+        const auto current = npc.relationships.find(entity_id);
+        const double previous = current == npc.relationships.end() ? 0.0 : current->second;
+        const double next = std::clamp(previous + delta, -1.0, 1.0);
+        next_relationships.emplace(entity_id, next);
+        resolution.relationship_deltas_applied.emplace(entity_id, next - previous);
+    }
+
+    npc.money = next_money;
+    npc.personal_stress = next_stress;
+    for (const auto& [entity_id, value] : next_relationships) {
+        npc.relationships[entity_id] = value;
+    }
+    return resolution;
 }
 
 ActivityDecision choose_activity(
