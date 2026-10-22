@@ -833,6 +833,18 @@ std::size_t SimulationWorld::record_witnessed_action(
         memory.action_tag = action_tag;
         memory.description = description;
         witness->memories.push_back(memory);
+        // A first-hand observation is strong counter-evidence to a different
+        // account about the same target and event hour. Preserve both interpretations,
+        // but weaken the conflicting hearsay and record that it was challenged.
+        for (NPCBelief& prior : witness->beliefs) {
+            if (prior.target_entity_id != actor_id
+                || prior.timestamp_hour != runtime_.total_hours()
+                || prior.action_tag == action_tag) {
+                continue;
+            }
+            prior.confidence = std::clamp(prior.confidence * 0.75, 0.0, 1.0);
+            ++prior.contradictions;
+        }
         const auto existing_belief = std::find_if(witness->beliefs.begin(), witness->beliefs.end(),
             [&actor_id, action_tag, this](const NPCBelief& belief) {
                 return belief.target_entity_id == actor_id && belief.action_tag == action_tag
