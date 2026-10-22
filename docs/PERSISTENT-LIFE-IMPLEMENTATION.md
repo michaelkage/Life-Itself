@@ -23,7 +23,7 @@ This subsystem is being connected to the existing simulation, rather than treate
 
 - `CampaignCoordinator` owns the active `SimulationWorld`, tracks the current life, records death, and allows the dead world to continue running while NPCs settle obligations.
 - Starting another life snapshots the old world as an immutable archive, marks the prior character `Archived`, and creates a separate day-zero world. Archive inspection returns a detached world copy, so inspection cannot mutate the preserved snapshot.
-- Versioned campaign save/load stores the active world and archive snapshots together. World format v8 persists NPC beliefs while remaining able to read legacy v5/v6/v7 snapshots.
+- Versioned campaign save/load stores the active world and archive snapshots together. World format v9 persists NPC beliefs and stable personality-bias traits while remaining able to read legacy v5/v6/v7/v8 snapshots.
 - Recovery sampling uses stable FNV-1a condition IDs rather than implementation-defined `std::hash`, avoiding compiler-library-dependent outcomes.
 
 ## Determinism regression coverage
@@ -37,7 +37,14 @@ CI for this branch is the verification authority; report only the checks that ha
 - NPCs retain beliefs separately from raw memories, recording the target, event/action, event time, confidence, source, direct-observation status, corroborations, and contradictions.
 - First-hand witnesses form high-confidence beliefs. Second-hand accounts are weighted by the listener's relationship with the speaker, the speaker's own balance of direct observation versus hearsay, and the reliability of the retold memory.
 - Accounts about the same target and event time can coexist when they disagree. Conflicting reports reduce confidence in competing interpretations instead of silently overwriting the original account; repeated compatible reports increase corroboration and confidence.
-- Contradictions create a small stress response and can erode trust in a hostile source. Existing conversation effects also change relationships, social needs, isolation, and stress. Beliefs are saved in world format v8; readers continue to accept v5/v6/v7 snapshots.
+- Contradictions create a small stress response and can erode trust in a hostile source. Existing conversation effects also change relationships, social needs, isolation, and stress. Beliefs are saved in world format v9; readers continue to accept v5/v6/v7/v8 snapshots.
+
+## Persistent NPC interpretation biases
+
+- NPCs have stable normalized loyalty, skepticism, and compassion traits; `0.5` is neutral, and old saves default to neutral values.
+- During conversation, loyalty biases ambiguous reports in line with the listener's existing relationship to the person discussed. Compassion shifts interpretation of prosocial versus harmful actions, while skepticism reduces confidence in second-hand reports. Neutral trait values preserve the prior confidence calculation.
+- Bias changes the listener's interpretation of a rumour, not the recorded event or a directly witnessed account. Competing beliefs remain separate, and the calculation consumes no random samples.
+- World format v9 persists these traits and validates their `[0, 1]` range; legacy v5-v8 saves load with neutral defaults.
 
 ## Personality-driven ghost interpretation
 

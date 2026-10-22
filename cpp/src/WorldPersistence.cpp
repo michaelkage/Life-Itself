@@ -17,6 +17,7 @@ constexpr std::array<char, 8> kMagicV5{{'S', 'R', 'E', 'C', 'O', 'R', 'E', '5'}}
 constexpr std::array<char, 8> kMagicV6{{'S', 'R', 'E', 'C', 'O', 'R', 'E', '6'}};
 constexpr std::array<char, 8> kMagicV7{{'S', 'R', 'E', 'C', 'O', 'R', 'E', '7'}};
 constexpr std::array<char, 8> kMagicV8{{'S', 'R', 'E', 'C', 'O', 'R', 'E', '8'}};
+constexpr std::array<char, 8> kMagicV9{{'S', 'R', 'E', 'C', 'O', 'R', 'E', '9'}};
 constexpr std::uint32_t kMaxCollectionItems = 1'000'000;
 constexpr std::uint32_t kMaxStringBytes = 16U * 1024U * 1024U;
 static_assert(sizeof(double) == sizeof(std::uint64_t));
@@ -212,6 +213,9 @@ void write_npc(std::ostream& out, const NPC& value) {
         write_u32(out, belief.corroborations);
         write_u32(out, belief.contradictions);
     }
+    write_double(out, value.loyalty_bias);
+    write_double(out, value.skepticism);
+    write_double(out, value.compassion);
 }
 
 NPC read_npc(std::istream& in, std::uint32_t version) {
@@ -269,6 +273,16 @@ NPC read_npc(std::istream& in, std::uint32_t version) {
             belief.corroborations = read_u32(in);
             belief.contradictions = read_u32(in);
             value.beliefs.push_back(std::move(belief));
+        }
+    }
+    if (version >= 9U) {
+        value.loyalty_bias = read_double(in);
+        value.skepticism = read_double(in);
+        value.compassion = read_double(in);
+        if (value.loyalty_bias < 0.0 || value.loyalty_bias > 1.0
+            || value.skepticism < 0.0 || value.skepticism > 1.0
+            || value.compassion < 0.0 || value.compassion > 1.0) {
+            throw std::runtime_error("invalid NPC personality trait");
         }
     }
     return value;
@@ -592,7 +606,7 @@ void read_life_state(std::istream& in, LifeCoordinator& life, std::uint32_t vers
 } // namespace
 
 void save_world(const SimulationWorld& world, std::ostream& output) {
-    output.write(kMagicV8.data(), static_cast<std::streamsize>(kMagicV8.size()));
+    output.write(kMagicV9.data(), static_cast<std::streamsize>(kMagicV9.size()));
     if (!output) throw std::runtime_error("failed writing world snapshot header");
     write_u32(output, kWorldSaveVersion);
     write_double(output, world.total_hours());
@@ -611,11 +625,13 @@ SimulationWorld load_world(std::istream& input) {
     const bool is_v6 = magic == kMagicV6;
     const bool is_v7 = magic == kMagicV7;
     const bool is_v8 = magic == kMagicV8;
-    if (!is_v5 && !is_v6 && !is_v7 && !is_v8) throw std::runtime_error("invalid world snapshot magic");
+    const bool is_v9 = magic == kMagicV9;
+    if (!is_v5 && !is_v6 && !is_v7 && !is_v8 && !is_v9) throw std::runtime_error("invalid world snapshot magic");
     const std::uint32_t version = read_u32(input);
     if ((version == 5U && !is_v5) || (version == 6U && !is_v6)
         || (version == 7U && !is_v7) || (version == 8U && !is_v8)
-        || (version != 5U && version != 6U && version != 7U && version != 8U)) {
+        || (version == 9U && !is_v9)
+        || (version != 5U && version != 6U && version != 7U && version != 8U && version != 9U)) {
         throw std::runtime_error("unsupported world snapshot version");
     }
 
