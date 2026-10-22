@@ -4,10 +4,14 @@
 
 The information layer must distinguish the world's underlying events from claims made about those events. NPCs may report accurately, misremember details, infer causes, repeat a rumour, or issue a correction. The ledger records that history without deciding truth on behalf of the world.
 
-The first portable implementation lives in:
+The portable implementations live in:
 - `cpp/include/simreality/Information.h`
 - `cpp/src/Information.cpp`
 - `cpp/tests/InformationTests.cpp`
+- `simreality/information.py`
+- `tests/test_information_provenance.py`
+
+The Python implementation is a reference implementation of the C++ ledger's validation and lineage rules. Both are intentionally engine-independent.
 
 ## Claim fields
 
@@ -49,14 +53,14 @@ This is an engine-independent provenance primitive, not a complete media or beli
 
 These are deliberate boundaries. Integration should come after the primitive's semantics and tests are stable.
 
-## Test command
+## Tests
 
-From the repository root:
+Python regression tests include lineage preservation, confidence attenuation, duplicate and invalid-parent rejection, invalid confidence/fidelity, monotonic ticks, corrections, and the distinction between repeated reports and separate evidence roots.
+
+From the repository root, run the Python suite using the project's existing test command. The C++ target can be run with:
 
 ```bash
 cmake -S cpp -B build
 cmake --build build --parallel 2
 ctest --test-dir build --output-on-failure
 ```
-
-The dedicated CTest target checks relay lineage, confidence attenuation, duplicate rejection, invalid parentage, time ordering, and the distinction between repeated reports and separate evidence roots.
