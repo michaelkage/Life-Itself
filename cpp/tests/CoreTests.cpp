@@ -1554,16 +1554,16 @@ int main() {
     corroborated_listener.entity_id = "corroborated-listener";
     corroborated_listener.beliefs.push_back(NPCBelief{
         "target", ActionTag::SocialAid, 0.0, 0.8, "speaker", false, 4U, 0U});
-    NPC hearsay_listener;
-    hearsay_listener.entity_id = "hearsay-listener";
-    hearsay_listener.beliefs.push_back(NPCBelief{
+    NPC decay_hearsay_npc;
+    decay_hearsay_npc.entity_id = "hearsay-listener";
+    decay_hearsay_npc.beliefs.push_back(NPCBelief{
         "target", ActionTag::SocialAid, 0.0, 0.8, "speaker", false, 0U, 0U});
     NPC disputed_listener;
     disputed_listener.entity_id = "disputed-listener";
     disputed_listener.beliefs.push_back(NPCBelief{
         "target", ActionTag::SocialAid, 0.0, 0.8, "speaker", false, 0U, 3U});
     belief_decay_state.npcs = {
-        direct_observer, corroborated_listener, hearsay_listener, disputed_listener};
+        direct_observer, corroborated_listener, decay_hearsay_npc, disputed_listener};
     SimulationWorld belief_decay_world(belief_decay_state, 0.0, 441U);
     SimulationWorld belief_decay_resumed(belief_decay_state, 0.0, 441U);
     (void)belief_decay_world.advance(24.0);
