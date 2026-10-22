@@ -1,5 +1,6 @@
 #include "simreality/Information.h"
 
+#include <algorithm>
 #include <cmath>
 #include <utility>
 
@@ -89,6 +90,28 @@ std::size_t InformationLedger::independent_evidence_count(
             roots.insert(claim.root_evidence_id);
     }
     return roots.size();
+}
+
+double InformationLedger::independent_evidence_strength(
+    const std::string& subject_key,
+    const std::string& proposition_key) const {
+    std::map<std::string, double> strongest_by_root;
+    for (const auto& [id, claim] : claims_) {
+        (void)id;
+        if (claim.subject_key != subject_key || claim.proposition_key != proposition_key)
+            continue;
+        double& strongest = strongest_by_root[claim.root_evidence_id];
+        strongest = std::max(strongest, claim.confidence);
+    }
+
+    // Noisy-OR combines distinct evidence roots while capping each root at its
+    // strongest confidence. Retelling one claim can never add another factor.
+    double remaining = 1.0;
+    for (const auto& [root_id, confidence] : strongest_by_root) {
+        (void)root_id;
+        remaining *= (1.0 - confidence);
+    }
+    return std::clamp(1.0 - remaining, 0.0, 1.0);
 }
 
 } // namespace simreality
