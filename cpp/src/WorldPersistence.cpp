@@ -19,6 +19,7 @@ constexpr std::array<char, 8> kMagicV7{{'S', 'R', 'E', 'C', 'O', 'R', 'E', '7'}}
 constexpr std::array<char, 8> kMagicV8{{'S', 'R', 'E', 'C', 'O', 'R', 'E', '8'}};
 constexpr std::array<char, 8> kMagicV9{{'S', 'R', 'E', 'C', 'O', 'R', 'E', '9'}};
 constexpr std::array<char, 8> kMagicV10{{'S', 'R', 'E', 'C', 'O', 'R', 'E', 'A'}};
+constexpr std::array<char, 8> kMagicV11{{'S', 'R', 'E', 'C', 'O', 'R', 'E', 'B'}};
 constexpr std::uint32_t kMaxCollectionItems = 1'000'000;
 constexpr std::uint32_t kMaxStringBytes = 16U * 1024U * 1024U;
 static_assert(sizeof(double) == sizeof(std::uint64_t));
@@ -632,6 +633,7 @@ void save_world(const SimulationWorld& world, std::ostream& output) {
     write_count(output, world.fixer_networks().size());
     for (const FixerNetwork& network : world.fixer_networks()) write_network(output, network);
     write_life_state(output, world.life_system());
+    write_information_ledger(output, world.information_ledger());
 }
 
 SimulationWorld load_world(std::istream& input) {
@@ -644,7 +646,8 @@ SimulationWorld load_world(std::istream& input) {
     const bool is_v8 = magic == kMagicV8;
     const bool is_v9 = magic == kMagicV9;
     const bool is_v10 = magic == kMagicV10;
-    if (!is_v5 && !is_v6 && !is_v7 && !is_v8 && !is_v9 && !is_v10) throw std::runtime_error("invalid world snapshot magic");
+    const bool is_v11 = magic == kMagicV11;
+    if (!is_v5 && !is_v6 && !is_v7 && !is_v8 && !is_v9 && !is_v10 && !is_v11) throw std::runtime_error("invalid world snapshot magic");
     const std::uint32_t version = read_u32(input);
     if ((version == 5U && !is_v5) || (version == 6U && !is_v6)
         || (version == 7U && !is_v7) || (version == 8U && !is_v8)
@@ -668,6 +671,7 @@ SimulationWorld load_world(std::istream& input) {
     SimulationWorld world(std::move(state), total_hours, random_state);
     world.fixer_networks() = std::move(fixer_networks);
     if (version >= 6U) read_life_state(input, world.life_system(), version);
+    if (version >= 11U) read_information_ledger(input, world.information_ledger());
     return world;
 }
 
