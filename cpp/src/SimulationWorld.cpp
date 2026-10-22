@@ -781,9 +781,16 @@ Conversation SimulationWorld::talk(
                     || prior.timestamp_hour != rumour.timestamp_hour
                     || prior.action_tag == believed_action) continue;
                 contradicted = true;
+                const double previous_confidence = prior.confidence;
                 prior.confidence = std::clamp(
                     prior.confidence - 0.20 * account_confidence, 0.0, 1.0);
                 ++prior.contradictions;
+                if (prior.confidence != previous_confidence) {
+                    listener.belief_revision_history.push_back(BeliefRevision{
+                        prior.target_entity_id, prior.action_tag, prior.timestamp_hour,
+                        previous_confidence, prior.confidence,
+                        BeliefRevisionReason::Contradiction, speaker_id, runtime_.total_hours()});
+                }
             }
         }
         if (belief == listener.beliefs.end()) {
@@ -795,10 +802,17 @@ Conversation SimulationWorld::talk(
             // can strengthen an existing second-hand account.
             if (!belief->directly_observed && !repeated_source_report
                 && !repeated_evidence_lineage) {
+                const double previous_confidence = belief->confidence;
                 belief->confidence = std::clamp(belief->confidence
                     + (1.0 - belief->confidence) * account_confidence * 0.25, 0.0, 1.0);
                 belief->source_entity_id = speaker_id;
                 ++belief->corroborations;
+                if (belief->confidence != previous_confidence) {
+                    listener.belief_revision_history.push_back(BeliefRevision{
+                        belief->target_entity_id, belief->action_tag, belief->timestamp_hour,
+                        previous_confidence, belief->confidence,
+                        BeliefRevisionReason::IndependentEvidence, speaker_id, runtime_.total_hours()});
+                }
             }
             if (contradicted) ++belief->contradictions;
         }
