@@ -37,6 +37,13 @@ int main() {
     assert(relayed->hop_count == 2);
     assert(relayed->source_entity_id == "resident-c");
     assert(std::abs(relayed->confidence - 0.36) < 1e-12);
+    const auto lineage = ledger.lineage_for_claim("claim-3");
+    assert(lineage.size() == 3U);
+    assert(lineage[0].claim_id == "claim-1");
+    assert(lineage[1].claim_id == "claim-2");
+    assert(lineage[2].claim_id == "claim-3");
+    assert(lineage[0].root_evidence_id == lineage[2].root_evidence_id);
+    assert(ledger.lineage_for_claim("missing-claim").empty());
 
     // A genuinely separate evidence root can independently corroborate it.
     InformationClaim second = first;
