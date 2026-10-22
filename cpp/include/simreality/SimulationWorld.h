@@ -75,6 +75,10 @@ public:
         const EntityId& npc_id, const EntityId& target_id = {}) const;
     [[nodiscard]] std::vector<BeliefRevisionExplanation> belief_explanations_for(
         const EntityId& npc_id, const EntityId& target_id = {}) const;
+    // Return every interpretation for one event, including incompatible accounts.
+    [[nodiscard]] std::vector<NPCBelief> beliefs_about_event(
+        const EntityId& npc_id, const EntityId& target_id,
+        SimulationHour event_timestamp_hour) const;
 
     // Advances simulation time in a frame-rate-independent way. All due hourly
     // memory sweeps and daily district/NPC updates run in chronological order.
