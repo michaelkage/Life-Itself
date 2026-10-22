@@ -2031,6 +2031,9 @@ int main() {
             revision_world.information_ledger().independent_evidence_count(
                 "revision-actor",
                 std::to_string(static_cast<unsigned int>(ActionTag::CrimeTheft)));
+        assert(revision_world.state().npcs[3].belief_revision_history.size() == 1U);
+        assert(revision_world.state().npcs[3].belief_revision_history.front().reason
+            == BeliefRevisionReason::IndependentEvidence);
         return std::tuple<double, double, std::uint32_t, std::uint32_t, std::size_t>{
             first_confidence, revised_confidence, first_corroborations,
             revised_corroborations, independent_roots};
@@ -2046,6 +2049,12 @@ int main() {
     // Information claim lineage is part of the saved world and remains stable
     // across save/resume, including deterministic serialized bytes.
     WorldState information_state;
+    NPC revision_history_npc;
+    revision_history_npc.entity_id = "revision-history-npc";
+    revision_history_npc.belief_revision_history.push_back(BeliefRevision{
+        "history-target", ActionTag::CrimeTheft, 3.0, 0.4, 0.7,
+        BeliefRevisionReason::IndependentEvidence, "history-source", 4.0});
+    information_state.npcs.push_back(revision_history_npc);
     SimulationWorld information_world(information_state, 0.0, 2026U);
     InformationClaim observed_claim;
     observed_claim.claim_id = "claim-observed";
@@ -2064,6 +2073,14 @@ int main() {
     save_world(information_world, information_snapshot);
     information_snapshot.seekg(0);
     SimulationWorld information_restored = load_world(information_snapshot);
+    assert(information_restored.state().npcs.size() == 1U);
+    assert(information_restored.state().npcs.front().belief_revision_history.size() == 1U);
+    const BeliefRevision& restored_revision =
+        information_restored.state().npcs.front().belief_revision_history.front();
+    assert(restored_revision.reason == BeliefRevisionReason::IndependentEvidence);
+    assert(restored_revision.previous_confidence == 0.4);
+    assert(restored_revision.revised_confidence == 0.7);
+    assert(restored_revision.source_entity_id == "history-source");
     assert(information_restored.information_ledger().size() == 2U);
     assert(information_restored.information_ledger().find("claim-relayed") != nullptr);
     assert(information_restored.information_ledger().find("claim-relayed")->hop_count == 1U);
