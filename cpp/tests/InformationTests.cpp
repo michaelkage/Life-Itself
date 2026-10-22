@@ -44,6 +44,10 @@ int main() {
     assert(lineage[2].claim_id == "claim-3");
     assert(lineage[0].root_evidence_id == lineage[2].root_evidence_id);
     assert(ledger.lineage_for_claim("missing-claim").empty());
+    assert(ledger.lineage_for_claim("claim-1").size() == 1U);
+    // The query returns copies, not mutable references into the ledger.
+    lineage[0].confidence = 0.0;
+    assert(std::abs(ledger.find("claim-1")->confidence - 0.9) < 1e-12);
 
     // A genuinely separate evidence root can independently corroborate it.
     InformationClaim second = first;
