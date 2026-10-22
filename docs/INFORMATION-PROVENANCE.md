@@ -31,6 +31,7 @@ The proposition key is a stable domain key, not free-form dialogue. Generated di
 ## Provenance rules
 
 1. Claim IDs are unique within a ledger.
+1. Every claim must identify a non-empty source and recipient; a claim without a recipient cannot represent knowledge delivered to an actor.
 2. Root claims have no parent and a hop count of zero.
 3. A child is recorded only after its parent.
 4. A relay must preserve its root evidence ID.
