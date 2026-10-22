@@ -5,6 +5,25 @@
 
 namespace simreality {
 
+MoralChoiceEvaluation evaluate_moral_choice(
+    const NPC& npc, const MoralChoiceOption& option) {
+    const auto unit = [](double value) { return std::clamp(value, 0.0, 1.0); };
+    const double compassion = unit(npc.compassion);
+    const double fairness = unit(npc.fairness_value);
+    const double safety = unit(npc.safety_value);
+    const double freedom = unit(npc.freedom_value);
+    const double loyalty = unit(npc.loyalty_bias);
+    const double self_interest = unit(npc.self_interest_value);
+    const double score = 0.25 * compassion * unit(option.urgency)
+        + 0.20 * compassion * unit(option.people_helped)
+        + 0.20 * fairness * unit(option.fairness)
+        + 0.15 * safety * unit(option.safety)
+        + 0.10 * freedom * unit(option.freedom)
+        + 0.10 * loyalty * unit(option.loyalty)
+        + 0.20 * self_interest * (1.0 - unit(option.personal_cost));
+    return {option.option_id, score};
+}
+
 ActivityDecision choose_activity(
     const NPC& npc, const District* district, const ActivityContext& context) {
     const double stress = std::clamp(npc.personal_stress, 0.0, 1.0);
