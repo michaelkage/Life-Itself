@@ -815,6 +815,45 @@ int main() {
     assert(referral_world.state().npcs[2].job_id == "referral-shop");
     assert(referral_world.state().npcs[1].job_id.empty());
 
+    // Community standing can widen access to automatic aid without replacing personal trust.
+    const auto verify_reputation_aid = [](ActionTag standing_action, double reciprocal_trust) {
+        WorldState aid_state;
+        District aid_district;
+        aid_district.district_id = "reputation-aid-district";
+        aid_state.districts.push_back(aid_district);
+        NPC aid_witness;
+        aid_witness.entity_id = "aid-witness";
+        aid_witness.district_id = "reputation-aid-district";
+        aid_witness.beliefs.push_back(NPCBelief{
+            "aid-recipient", standing_action, 0.0, 0.9,
+            "aid-witness", true, 1U, 0U});
+        NPC aid_recipient;
+        aid_recipient.entity_id = "aid-recipient";
+        aid_recipient.district_id = "reputation-aid-district";
+        aid_recipient.money = 0.0;
+        aid_recipient.daily_rent = 10.0;
+        aid_recipient.lost_income = 1.0;
+        aid_recipient.relationships["aid-helper"] = reciprocal_trust;
+        NPC aid_helper;
+        aid_helper.entity_id = "aid-helper";
+        aid_helper.district_id = "reputation-aid-district";
+        aid_helper.money = 100.0;
+        aid_helper.relationships["aid-recipient"] = reciprocal_trust;
+        aid_state.npcs = {aid_witness, aid_recipient, aid_helper};
+        SimulationWorld aid_world(aid_state, 0.0, 77U);
+        (void)aid_world.advance(24.0);
+        return aid_world;
+    };
+    SimulationWorld reputation_enabled_aid = verify_reputation_aid(
+        ActionTag::InteractionPolite, 0.30);
+    assert(reputation_enabled_aid.state().npcs[1].money > 0.0);
+    assert(reputation_enabled_aid.state().npcs[2].money < 100.0);
+    // A strong reciprocal bond still helps despite a negative local reputation.
+    SimulationWorld bond_overcomes_reputation = verify_reputation_aid(
+        ActionTag::CrimeTheft, 0.90);
+    assert(bond_overcomes_reputation.state().npcs[1].money > 0.0);
+    assert(bond_overcomes_reputation.state().npcs[2].money < 100.0);
+
     // Reputation softly prioritizes scarce housing without replacing affordability checks.
     WorldState reputation_housing_state;
     District reputation_housing_district;

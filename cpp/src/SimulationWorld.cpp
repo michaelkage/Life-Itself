@@ -459,8 +459,16 @@ WorldAdvanceReport SimulationWorld::advance(
                             const double trust = std::min(
                                 forward == resident.relationships.end() ? 0.0 : forward->second,
                                 reverse == helper.relationships.end() ? 0.0 : reverse->second);
+                            const double recipient_reputation = community_reputation(
+                                resident.entity_id, district.district_id);
+                            const double assistance_score = 0.65 * trust
+                                + 0.35 * recipient_reputation;
                             const double reserve = std::max(20.0, helper.daily_rent * 3.0);
-                            if (trust < 0.5 || helper.money <= reserve) continue;
+                            // Community standing can open the door to help when a tie
+                            // is modest, while a strong reciprocal bond can overcome
+                            // a poor reputation. Neither rumours nor reputation alone
+                            // can trigger aid without a real personal connection.
+                            if (assistance_score < 0.30 || helper.money <= reserve) continue;
                             const double gift = std::min({need, helper.money - reserve, 10.0});
                             if (gift <= 0.0) continue;
                             helper.money -= gift;
