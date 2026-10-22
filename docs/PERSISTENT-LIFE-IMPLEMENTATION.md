@@ -57,6 +57,7 @@ CI for this branch is the verification authority; report only the checks that ha
 
 ## Persistent social consequences of direct aid
 
+- Successful aid uses a dedicated `SocialAid` memory/belief tag, distinct from generic politeness. When the story is retold, listeners can form a positive account of the donor, improve their relationship toward them, and contribute to the donor’s local reputation.
 - A successful support transfer records a timestamped, attributable interaction memory for both the donor and recipient. The existing memory persistence and conversation-transfer systems carry that history through save/resume and ordinary gossip.
 - Aid builds reciprocal relationship trust over repeated encounters, rather than applying only a one-time financial effect.
 - Receiving aid also modestly reduces the recipient's stress and desperation, while money balances remain governed by the existing transfer and daily-life systems.

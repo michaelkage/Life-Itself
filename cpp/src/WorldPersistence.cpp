@@ -164,7 +164,7 @@ NPCMemory read_memory(std::istream& in) {
     value.initial_impact = read_double(in);
     value.retention = read_double(in);
     value.timestamp_hour = read_double(in);
-    value.action_tag = read_enum<ActionTag>(in, 7U, "action tag");
+    value.action_tag = read_enum<ActionTag>(in, 8U, "action tag");
     value.description = read_description(in);
     return value;
 }
@@ -257,7 +257,7 @@ NPC read_npc(std::istream& in, std::uint32_t version) {
         for (std::uint32_t i = 0; i < beliefs; ++i) {
             NPCBelief belief;
             belief.target_entity_id = read_string(in);
-            belief.action_tag = read_enum<ActionTag>(in, 7U, "belief action");
+            belief.action_tag = read_enum<ActionTag>(in, 8U, "belief action");
             belief.timestamp_hour = read_double(in);
             belief.confidence = read_double(in);
             if (belief.confidence < 0.0 || belief.confidence > 1.0)
@@ -366,7 +366,7 @@ WorldState read_world_state(std::istream& in, std::uint32_t version) {
         OngoingEvent event;
         event.event_id = read_string(in); event.district_id = read_string(in);
         event.actor_id = read_string(in);
-        event.action_tag = read_enum<ActionTag>(in, 7U, "event action");
+        event.action_tag = read_enum<ActionTag>(in, 8U, "event action");
         event.created_hour = read_double(in); event.severity = read_double(in);
         const std::uint32_t witnesses = read_count(in);
         for (std::uint32_t j = 0; j < witnesses; ++j) event.witness_ids.push_back(read_string(in));

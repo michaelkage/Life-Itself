@@ -24,7 +24,9 @@ enum class ActionTag {
     // Ghost manifestations are social memories, not criminal evidence.
     GhostSign,
     GhostSound,
-    GhostDream
+    GhostDream,
+    // Successful aid is a distinct social signal, not generic politeness.
+    SocialAid
 };
 
 enum class AgeBand { YoungAdult, Adult, Senior };
