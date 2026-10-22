@@ -49,6 +49,31 @@ struct MoralChoiceEvaluation {
 [[nodiscard]] MoralChoiceEvaluation choose_moral_option(
     const NPC& npc, const std::vector<MoralChoiceOption>& options);
 
+// Consequences are scenario-authored, not inferred from a score. Only the
+// selected option's entry is applied. Relationship changes are directed from
+// the deciding NPC toward each named entity.
+struct MoralChoiceConsequence {
+    std::string option_id{};
+    double money_delta{0.0};
+    double stress_delta{0.0};
+    std::map<EntityId, double> relationship_deltas{};
+};
+
+struct MoralChoiceResolution {
+    MoralChoiceEvaluation choice{};
+    double money_delta_applied{0.0};
+    double stress_delta_applied{0.0};
+    std::map<EntityId, double> relationship_deltas_applied{};
+};
+
+// Selects an option and applies its explicitly authored effects to the NPC.
+// Money is floored at zero; stress and relationships are clamped to [0, 1]
+// and [-1, 1] respectively. Invalid/ambiguous scenario data throws without
+// partially applying effects.
+[[nodiscard]] MoralChoiceResolution resolve_moral_choice(
+    NPC& npc, const std::vector<MoralChoiceOption>& options,
+    const std::vector<MoralChoiceConsequence>& consequences);
+
 // Deterministic utility-based choice for unscheduled NPC hours. Explicit schedule
 // entries always take precedence; this function supplies an explainable fallback.
 [[nodiscard]] ActivityDecision choose_activity(
