@@ -252,7 +252,7 @@ WorldAdvanceReport SimulationWorld::advance(
         // state evolution and deliberately consumes no random samples.
         for (NPC& npc : state_.npcs) {
             for (NPCBelief& belief : npc.beliefs) {
-                double daily_decay = belief.directly_observed ? 0.004 : 0.008;
+                double daily_decay = belief.directly_observed ? 0.006 : 0.008;
                 daily_decay -= static_cast<double>(std::min(belief.corroborations, 4U)) * 0.001;
                 daily_decay += static_cast<double>(std::min(belief.contradictions, 4U)) * 0.001;
                 daily_decay = std::clamp(daily_decay, 0.002, 0.012);
