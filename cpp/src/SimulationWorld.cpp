@@ -677,7 +677,30 @@ Conversation SimulationWorld::talk(
                 parent_claim = &claim;
             }
         }
+        bool repeated_evidence_lineage = false;
         if (parent_claim != nullptr) {
+            // A different speaker can still be repeating the very same original
+            // observation. Check the root against what this listener already
+            // received before relaying, so another hop cannot masquerade as
+            // independent corroboration.
+            const InformationClaim* root = parent_claim;
+            while (!root->parent_claim_id.empty()) {
+                root = information_.find(root->parent_claim_id);
+                if (root == nullptr) break;
+            }
+            if (root != nullptr) {
+                for (const auto& [claim_id, known_claim] : information_.claims()) {
+                    (void)claim_id;
+                    if (known_claim.recipient_entity_id == listener_id
+                        && known_claim.subject_key == rumour.target_entity_id
+                        && known_claim.proposition_key == proposition_key
+                        && known_claim.root_evidence_id == root->root_evidence_id) {
+                        repeated_evidence_lineage = true;
+                        break;
+                    }
+                }
+            }
+
             const auto relay_tick = static_cast<std::int64_t>(
                 std::llround(runtime_.total_hours() * 1000.0));
             const std::string relay_id = "relay:" + parent_claim->claim_id + ":"
@@ -743,7 +766,7 @@ Conversation SimulationWorld::talk(
         const bool repeated_source_report = belief != listener.beliefs.end()
             && !belief->directly_observed && belief->source_entity_id == speaker_id;
         bool contradicted = false;
-        if (!repeated_source_report) {
+        if (!repeated_source_report && !repeated_evidence_lineage) {
             for (NPCBelief& prior : listener.beliefs) {
                 if (prior.target_entity_id != rumour.target_entity_id
                     || prior.timestamp_hour != rumour.timestamp_hour
@@ -761,7 +784,8 @@ Conversation SimulationWorld::talk(
         } else {
             // A first-hand belief keeps its provenance. Only a distinct source
             // can strengthen an existing second-hand account.
-            if (!belief->directly_observed && !repeated_source_report) {
+            if (!belief->directly_observed && !repeated_source_report
+                && !repeated_evidence_lineage) {
                 belief->confidence = std::clamp(belief->confidence
                     + (1.0 - belief->confidence) * account_confidence * 0.25, 0.0, 1.0);
                 belief->source_entity_id = speaker_id;
