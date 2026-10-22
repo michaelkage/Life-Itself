@@ -919,12 +919,38 @@ bool SimulationWorld::offer_support(
     }
     donor.money -= amount;
     recipient.money += amount;
+    // Aid is remembered as a durable, attributable social event. The memory
+    // uses the existing persisted interaction channel, so it survives snapshots
+    // and can be passed on through the ordinary conversation system.
+    const SimulationHour event_hour = runtime_.total_hours();
+    NPCMemory donor_memory;
+    donor_memory.witness_id = from_id;
+    donor_memory.target_entity_id = to_id;
+    donor_memory.initial_impact = 0.8;
+    donor_memory.retention = 1.0;
+    donor_memory.timestamp_hour = event_hour;
+    donor_memory.action_tag = ActionTag::InteractionPolite;
+    donor.memories.push_back(donor_memory);
+
+    NPCMemory recipient_memory;
+    recipient_memory.witness_id = to_id;
+    recipient_memory.target_entity_id = from_id;
+    recipient_memory.initial_impact = 0.9;
+    recipient_memory.retention = 1.0;
+    recipient_memory.timestamp_hour = event_hour;
+    recipient_memory.action_tag = ActionTag::InteractionPolite;
+    recipient.memories.push_back(recipient_memory);
+
+    // Repeated help compounds into durable reciprocal trust rather than only
+    // producing an immediate money transfer.
     donor.relationships[to_id] = std::clamp(
-        (donor.relationships.contains(to_id) ? donor.relationships[to_id] : 0.0) + 0.025,
+        (donor.relationships.contains(to_id) ? donor.relationships[to_id] : 0.0) + 0.04,
         -1.0, 1.0);
     recipient.relationships[from_id] = std::clamp(
-        (recipient.relationships.contains(from_id) ? recipient.relationships[from_id] : 0.0) + 0.015,
+        (recipient.relationships.contains(from_id) ? recipient.relationships[from_id] : 0.0) + 0.03,
         -1.0, 1.0);
+    recipient.personal_stress = std::clamp(recipient.personal_stress - 0.02, 0.0, 1.0);
+    recipient.desperation_index = std::clamp(recipient.desperation_index - 0.01, 0.0, 1.0);
     return true;
 }
 

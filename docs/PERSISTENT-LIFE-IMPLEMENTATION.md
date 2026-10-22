@@ -53,3 +53,11 @@ CI for this branch is the verification authority; report only the checks that ha
 - When housing is scarce, unhoused residents are considered in stable descending order of district reputation. Affordability, unit capacity, and reciprocal trust for shared housing still apply; reputation changes consideration order, not eligibility. This models the unfair influence of community opinion without treating rumours as objective truth.
 - Automatic rent assistance uses reciprocal personal trust (65%) and the recipient's community reputation (35%). A modest relationship can qualify when local standing is positive, while a strong bond can still overcome poor public standing; reputation alone never triggers aid.
 - Beliefs, relationships, housing assignments, and money are saved with the world. Regression coverage checks reputation-sensitive hiring and housing, refusal of support, and byte-identical save/resume outcomes.
+
+
+## Persistent social consequences of direct aid
+
+- A successful support transfer records a timestamped, attributable interaction memory for both the donor and recipient. The existing memory persistence and conversation-transfer systems carry that history through save/resume and ordinary gossip.
+- Aid builds reciprocal relationship trust over repeated encounters, rather than applying only a one-time financial effect.
+- Receiving aid also modestly reduces the recipient's stress and desperation, while money balances remain governed by the existing transfer and daily-life systems.
+- Regression coverage verifies both sides remember the other, event timestamps match simulation time, recipient state changes, and the result remains equivalent after save/resume.
