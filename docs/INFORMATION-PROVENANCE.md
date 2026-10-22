@@ -40,6 +40,7 @@ The proposition key is a stable domain key, not free-form dialogue. Generated di
 8. Confidence and transmission fidelity must be finite values in [0, 1].
 9. Corrections are new claims. They do not erase or rewrite the claim being corrected.
 10. Independent evidence is counted by distinct root evidence IDs, not by the number of retellings.
+11. The evidence-strength query combines distinct roots with a bounded noisy-OR estimate; each root contributes only its strongest recorded confidence, so retelling cannot amplify it.
 
 ## What this does not yet do
 
@@ -50,7 +51,7 @@ This is an engine-independent provenance primitive, not a complete media or beli
 - Replace the existing gossip/rumour implementation
 - Guarantee that two differently named root IDs truly represent independent evidence; evidence identity must be assigned by the event/evidence creation layer
 
-The ledger is owned by `SimulationWorld` and included in version 11 C++ snapshots. Older versions 5–10 remain readable and restore with an empty ledger. `record_witnessed_action` now creates an observation claim for each witness, and conversations relay matching claims when the speaker has a recorded parent claim. The existing belief update remains authoritative for NPC interpretation; automatic belief updates from ledger records and full gossip replacement remain separate steps.
+The ledger exposes both a distinct-root count and an optional evidence-strength estimate. The estimate is deliberately a bounded support signal, not an objective-truth score, and depends on root IDs being assigned correctly. The ledger is owned by `SimulationWorld` and included in version 11 C++ snapshots. Older versions 5–10 remain readable and restore with an empty ledger. `record_witnessed_action` now creates an observation claim for each witness, and conversations relay matching claims when the speaker has a recorded parent claim. The existing belief update remains authoritative for NPC interpretation; automatic belief updates from ledger records and full gossip replacement remain separate steps.
 
 ## Tests
 
