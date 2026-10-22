@@ -167,12 +167,32 @@ struct OngoingEvent {
     bool resolved{false};
 };
 
+struct MoralDecisionRecord {
+    std::string decision_id{};
+    std::string scenario_id{};
+    EntityId deciding_npc_id{};
+    SimulationHour timestamp_hour{0.0};
+    std::string option_id{};
+    double score{0.0};
+    double compassion{0.5};
+    double loyalty_bias{0.5};
+    double fairness_value{0.5};
+    double safety_value{0.5};
+    double freedom_value{0.5};
+    double self_interest_value{0.5};
+    double money_delta_applied{0.0};
+    double stress_delta_applied{0.0};
+    std::map<EntityId, double> relationship_deltas_applied{};
+};
+
 struct WorldState {
     std::vector<NPC> npcs{};
     std::vector<District> districts{};
     std::vector<OngoingEvent> ongoing_events{};
     std::vector<Business> businesses{};
     std::vector<HousingUnit> housing_units{};
-};
+    // Append-only deterministic history of resolved, scenario-authored choices.
+    std::vector<MoralDecisionRecord> moral_decision_history{};
+}
 
 } // namespace simreality
