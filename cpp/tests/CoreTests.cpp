@@ -2138,6 +2138,38 @@ int main() {
     assert(competing_accounts_world.beliefs_about_event("competing-accounts-npc", "", 12.0).empty());
     assert(competing_accounts_world.beliefs_about_event(
         "competing-accounts-npc", "target", std::numeric_limits<double>::quiet_NaN()).empty());
+    // Account explanations join only revisions for the same interpretation and
+    // event timestamp; accounts without history remain visible.
+    competing_accounts_npc.belief_revision_history = {
+        BeliefRevision{"target", ActionTag::CrimeTheft, 12.0, 0.2, 0.35,
+            BeliefRevisionReason::IndependentEvidence, "rumour-source", 14.0},
+        BeliefRevision{"target", ActionTag::CrimeTheft, 12.0, 0.35, 0.25,
+            BeliefRevisionReason::Contradiction, "other-source", 15.0},
+        BeliefRevision{"target", ActionTag::SocialAid, 12.0, 0.5, 0.8,
+            BeliefRevisionReason::IndependentEvidence, "friend-source", 16.0},
+        BeliefRevision{"target", ActionTag::CrimeTheft, 13.0, 0.4, 0.7,
+            BeliefRevisionReason::IndependentEvidence, "later-source", 17.0}
+    };
+    competing_accounts_state.npcs.clear();
+    competing_accounts_state.npcs.push_back(competing_accounts_npc);
+    const SimulationWorld explained_accounts_world(competing_accounts_state, 0.0, 2029U);
+    const auto account_explanations =
+        explained_accounts_world.belief_account_explanations_for(
+            "competing-accounts-npc", "target", 12.0);
+    assert(account_explanations.size() == 2U);
+    assert(account_explanations[0].current_belief.action_tag == ActionTag::CrimeTheft);
+    assert(account_explanations[0].revisions.size() == 2U);
+    assert(account_explanations[0].revisions[0].revision.recorded_hour == 14.0);
+    assert(account_explanations[0].revisions[1].revision.recorded_hour == 15.0);
+    assert(std::abs(account_explanations[0].revisions[0].confidence_delta - 0.15) < 1e-12);
+    assert(std::abs(account_explanations[0].revisions[1].confidence_delta - (-0.1)) < 1e-12);
+    assert(account_explanations[1].current_belief.action_tag == ActionTag::SocialAid);
+    assert(account_explanations[1].revisions.size() == 1U);
+    assert(account_explanations[1].revisions[0].revision.recorded_hour == 16.0);
+    assert(explained_accounts_world.belief_account_explanations_for(
+        "missing-npc", "target", 12.0).empty());
+    assert(explained_accounts_world.belief_account_explanations_for(
+        "competing-accounts-npc", "target", std::numeric_limits<double>::infinity()).empty());
     InformationClaim observed_claim;
     observed_claim.claim_id = "claim-observed";
     observed_claim.subject_key = "bridge-7";
