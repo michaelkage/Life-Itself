@@ -104,5 +104,24 @@ int main() {
     assert(ledger.find("claim-correction") != nullptr);
     assert(ledger.independent_evidence_count("bridge-7", "bridge-unsafe") == 2);
 
+    // Conflicting accounts remain separate propositions. The ledger records
+    // support for each claim independently; it does not pick an objective winner.
+    InformationClaim conflicting = first;
+    conflicting.claim_id = "claim-conflicting-account";
+    conflicting.subject_key = "bridge-7";
+    conflicting.proposition_key = "bridge-safe";
+    conflicting.root_evidence_id = "evidence-driver-account";
+    conflicting.source_entity_id = "driver";
+    conflicting.recipient_entity_id = "resident-b";
+    conflicting.created_tick = 15;
+    conflicting.confidence = 0.8;
+    assert(ledger.record(conflicting).accepted);
+    assert(ledger.independent_evidence_count("bridge-7", "bridge-unsafe") == 2);
+    assert(ledger.independent_evidence_count("bridge-7", "bridge-safe") == 1);
+    assert(std::abs(ledger.independent_evidence_strength_for_recipient(
+        "bridge-7", "bridge-safe", "resident-b") - 0.8) < 1e-12);
+    assert(ledger.independent_evidence_strength_for_recipient(
+        "bridge-7", "bridge-unsafe", "uninformed") == 0.0);
+
     return 0;
 }
