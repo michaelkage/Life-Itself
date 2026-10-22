@@ -23,7 +23,7 @@ This subsystem is being connected to the existing simulation, rather than treate
 
 - `CampaignCoordinator` owns the active `SimulationWorld`, tracks the current life, records death, and allows the dead world to continue running while NPCs settle obligations.
 - Starting another life snapshots the old world as an immutable archive, marks the prior character `Archived`, and creates a separate day-zero world. Archive inspection returns a detached world copy, so inspection cannot mutate the preserved snapshot.
-- Versioned campaign save/load stores the active world and archive snapshots together. World format v9 persists NPC beliefs and stable personality-bias traits while remaining able to read legacy v5/v6/v7/v8 snapshots.
+- Versioned campaign save/load stores the active world and archive snapshots together. World format v10 persists NPC beliefs, personality biases, and moral value priorities while remaining able to read legacy v5-v9 snapshots.
 - Recovery sampling uses stable FNV-1a condition IDs rather than implementation-defined `std::hash`, avoiding compiler-library-dependent outcomes.
 
 ## Determinism regression coverage
@@ -44,7 +44,14 @@ CI for this branch is the verification authority; report only the checks that ha
 - NPCs have stable normalized loyalty, skepticism, and compassion traits; `0.5` is neutral, and old saves default to neutral values.
 - During conversation, loyalty biases ambiguous reports in line with the listener's existing relationship to the person discussed. Compassion shifts interpretation of prosocial versus harmful actions, while skepticism reduces confidence in second-hand reports. Neutral trait values preserve the prior confidence calculation.
 - Bias changes the listener's interpretation of a rumour, not the recorded event or a directly witnessed account. Competing beliefs remain separate, and the calculation consumes no random samples.
-- World format v9 persists these traits and validates their `[0, 1]` range; legacy v5-v8 saves load with neutral defaults.
+- World format v10 persists these traits and validates their `[0, 1]` range; legacy v5-v8 saves load with neutral defaults.
+
+## Moral choice evaluation
+
+- NPCs persist separate fairness, safety, freedom, and self-interest priorities alongside compassion and loyalty.
+- `evaluate_moral_choice` scores scenario options using urgency, people helped, fairness, safety, freedom, loyalty, and personal cost. Scenario features and values are bounded to `[0, 1]`; out-of-range inputs are clamped for evaluation.
+- The evaluator is deterministic and side-effect-free. It does not mark an option objectively good or bad, mutate the world, or consume randomness; it returns a comparable score for each option so callers can present trade-offs or select a preferred option.
+- World format v10 writes the additional value priorities; legacy v5-v9 snapshots retain neutral defaults for fields they do not contain.
 
 ## Personality-driven ghost interpretation
 
