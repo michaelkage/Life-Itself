@@ -114,4 +114,24 @@ double InformationLedger::independent_evidence_strength(
     return std::clamp(1.0 - remaining, 0.0, 1.0);
 }
 
+double InformationLedger::independent_evidence_strength_for_recipient(
+    const std::string& subject_key,
+    const std::string& proposition_key,
+    const std::string& recipient_entity_id) const {
+    std::map<std::string, double> strongest_by_root;
+    for (const auto& [id, claim] : claims_) {
+        (void)id;
+        if (claim.subject_key != subject_key || claim.proposition_key != proposition_key
+            || claim.recipient_entity_id != recipient_entity_id) continue;
+        double& strongest = strongest_by_root[claim.root_evidence_id];
+        strongest = std::max(strongest, claim.confidence);
+    }
+    double remaining = 1.0;
+    for (const auto& [root_id, confidence] : strongest_by_root) {
+        (void)root_id;
+        remaining *= (1.0 - confidence);
+    }
+    return std::clamp(1.0 - remaining, 0.0, 1.0);
+}
+
 } // namespace simreality
