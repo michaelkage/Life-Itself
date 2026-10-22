@@ -12,6 +12,7 @@ ClaimResult InformationLedger::record(const InformationClaim& claim) {
     if (claim.proposition_key.empty()) return {false, "proposition_key must not be empty"};
     if (claim.root_evidence_id.empty()) return {false, "root_evidence_id must not be empty"};
     if (claim.source_entity_id.empty()) return {false, "source_entity_id must not be empty"};
+    if (claim.recipient_entity_id.empty()) return {false, "recipient_entity_id must not be empty"};
     if (claim.created_tick < 0) return {false, "created_tick must be non-negative"};
     if (!std::isfinite(claim.confidence) || claim.confidence < 0.0 || claim.confidence > 1.0)
         return {false, "confidence must be finite and within [0, 1]"};
