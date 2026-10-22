@@ -55,6 +55,12 @@ public:
     [[nodiscard]] std::size_t independent_evidence_count(
         const std::string& subject_key,
         const std::string& proposition_key) const;
+    // Returns a deterministic, bounded support estimate from distinct roots.
+    // Each root contributes only its strongest recorded confidence, so relays
+    // cannot inflate support. This is evidence strength, not objective truth.
+    [[nodiscard]] double independent_evidence_strength(
+        const std::string& subject_key,
+        const std::string& proposition_key) const;
     [[nodiscard]] std::size_t size() const noexcept { return claims_.size(); }
     [[nodiscard]] const std::map<std::string, InformationClaim>& claims() const noexcept {
         return claims_;
