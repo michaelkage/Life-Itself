@@ -20,6 +20,29 @@ SimulationWorld::SimulationWorld(
       runtime_(initial_hour),
       random_(random_seed) {}
 
+std::vector<BeliefRevision> SimulationWorld::belief_history_for(
+    const EntityId& npc_id, const EntityId& target_id) const {
+    const auto npc = std::find_if(
+        state_.npcs.begin(), state_.npcs.end(),
+        [&npc_id](const NPC& candidate) { return candidate.entity_id == npc_id; });
+    if (npc == state_.npcs.end()) return {};
+
+    std::vector<BeliefRevision> history;
+    history.reserve(npc->belief_revision_history.size());
+    for (const BeliefRevision& revision : npc->belief_revision_history) {
+        if (target_id.empty() || revision.target_entity_id == target_id) {
+            history.push_back(revision);
+        }
+    }
+    std::stable_sort(history.begin(), history.end(),
+        [](const BeliefRevision& left, const BeliefRevision& right) {
+            if (left.recorded_hour != right.recorded_hour)
+                return left.recorded_hour < right.recorded_hour;
+            return left.event_timestamp_hour < right.event_timestamp_hour;
+        });
+    return history;
+}
+
 GhostInfluenceResult SimulationWorld::attempt_ghost_influence(
     const EntityId& ghost_id, const EntityId& npc_id,
     const std::string& action, double hour_of_day) {
