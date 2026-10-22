@@ -43,6 +43,8 @@ The proposition key is a stable domain key, not free-form dialogue. Generated di
 10. Independent evidence is counted by distinct root evidence IDs, not by the number of retellings.
 11. The evidence-strength query combines distinct roots with a bounded noisy-OR estimate; each root contributes only its strongest recorded confidence, so retelling cannot amplify it.
 
+`InformationLedger::lineage_for_claim(claim_id)` returns a copied, source-to-recipient chain in oldest-first order; an unknown claim or incomplete chain returns an empty result. This is for investigation and explanation: it exposes how a claim travelled, but does not declare the claim true or make repeated relays independent evidence.
+
 ## What this does not yet do
 
 This is an engine-independent provenance primitive, not a complete media or belief system. It does not yet:
