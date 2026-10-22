@@ -23,6 +23,7 @@ int main() {
     assert(ledger.record(first).accepted);
     assert(ledger.size() == 1);
     assert(ledger.independent_evidence_count("bridge-7", "bridge-unsafe") == 1);
+    assert(std::abs(ledger.independent_evidence_strength("bridge-7", "bridge-unsafe") - 0.9) < 1e-12);
 
     // Relaying the same underlying evidence must not create corroboration.
     assert(ledger.relay("claim-1", "claim-2", "resident-b", "resident-c", 11, 0.8).accepted);
@@ -47,6 +48,7 @@ int main() {
     second.confidence = 0.95;
     assert(ledger.record(second).accepted);
     assert(ledger.independent_evidence_count("bridge-7", "bridge-unsafe") == 2);
+    assert(std::abs(ledger.independent_evidence_strength("bridge-7", "bridge-unsafe") - 0.995) < 1e-12);
 
     // Invalid or ambiguous lineage is rejected without mutating the ledger.
     const std::size_t before_invalid = ledger.size();
