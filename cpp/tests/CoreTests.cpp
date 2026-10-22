@@ -2115,6 +2115,29 @@ int main() {
     assert(explanations[0].revision.reason == BeliefRevisionReason::IndependentEvidence);
     assert(explanations[1].revision.reason == BeliefRevisionReason::Contradiction);
     assert(history_query_world.belief_explanations_for("missing-npc").empty());
+
+    // Competing interpretations of one event are returned together, not collapsed.
+    WorldState competing_accounts_state;
+    NPC competing_accounts_npc;
+    competing_accounts_npc.entity_id = "competing-accounts-npc";
+    competing_accounts_npc.beliefs = {
+        NPCBelief{"target", ActionTag::CrimeTheft, 12.0, 0.35, "rumour-source", false, 0U, 1U},
+        NPCBelief{"target", ActionTag::SocialAid, 12.0, 0.8, "friend-source", false, 1U, 0U},
+        NPCBelief{"target", ActionTag::CrimeTheft, 13.0, 0.7, "later-source", false, 0U, 0U}
+    };
+    competing_accounts_state.npcs.push_back(competing_accounts_npc);
+    const SimulationWorld competing_accounts_world(competing_accounts_state, 0.0, 2028U);
+    const auto same_event_accounts =
+        competing_accounts_world.beliefs_about_event("competing-accounts-npc", "target", 12.0);
+    assert(same_event_accounts.size() == 2U);
+    assert(same_event_accounts[0].action_tag == ActionTag::CrimeTheft);
+    assert(same_event_accounts[1].action_tag == ActionTag::SocialAid);
+    assert(same_event_accounts[0].source_entity_id == "rumour-source");
+    assert(same_event_accounts[1].source_entity_id == "friend-source");
+    assert(competing_accounts_world.beliefs_about_event("missing-npc", "target", 12.0).empty());
+    assert(competing_accounts_world.beliefs_about_event("competing-accounts-npc", "", 12.0).empty());
+    assert(competing_accounts_world.beliefs_about_event(
+        "competing-accounts-npc", "target", std::numeric_limits<double>::quiet_NaN()).empty());
     InformationClaim observed_claim;
     observed_claim.claim_id = "claim-observed";
     observed_claim.subject_key = "bridge-7";
