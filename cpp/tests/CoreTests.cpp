@@ -833,6 +833,8 @@ int main() {
         aid_recipient.money = 0.0;
         aid_recipient.daily_rent = 10.0;
         aid_recipient.lost_income = 1.0;
+        aid_recipient.personal_stress = 0.5;
+        aid_recipient.desperation_index = 0.5;
         aid_recipient.relationships["aid-helper"] = reciprocal_trust;
         NPC aid_helper;
         aid_helper.entity_id = "aid-helper";
@@ -846,13 +848,17 @@ int main() {
     };
     SimulationWorld reputation_enabled_aid = verify_reputation_aid(
         ActionTag::InteractionPolite, 0.30);
-    assert(reputation_enabled_aid.state().npcs[1].money > 0.0);
+    // The gift is applied to rent during the same daily tick, so the helper's
+    // balance and the recipient's reduced strain are the durable evidence of aid.
     assert(reputation_enabled_aid.state().npcs[2].money < 100.0);
+    assert(reputation_enabled_aid.state().npcs[1].personal_stress < 0.5);
+    assert(reputation_enabled_aid.state().npcs[1].desperation_index < 0.5);
     // A strong reciprocal bond still helps despite a negative local reputation.
     SimulationWorld bond_overcomes_reputation = verify_reputation_aid(
         ActionTag::CrimeTheft, 0.90);
-    assert(bond_overcomes_reputation.state().npcs[1].money > 0.0);
     assert(bond_overcomes_reputation.state().npcs[2].money < 100.0);
+    assert(bond_overcomes_reputation.state().npcs[1].personal_stress < 0.5);
+    assert(bond_overcomes_reputation.state().npcs[1].desperation_index < 0.5);
 
     // Reputation softly prioritizes scarce housing without replacing affordability checks.
     WorldState reputation_housing_state;
