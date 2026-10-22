@@ -1903,6 +1903,29 @@ int main() {
     assert(witnessed_information_world.information_ledger().independent_evidence_count(
         "observed-actor", std::to_string(static_cast<unsigned int>(ActionTag::CrimeTheft))) == 1U);
 
+    const auto find_observed_theft_belief = [](const NPC& npc) -> const NPCBelief& {
+        const auto found = std::find_if(npc.beliefs.begin(), npc.beliefs.end(),
+            [](const NPCBelief& belief) {
+                return belief.target_entity_id == "observed-actor"
+                    && belief.action_tag == ActionTag::CrimeTheft
+                    && belief.timestamp_hour == 2.0;
+            });
+        assert(found != npc.beliefs.end());
+        return *found;
+    };
+    const NPCBelief before_same_lineage_return = find_observed_theft_belief(
+        witnessed_information_world.state().npcs[2]);
+    const double confidence_before_same_lineage_return = before_same_lineage_return.confidence;
+    const std::uint32_t corroborations_before_same_lineage_return =
+        before_same_lineage_return.corroborations;
+    (void)witnessed_information_world.talk("listening-npc", "third-npc");
+    const NPCBelief& after_same_lineage_return = find_observed_theft_belief(
+        witnessed_information_world.state().npcs[2]);
+    assert(after_same_lineage_return.confidence == confidence_before_same_lineage_return);
+    assert(after_same_lineage_return.corroborations == corroborations_before_same_lineage_return);
+    assert(witnessed_information_world.information_ledger().independent_evidence_count(
+        "observed-actor", std::to_string(static_cast<unsigned int>(ActionTag::CrimeTheft))) == 1U);
+
     // Information claim lineage is part of the saved world and remains stable
     // across save/resume, including deterministic serialized bytes.
     WorldState information_state;
