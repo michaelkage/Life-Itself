@@ -69,3 +69,10 @@ CI for this branch is the verification authority; report only the checks that ha
 - NPC beliefs gradually lose confidence on daily world ticks rather than remaining frozen forever. Direct observation and corroboration slow the decay; unresolved contradictions accelerate it.
 - Decay is bounded and deterministic, consumes no random samples, and uses fields already persisted in world format v8. No save-format change is required.
 - Regression coverage compares direct observation, corroborated hearsay, ordinary hearsay, and disputed accounts, and verifies byte-identical save/resume replay across multiple days.
+
+
+## First-hand evidence revises conflicting beliefs
+
+- When an NPC directly witnesses an action, a different belief about the same target and event hour is retained as a competing account, but its confidence is reduced and its contradiction count increases.
+- The directly observed account is recorded at full confidence; the system does not silently delete the earlier interpretation or treat unrelated events at other times as contradictions.
+- Regression coverage verifies both beliefs remain distinct and that the challenged confidence, contradiction count, and serialized world survive save/load byte-for-byte.

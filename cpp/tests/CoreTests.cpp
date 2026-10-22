@@ -1597,5 +1597,46 @@ int main() {
     save_world(belief_decay_resumed, decay_replayed_bytes);
     assert(decay_continuous_bytes.str() == decay_replayed_bytes.str());
 
+    // Direct observation challenges conflicting hearsay about the same event,
+    // without erasing either account. The revision survives persistence exactly.
+    WorldState direct_evidence_state;
+    NPC direct_evidence_observer;
+    direct_evidence_observer.entity_id = "direct-evidence-observer";
+    direct_evidence_observer.district_id = "evidence-district";
+    direct_evidence_observer.beliefs.push_back(NPCBelief{
+        "evidence-target", ActionTag::CrimeAssault, 0.0, 0.72,
+        "rumour-source", false, 1U, 0U});
+    NPC evidence_target;
+    evidence_target.entity_id = "evidence-target";
+    evidence_target.district_id = "evidence-district";
+    direct_evidence_state.npcs = {direct_evidence_observer, evidence_target};
+    SimulationWorld direct_evidence_world(direct_evidence_state, 0.0, 882U);
+    Description evidence_description;
+    evidence_description.height_m = 1.8;
+    assert(direct_evidence_world.record_witnessed_action(
+        "evidence-target", ActionTag::CrimeTheft, evidence_description,
+        {"direct-evidence-observer"}) == 1U);
+    const NPC& revised_observer = direct_evidence_world.state().npcs[0];
+    assert(revised_observer.beliefs.size() == 2U);
+    assert(revised_observer.beliefs[0].action_tag == ActionTag::CrimeAssault);
+    assert(revised_observer.beliefs[0].confidence < 0.72);
+    assert(revised_observer.beliefs[0].contradictions == 1U);
+    assert(revised_observer.beliefs[1].action_tag == ActionTag::CrimeTheft);
+    assert(revised_observer.beliefs[1].directly_observed);
+    assert(revised_observer.beliefs[1].confidence == 1.0);
+    std::stringstream direct_evidence_bytes(std::ios::in | std::ios::out | std::ios::binary);
+    save_world(direct_evidence_world, direct_evidence_bytes);
+    direct_evidence_bytes.seekg(0);
+    SimulationWorld direct_evidence_resumed = load_world(direct_evidence_bytes);
+    assert(direct_evidence_resumed.state().npcs[0].beliefs.size() == 2U);
+    assert(direct_evidence_resumed.state().npcs[0].beliefs[0].confidence
+        == revised_observer.beliefs[0].confidence);
+    assert(direct_evidence_resumed.state().npcs[0].beliefs[0].contradictions == 1U);
+    std::stringstream direct_evidence_original(std::ios::in | std::ios::out | std::ios::binary);
+    std::stringstream direct_evidence_loaded(std::ios::in | std::ios::out | std::ios::binary);
+    save_world(direct_evidence_world, direct_evidence_original);
+    save_world(direct_evidence_resumed, direct_evidence_loaded);
+    assert(direct_evidence_original.str() == direct_evidence_loaded.str());
+
     return 0;
 }
