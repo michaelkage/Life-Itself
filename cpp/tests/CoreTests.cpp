@@ -1766,7 +1766,6 @@ int main() {
         < evaluate_moral_choice(fairness_focused, fair_distribution).score);
     assert(evaluate_moral_choice(fairness_focused, fair_distribution).score
         == evaluate_moral_choice(fairness_focused, fair_distribution).score);
-    fairness_focused.fairness_value = 1.2;
     std::stringstream moral_snapshot(std::ios::in | std::ios::out | std::ios::binary);
     WorldState moral_state;
     fairness_focused.fairness_value = 1.0;
