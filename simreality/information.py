@@ -57,6 +57,8 @@ class InformationLedger:
             return ClaimResult(False, "root_evidence_id must not be empty")
         if not claim.source_entity_id:
             return ClaimResult(False, "source_entity_id must not be empty")
+        if not claim.recipient_entity_id:
+            return ClaimResult(False, "recipient_entity_id must not be empty")
         if claim.created_tick < 0:
             return ClaimResult(False, "created_tick must be non-negative")
         if not math.isfinite(claim.confidence) or not 0.0 <= claim.confidence <= 1.0:
