@@ -648,6 +648,33 @@ Conversation SimulationWorld::talk(
             if (rumour.action_tag == "Crime.Vandalism") return ActionTag::CrimeVandalism;
             return ActionTag::InteractionPolite;
         }();
+        // Transfer the same claim lineage as the conversation. Only a claim
+        // the speaker actually received can be relayed; repeats keep the same
+        // root evidence ID and therefore do not manufacture corroboration.
+        const std::string proposition_key =
+            std::to_string(static_cast<unsigned int>(believed_action));
+        const auto source_tick = static_cast<std::int64_t>(
+            std::llround(rumour.timestamp_hour * 1000.0));
+        const InformationClaim* parent_claim = nullptr;
+        for (const auto& [claim_id, claim] : information_.claims()) {
+            (void)claim_id;
+            if (claim.recipient_entity_id != speaker_id
+                || claim.subject_key != rumour.target_entity_id
+                || claim.proposition_key != proposition_key
+                || claim.created_tick != source_tick) continue;
+            if (parent_claim == nullptr || claim.claim_id < parent_claim->claim_id)
+                parent_claim = &claim;
+        }
+        if (parent_claim != nullptr) {
+            const auto relay_tick = static_cast<std::int64_t>(
+                std::llround(runtime_.total_hours() * 1000.0));
+            const std::string relay_id = "relay:" + parent_claim->claim_id + ":"
+                + listener_id + ":" + std::to_string(relay_tick);
+            const double fidelity = std::clamp(rumour.retention, 0.0, 1.0);
+            (void)information_.relay(parent_claim->claim_id, relay_id, speaker_id,
+                listener_id, std::max(source_tick, relay_tick), fidelity);
+        }
+
         double source_reliability = 0.5;
         if (!speaker.beliefs.empty()) {
             double total = 0.0;
