@@ -345,8 +345,11 @@ NPC read_npc(std::istream& in, std::uint32_t version) {
                 revision.compassion_factor = read_double(in);
                 revision.skepticism_factor = read_double(in);
                 revision.evidence_factor = read_double(in);
-                const double factors[] = {revision.source_reliability, revision.loyalty_factor,
-                    revision.compassion_factor, revision.skepticism_factor, revision.evidence_factor};
+                if (!std::isfinite(revision.source_reliability)
+                    || revision.source_reliability < 0.0 || revision.source_reliability > 1.0)
+                    throw std::runtime_error("invalid belief revision source reliability");
+                const double factors[] = {revision.loyalty_factor, revision.compassion_factor,
+                    revision.skepticism_factor, revision.evidence_factor};
                 for (double factor : factors) {
                     if (!std::isfinite(factor) || factor < 0.0 || factor > 1.5)
                         throw std::runtime_error("invalid belief revision interpretation factor");
