@@ -1638,5 +1638,62 @@ int main() {
     save_world(direct_evidence_resumed, direct_evidence_loaded);
     assert(direct_evidence_original.str() == direct_evidence_loaded.str());
 
+
+    // Repetition from one speaker is not independent corroboration. It must not
+    // inflate belief confidence/counts or repeatedly weaken a competing account.
+    WorldState repeated_rumour_state;
+    NPC repeated_rumour_speaker;
+    repeated_rumour_speaker.entity_id = "repeat-speaker";
+    repeated_rumour_speaker.district_id = "rumour-district";
+    NPCMemory repeated_theft_memory;
+    repeated_theft_memory.witness_id = "repeat-speaker";
+    repeated_theft_memory.target_entity_id = "rumour-target";
+    repeated_theft_memory.initial_impact = 0.8;
+    repeated_theft_memory.retention = 0.8;
+    repeated_theft_memory.timestamp_hour = 0.0;
+    repeated_theft_memory.action_tag = ActionTag::CrimeTheft;
+    repeated_rumour_speaker.memories.push_back(repeated_theft_memory);
+    NPC repeated_rumour_listener;
+    repeated_rumour_listener.entity_id = "repeat-listener";
+    repeated_rumour_listener.district_id = "rumour-district";
+    repeated_rumour_listener.beliefs.push_back(NPCBelief{
+        "rumour-target", ActionTag::CrimeAssault, 0.0, 0.7,
+        "other-source", false, 1U, 0U});
+    NPC rumour_target;
+    rumour_target.entity_id = "rumour-target";
+    rumour_target.district_id = "rumour-district";
+    repeated_rumour_state.npcs = {repeated_rumour_speaker, repeated_rumour_listener, rumour_target};
+    SimulationWorld repeated_rumour_world(repeated_rumour_state, 0.0, 991U);
+    SimulationWorld repeated_rumour_resumed(repeated_rumour_state, 0.0, 991U);
+    (void)repeated_rumour_world.talk("repeat-listener", "repeat-speaker");
+    (void)repeated_rumour_resumed.talk("repeat-listener", "repeat-speaker");
+    const auto get_belief = [](const NPC& npc, ActionTag tag) -> const NPCBelief& {
+        const auto found = std::find_if(npc.beliefs.begin(), npc.beliefs.end(),
+            [tag](const NPCBelief& candidate) { return candidate.action_tag == tag; });
+        assert(found != npc.beliefs.end());
+        return *found;
+    };
+    const NPCBelief first_telling = get_belief(
+        repeated_rumour_world.state().npcs[1], ActionTag::CrimeTheft);
+    const double first_telling_confidence = first_telling.confidence;
+    const std::uint32_t first_telling_corroborations = first_telling.corroborations;
+    const double competing_confidence_after_first =
+        get_belief(repeated_rumour_world.state().npcs[1], ActionTag::CrimeAssault).confidence;
+    (void)repeated_rumour_world.talk("repeat-listener", "repeat-speaker");
+    (void)repeated_rumour_resumed.talk("repeat-listener", "repeat-speaker");
+    const NPC& repeated_listener = repeated_rumour_world.state().npcs[1];
+    const NPCBelief& repeated_theft_belief = get_belief(repeated_listener, ActionTag::CrimeTheft);
+    const NPCBelief& repeated_assault_belief = get_belief(repeated_listener, ActionTag::CrimeAssault);
+    assert(repeated_theft_belief.source_entity_id == "repeat-speaker");
+    assert(repeated_theft_belief.confidence == first_telling_confidence);
+    assert(repeated_theft_belief.corroborations == first_telling_corroborations);
+    assert(repeated_assault_belief.confidence == competing_confidence_after_first);
+    assert(repeated_assault_belief.contradictions == 1U);
+    std::stringstream repeated_rumour_bytes(std::ios::in | std::ios::out | std::ios::binary);
+    std::stringstream repeated_rumour_resumed_bytes(std::ios::in | std::ios::out | std::ios::binary);
+    save_world(repeated_rumour_world, repeated_rumour_bytes);
+    save_world(repeated_rumour_resumed, repeated_rumour_resumed_bytes);
+    assert(repeated_rumour_bytes.str() == repeated_rumour_resumed_bytes.str());
+
     return 0;
 }

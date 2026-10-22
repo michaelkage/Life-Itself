@@ -76,3 +76,10 @@ CI for this branch is the verification authority; report only the checks that ha
 - When an NPC directly witnesses an action, a different belief about the same target and event hour is retained as a competing account, but its confidence is reduced and its contradiction count increases.
 - The directly observed account is recorded at full confidence; the system does not silently delete the earlier interpretation or treat unrelated events at other times as contradictions.
 - Regression coverage verifies both beliefs remain distinct and that the challenged confidence, contradiction count, and serialized world survive save/load byte-for-byte.
+
+
+## Repeated accounts are not independent corroboration
+
+- Repeating the same account from the same speaker does not increase an NPC belief's confidence or corroboration count, and does not repeatedly weaken competing accounts.
+- A distinct source can still reinforce second-hand information. Directly observed beliefs retain their first-hand provenance when a matching story is heard.
+- Regression coverage checks repeat-telling stability and byte-identical state across equivalent replay.
