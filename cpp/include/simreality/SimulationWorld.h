@@ -62,6 +62,11 @@ public:
     [[nodiscard]] InformationLedger& information_ledger() noexcept { return information_; }
     [[nodiscard]] const InformationLedger& information_ledger() const noexcept { return information_; }
 
+    // Read-only, presentation-agnostic belief history query. An empty target ID
+    // returns all revisions for the NPC; results are chronologically ordered.
+    [[nodiscard]] std::vector<BeliefRevision> belief_history_for(
+        const EntityId& npc_id, const EntityId& target_id = {}) const;
+
     // Advances simulation time in a frame-rate-independent way. All due hourly
     // memory sweeps and daily district/NPC updates run in chronological order.
     [[nodiscard]] WorldAdvanceReport advance(
