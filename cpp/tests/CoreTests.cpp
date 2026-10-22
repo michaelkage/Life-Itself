@@ -1851,5 +1851,50 @@ int main() {
     }
     assert(rejected_unknown_consequence);
 
+    // World-level moral decisions append a durable, replay-stable account of
+    // the choice, value priorities, and the effects actually applied.
+    WorldState history_state;
+    NPC history_npc;
+    history_npc.entity_id = "history-npc";
+    history_npc.compassion = 0.8;
+    history_npc.fairness_value = 0.9;
+    history_npc.money = 10.0;
+    history_npc.personal_stress = 0.2;
+    history_state.npcs.push_back(history_npc);
+    SimulationWorld history_world(history_state, 12.5, 991U);
+    const auto history_result = history_world.resolve_moral_choice(
+        "history-npc", "clinic-shortage",
+        {{"help-neighbor", 0.8, 0.7, 0.9, 0.8, 0.4, 0.6, 0.3}},
+        {{"help-neighbor", -3.0, 0.1, {{"neighbor", 0.25}}}});
+    assert(history_result.choice.option_id == "help-neighbor");
+    assert(history_world.state().moral_decision_history.size() == 1U);
+    const MoralDecisionRecord& history_record =
+        history_world.state().moral_decision_history.front();
+    assert(history_record.scenario_id == "clinic-shortage");
+    assert(history_record.deciding_npc_id == "history-npc");
+    assert(history_record.timestamp_hour == 12.5);
+    assert(history_record.option_id == "help-neighbor");
+    assert(history_record.compassion == 0.8);
+    assert(history_record.fairness_value == 0.9);
+    assert(history_record.money_delta_applied == -3.0);
+    assert(std::abs(history_record.stress_delta_applied - 0.1) < 1e-9);
+    assert(std::abs(history_record.relationship_deltas_applied.at("neighbor") - 0.25) < 1e-9);
+
+    std::stringstream history_snapshot(std::ios::in | std::ios::out | std::ios::binary);
+    save_world(history_world, history_snapshot);
+    const std::string history_bytes = history_snapshot.str();
+    history_snapshot.seekg(0);
+    SimulationWorld history_restored = load_world(history_snapshot);
+    assert(history_restored.state().moral_decision_history.size() == 1U);
+    const MoralDecisionRecord& restored_record =
+        history_restored.state().moral_decision_history.front();
+    assert(restored_record.decision_id == history_record.decision_id);
+    assert(restored_record.scenario_id == history_record.scenario_id);
+    assert(restored_record.option_id == history_record.option_id);
+    assert(restored_record.relationship_deltas_applied == history_record.relationship_deltas_applied);
+    std::stringstream history_resaved(std::ios::in | std::ios::out | std::ios::binary);
+    save_world(history_restored, history_resaved);
+    assert(history_resaved.str() == history_bytes);
+
     return 0;
 }

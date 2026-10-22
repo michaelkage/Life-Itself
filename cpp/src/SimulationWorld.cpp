@@ -974,6 +974,40 @@ double SimulationWorld::cooperation_score(
         + 0.35 * community_reputation(to_id, from.district_id), -1.0, 1.0);
 }
 
+MoralChoiceResolution SimulationWorld::resolve_moral_choice(
+    const EntityId& npc_id, const std::string& scenario_id,
+    const std::vector<MoralChoiceOption>& options,
+    const std::vector<MoralChoiceConsequence>& consequences) {
+    if (scenario_id.empty()) {
+        throw std::invalid_argument("moral decision scenario ID must not be empty");
+    }
+    NPC& npc = find_npc(npc_id);
+    const MoralChoiceResolution resolution =
+        simreality::resolve_moral_choice(npc, options, consequences);
+
+    MoralDecisionRecord record;
+    const auto hour_key = static_cast<std::uint64_t>(
+        std::llround(runtime_.total_hours() * 1000.0));
+    record.decision_id = "moral-decision:" + npc_id + ":" + scenario_id + ":"
+        + std::to_string(hour_key) + ":" + std::to_string(state_.moral_decision_history.size());
+    record.scenario_id = scenario_id;
+    record.deciding_npc_id = npc_id;
+    record.timestamp_hour = runtime_.total_hours();
+    record.option_id = resolution.choice.option_id;
+    record.score = resolution.choice.score;
+    record.compassion = npc.compassion;
+    record.loyalty_bias = npc.loyalty_bias;
+    record.fairness_value = npc.fairness_value;
+    record.safety_value = npc.safety_value;
+    record.freedom_value = npc.freedom_value;
+    record.self_interest_value = npc.self_interest_value;
+    record.money_delta_applied = resolution.money_delta_applied;
+    record.stress_delta_applied = resolution.stress_delta_applied;
+    record.relationship_deltas_applied = resolution.relationship_deltas_applied;
+    state_.moral_decision_history.push_back(std::move(record));
+    return resolution;
+}
+
 bool SimulationWorld::offer_support(
     const EntityId& from_id, const EntityId& to_id, double amount) {
     // Invalid support requests are rejected like other unavailable transfers;

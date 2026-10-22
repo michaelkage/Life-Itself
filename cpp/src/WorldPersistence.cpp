@@ -19,6 +19,7 @@ constexpr std::array<char, 8> kMagicV7{{'S', 'R', 'E', 'C', 'O', 'R', 'E', '7'}}
 constexpr std::array<char, 8> kMagicV8{{'S', 'R', 'E', 'C', 'O', 'R', 'E', '8'}};
 constexpr std::array<char, 8> kMagicV9{{'S', 'R', 'E', 'C', 'O', 'R', 'E', '9'}};
 constexpr std::array<char, 8> kMagicV10{{'S', 'R', 'E', 'C', 'O', 'R', 'E', 'A'}};
+constexpr std::array<char, 8> kMagicV11{{'S', 'R', 'E', 'C', 'O', 'R', 'E', 'B'}};
 constexpr std::uint32_t kMaxCollectionItems = 1'000'000;
 constexpr std::uint32_t kMaxStringBytes = 16U * 1024U * 1024U;
 static_assert(sizeof(double) == sizeof(std::uint64_t));
@@ -379,6 +380,28 @@ void write_world_state(std::ostream& out, const WorldState& value) {
         write_u32(out, unit.capacity); write_double(out, unit.daily_rent);
         write_double(out, unit.condition);
     }
+    write_count(out, value.moral_decision_history.size());
+    for (const MoralDecisionRecord& record : value.moral_decision_history) {
+        write_string(out, record.decision_id);
+        write_string(out, record.scenario_id);
+        write_string(out, record.deciding_npc_id);
+        write_double(out, record.timestamp_hour);
+        write_string(out, record.option_id);
+        write_double(out, record.score);
+        write_double(out, record.compassion);
+        write_double(out, record.loyalty_bias);
+        write_double(out, record.fairness_value);
+        write_double(out, record.safety_value);
+        write_double(out, record.freedom_value);
+        write_double(out, record.self_interest_value);
+        write_double(out, record.money_delta_applied);
+        write_double(out, record.stress_delta_applied);
+        write_count(out, record.relationship_deltas_applied.size());
+        for (const auto& [entity_id, delta] : record.relationship_deltas_applied) {
+            write_string(out, entity_id);
+            write_double(out, delta);
+        }
+    }
 }
 
 WorldState read_world_state(std::istream& in, std::uint32_t version) {
@@ -432,6 +455,45 @@ WorldState read_world_state(std::istream& in, std::uint32_t version) {
         unit.capacity = read_u32(in); unit.daily_rent = read_double(in);
         unit.condition = read_double(in);
         value.housing_units.push_back(std::move(unit));
+    }
+    if (version >= 11U) {
+        const std::uint32_t records = read_count(in);
+        value.moral_decision_history.reserve(records);
+        for (std::uint32_t i = 0; i < records; ++i) {
+            MoralDecisionRecord record;
+            record.decision_id = read_string(in);
+            record.scenario_id = read_string(in);
+            record.deciding_npc_id = read_string(in);
+            record.timestamp_hour = read_double(in);
+            record.option_id = read_string(in);
+            record.score = read_double(in);
+            record.compassion = read_double(in);
+            record.loyalty_bias = read_double(in);
+            record.fairness_value = read_double(in);
+            record.safety_value = read_double(in);
+            record.freedom_value = read_double(in);
+            record.self_interest_value = read_double(in);
+            record.money_delta_applied = read_double(in);
+            record.stress_delta_applied = read_double(in);
+            if (record.decision_id.empty() || record.scenario_id.empty()
+                || record.deciding_npc_id.empty() || record.option_id.empty())
+                throw std::runtime_error("invalid moral decision identity");
+            if (record.compassion < 0.0 || record.compassion > 1.0
+                || record.loyalty_bias < 0.0 || record.loyalty_bias > 1.0
+                || record.fairness_value < 0.0 || record.fairness_value > 1.0
+                || record.safety_value < 0.0 || record.safety_value > 1.0
+                || record.freedom_value < 0.0 || record.freedom_value > 1.0
+                || record.self_interest_value < 0.0 || record.self_interest_value > 1.0)
+                throw std::runtime_error("invalid moral decision value snapshot");
+            const std::uint32_t deltas = read_count(in);
+            for (std::uint32_t j = 0; j < deltas; ++j) {
+                const std::string entity_id = read_string(in);
+                const double delta = read_double(in);
+                if (entity_id.empty() || !record.relationship_deltas_applied.emplace(entity_id, delta).second)
+                    throw std::runtime_error("invalid moral decision relationship delta");
+            }
+            value.moral_decision_history.push_back(std::move(record));
+        }
     }
     return value;
 }
@@ -623,7 +685,7 @@ void read_life_state(std::istream& in, LifeCoordinator& life, std::uint32_t vers
 } // namespace
 
 void save_world(const SimulationWorld& world, std::ostream& output) {
-    output.write(kMagicV10.data(), static_cast<std::streamsize>(kMagicV10.size()));
+    output.write(kMagicV11.data(), static_cast<std::streamsize>(kMagicV11.size()));
     if (!output) throw std::runtime_error("failed writing world snapshot header");
     write_u32(output, kWorldSaveVersion);
     write_double(output, world.total_hours());
@@ -635,7 +697,7 @@ void save_world(const SimulationWorld& world, std::ostream& output) {
 }
 
 SimulationWorld load_world(std::istream& input) {
-    std::array<char, kMagicV8.size()> magic{};
+    std::array<char, kMagicV11.size()> magic{};
     input.read(magic.data(), static_cast<std::streamsize>(magic.size()));
     if (!input) throw std::runtime_error("truncated world snapshot header");
     const bool is_v5 = magic == kMagicV5;
@@ -644,13 +706,14 @@ SimulationWorld load_world(std::istream& input) {
     const bool is_v8 = magic == kMagicV8;
     const bool is_v9 = magic == kMagicV9;
     const bool is_v10 = magic == kMagicV10;
-    if (!is_v5 && !is_v6 && !is_v7 && !is_v8 && !is_v9 && !is_v10) throw std::runtime_error("invalid world snapshot magic");
+    const bool is_v11 = magic == kMagicV11;
+    if (!is_v5 && !is_v6 && !is_v7 && !is_v8 && !is_v9 && !is_v10 && !is_v11) throw std::runtime_error("invalid world snapshot magic");
     const std::uint32_t version = read_u32(input);
     if ((version == 5U && !is_v5) || (version == 6U && !is_v6)
         || (version == 7U && !is_v7) || (version == 8U && !is_v8)
-        || (version == 9U && !is_v9) || (version == 10U && !is_v10)
+        || (version == 9U && !is_v9) || (version == 10U && !is_v10) || (version == 11U && !is_v11)
         || (version != 5U && version != 6U && version != 7U && version != 8U
-            && version != 9U && version != 10U)) {
+            && version != 9U && version != 10U && version != 11U)) {
         throw std::runtime_error("unsupported world snapshot version");
     }
 
