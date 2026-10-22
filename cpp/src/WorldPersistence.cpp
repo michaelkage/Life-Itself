@@ -715,8 +715,9 @@ SimulationWorld load_world(std::istream& input) {
     if ((version == 5U && !is_v5) || (version == 6U && !is_v6)
         || (version == 7U && !is_v7) || (version == 8U && !is_v8)
         || (version == 9U && !is_v9) || (version == 10U && !is_v10)
+        || (version == 11U && !is_v11)
         || (version != 5U && version != 6U && version != 7U && version != 8U
-            && version != 9U && version != 10U)) {
+            && version != 9U && version != 10U && version != 11U)) {
         throw std::runtime_error("unsupported world snapshot version");
     }
 
