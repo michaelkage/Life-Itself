@@ -61,6 +61,12 @@ public:
     [[nodiscard]] double independent_evidence_strength(
         const std::string& subject_key,
         const std::string& proposition_key) const;
+    // Recipient-scoped estimate: NPC belief updates must only use claims that
+    // reached that NPC, never information elsewhere in the world.
+    [[nodiscard]] double independent_evidence_strength_for_recipient(
+        const std::string& subject_key,
+        const std::string& proposition_key,
+        const std::string& recipient_entity_id) const;
     [[nodiscard]] std::size_t size() const noexcept { return claims_.size(); }
     [[nodiscard]] const std::map<std::string, InformationClaim>& claims() const noexcept {
         return claims_;
