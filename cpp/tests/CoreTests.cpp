@@ -815,6 +815,56 @@ int main() {
     assert(referral_world.state().npcs[2].job_id == "referral-shop");
     assert(referral_world.state().npcs[1].job_id.empty());
 
+    // Reputation softly prioritizes scarce housing without replacing affordability checks.
+    WorldState reputation_housing_state;
+    District reputation_housing_district;
+    reputation_housing_district.district_id = "reputation-housing-district";
+    reputation_housing_state.districts.push_back(reputation_housing_district);
+    HousingUnit scarce_home;
+    scarce_home.unit_id = "scarce-home";
+    scarce_home.district_id = "reputation-housing-district";
+    scarce_home.capacity = 1;
+    scarce_home.daily_rent = 10.0;
+    reputation_housing_state.housing_units.push_back(scarce_home);
+    NPC housing_witness;
+    housing_witness.entity_id = "housing-witness";
+    housing_witness.district_id = "reputation-housing-district";
+    housing_witness.beliefs.push_back(NPCBelief{
+        "trusted-housing-applicant", ActionTag::InteractionPolite, 0.0, 0.9,
+        "housing-witness", true, 1U, 0U});
+    housing_witness.beliefs.push_back(NPCBelief{
+        "poor-standing-applicant", ActionTag::CrimeTheft, 0.0, 0.9,
+        "housing-witness", true, 1U, 0U});
+    NPC poor_standing_applicant;
+    poor_standing_applicant.entity_id = "poor-standing-applicant";
+    poor_standing_applicant.district_id = "reputation-housing-district";
+    poor_standing_applicant.money = 100.0;
+    NPC trusted_housing_applicant;
+    trusted_housing_applicant.entity_id = "trusted-housing-applicant";
+    trusted_housing_applicant.district_id = "reputation-housing-district";
+    trusted_housing_applicant.money = 100.0;
+    reputation_housing_state.npcs = {
+        housing_witness, poor_standing_applicant, trusted_housing_applicant};
+    SimulationWorld housing_reference(reputation_housing_state, 0.0, 25U);
+    SimulationWorld housing_resumed(reputation_housing_state, 0.0, 25U);
+    (void)housing_reference.advance(24.0);
+    (void)housing_resumed.advance(12.0);
+    std::stringstream housing_snapshot(std::ios::in | std::ios::out | std::ios::binary);
+    save_world(housing_resumed, housing_snapshot);
+    housing_snapshot.seekg(0);
+    housing_resumed = load_world(housing_snapshot);
+    (void)housing_resumed.advance(12.0);
+    assert(housing_reference.state().npcs[2].home_id == "scarce-home");
+    assert(housing_reference.state().npcs[1].home_id.empty());
+    assert(housing_resumed.state().npcs[2].home_id == "scarce-home");
+    assert(housing_reference.state().npcs[2].daily_rent
+        == housing_resumed.state().npcs[2].daily_rent);
+    std::stringstream housing_reference_bytes(std::ios::in | std::ios::out | std::ios::binary);
+    std::stringstream housing_resumed_bytes(std::ios::in | std::ios::out | std::ios::binary);
+    save_world(housing_reference, housing_reference_bytes);
+    save_world(housing_resumed, housing_resumed_bytes);
+    assert(housing_reference_bytes.str() == housing_resumed_bytes.str());
+
     // Community reputation can decide a scarce job slot when applicants have equal referrals.
     // A directly witnessed polite interaction helps standing; a witnessed theft harms it.
     WorldState reputation_hiring_state;
