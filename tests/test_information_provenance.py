@@ -36,6 +36,8 @@ class InformationProvenanceTests(unittest.TestCase):
         self.assertEqual(ledger.find("c3").hop_count, 2)
         self.assertIs(ledger.find("c3").kind, InformationKind.REPORT)
         self.assertEqual(ledger.independent_evidence_count("person:7", "was_at:market"), 1)
+        # A long relay chain contributes only the strongest confidence for its root.
+        self.assertAlmostEqual(ledger.independent_evidence_strength("person:7", "was_at:market"), 0.9)
 
     def test_distinct_root_evidence_counts_as_independent(self):
         ledger = InformationLedger()
@@ -47,6 +49,9 @@ class InformationProvenanceTests(unittest.TestCase):
             recipient_entity_id="witness-y",
         )).accepted)
         self.assertEqual(ledger.independent_evidence_count("person:7", "was_at:market"), 2)
+        self.assertAlmostEqual(
+            ledger.independent_evidence_strength("person:7", "was_at:market"), 1.0 - (0.1 * 0.1)
+        )
 
     def test_invalid_root_claims_are_rejected(self):
         invalid_claims = [
