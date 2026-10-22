@@ -1695,5 +1695,52 @@ int main() {
     save_world(repeated_rumour_resumed, repeated_rumour_resumed_bytes);
     assert(repeated_rumour_bytes.str() == repeated_rumour_resumed_bytes.str());
 
+
+    // Stable personality traits bias second-hand interpretation without changing
+    // the event record or consuming randomness; save/resume preserves the traits.
+    WorldState bias_state;
+    NPC bias_speaker;
+    bias_speaker.entity_id = "bias-speaker";
+    bias_speaker.district_id = "D-bias";
+    NPCMemory theft_story;
+    theft_story.witness_id = "bias-speaker";
+    theft_story.target_entity_id = "bias-target";
+    theft_story.action_tag = ActionTag::CrimeTheft;
+    theft_story.timestamp_hour = 0.0;
+    theft_story.retention = 0.9;
+    bias_speaker.memories.push_back(theft_story);
+    NPC loyal_listener;
+    loyal_listener.entity_id = "loyal-listener";
+    loyal_listener.district_id = "D-bias";
+    loyal_listener.loyalty_bias = 1.0;
+    loyal_listener.relationships["bias-target"] = 0.9;
+    NPC skeptical_listener = loyal_listener;
+    skeptical_listener.entity_id = "skeptical-listener";
+    skeptical_listener.loyalty_bias = 0.5;
+    skeptical_listener.skepticism = 1.0;
+    bias_state.npcs = {bias_speaker, loyal_listener, skeptical_listener};
+    SimulationWorld bias_world(bias_state, 0.0, 177U);
+    (void)bias_world.talk("loyal-listener", "bias-speaker");
+    (void)bias_world.talk("skeptical-listener", "bias-speaker");
+    const auto confidence_for = [](const NPC& npc) {
+        const auto found = std::find_if(npc.beliefs.begin(), npc.beliefs.end(),
+            [](const NPCBelief& belief) { return belief.action_tag == ActionTag::CrimeTheft; });
+        assert(found != npc.beliefs.end());
+        return found->confidence;
+    };
+    assert(confidence_for(bias_world.state().npcs[1])
+        < confidence_for(bias_world.state().npcs[2]));
+    std::stringstream bias_snapshot(std::ios::in | std::ios::out | std::ios::binary);
+    save_world(bias_world, bias_snapshot);
+    bias_snapshot.seekg(0);
+    SimulationWorld bias_restored = load_world(bias_snapshot);
+    assert(bias_restored.state().npcs[1].loyalty_bias == 1.0);
+    assert(bias_restored.state().npcs[2].skepticism == 1.0);
+    std::stringstream bias_bytes_a(std::ios::in | std::ios::out | std::ios::binary);
+    std::stringstream bias_bytes_b(std::ios::in | std::ios::out | std::ios::binary);
+    save_world(bias_world, bias_bytes_a);
+    save_world(bias_restored, bias_bytes_b);
+    assert(bias_bytes_a.str() == bias_bytes_b.str());
+
     return 0;
 }
