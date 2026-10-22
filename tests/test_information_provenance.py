@@ -39,6 +39,11 @@ class InformationProvenanceTests(unittest.TestCase):
         self.assertEqual(tuple(claim.claim_id for claim in lineage), ("c1", "c2", "c3"))
         self.assertEqual(lineage[0].root_evidence_id, lineage[-1].root_evidence_id)
         self.assertEqual(ledger.lineage_for_claim("missing"), ())
+        self.assertEqual(tuple(claim.claim_id for claim in ledger.lineage_for_claim("c1")), ("c1",))
+        # Returned claims are immutable values; querying lineage cannot mutate stored state.
+        with self.assertRaises((AttributeError, TypeError)):
+            lineage[0].confidence = 0.0
+        self.assertAlmostEqual(ledger.find("c1").confidence, 0.9)
         self.assertEqual(ledger.independent_evidence_count("person:7", "was_at:market"), 1)
         # A long relay chain contributes only the strongest confidence for its root.
         self.assertAlmostEqual(ledger.independent_evidence_strength("person:7", "was_at:market"), 0.9)
