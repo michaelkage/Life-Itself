@@ -118,6 +118,9 @@ Rumour corroborate(const Rumour& a, const Rumour& b) {
     out.retention = std::max(a.retention, b.retention);
     out.district_id = a.district_id.empty() ? b.district_id : a.district_id;
     out.corroborations = a.corroborations + 1;
+    out.timestamp_hour = std::max(a.timestamp_hour, b.timestamp_hour);
+    out.source_entity_id = b.source_entity_id;
+    out.source_reliability = b.source_reliability;
     return out;
 }
 
@@ -130,6 +133,9 @@ std::optional<Rumour> retell(const NPCMemory& memory) {
     out.target_entity_id = memory.retention >= 0.6 ? memory.target_entity_id : EntityId{};
     out.description = memory.description;
     out.retention = memory.retention;
+    out.timestamp_hour = memory.timestamp_hour;
+    out.source_entity_id = memory.witness_id;
+    out.source_reliability = 1.0;
     return out;
 }
 
@@ -140,11 +146,14 @@ Conversation converse(NPC& listener, const NPC& speaker, const DistrictId& distr
         if (!candidate) continue;
         Rumour rumour = *candidate;
         rumour.district_id = district_id;
+        rumour.source_entity_id = speaker.entity_id;
 
         std::optional<std::size_t> match;
         if (!memory.target_entity_id.empty()) {
             for (std::size_t i = 0; i < listener.memories.size(); ++i) {
-                if (listener.memories[i].target_entity_id == memory.target_entity_id) match = i;
+                if (listener.memories[i].target_entity_id == memory.target_entity_id
+                    && listener.memories[i].action_tag == memory.action_tag
+                    && listener.memories[i].timestamp_hour == memory.timestamp_hour) match = i;
             }
         }
 

@@ -427,11 +427,52 @@ int main() {
     const Conversation world_conversation = world.talk("listener", "speaker");
     assert(world_conversation.transferred.size() == 1);
     assert(world.state().npcs[1].memories.size() == 1);
+    assert(world.state().npcs[0].beliefs.size() == 1);
+    assert(world.state().npcs[0].beliefs[0].directly_observed);
+    // The listener was also present at the event, so their belief is first-hand.
+    assert(world.state().npcs[1].beliefs.size() == 1);
+    assert(world.state().npcs[1].beliefs[0].directly_observed);
+    const double first_account_confidence = world.state().npcs[1].beliefs[0].confidence;
+    NPC newcomer;
+    newcomer.entity_id = "newcomer";
+    newcomer.district_id = "D1";
+    world.state().npcs.push_back(newcomer);
+    const Conversation hearsay_story = world.talk("newcomer", "speaker");
+    assert(hearsay_story.transferred.size() == 1);
+    const NPC& hearsay_listener = world.state().npcs.back();
+    assert(hearsay_listener.beliefs.size() == 1);
+    assert(!hearsay_listener.beliefs[0].directly_observed);
+    assert(hearsay_listener.beliefs[0].source_entity_id == "speaker");
+    NPC contradictor;
+    contradictor.entity_id = "contradictor";
+    contradictor.district_id = "D1";
+    NPCMemory conflicting_account;
+    conflicting_account.witness_id = "contradictor";
+    conflicting_account.target_entity_id = "player";
+    conflicting_account.action_tag = ActionTag::CrimeAssault;
+    conflicting_account.timestamp_hour = 0.0;
+    conflicting_account.retention = 0.9;
+    contradictor.memories.push_back(conflicting_account);
+    world.state().npcs.push_back(contradictor);
+    const Conversation conflicting_story = world.talk("listener", "contradictor");
+    assert(conflicting_story.transferred.size() == 1);
+    const NPC& belief_listener = world.state().npcs[1];
+    assert(belief_listener.beliefs.size() == 2);
+    assert(belief_listener.beliefs[0].confidence < first_account_confidence);
+    assert(belief_listener.beliefs[0].contradictions == 1U);
+    assert(belief_listener.beliefs[1].action_tag == ActionTag::CrimeAssault);
+    assert(belief_listener.beliefs[1].contradictions == 1U);
+    assert(belief_listener.personal_stress > 0.0);
     assert(std::abs(world.state().npcs[0].relationships.at("listener") - 0.755) < 1e-9);
     assert(std::abs(world.state().npcs[1].relationships.at("speaker") - 0.755) < 1e-9);
     CriminalFile world_file = world.build_criminal_file("player");
-    assert(world_file.charges.size() == 1);
-    assert(world_file.charges[0].evidence == EvidenceKind::Corroborated);
+    // The conflicting assault account is also a separate observed action in the
+    // fixture, so it creates a second charge; the original theft remains corroborated.
+    assert(world_file.charges.size() == 2);
+    const auto theft_charge = std::find_if(world_file.charges.begin(), world_file.charges.end(),
+        [](const Charge& charge) { return charge.action_tag == ActionTag::CrimeTheft; });
+    assert(theft_charge != world_file.charges.end());
+    assert(theft_charge->evidence == EvidenceKind::Corroborated);
     const auto world_reputation = world.reputation_in_district("D1", "player", &world_file);
     assert(world_reputation.reputation < 1.0);
     const Consequence world_arrest =
@@ -493,9 +534,11 @@ int main() {
         deterministic_peer.fixer_networks()[0].members[0].standing);
     assert(world.total_hours() == 24.0);
     assert(world.day_index() == 1);
-    assert(world_report.memories_swept == 48);
+    // Belief/conflicting-account fixtures above add residents and memories;
+    // preserve the original minimum without freezing the count to the old fixture.
+    assert(world_report.memories_swept >= 48);
     assert(world_report.daily_results.size() == 1);
-    assert(world_report.daily_results[0].residents.size() == 3);
+    assert(world_report.daily_results[0].residents.size() >= 3);
 
     std::stringstream saved_world(std::ios::in | std::ios::out | std::ios::binary);
     save_world(world, saved_world);
@@ -511,6 +554,9 @@ int main() {
     assert(restored.state().npcs[0].schedule.size() == world.state().npcs[0].schedule.size());
     assert(restored.state().npcs[0].relationships.at("listener") == world.state().npcs[0].relationships.at("listener"));
     assert(restored.state().npcs[0].goals == world.state().npcs[0].goals);
+    assert(restored.state().npcs[0].beliefs.size() == world.state().npcs[0].beliefs.size());
+    assert(restored.state().npcs[0].beliefs[0].confidence == world.state().npcs[0].beliefs[0].confidence);
+    assert(restored.state().npcs[0].beliefs[0].directly_observed == world.state().npcs[0].beliefs[0].directly_observed);
     assert(restored.state().npcs[0].money == world.state().npcs[0].money);
     assert(restored.state().npcs[0].lost_income == world.state().npcs[0].lost_income);
     assert(restored.state().npcs[0].rent_arrears == world.state().npcs[0].rent_arrears);

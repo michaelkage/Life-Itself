@@ -23,7 +23,7 @@ This subsystem is being connected to the existing simulation, rather than treate
 
 - `CampaignCoordinator` owns the active `SimulationWorld`, tracks the current life, records death, and allows the dead world to continue running while NPCs settle obligations.
 - Starting another life snapshots the old world as an immutable archive, marks the prior character `Archived`, and creates a separate day-zero world. Archive inspection returns a detached world copy, so inspection cannot mutate the preserved snapshot.
-- Versioned campaign save/load stores the active world and archive snapshots together. World format v7 persists permitted ghost actions while remaining able to read legacy v5/v6 snapshots.
+- Versioned campaign save/load stores the active world and archive snapshots together. World format v8 persists NPC beliefs while remaining able to read legacy v5/v6/v7 snapshots.
 - Recovery sampling uses stable FNV-1a condition IDs rather than implementation-defined `std::hash`, avoiding compiler-library-dependent outcomes.
 
 ## Determinism regression coverage
@@ -31,6 +31,13 @@ This subsystem is being connected to the existing simulation, rather than treate
 The C++ regression compares continuous simulation with save/resume at hour 8.5 and at multiple checkpoints across three additional days. Ghost actions are validated against each window's permitted action list; accepted influence updates a manifestation-specific memory, creates a persisted event linked to its witness, and applies action-specific social effects. The replay regression also checks that ghost stories propagate through NPC conversations and a newly informed listener reacts only once to the same manifestation. The campaign API consumes the saved world random stream so decisions, event counts, memory changes, emotional effects, obligations, and serialized bytes match after each checkpoint. Ghost manifestation memories use absolute world hours (not just the time of day), so their decay remains correct on later days. Coverage also checks out-of-window actions, estate/supporter debt settlement, NPC balances, life status, archive immutability, and a new life in a fresh day-zero world. The C++ core remains engine-independent; Unreal UI/animation/game-thread code is not yet wired to this API.
 
 CI for this branch is the verification authority; report only the checks that have actually completed successfully.
+
+## Belief formation and conflicting accounts
+
+- NPCs retain beliefs separately from raw memories, recording the target, event/action, event time, confidence, source, direct-observation status, corroborations, and contradictions.
+- First-hand witnesses form high-confidence beliefs. Second-hand accounts are weighted by the listener's relationship with the speaker, the speaker's own balance of direct observation versus hearsay, and the reliability of the retold memory.
+- Accounts about the same target and event time can coexist when they disagree. Conflicting reports reduce confidence in competing interpretations instead of silently overwriting the original account; repeated compatible reports increase corroboration and confidence.
+- Contradictions create a small stress response and can erode trust in a hostile source. Existing conversation effects also change relationships, social needs, isolation, and stress. Beliefs are saved in world format v8; readers continue to accept v5/v6/v7 snapshots.
 
 ## Personality-driven ghost interpretation
 

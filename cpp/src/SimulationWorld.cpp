@@ -592,6 +592,60 @@ Conversation SimulationWorld::talk(
     };
     for (const Rumour& rumour : conversation.transferred) {
         const std::string expected_action = rumour.action_tag;
+        const ActionTag believed_action = [&rumour]() {
+            if (rumour.action_tag == "Ghost.Sign") return ActionTag::GhostSign;
+            if (rumour.action_tag == "Ghost.Sound") return ActionTag::GhostSound;
+            if (rumour.action_tag == "Ghost.Dream") return ActionTag::GhostDream;
+            if (rumour.action_tag == "Crime.Theft") return ActionTag::CrimeTheft;
+            if (rumour.action_tag == "Crime.Assault") return ActionTag::CrimeAssault;
+            if (rumour.action_tag == "Crime.ArmedAssault") return ActionTag::CrimeArmedAssault;
+            if (rumour.action_tag == "Crime.Vandalism") return ActionTag::CrimeVandalism;
+            return ActionTag::InteractionPolite;
+        }();
+        double source_reliability = 0.5;
+        if (!speaker.beliefs.empty()) {
+            double total = 0.0;
+            for (const NPCBelief& belief : speaker.beliefs) {
+                total += belief.directly_observed ? 1.0 : belief.confidence;
+            }
+            source_reliability = total / static_cast<double>(speaker.beliefs.size());
+        }
+        const double account_confidence = std::clamp(
+            rumour.retention * (0.55 + 0.25 * std::clamp(prior_trust, -1.0, 1.0)
+                + 0.20 * source_reliability), 0.0, 1.0);
+        auto belief = std::find_if(listener.beliefs.begin(), listener.beliefs.end(),
+            [&rumour, &believed_action](const NPCBelief& candidate) {
+                return candidate.target_entity_id == rumour.target_entity_id
+                    && candidate.timestamp_hour == rumour.timestamp_hour
+                    && candidate.action_tag == believed_action;
+            });
+        bool contradicted = false;
+        for (NPCBelief& prior : listener.beliefs) {
+            if (prior.target_entity_id != rumour.target_entity_id
+                || prior.timestamp_hour != rumour.timestamp_hour
+                || prior.action_tag == believed_action) continue;
+            contradicted = true;
+            prior.confidence = std::clamp(prior.confidence - 0.20 * account_confidence, 0.0, 1.0);
+            ++prior.contradictions;
+        }
+        if (belief == listener.beliefs.end()) {
+            listener.beliefs.push_back(NPCBelief{rumour.target_entity_id, believed_action,
+                rumour.timestamp_hour, account_confidence, speaker_id, false,
+                rumour.corroborations, contradicted ? 1U : 0U});
+        } else {
+            belief->confidence = std::clamp(belief->confidence
+                + (1.0 - belief->confidence) * account_confidence * 0.25, 0.0, 1.0);
+            belief->source_entity_id = speaker_id;
+            ++belief->corroborations;
+            if (contradicted) ++belief->contradictions;
+        }
+        if (contradicted) {
+            listener.personal_stress = std::clamp(listener.personal_stress + 0.006, 0.0, 1.0);
+            if (prior_trust < 0.0) {
+                auto& source_tie = listener.relationships[speaker_id];
+                source_tie = std::clamp(source_tie - 0.015, -1.0, 1.0);
+            }
+        }
         const bool ghost_manifestation = expected_action == "Ghost.Sign"
             || expected_action == "Ghost.Sound" || expected_action == "Ghost.Dream";
         const bool already_knew_manifestation = ghost_manifestation
@@ -720,7 +774,20 @@ std::size_t SimulationWorld::record_witnessed_action(
         memory.timestamp_hour = runtime_.total_hours();
         memory.action_tag = action_tag;
         memory.description = description;
-        witness->memories.push_back(std::move(memory));
+        witness->memories.push_back(memory);
+        const auto existing_belief = std::find_if(witness->beliefs.begin(), witness->beliefs.end(),
+            [&actor_id, action_tag, this](const NPCBelief& belief) {
+                return belief.target_entity_id == actor_id && belief.action_tag == action_tag
+                    && belief.timestamp_hour == runtime_.total_hours();
+            });
+        if (existing_belief == witness->beliefs.end()) {
+            witness->beliefs.push_back(NPCBelief{actor_id, action_tag, runtime_.total_hours(),
+                1.0, witness->entity_id, true, 1U, 0U});
+        } else {
+            existing_belief->confidence = 1.0;
+            existing_belief->directly_observed = true;
+            ++existing_belief->corroborations;
+        }
         (void)absorb(*witness, action_tag, witness->entity_id == victim_id);
     }
 

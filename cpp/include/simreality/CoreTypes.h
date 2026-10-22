@@ -59,6 +59,17 @@ enum class DailyActivity : std::uint8_t { Home, Commute, Work, Shop, Socialise, 
 
 struct ScheduleEntry { DailyActivity activity{DailyActivity::Sleep}; std::uint8_t start_hour{22}; std::uint8_t end_hour{6}; };
 
+struct NPCBelief {
+    EntityId target_entity_id{};
+    ActionTag action_tag{ActionTag::InteractionPolite};
+    SimulationHour timestamp_hour{0.0};
+    double confidence{0.5};
+    EntityId source_entity_id{};
+    bool directly_observed{false};
+    std::uint32_t corroborations{0};
+    std::uint32_t contradictions{0};
+};
+
 struct NPC {
     EntityId entity_id{};
     AgeBand age_band{AgeBand::Adult};
@@ -85,6 +96,9 @@ struct NPC {
     double rent_arrears{0.0};
     double social_need{0.25};
     double isolation{0.0};
+    // Durable interpretations are separate from raw memories: conflicting accounts
+    // can coexist without silently rewriting what the NPC originally witnessed.
+    std::vector<NPCBelief> beliefs{};
 };
 
 struct District {
