@@ -502,7 +502,11 @@ int main() {
     SimulationWorld social_resumed = load_world(social_snapshot);
     world.state().npcs[1].relationships["player"] = 0.9;
     social_resumed.state().npcs[1].relationships["player"] = 0.9;
+    // The first load consumed the stream; rewind before creating the isolated test world.
+    social_snapshot.clear();
+    social_snapshot.seekg(0);
     SimulationWorld support_world = load_world(social_snapshot);
+    support_world.state().npcs[1].relationships["player"] = 0.9;
     const double player_money_before_help = support_world.state().npcs[2].money;
     // Give the recipient room for aid to produce a measurable stress/desperation change.
     support_world.state().npcs[2].personal_stress = 0.5;
