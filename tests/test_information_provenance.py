@@ -52,6 +52,12 @@ class InformationProvenanceTests(unittest.TestCase):
         self.assertAlmostEqual(
             ledger.independent_evidence_strength("person:7", "was_at:market"), 1.0 - (0.1 * 0.1)
         )
+        self.assertAlmostEqual(
+            ledger.independent_evidence_strength_for_recipient("person:7", "was_at:market", "listener"), 0.9
+        )
+        self.assertEqual(
+            ledger.independent_evidence_strength_for_recipient("person:7", "was_at:market", "uninformed"), 0.0
+        )
 
     def test_invalid_root_claims_are_rejected(self):
         invalid_claims = [
