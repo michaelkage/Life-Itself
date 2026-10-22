@@ -789,7 +789,9 @@ Conversation SimulationWorld::talk(
                     listener.belief_revision_history.push_back(BeliefRevision{
                         prior.target_entity_id, prior.action_tag, prior.timestamp_hour,
                         previous_confidence, prior.confidence,
-                        BeliefRevisionReason::Contradiction, speaker_id, runtime_.total_hours()});
+                        BeliefRevisionReason::Contradiction, speaker_id, runtime_.total_hours(),
+                        source_reliability, loyalty_factor, compassion_factor,
+                        skepticism_factor, evidence_factor});
                 }
             }
         }
@@ -811,7 +813,9 @@ Conversation SimulationWorld::talk(
                     listener.belief_revision_history.push_back(BeliefRevision{
                         belief->target_entity_id, belief->action_tag, belief->timestamp_hour,
                         previous_confidence, belief->confidence,
-                        BeliefRevisionReason::IndependentEvidence, speaker_id, runtime_.total_hours()});
+                        BeliefRevisionReason::IndependentEvidence, speaker_id, runtime_.total_hours(),
+                        source_reliability, loyalty_factor, compassion_factor,
+                        skepticism_factor, evidence_factor});
                 }
             }
             if (contradicted) ++belief->contradictions;
