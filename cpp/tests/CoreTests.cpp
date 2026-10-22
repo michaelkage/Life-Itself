@@ -1782,5 +1782,23 @@ int main() {
     assert(moral_restored.state().npcs.front().freedom_value == 0.3);
     assert(moral_restored.state().npcs.front().self_interest_value == 0.7);
 
+
+    const MoralChoiceEvaluation preferred_urgent = choose_moral_option(
+        urgency_focused, {urgent_aid, fair_distribution});
+    const MoralChoiceEvaluation preferred_fair = choose_moral_option(
+        fairness_focused, {urgent_aid, fair_distribution});
+    assert(preferred_urgent.option_id == "urgent-aid");
+    assert(preferred_fair.option_id == "fair-distribution");
+    const MoralChoiceOption tied_a{"first", 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5};
+    const MoralChoiceOption tied_b{"second", 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5};
+    assert(choose_moral_option(NPC{}, {tied_a, tied_b}).option_id == "first");
+    bool rejected_empty_moral_options = false;
+    try {
+        (void)choose_moral_option(NPC{}, {});
+    } catch (const std::invalid_argument&) {
+        rejected_empty_moral_options = true;
+    }
+    assert(rejected_empty_moral_options);
+
     return 0;
 }

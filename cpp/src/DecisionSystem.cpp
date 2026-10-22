@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <stdexcept>
 
 namespace simreality {
 
@@ -22,6 +23,21 @@ MoralChoiceEvaluation evaluate_moral_choice(
         + 0.10 * loyalty * unit(option.loyalty)
         + 0.20 * self_interest * (1.0 - unit(option.personal_cost));
     return {option.option_id, score};
+}
+
+MoralChoiceEvaluation choose_moral_option(
+    const NPC& npc, const std::vector<MoralChoiceOption>& options) {
+    if (options.empty()) {
+        throw std::invalid_argument("moral choice requires at least one option");
+    }
+    MoralChoiceEvaluation best = evaluate_moral_choice(npc, options.front());
+    for (std::size_t i = 1; i < options.size(); ++i) {
+        const MoralChoiceEvaluation candidate = evaluate_moral_choice(npc, options[i]);
+        if (candidate.score > best.score) {
+            best = candidate;
+        }
+    }
+    return best;
 }
 
 ActivityDecision choose_activity(
