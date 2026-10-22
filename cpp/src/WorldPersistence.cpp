@@ -23,6 +23,7 @@ constexpr std::array<char, 8> kMagicV9{{'S', 'R', 'E', 'C', 'O', 'R', 'E', '9'}}
 constexpr std::array<char, 8> kMagicV10{{'S', 'R', 'E', 'C', 'O', 'R', 'E', 'A'}};
 constexpr std::array<char, 8> kMagicV11{{'S', 'R', 'E', 'C', 'O', 'R', 'E', 'B'}};
 constexpr std::array<char, 8> kMagicV12{{'S', 'R', 'E', 'C', 'O', 'R', 'E', 'C'}};
+constexpr std::array<char, 8> kMagicV13{{'S', 'R', 'E', 'C', 'O', 'R', 'E', 'D'}};
 constexpr std::uint32_t kMaxCollectionItems = 1'000'000;
 constexpr std::uint32_t kMaxStringBytes = 16U * 1024U * 1024U;
 static_assert(sizeof(double) == sizeof(std::uint64_t));
@@ -235,6 +236,11 @@ void write_npc(std::ostream& out, const NPC& value) {
         write_u8(out, static_cast<std::uint8_t>(revision.reason));
         write_string(out, revision.source_entity_id);
         write_double(out, revision.recorded_hour);
+        write_double(out, revision.source_reliability);
+        write_double(out, revision.loyalty_factor);
+        write_double(out, revision.compassion_factor);
+        write_double(out, revision.skepticism_factor);
+        write_double(out, revision.evidence_factor);
     }
 }
 
@@ -333,6 +339,19 @@ NPC read_npc(std::istream& in, std::uint32_t version) {
             revision.reason = read_enum<BeliefRevisionReason>(in, 2U, "belief revision reason");
             revision.source_entity_id = read_string(in);
             revision.recorded_hour = read_double(in);
+            if (version >= 13U) {
+                revision.source_reliability = read_double(in);
+                revision.loyalty_factor = read_double(in);
+                revision.compassion_factor = read_double(in);
+                revision.skepticism_factor = read_double(in);
+                revision.evidence_factor = read_double(in);
+                const double factors[] = {revision.source_reliability, revision.loyalty_factor,
+                    revision.compassion_factor, revision.skepticism_factor, revision.evidence_factor};
+                for (double factor : factors) {
+                    if (!std::isfinite(factor) || factor < 0.0 || factor > 1.5)
+                        throw std::runtime_error("invalid belief revision interpretation factor");
+                }
+            }
             if (revision.event_timestamp_hour < 0.0 || revision.recorded_hour < 0.0)
                 throw std::runtime_error("invalid belief revision timestamp");
             value.belief_revision_history.push_back(std::move(revision));
@@ -720,7 +739,7 @@ void read_information_ledger(std::istream& in, InformationLedger& ledger) {
 } // namespace
 
 void save_world(const SimulationWorld& world, std::ostream& output) {
-    output.write(kMagicV12.data(), static_cast<std::streamsize>(kMagicV12.size()));
+    output.write(kMagicV13.data(), static_cast<std::streamsize>(kMagicV13.size()));
     if (!output) throw std::runtime_error("failed writing world snapshot header");
     write_u32(output, kWorldSaveVersion);
     write_double(output, world.total_hours());
@@ -744,14 +763,16 @@ SimulationWorld load_world(std::istream& input) {
     const bool is_v10 = magic == kMagicV10;
     const bool is_v11 = magic == kMagicV11;
     const bool is_v12 = magic == kMagicV12;
-    if (!is_v5 && !is_v6 && !is_v7 && !is_v8 && !is_v9 && !is_v10 && !is_v11 && !is_v12) throw std::runtime_error("invalid world snapshot magic");
+    const bool is_v13 = magic == kMagicV13;
+    if (!is_v5 && !is_v6 && !is_v7 && !is_v8 && !is_v9 && !is_v10 && !is_v11 && !is_v12 && !is_v13) throw std::runtime_error("invalid world snapshot magic");
     const std::uint32_t version = read_u32(input);
     if ((version == 5U && !is_v5) || (version == 6U && !is_v6)
         || (version == 7U && !is_v7) || (version == 8U && !is_v8)
         || (version == 9U && !is_v9) || (version == 10U && !is_v10)
         || (version == 11U && !is_v11) || (version == 12U && !is_v12)
+        || (version == 13U && !is_v13)
         || (version != 5U && version != 6U && version != 7U && version != 8U
-            && version != 9U && version != 10U && version != 11U && version != 12U)) {
+            && version != 9U && version != 10U && version != 11U && version != 12U && version != 13U)) {
         throw std::runtime_error("unsupported world snapshot version");
     }
 
