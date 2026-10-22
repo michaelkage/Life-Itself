@@ -2107,6 +2107,14 @@ int main() {
     assert(target_history[0].event_timestamp_hour == 4.0);
     assert(target_history[1].event_timestamp_hour == 8.0);
     assert(history_query_world.belief_history_for("missing-npc").empty());
+    const auto explanations =
+        history_query_world.belief_explanations_for("history-query-npc", "target-a");
+    assert(explanations.size() == 2U);
+    assert(std::abs(explanations[0].confidence_delta - 0.2) < 1e-12);
+    assert(std::abs(explanations[1].confidence_delta - (-0.2)) < 1e-12);
+    assert(explanations[0].revision.reason == BeliefRevisionReason::IndependentEvidence);
+    assert(explanations[1].revision.reason == BeliefRevisionReason::Contradiction);
+    assert(history_query_world.belief_explanations_for("missing-npc").empty());
     InformationClaim observed_claim;
     observed_claim.claim_id = "claim-observed";
     observed_claim.subject_key = "bridge-7";
