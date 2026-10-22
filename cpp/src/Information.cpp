@@ -81,6 +81,20 @@ const InformationClaim* InformationLedger::find(const std::string& claim_id) con
     return it == claims_.end() ? nullptr : &it->second;
 }
 
+std::vector<InformationClaim> InformationLedger::lineage_for_claim(
+    const std::string& claim_id) const {
+    std::vector<InformationClaim> lineage;
+    const InformationClaim* current = find(claim_id);
+    while (current != nullptr) {
+        lineage.push_back(*current);
+        if (current->parent_claim_id.empty()) break;
+        current = find(current->parent_claim_id);
+    }
+    if (lineage.empty() || !lineage.back().parent_claim_id.empty()) return {};
+    std::reverse(lineage.begin(), lineage.end());
+    return lineage;
+}
+
 std::size_t InformationLedger::independent_evidence_count(
     const std::string& subject_key,
     const std::string& proposition_key) const {
