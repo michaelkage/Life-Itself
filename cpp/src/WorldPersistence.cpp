@@ -687,7 +687,7 @@ void read_information_ledger(std::istream& in, InformationLedger& ledger) {
 } // namespace
 
 void save_world(const SimulationWorld& world, std::ostream& output) {
-    output.write(kMagicV10.data(), static_cast<std::streamsize>(kMagicV10.size()));
+    output.write(kMagicV11.data(), static_cast<std::streamsize>(kMagicV11.size()));
     if (!output) throw std::runtime_error("failed writing world snapshot header");
     write_u32(output, kWorldSaveVersion);
     write_double(output, world.total_hours());
