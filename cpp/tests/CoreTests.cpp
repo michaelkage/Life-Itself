@@ -543,6 +543,54 @@ int main() {
     assert(social_bytes_a.str() == social_bytes_b.str());
     assert(std::abs(world.state().npcs[0].relationships.at("listener") - 0.755) < 1e-9);
     assert(std::abs(world.state().npcs[1].relationships.at("speaker") - 0.755) < 1e-9);
+    // Successful aid is distinguishable from generic politeness when the story
+    // reaches a third resident: the recipient gains a positive social belief and
+    // the donor's community reputation reflects the account.
+    WorldState aid_story_state;
+    District aid_story_district;
+    aid_story_district.district_id = "aid-story-district";
+    aid_story_state.districts.push_back(aid_story_district);
+    NPC aid_donor;
+    aid_donor.entity_id = "aid-donor";
+    aid_donor.district_id = "aid-story-district";
+    aid_donor.money = 30.0;
+    aid_donor.relationships["aid-recipient"] = 0.9;
+    aid_donor.relationships["aid-listener"] = 0.4;
+    NPC aid_recipient;
+    aid_recipient.entity_id = "aid-recipient";
+    aid_recipient.district_id = "aid-story-district";
+    aid_recipient.money = 0.0;
+    aid_recipient.relationships["aid-donor"] = 0.9;
+    aid_recipient.relationships["aid-listener"] = 0.4;
+    NPC aid_listener;
+    aid_listener.entity_id = "aid-listener";
+    aid_listener.district_id = "aid-story-district";
+    aid_listener.relationships["aid-recipient"] = 0.2;
+    aid_listener.relationships["aid-donor"] = 0.2;
+    aid_story_state.npcs = {aid_donor, aid_recipient, aid_listener};
+    SimulationWorld aid_story_world(std::move(aid_story_state), 6.0, 41U);
+    assert(aid_story_world.offer_support("aid-donor", "aid-recipient", 5.0));
+    assert(aid_story_world.state().npcs[0].memories.back().action_tag == ActionTag::SocialAid);
+    assert(aid_story_world.state().npcs[1].memories.back().action_tag == ActionTag::SocialAid);
+    const double donor_tie_before_story =
+        aid_story_world.state().npcs[2].relationships["aid-donor"];
+    const Conversation aid_story = aid_story_world.talk("aid-listener", "aid-recipient");
+    assert(aid_story.transferred.size() == 1U);
+    assert(aid_story.transferred[0].action_tag == "Social.Aid");
+    const NPC& aid_listener_after_story = aid_story_world.state().npcs[2];
+    assert(aid_listener_after_story.beliefs.size() == 1U);
+    assert(aid_listener_after_story.beliefs[0].action_tag == ActionTag::SocialAid);
+    assert(aid_listener_after_story.beliefs[0].target_entity_id == "aid-donor");
+    assert(aid_listener_after_story.relationships.at("aid-donor") > donor_tie_before_story);
+    assert(aid_story_world.community_reputation("aid-donor", "aid-story-district") > 0.0);
+    SimulationWorld aid_story_resumed = aid_story_world;
+    std::stringstream aid_story_snapshot(std::ios::in | std::ios::out | std::ios::binary);
+    save_world(aid_story_world, aid_story_snapshot);
+    aid_story_snapshot.seekg(0);
+    aid_story_resumed = load_world(aid_story_snapshot);
+    assert(aid_story_resumed.state().npcs[2].beliefs[0].action_tag == ActionTag::SocialAid);
+    assert(aid_story_resumed.community_reputation("aid-donor", "aid-story-district")
+        == aid_story_world.community_reputation("aid-donor", "aid-story-district"));
     CriminalFile world_file = world.build_criminal_file("player");
     // The conflicting assault account is also a separate observed action in the
     // fixture, so it creates a second charge; the original theft remains corroborated.

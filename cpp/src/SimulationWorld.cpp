@@ -609,6 +609,7 @@ Conversation SimulationWorld::talk(
     const auto action_name = [](ActionTag tag) {
         switch (tag) {
             case ActionTag::InteractionPolite: return std::string("Interaction.Polite");
+            case ActionTag::SocialAid: return std::string("Social.Aid");
             case ActionTag::GhostSign: return std::string("Ghost.Sign");
             case ActionTag::GhostSound: return std::string("Ghost.Sound");
             case ActionTag::GhostDream: return std::string("Ghost.Dream");
@@ -622,6 +623,7 @@ Conversation SimulationWorld::talk(
     for (const Rumour& rumour : conversation.transferred) {
         const std::string expected_action = rumour.action_tag;
         const ActionTag believed_action = [&rumour]() {
+            if (rumour.action_tag == "Social.Aid") return ActionTag::SocialAid;
             if (rumour.action_tag == "Ghost.Sign") return ActionTag::GhostSign;
             if (rumour.action_tag == "Ghost.Sound") return ActionTag::GhostSound;
             if (rumour.action_tag == "Ghost.Dream") return ActionTag::GhostDream;
@@ -683,6 +685,8 @@ Conversation SimulationWorld::talk(
                 target_tie = std::clamp(target_tie - 0.025 * evidence, -1.0, 1.0);
             } else if (believed_action == ActionTag::InteractionPolite) {
                 target_tie = std::clamp(target_tie + 0.008 * evidence, -1.0, 1.0);
+            } else if (believed_action == ActionTag::SocialAid) {
+                target_tie = std::clamp(target_tie + 0.02 * evidence, -1.0, 1.0);
             }
         }
         const bool ghost_manifestation = expected_action == "Ghost.Sign"
@@ -850,6 +854,7 @@ std::size_t SimulationWorld::record_witnessed_action(
         case ActionTag::CrimeVandalism: event.severity = 0.45; break;
         case ActionTag::CrimeAssault: event.severity = 0.7; break;
         case ActionTag::CrimeArmedAssault: event.severity = 1.0; break;
+        case ActionTag::SocialAid: event.severity = 0.0; break;
     }
     for (const NPC* witness : witnesses) event.witness_ids.push_back(witness->entity_id);
     state_.ongoing_events.push_back(std::move(event));
@@ -868,6 +873,9 @@ double SimulationWorld::community_reputation(
             switch (belief.action_tag) {
                 case ActionTag::InteractionPolite:
                     valence = 0.35;
+                    break;
+                case ActionTag::SocialAid:
+                    valence = 0.65;
                     break;
                 case ActionTag::CrimeTheft:
                 case ActionTag::CrimeAssault:
@@ -929,7 +937,7 @@ bool SimulationWorld::offer_support(
     donor_memory.initial_impact = 0.8;
     donor_memory.retention = 1.0;
     donor_memory.timestamp_hour = event_hour;
-    donor_memory.action_tag = ActionTag::InteractionPolite;
+    donor_memory.action_tag = ActionTag::SocialAid;
     donor.memories.push_back(donor_memory);
 
     NPCMemory recipient_memory;
@@ -938,7 +946,7 @@ bool SimulationWorld::offer_support(
     recipient_memory.initial_impact = 0.9;
     recipient_memory.retention = 1.0;
     recipient_memory.timestamp_hour = event_hour;
-    recipient_memory.action_tag = ActionTag::InteractionPolite;
+    recipient_memory.action_tag = ActionTag::SocialAid;
     recipient.memories.push_back(recipient_memory);
 
     // Repeated help compounds into durable reciprocal trust rather than only
