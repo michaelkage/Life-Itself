@@ -43,6 +43,18 @@ std::vector<BeliefRevision> SimulationWorld::belief_history_for(
     return history;
 }
 
+std::vector<BeliefRevisionExplanation> SimulationWorld::belief_explanations_for(
+    const EntityId& npc_id, const EntityId& target_id) const {
+    const std::vector<BeliefRevision> history = belief_history_for(npc_id, target_id);
+    std::vector<BeliefRevisionExplanation> explanations;
+    explanations.reserve(history.size());
+    for (const BeliefRevision& revision : history) {
+        explanations.push_back(BeliefRevisionExplanation{
+            revision, revision.revised_confidence - revision.previous_confidence});
+    }
+    return explanations;
+}
+
 GhostInfluenceResult SimulationWorld::attempt_ghost_influence(
     const EntityId& ghost_id, const EntityId& npc_id,
     const std::string& action, double hour_of_day) {
