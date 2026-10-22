@@ -44,3 +44,9 @@ CI for this branch is the verification authority; report only the checks that ha
 - Ghost manifestations are interpreted through the NPC's existing stress, trauma, desperation, relationship with the deceased, and retained memories. A frightened NPC can become more alarmed; a close contact is more likely to seek further contact; a skeptical or weakly connected NPC can become more suspicious or investigate rather than trust immediately.
 - Each witnessed manifestation is retained in the event history. Repeated encounters increase history-weighted emotional and relationship consequences and can create durable goals such as `avoid_ghost`, `investigate_ghost`, or `seek_ghost_contact`. Conversation-based stories use the same deterministic personality/history model and are gated by saved memories to avoid repeating the same one-time response.
 - These effects use persisted fields and no additional random draws, so uninterrupted and save/resumed simulations can be compared byte-for-byte.
+## Rumour ripple and cooperation
+
+- Conversations can shift a listener's directed relationship toward the person discussed. The change is confidence-weighted and does not declare the account objectively true.
+- District reputation is derived from persisted resident beliefs. Confidence, direct observation, corroboration, and contradictions affect each account's weight; ghost manifestations are excluded from reputation scoring.
+- Cooperation combines personal trust (65%) with community reputation (35%). NPCs can decline resource support when this score is too low, while a strong personal bond can outweigh a poor public reputation. Accepted support transfers money and improves reciprocal trust.
+- Beliefs, relationships, and money are saved with the world. Regression coverage checks reputation changes, refusal of support, and help restored by a strong personal bond.
