@@ -66,6 +66,7 @@ class InformationProvenanceTests(unittest.TestCase):
             root_claim(proposition_key=""),
             root_claim(root_evidence_id=""),
             root_claim(source_entity_id=""),
+            root_claim(recipient_entity_id=""),
             root_claim(created_tick=-1),
             root_claim(confidence=float("nan")),
             root_claim(confidence=float("inf")),
