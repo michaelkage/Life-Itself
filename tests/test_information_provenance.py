@@ -35,6 +35,10 @@ class InformationProvenanceTests(unittest.TestCase):
         self.assertAlmostEqual(ledger.find("c3").confidence, 0.36)
         self.assertEqual(ledger.find("c3").hop_count, 2)
         self.assertIs(ledger.find("c3").kind, InformationKind.REPORT)
+        lineage = ledger.lineage_for_claim("c3")
+        self.assertEqual(tuple(claim.claim_id for claim in lineage), ("c1", "c2", "c3"))
+        self.assertEqual(lineage[0].root_evidence_id, lineage[-1].root_evidence_id)
+        self.assertEqual(ledger.lineage_for_claim("missing"), ())
         self.assertEqual(ledger.independent_evidence_count("person:7", "was_at:market"), 1)
         # A long relay chain contributes only the strongest confidence for its root.
         self.assertAlmostEqual(ledger.independent_evidence_strength("person:7", "was_at:market"), 0.9)
