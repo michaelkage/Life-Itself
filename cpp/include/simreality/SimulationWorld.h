@@ -44,6 +44,13 @@ struct BeliefRevisionExplanation {
     double confidence_delta{0.0};
 };
 
+// One current interpretation paired with only the revisions that explain that
+// same action account and event time. This is not a claim about objective truth.
+struct BeliefAccountExplanation {
+    NPCBelief current_belief{};
+    std::vector<BeliefRevisionExplanation> revisions{};
+};
+
 // Portable coordinator for deterministic, simulation-time-driven world updates.
 // Unreal-facing code should consume snapshots/reports rather than enter this core.
 class SimulationWorld {
@@ -77,6 +84,11 @@ public:
         const EntityId& npc_id, const EntityId& target_id = {}) const;
     // Return every interpretation for one event, including incompatible accounts.
     [[nodiscard]] std::vector<NPCBelief> beliefs_about_event(
+        const EntityId& npc_id, const EntityId& target_id,
+        SimulationHour event_timestamp_hour) const;
+    // Combines current accounts with revision history matching the exact target,
+    // action interpretation, and event timestamp; accounts without revisions remain.
+    [[nodiscard]] std::vector<BeliefAccountExplanation> belief_account_explanations_for(
         const EntityId& npc_id, const EntityId& target_id,
         SimulationHour event_timestamp_hour) const;
 
