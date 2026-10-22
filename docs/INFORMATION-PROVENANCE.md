@@ -47,11 +47,11 @@ This is an engine-independent provenance primitive, not a complete media or beli
 - Decide whether a proposition is objectively true
 - Automatically update NPC beliefs
 - Model news organizations, private channels, access control, or publication incentives
-- Persist the ledger in world snapshots
+- Automatically update NPC beliefs from claims
 - Replace the existing gossip/rumour implementation
 - Guarantee that two differently named root IDs truly represent independent evidence; evidence identity must be assigned by the event/evidence creation layer
 
-These are deliberate boundaries. Integration should come after the primitive's semantics and tests are stable.
+The ledger is now owned by `SimulationWorld` and included in version 11 C++ snapshots. Older versions 5–10 remain readable and restore with an empty ledger. Automatic NPC-belief and gossip integration remains a separate step.
 
 ## Tests
 
