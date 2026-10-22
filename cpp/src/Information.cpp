@@ -95,6 +95,23 @@ std::vector<InformationClaim> InformationLedger::lineage_for_claim(
     return lineage;
 }
 
+std::vector<InformationClaim> InformationLedger::claims_received_by(
+    const std::string& recipient_entity_id) const {
+    std::vector<InformationClaim> received;
+    if (recipient_entity_id.empty()) return received;
+    for (const auto& [id, claim] : claims_) {
+        (void)id;
+        if (claim.recipient_entity_id == recipient_entity_id) received.push_back(claim);
+    }
+    std::sort(received.begin(), received.end(),
+        [](const InformationClaim& left, const InformationClaim& right) {
+            if (left.created_tick != right.created_tick)
+                return left.created_tick < right.created_tick;
+            return left.claim_id < right.claim_id;
+        });
+    return received;
+}
+
 std::size_t InformationLedger::independent_evidence_count(
     const std::string& subject_key,
     const std::string& proposition_key) const {
