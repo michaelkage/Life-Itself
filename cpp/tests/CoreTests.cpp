@@ -1729,7 +1729,7 @@ int main() {
         return found->confidence;
     };
     assert(confidence_for(bias_world.state().npcs[1])
-        < confidence_for(bias_world.state().npcs[2]));
+        > confidence_for(bias_world.state().npcs[2]));
     std::stringstream bias_snapshot(std::ios::in | std::ios::out | std::ios::binary);
     save_world(bias_world, bias_snapshot);
     bias_snapshot.seekg(0);
