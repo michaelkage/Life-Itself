@@ -1930,6 +1930,70 @@ int main() {
     assert(witnessed_information_world.information_ledger().independent_evidence_count(
         "observed-actor", std::to_string(static_cast<unsigned int>(ActionTag::CrimeTheft))) == 1U);
 
+    // Independent witnesses can revise an existing second-hand belief,
+    // while skepticism changes how strongly the listener accepts each account.
+    const auto belief_revision_result = [](double skepticism) {
+        WorldState revision_state;
+        NPC revision_actor;
+        revision_actor.entity_id = "revision-actor";
+        revision_actor.district_id = "revision-district";
+        NPC first_witness;
+        first_witness.entity_id = "revision-witness-a";
+        first_witness.district_id = "revision-district";
+        NPC second_witness;
+        second_witness.entity_id = "revision-witness-b";
+        second_witness.district_id = "revision-district";
+        NPC revision_listener;
+        revision_listener.entity_id = "revision-listener";
+        revision_listener.district_id = "revision-district";
+        revision_listener.skepticism = skepticism;
+        revision_state.npcs = {revision_actor, first_witness, second_witness, revision_listener};
+        SimulationWorld revision_world(revision_state, 4.0, 2027U);
+
+        assert(revision_world.record_witnessed_action(
+            "revision-actor", ActionTag::CrimeTheft, Description{},
+            {"revision-witness-a"}) == 1U);
+        (void)revision_world.talk("revision-listener", "revision-witness-a");
+        const auto find_revision_belief = [&revision_world]() -> const NPCBelief& {
+            const auto found = std::find_if(
+                revision_world.state().npcs[3].beliefs.begin(),
+                revision_world.state().npcs[3].beliefs.end(),
+                [](const NPCBelief& belief) {
+                    return belief.target_entity_id == "revision-actor"
+                        && belief.action_tag == ActionTag::CrimeTheft
+                        && belief.timestamp_hour == 4.0;
+                });
+            assert(found != revision_world.state().npcs[3].beliefs.end());
+            return *found;
+        };
+        const double first_confidence = find_revision_belief().confidence;
+        const std::uint32_t first_corroborations = find_revision_belief().corroborations;
+
+        // A second event at the same simulation hour has a distinct root ID;
+        // it is independent evidence, not another relay of the first event.
+        assert(revision_world.record_witnessed_action(
+            "revision-actor", ActionTag::CrimeTheft, Description{},
+            {"revision-witness-b"}) == 1U);
+        (void)revision_world.talk("revision-listener", "revision-witness-b");
+        const double revised_confidence = find_revision_belief().confidence;
+        const std::uint32_t revised_corroborations = find_revision_belief().corroborations;
+        const std::size_t independent_roots =
+            revision_world.information_ledger().independent_evidence_count(
+                "revision-actor",
+                std::to_string(static_cast<unsigned int>(ActionTag::CrimeTheft)));
+        return std::tuple<double, double, std::uint32_t, std::uint32_t, std::size_t>{
+            first_confidence, revised_confidence, first_corroborations,
+            revised_corroborations, independent_roots};
+    };
+    const auto open_revision = belief_revision_result(0.0);
+    const auto skeptical_revision = belief_revision_result(1.0);
+    assert(std::get<1>(open_revision) > std::get<0>(open_revision));
+    assert(std::get<3>(open_revision) == std::get<2>(open_revision) + 1U);
+    assert(std::get<4>(open_revision) == 2U);
+    assert(std::get<1>(skeptical_revision) > std::get<0>(skeptical_revision));
+    assert(std::get<1>(open_revision) - std::get<0>(open_revision)
+        > std::get<1>(skeptical_revision) - std::get<0>(skeptical_revision));
+
     // Information claim lineage is part of the saved world and remains stable
     // across save/resume, including deterministic serialized bytes.
     WorldState information_state;
