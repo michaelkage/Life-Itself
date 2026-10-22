@@ -660,10 +660,22 @@ Conversation SimulationWorld::talk(
             (void)claim_id;
             if (claim.recipient_entity_id != speaker_id
                 || claim.subject_key != rumour.target_entity_id
-                || claim.proposition_key != proposition_key
-                || claim.created_tick != source_tick) continue;
-            if (parent_claim == nullptr || claim.claim_id < parent_claim->claim_id)
+                || claim.proposition_key != proposition_key) continue;
+
+            // A relayed claim's own tick is the time it was passed on, while
+            // the rumour keeps the original event time. Compare the root tick
+            // so provenance can survive multiple conversations.
+            const InformationClaim* root = &claim;
+            while (!root->parent_claim_id.empty()) {
+                root = information_.find(root->parent_claim_id);
+                if (root == nullptr) break;
+            }
+            if (root == nullptr || root->created_tick != source_tick) continue;
+            if (parent_claim == nullptr || claim.hop_count > parent_claim->hop_count
+                || (claim.hop_count == parent_claim->hop_count
+                    && claim.claim_id < parent_claim->claim_id)) {
                 parent_claim = &claim;
+            }
         }
         if (parent_claim != nullptr) {
             const auto relay_tick = static_cast<std::int64_t>(
