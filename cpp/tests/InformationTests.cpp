@@ -49,6 +49,8 @@ int main() {
     assert(ledger.record(second).accepted);
     assert(ledger.independent_evidence_count("bridge-7", "bridge-unsafe") == 2);
     assert(std::abs(ledger.independent_evidence_strength("bridge-7", "bridge-unsafe") - 0.995) < 1e-12);
+    assert(std::abs(ledger.independent_evidence_strength_for_recipient("bridge-7", "bridge-unsafe", "listener") - 0.9) < 1e-12);
+    assert(ledger.independent_evidence_strength_for_recipient("bridge-7", "bridge-unsafe", "uninformed") == 0.0);
 
     // Invalid or ambiguous lineage is rejected without mutating the ledger.
     const std::size_t before_invalid = ledger.size();
