@@ -52,6 +52,10 @@ public:
         double transmission_fidelity);
 
     [[nodiscard]] const InformationClaim* find(const std::string& claim_id) const noexcept;
+    // Returns the complete source-to-recipient chain, oldest claim first.
+    // Missing claims return an empty chain; stored claims are append-only.
+    [[nodiscard]] std::vector<InformationClaim> lineage_for_claim(
+        const std::string& claim_id) const;
     [[nodiscard]] std::size_t independent_evidence_count(
         const std::string& subject_key,
         const std::string& proposition_key) const;
