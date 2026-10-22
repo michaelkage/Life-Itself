@@ -616,6 +616,18 @@ int main() {
     assert(aid_listener_after_conflict.beliefs[0].action_tag == ActionTag::SocialAid);
     assert(aid_listener_after_conflict.beliefs[0].confidence < aid_confidence_before_contradiction);
     assert(aid_listener_after_conflict.beliefs[0].contradictions == 1U);
+    assert(aid_listener_after_conflict.belief_revision_history.size() == 1U);
+    const BeliefRevision& contradiction_revision =
+        aid_listener_after_conflict.belief_revision_history.front();
+    assert(contradiction_revision.target_entity_id == "aid-donor");
+    assert(contradiction_revision.action_tag == ActionTag::SocialAid);
+    assert(contradiction_revision.event_timestamp_hour == aid_story_world.total_hours());
+    assert(contradiction_revision.previous_confidence == aid_confidence_before_contradiction);
+    assert(contradiction_revision.revised_confidence
+        == aid_listener_after_conflict.beliefs[0].confidence);
+    assert(contradiction_revision.reason == BeliefRevisionReason::Contradiction);
+    assert(contradiction_revision.source_entity_id == "aid-contradictor");
+    assert(contradiction_revision.recorded_hour == aid_story_world.total_hours());
     assert(aid_listener_after_conflict.beliefs[1].action_tag == ActionTag::CrimeTheft);
     assert(aid_listener_after_conflict.beliefs[1].contradictions == 1U);
     assert(aid_story_world.community_reputation("aid-donor", "aid-story-district") < 0.0);
