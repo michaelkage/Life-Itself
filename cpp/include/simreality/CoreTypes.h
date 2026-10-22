@@ -89,6 +89,12 @@ struct BeliefRevision {
     BeliefRevisionReason reason{BeliefRevisionReason::IndependentEvidence};
     EntityId source_entity_id{};
     SimulationHour recorded_hour{0.0};
+    // Captured interpretation factors explain a revision without claiming truth.
+    double source_reliability{0.5};
+    double loyalty_factor{1.0};
+    double compassion_factor{1.0};
+    double skepticism_factor{1.0};
+    double evidence_factor{1.0};
 };
 
 struct NPC {
