@@ -20,6 +20,7 @@
 
 #include <cassert>
 #include <cmath>
+#include <limits>
 #include <sstream>
 #include <stdexcept>
 #include <utility>
@@ -463,6 +464,57 @@ int main() {
     assert(belief_listener.beliefs[1].action_tag == ActionTag::CrimeAssault);
     assert(belief_listener.beliefs[1].contradictions == 1U);
     assert(belief_listener.personal_stress > 0.0);
+    // The community reputation is an aggregate of saved beliefs, not an objective
+    // crime flag; contradictory reports temper the weight of each account.
+    assert(world.community_reputation("player", "D1") < 0.0);
+    // A poor personal relationship plus negative community standing should block support.
+    world.state().npcs[1].relationships["player"] = -0.75;
+    assert(world.cooperation_score("listener", "player") < 0.0);
+    // Ghost stories must not dilute civic reputation for witnessed real-world actions.
+    WorldState reputation_probe_state;
+    NPC reputation_observer;
+    reputation_observer.entity_id = "reputation-observer";
+    reputation_observer.district_id = "D1";
+    reputation_observer.beliefs.push_back(NPCBelief{
+        "target", ActionTag::CrimeTheft, 12.0, 1.0, "reputation-observer", true, 1U, 0U});
+    reputation_observer.beliefs.push_back(NPCBelief{
+        "target", ActionTag::GhostSound, 12.0, 1.0, "storyteller", false, 1U, 0U});
+    reputation_probe_state.npcs.push_back(reputation_observer);
+    SimulationWorld reputation_probe(std::move(reputation_probe_state));
+    assert(std::abs(reputation_probe.community_reputation("target", "D1") + 0.7) < 1e-9);
+    const double listener_money_before_refusal = world.state().npcs[1].money;
+    const double player_money_before_refusal = world.state().npcs[2].money;
+    // Invalid transfer amounts must be rejected without changing either balance.
+    assert(!world.offer_support("listener", "player", 0.0));
+    assert(!world.offer_support("listener", "player", -5.0));
+    assert(!world.offer_support("listener", "player", std::numeric_limits<double>::quiet_NaN()));
+    assert(!world.offer_support("listener", "player", std::numeric_limits<double>::infinity()));
+    assert(world.state().npcs[1].money == listener_money_before_refusal);
+    assert(world.state().npcs[2].money == player_money_before_refusal);
+    assert(!world.offer_support("listener", "player", 5.0));
+    assert(world.state().npcs[1].money == listener_money_before_refusal);
+    assert(world.state().npcs[2].money == player_money_before_refusal);
+    // Save/resume preserves the beliefs and relationship state that decide
+    // whether the same support offer is accepted.
+    std::stringstream social_snapshot(std::ios::in | std::ios::out | std::ios::binary);
+    save_world(world, social_snapshot);
+    social_snapshot.seekg(0);
+    SimulationWorld social_resumed = load_world(social_snapshot);
+    world.state().npcs[1].relationships["player"] = 0.9;
+    social_resumed.state().npcs[1].relationships["player"] = 0.9;
+    const double player_money_before_help = world.state().npcs[2].money;
+    assert(world.offer_support("listener", "player", 5.0));
+    assert(social_resumed.offer_support("listener", "player", 5.0));
+    assert(world.state().npcs[1].money == listener_money_before_refusal - 5.0);
+    assert(world.state().npcs[2].money == player_money_before_help + 5.0);
+    assert(world.state().npcs[0].money == social_resumed.state().npcs[0].money);
+    assert(world.state().npcs[1].money == social_resumed.state().npcs[1].money);
+    assert(world.state().npcs[1].relationships == social_resumed.state().npcs[1].relationships);
+    std::stringstream social_bytes_a(std::ios::in | std::ios::out | std::ios::binary);
+    std::stringstream social_bytes_b(std::ios::in | std::ios::out | std::ios::binary);
+    save_world(world, social_bytes_a);
+    save_world(social_resumed, social_bytes_b);
+    assert(social_bytes_a.str() == social_bytes_b.str());
     assert(std::abs(world.state().npcs[0].relationships.at("listener") - 0.755) < 1e-9);
     assert(std::abs(world.state().npcs[1].relationships.at("speaker") - 0.755) < 1e-9);
     CriminalFile world_file = world.build_criminal_file("player");

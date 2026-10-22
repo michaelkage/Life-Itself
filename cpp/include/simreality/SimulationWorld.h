@@ -72,6 +72,16 @@ public:
     // district. The resulting conversation mutates the listener's memory state.
     [[nodiscard]] Conversation talk(const EntityId& listener_id, const EntityId& speaker_id);
 
+    // Reputation is derived from the district's saved beliefs, not treated as
+    // objective truth. Cooperation and resource-sharing use that standing plus
+    // the donor's personal relationship with the recipient.
+    [[nodiscard]] double community_reputation(
+        const EntityId& target_id, const DistrictId& district_id) const;
+    [[nodiscard]] double cooperation_score(
+        const EntityId& from_id, const EntityId& to_id) const;
+    [[nodiscard]] bool offer_support(
+        const EntityId& from_id, const EntityId& to_id, double amount);
+
     // Records one observed action in the witnesses' local memories and applies
     // personal stress to witnesses and, when supplied, the victim.
     [[nodiscard]] std::size_t record_witnessed_action(
