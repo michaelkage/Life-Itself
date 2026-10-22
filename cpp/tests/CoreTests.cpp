@@ -1851,5 +1851,38 @@ int main() {
     }
     assert(rejected_unknown_consequence);
 
+
+    // Information claim lineage is part of the saved world and remains stable
+    // across save/resume, including deterministic serialized bytes.
+    WorldState information_state;
+    SimulationWorld information_world(information_state, 0.0, 2026U);
+    InformationClaim observed_claim;
+    observed_claim.claim_id = "claim-observed";
+    observed_claim.subject_key = "bridge-7";
+    observed_claim.proposition_key = "bridge-unsafe";
+    observed_claim.root_evidence_id = "inspection-42";
+    observed_claim.source_entity_id = "inspector";
+    observed_claim.recipient_entity_id = "resident-a";
+    observed_claim.created_tick = 3;
+    observed_claim.confidence = 0.95;
+    observed_claim.kind = InformationKind::Observation;
+    assert(information_world.information_ledger().record(observed_claim).accepted);
+    assert(information_world.information_ledger().relay(
+        "claim-observed", "claim-relayed", "resident-a", "resident-b", 4, 0.8).accepted);
+    std::stringstream information_snapshot(std::ios::in | std::ios::out | std::ios::binary);
+    save_world(information_world, information_snapshot);
+    information_snapshot.seekg(0);
+    SimulationWorld information_restored = load_world(information_snapshot);
+    assert(information_restored.information_ledger().size() == 2U);
+    assert(information_restored.information_ledger().find("claim-relayed") != nullptr);
+    assert(information_restored.information_ledger().find("claim-relayed")->hop_count == 1U);
+    assert(information_restored.information_ledger().independent_evidence_count(
+        "bridge-7", "bridge-unsafe") == 1U);
+    std::stringstream information_bytes_a(std::ios::in | std::ios::out | std::ios::binary);
+    std::stringstream information_bytes_b(std::ios::in | std::ios::out | std::ios::binary);
+    save_world(information_world, information_bytes_a);
+    save_world(information_restored, information_bytes_b);
+    assert(information_bytes_a.str() == information_bytes_b.str());
+
     return 0;
 }
