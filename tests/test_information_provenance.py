@@ -55,11 +55,11 @@ class InformationProvenanceTests(unittest.TestCase):
             claim_id="earlier-z", created_tick=10, recipient_entity_id="witness-c"
         )).accepted)
         self.assertTrue(ledger.record(root_claim(
-            claim_id="earlier-a", created_tick=10, recipient_entity_id="witness-c"
-        ).__class__(
-            **{**root_claim(claim_id="earlier-a", created_tick=10, recipient_entity_id="witness-c").__dict__,
-               "root_evidence_id": "evidence:camera-2",
-               "source_entity_id": "witness-x"}
+            claim_id="earlier-a",
+            created_tick=10,
+            recipient_entity_id="witness-c",
+            root_evidence_id="evidence:camera-2",
+            source_entity_id="witness-x",
         )).accepted)
         received = ledger.claims_received_by("witness-c")
         self.assertEqual(tuple(claim.claim_id for claim in received), ("earlier-a", "earlier-z"))
