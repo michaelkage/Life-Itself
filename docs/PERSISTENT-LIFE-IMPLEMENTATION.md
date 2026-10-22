@@ -50,7 +50,7 @@ CI for this branch is the verification authority; report only the checks that ha
 
 - NPCs persist separate fairness, safety, freedom, and self-interest priorities alongside compassion and loyalty.
 - `evaluate_moral_choice` scores scenario options using urgency, people helped, fairness, safety, freedom, loyalty, and personal cost. Scenario features and values are bounded to `[0, 1]`; out-of-range inputs are clamped for evaluation.
-- The evaluator is deterministic and side-effect-free. It does not mark an option objectively good or bad, mutate the world, or consume randomness; it returns a comparable score for each option so callers can present trade-offs or select a preferred option.
+- The evaluator is deterministic and side-effect-free. It does not mark an option objectively good or bad, mutate the world, or consume randomness; it returns a comparable score for each option so callers can present trade-offs or select a preferred option. `choose_moral_option` selects the highest score, breaks ties by stable input order, and rejects empty option lists.
 - World format v10 writes the additional value priorities; legacy v5-v9 snapshots retain neutral defaults for fields they do not contain.
 
 ## Personality-driven ghost interpretation
