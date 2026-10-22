@@ -687,6 +687,11 @@ Conversation SimulationWorld::talk(
                 listener_id, std::max(source_tick, relay_tick), fidelity);
         }
 
+        // A belief update may use only provenance that reached this listener.
+        // Claims elsewhere in the world are intentionally invisible to this NPC.
+        const double received_evidence_strength =
+            information_.independent_evidence_strength_for_recipient(
+                rumour.target_entity_id, proposition_key, listener_id);
         double source_reliability = 0.5;
         if (!speaker.beliefs.empty()) {
             double total = 0.0;
@@ -715,10 +720,17 @@ Conversation SimulationWorld::talk(
                 * account_valence;
         const double skepticism_factor = 1.0
             - 0.40 * (std::clamp(listener.skepticism, 0.0, 1.0) - 0.5);
-        const double account_confidence = std::clamp(
+        const double personality_confidence = std::clamp(
             rumour.retention * (0.55 + 0.25 * std::clamp(prior_trust, -1.0, 1.0)
                 + 0.20 * source_reliability) * loyalty_factor * compassion_factor
                 * skepticism_factor, 0.0, 1.0);
+        // Provenance is a modest evidence-quality adjustment, not a truth oracle.
+        // With no ledger claim, retain the legacy subjective calculation. Once a
+        // claim is known, stronger recipient-visible evidence can modestly reinforce it.
+        const double evidence_factor = received_evidence_strength > 0.0
+            ? 0.75 + 0.25 * received_evidence_strength : 1.0;
+        const double account_confidence = std::clamp(
+            personality_confidence * evidence_factor, 0.0, 1.0);
         auto belief = std::find_if(listener.beliefs.begin(), listener.beliefs.end(),
             [&rumour, &believed_action](const NPCBelief& candidate) {
                 return candidate.target_entity_id == rumour.target_entity_id
