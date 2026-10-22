@@ -24,6 +24,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <utility>
+#include <tuple>
 
 int main() {
     using namespace simreality;
