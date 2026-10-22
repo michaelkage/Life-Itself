@@ -1,5 +1,6 @@
 #include "simreality/WorldPersistence.h"
 
+#include <algorithm>
 #include <array>
 #include <bit>
 #include <cmath>
@@ -10,6 +11,7 @@
 #include <stdexcept>
 #include <string>
 #include <utility>
+#include <vector>
 
 namespace simreality {
 namespace {
@@ -619,6 +621,67 @@ void read_life_state(std::istream& in, LifeCoordinator& life, std::uint32_t vers
         windows.push_back(std::move(window));
     }
     life.restore_snapshot(std::move(characters), std::move(obligations), std::move(windows));
+}
+
+void write_information_claim(std::ostream& out, const InformationClaim& claim) {
+    write_string(out, claim.claim_id);
+    write_string(out, claim.subject_key);
+    write_string(out, claim.proposition_key);
+    write_string(out, claim.root_evidence_id);
+    write_string(out, claim.parent_claim_id);
+    write_string(out, claim.source_entity_id);
+    write_string(out, claim.recipient_entity_id);
+    write_u64(out, static_cast<std::uint64_t>(claim.created_tick));
+    write_double(out, claim.confidence);
+    write_u32(out, claim.hop_count);
+    write_u8(out, static_cast<std::uint8_t>(claim.kind));
+}
+
+InformationClaim read_information_claim(std::istream& in) {
+    InformationClaim claim;
+    claim.claim_id = read_string(in);
+    claim.subject_key = read_string(in);
+    claim.proposition_key = read_string(in);
+    claim.root_evidence_id = read_string(in);
+    claim.parent_claim_id = read_string(in);
+    claim.source_entity_id = read_string(in);
+    claim.recipient_entity_id = read_string(in);
+    const std::uint64_t tick = read_u64(in);
+    if (tick > static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max()))
+        throw std::runtime_error("information claim tick exceeds supported range");
+    claim.created_tick = static_cast<std::int64_t>(tick);
+    claim.confidence = read_double(in);
+    claim.hop_count = read_u32(in);
+    claim.kind = read_enum<InformationKind>(in, 3U, "information kind");
+    return claim;
+}
+
+void write_information_ledger(std::ostream& out, const InformationLedger& ledger) {
+    std::vector<InformationClaim> ordered;
+    ordered.reserve(ledger.size());
+    for (const auto& [id, claim] : ledger.claims()) {
+        (void)id;
+        ordered.push_back(claim);
+    }
+    // Parents have smaller hop counts than descendants. Stable sorting restores
+    // claims in parent-first order and keeps snapshot bytes deterministic.
+    std::sort(ordered.begin(), ordered.end(),
+        [](const InformationClaim& left, const InformationClaim& right) {
+            if (left.hop_count != right.hop_count) return left.hop_count < right.hop_count;
+            return left.claim_id < right.claim_id;
+        });
+    write_count(out, ordered.size());
+    for (const InformationClaim& claim : ordered) write_information_claim(out, claim);
+}
+
+void read_information_ledger(std::istream& in, InformationLedger& ledger) {
+    const std::uint32_t count = read_count(in);
+    for (std::uint32_t i = 0; i < count; ++i) {
+        const InformationClaim claim = read_information_claim(in);
+        const ClaimResult result = ledger.record(claim);
+        if (!result.accepted)
+            throw std::runtime_error("invalid information ledger snapshot claim: " + result.error);
+    }
 }
 
 } // namespace
