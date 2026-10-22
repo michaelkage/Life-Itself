@@ -1852,6 +1852,27 @@ int main() {
     assert(rejected_unknown_consequence);
 
 
+    // Direct witness observations enter the world-owned provenance ledger.
+    WorldState witnessed_information_state;
+    NPC witnessed_actor;
+    witnessed_actor.entity_id = "observed-actor";
+    witnessed_actor.district_id = "observed-district";
+    NPC witnessed_observer;
+    witnessed_observer.entity_id = "observing-npc";
+    witnessed_observer.district_id = "observed-district";
+    witnessed_information_state.npcs = {witnessed_actor, witnessed_observer};
+    SimulationWorld witnessed_information_world(witnessed_information_state, 2.0, 2025U);
+    assert(witnessed_information_world.record_witnessed_action(
+        "observed-actor", ActionTag::CrimeTheft, Description{},
+        {"observing-npc"}) == 1U);
+    assert(witnessed_information_world.information_ledger().size() == 1U);
+    const InformationClaim* witness_claim = witnessed_information_world.information_ledger().find(
+        "observation:event-1:observing-npc");
+    assert(witness_claim != nullptr);
+    assert(witness_claim->subject_key == "observed-actor");
+    assert(witness_claim->recipient_entity_id == "observing-npc");
+    assert(witness_claim->kind == InformationKind::Observation);
+
     // Information claim lineage is part of the saved world and remains stable
     // across save/resume, including deterministic serialized bytes.
     WorldState information_state;
