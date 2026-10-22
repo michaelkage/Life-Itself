@@ -55,6 +55,32 @@ std::vector<BeliefRevisionExplanation> SimulationWorld::belief_explanations_for(
     return explanations;
 }
 
+std::vector<NPCBelief> SimulationWorld::beliefs_about_event(
+    const EntityId& npc_id, const EntityId& target_id,
+    SimulationHour event_timestamp_hour) const {
+    if (target_id.empty() || !std::isfinite(event_timestamp_hour)) return {};
+    const auto npc = std::find_if(
+        state_.npcs.begin(), state_.npcs.end(),
+        [&npc_id](const NPC& candidate) { return candidate.entity_id == npc_id; });
+    if (npc == state_.npcs.end()) return {};
+
+    std::vector<NPCBelief> accounts;
+    for (const NPCBelief& belief : npc->beliefs) {
+        if (belief.target_entity_id == target_id
+            && belief.timestamp_hour == event_timestamp_hour) {
+            accounts.push_back(belief);
+        }
+    }
+    // Canonical ordering is for deterministic display only, not a truth ranking.
+    std::stable_sort(accounts.begin(), accounts.end(),
+        [](const NPCBelief& left, const NPCBelief& right) {
+            if (left.action_tag != right.action_tag)
+                return left.action_tag < right.action_tag;
+            return left.source_entity_id < right.source_entity_id;
+        });
+    return accounts;
+}
+
 GhostInfluenceResult SimulationWorld::attempt_ghost_influence(
     const EntityId& ghost_id, const EntityId& npc_id,
     const std::string& action, double hour_of_day) {
