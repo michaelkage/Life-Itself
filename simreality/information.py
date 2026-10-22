@@ -141,6 +141,16 @@ class InformationLedger:
         lineage.reverse()
         return tuple(lineage)
 
+    def claims_received_by(self, recipient_entity_id: str) -> tuple[InformationClaim, ...]:
+        """Return only claims delivered to one recipient in deterministic order."""
+        if not recipient_entity_id:
+            return ()
+        received = (
+            claim for claim in self._claims.values()
+            if claim.recipient_entity_id == recipient_entity_id
+        )
+        return tuple(sorted(received, key=lambda claim: (claim.created_tick, claim.claim_id)))
+
     def independent_evidence_count(self, subject_key: str, proposition_key: str) -> int:
         return len({
             claim.root_evidence_id
