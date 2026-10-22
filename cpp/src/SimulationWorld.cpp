@@ -656,9 +656,30 @@ Conversation SimulationWorld::talk(
             }
             source_reliability = total / static_cast<double>(speaker.beliefs.size());
         }
+        // Personality affects interpretation, not the underlying event record.
+        // Neutral traits (0.5) preserve the pre-bias calculation exactly.
+        const auto relationship_it = listener.relationships.find(rumour.target_entity_id);
+        const double target_tie = relationship_it == listener.relationships.end()
+            ? 0.0 : std::clamp(relationship_it->second, -1.0, 1.0);
+        const bool prosocial_account = believed_action == ActionTag::SocialAid
+            || believed_action == ActionTag::InteractionPolite;
+        const bool harmful_account = believed_action == ActionTag::CrimeTheft
+            || believed_action == ActionTag::CrimeAssault
+            || believed_action == ActionTag::CrimeArmedAssault
+            || believed_action == ActionTag::CrimeVandalism;
+        const double account_valence = prosocial_account ? 1.0 : (harmful_account ? -1.0 : 0.0);
+        const double loyalty_factor = 1.0
+            + 0.30 * (std::clamp(listener.loyalty_bias, 0.0, 1.0) - 0.5)
+                * target_tie * account_valence;
+        const double compassion_factor = 1.0
+            + 0.20 * (std::clamp(listener.compassion, 0.0, 1.0) - 0.5)
+                * account_valence;
+        const double skepticism_factor = 1.0
+            - 0.40 * (std::clamp(listener.skepticism, 0.0, 1.0) - 0.5);
         const double account_confidence = std::clamp(
             rumour.retention * (0.55 + 0.25 * std::clamp(prior_trust, -1.0, 1.0)
-                + 0.20 * source_reliability), 0.0, 1.0);
+                + 0.20 * source_reliability) * loyalty_factor * compassion_factor
+                * skepticism_factor, 0.0, 1.0);
         auto belief = std::find_if(listener.beliefs.begin(), listener.beliefs.end(),
             [&rumour, &believed_action](const NPCBelief& candidate) {
                 return candidate.target_entity_id == rumour.target_entity_id
