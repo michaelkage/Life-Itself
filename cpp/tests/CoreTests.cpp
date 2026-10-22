@@ -1873,6 +1873,36 @@ int main() {
     assert(witness_claim->recipient_entity_id == "observing-npc");
     assert(witness_claim->kind == InformationKind::Observation);
 
+    NPC conversation_listener;
+    conversation_listener.entity_id = "listening-npc";
+    conversation_listener.district_id = "observed-district";
+    witnessed_information_world.state().npcs.push_back(conversation_listener);
+    const Conversation first_conversation = witnessed_information_world.talk(
+        "listening-npc", "observing-npc");
+    assert(first_conversation.transferred.size() == 1U);
+    assert(witnessed_information_world.information_ledger().size() == 2U);
+    const InformationClaim* first_relay = witnessed_information_world.information_ledger().find(
+        "relay:observation:event-1:observing-npc:listening-npc:2000");
+    assert(first_relay != nullptr);
+    assert(first_relay->root_evidence_id == witness_claim->root_evidence_id);
+    assert(first_relay->hop_count == 1U);
+
+    NPC next_listener;
+    next_listener.entity_id = "third-npc";
+    next_listener.district_id = "observed-district";
+    witnessed_information_world.state().npcs.push_back(next_listener);
+    const Conversation second_conversation = witnessed_information_world.talk(
+        "third-npc", "listening-npc");
+    assert(second_conversation.transferred.size() == 1U);
+    assert(witnessed_information_world.information_ledger().size() == 3U);
+    const InformationClaim* second_relay = witnessed_information_world.information_ledger().find(
+        "relay:relay:observation:event-1:observing-npc:listening-npc:2000:third-npc:2000");
+    assert(second_relay != nullptr);
+    assert(second_relay->root_evidence_id == witness_claim->root_evidence_id);
+    assert(second_relay->hop_count == 2U);
+    assert(witnessed_information_world.information_ledger().independent_evidence_count(
+        "observed-actor", std::to_string(static_cast<unsigned int>(ActionTag::CrimeTheft))) == 1U);
+
     // Information claim lineage is part of the saved world and remains stable
     // across save/resume, including deterministic serialized bytes.
     WorldState information_state;
