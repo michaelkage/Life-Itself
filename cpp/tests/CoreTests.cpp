@@ -634,6 +634,12 @@ int main() {
     assert(contradiction_revision.compassion_factor >= 0.0);
     assert(contradiction_revision.skepticism_factor >= 0.0);
     assert(contradiction_revision.evidence_factor >= 0.0);
+    assert(contradiction_revision.source_reliability >= 0.0
+        && contradiction_revision.source_reliability <= 1.0);
+    assert(contradiction_revision.loyalty_factor >= 0.0);
+    assert(contradiction_revision.compassion_factor >= 0.0);
+    assert(contradiction_revision.skepticism_factor >= 0.0);
+    assert(contradiction_revision.evidence_factor >= 0.0);
     assert(aid_listener_after_conflict.beliefs[1].action_tag == ActionTag::CrimeTheft);
     assert(aid_listener_after_conflict.beliefs[1].contradictions == 1U);
     assert(aid_story_world.community_reputation("aid-donor", "aid-story-district") < 0.0);
@@ -2100,6 +2106,11 @@ int main() {
     assert(restored_revision.previous_confidence == 0.4);
     assert(restored_revision.revised_confidence == 0.7);
     assert(restored_revision.source_entity_id == "history-source");
+    assert(restored_revision.source_reliability == 0.8);
+    assert(restored_revision.loyalty_factor == 1.1);
+    assert(restored_revision.compassion_factor == 0.95);
+    assert(restored_revision.skepticism_factor == 0.8);
+    assert(restored_revision.evidence_factor == 0.9);
     assert(restored_revision.source_reliability == 0.8);
     assert(restored_revision.loyalty_factor == 1.1);
     assert(restored_revision.compassion_factor == 0.95);
