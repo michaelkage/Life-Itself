@@ -800,7 +800,9 @@ Conversation SimulationWorld::talk(
                 source_tie = std::clamp(source_tie - 0.015, -1.0, 1.0);
             }
         }
-        if (!rumour.target_entity_id.empty() && rumour.target_entity_id != listener_id) {
+        // Do not reapply social consequences for an account already known through the same source or evidence lineage.
+        if (!repeated_source_report && !repeated_evidence_lineage
+            && !rumour.target_entity_id.empty() && rumour.target_entity_id != listener_id) {
             double& target_tie = listener.relationships[rumour.target_entity_id];
             const double evidence = std::clamp(account_confidence, 0.0, 1.0);
             if (believed_action == ActionTag::CrimeTheft || believed_action == ActionTag::CrimeVandalism
