@@ -828,6 +828,7 @@ std::size_t SimulationWorld::record_witnessed_action(
     const EntityId& actor_id, ActionTag action_tag, Description description,
     const std::vector<EntityId>& witness_ids, const EntityId& victim_id) {
     const NPC& actor = find_npc(actor_id);
+    const std::string event_id = "event-" + std::to_string(state_.ongoing_events.size() + 1U);
     std::vector<NPC*> witnesses;
     std::vector<EntityId> processed;
     processed.reserve(witness_ids.size());
@@ -866,6 +867,17 @@ std::size_t SimulationWorld::record_witnessed_action(
         memory.action_tag = action_tag;
         memory.description = description;
         witness->memories.push_back(memory);
+        InformationClaim claim;
+        claim.claim_id = "observation:" + event_id + ":" + witness->entity_id;
+        claim.subject_key = actor_id;
+        claim.proposition_key = std::to_string(static_cast<unsigned int>(action_tag));
+        claim.root_evidence_id = event_id;
+        claim.source_entity_id = witness->entity_id;
+        claim.recipient_entity_id = witness->entity_id;
+        claim.created_tick = static_cast<std::int64_t>(std::llround(runtime_.total_hours() * 1000.0));
+        claim.confidence = 1.0;
+        claim.kind = InformationKind::Observation;
+        (void)information_.record(claim);
         // A first-hand observation is strong counter-evidence to a different
         // account about the same target and event hour. Preserve both interpretations,
         // but weaken the conflicting hearsay and record that it was challenged.
@@ -900,7 +912,7 @@ std::size_t SimulationWorld::record_witnessed_action(
     }
 
     OngoingEvent event;
-    event.event_id = "event-" + std::to_string(state_.ongoing_events.size() + 1U);
+    event.event_id = event_id;
     event.district_id = actor.district_id;
     event.actor_id = actor_id;
     event.action_tag = action_tag;
