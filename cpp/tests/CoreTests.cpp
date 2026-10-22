@@ -2081,6 +2081,32 @@ int main() {
         0.8, 1.1, 0.95, 0.8, 0.9});
     information_state.npcs.push_back(revision_history_npc);
     SimulationWorld information_world(information_state, 0.0, 2026U);
+
+    // Belief history queries are read-only, target-filterable, and chronological.
+    WorldState history_query_state;
+    NPC history_query_npc;
+    history_query_npc.entity_id = "history-query-npc";
+    history_query_npc.belief_revision_history = {
+        BeliefRevision{"target-a", ActionTag::CrimeTheft, 8.0, 0.2, 0.4,
+            BeliefRevisionReason::Contradiction, "source-c", 9.0},
+        BeliefRevision{"target-b", ActionTag::SocialAid, 2.0, 0.1, 0.3,
+            BeliefRevisionReason::IndependentEvidence, "source-a", 3.0},
+        BeliefRevision{"target-a", ActionTag::CrimeTheft, 4.0, 0.4, 0.6,
+            BeliefRevisionReason::IndependentEvidence, "source-b", 5.0}
+    };
+    history_query_state.npcs.push_back(history_query_npc);
+    const SimulationWorld history_query_world(history_query_state, 0.0, 2027U);
+    const auto all_history = history_query_world.belief_history_for("history-query-npc");
+    assert(all_history.size() == 3U);
+    assert(all_history[0].recorded_hour == 3.0);
+    assert(all_history[1].recorded_hour == 5.0);
+    assert(all_history[2].recorded_hour == 9.0);
+    const auto target_history =
+        history_query_world.belief_history_for("history-query-npc", "target-a");
+    assert(target_history.size() == 2U);
+    assert(target_history[0].event_timestamp_hour == 4.0);
+    assert(target_history[1].event_timestamp_hour == 8.0);
+    assert(history_query_world.belief_history_for("missing-npc").empty());
     InformationClaim observed_claim;
     observed_claim.claim_id = "claim-observed";
     observed_claim.subject_key = "bridge-7";
