@@ -106,6 +106,11 @@ struct NPC {
     double loyalty_bias{0.5};
     double skepticism{0.5};
     double compassion{0.5};
+    // Stable value priorities used when comparing morally competing options.
+    double fairness_value{0.5};
+    double safety_value{0.5};
+    double freedom_value{0.5};
+    double self_interest_value{0.5};
 };
 
 struct District {
