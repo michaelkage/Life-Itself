@@ -101,6 +101,11 @@ struct NPC {
     // Durable interpretations are separate from raw memories: conflicting accounts
     // can coexist without silently rewriting what the NPC originally witnessed.
     std::vector<NPCBelief> beliefs{};
+    // Stable individual tendencies that bias ambiguous second-hand accounts.
+    // Values are normalized to [0, 1]; 0.5 is neutral.
+    double loyalty_bias{0.5};
+    double skepticism{0.5};
+    double compassion{0.5};
 };
 
 struct District {
