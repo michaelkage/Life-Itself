@@ -503,6 +503,11 @@ int main() {
     world.state().npcs[1].relationships["player"] = 0.9;
     social_resumed.state().npcs[1].relationships["player"] = 0.9;
     const double player_money_before_help = world.state().npcs[2].money;
+    // Give the recipient room for aid to produce a measurable stress/desperation change.
+    world.state().npcs[2].personal_stress = 0.5;
+    social_resumed.state().npcs[2].personal_stress = 0.5;
+    world.state().npcs[2].desperation_index = 0.5;
+    social_resumed.state().npcs[2].desperation_index = 0.5;
     const double stress_before_help = world.state().npcs[2].personal_stress;
     const double desperation_before_help = world.state().npcs[2].desperation_index;
     const std::size_t donor_memories_before_help = world.state().npcs[1].memories.size();
