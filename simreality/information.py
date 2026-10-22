@@ -127,6 +127,20 @@ class InformationLedger:
     def find(self, claim_id: str) -> InformationClaim | None:
         return self._claims.get(claim_id)
 
+    def lineage_for_claim(self, claim_id: str) -> tuple[InformationClaim, ...]:
+        """Return a claim's source-to-recipient chain, oldest claim first."""
+        lineage: list[InformationClaim] = []
+        current = self.find(claim_id)
+        while current is not None:
+            lineage.append(current)
+            if not current.parent_claim_id:
+                break
+            current = self.find(current.parent_claim_id)
+        if not lineage or lineage[-1].parent_claim_id:
+            return ()
+        lineage.reverse()
+        return tuple(lineage)
+
     def independent_evidence_count(self, subject_key: str, proposition_key: str) -> int:
         return len({
             claim.root_evidence_id
