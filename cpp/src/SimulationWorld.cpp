@@ -246,6 +246,21 @@ WorldAdvanceReport SimulationWorld::advance(
             continue;
         }
 
+        // Beliefs are durable interpretations, but even a strongly held account can
+        // soften over time. Direct observation and corroboration preserve confidence;
+        // unresolved contradictions make an account more fragile. This is deterministic
+        // state evolution and deliberately consumes no random samples.
+        for (NPC& npc : state_.npcs) {
+            for (NPCBelief& belief : npc.beliefs) {
+                double daily_decay = belief.directly_observed ? 0.006 : 0.008;
+                daily_decay -= static_cast<double>(std::min(belief.corroborations, 4U)) * 0.001;
+                daily_decay += static_cast<double>(std::min(belief.contradictions, 4U)) * 0.001;
+                daily_decay = std::clamp(daily_decay, 0.002, 0.012);
+                belief.confidence = std::clamp(
+                    belief.confidence * (1.0 - daily_decay), 0.0, 1.0);
+            }
+        }
+
         for (const NPC& npc : state_.npcs) {
             if (!life_.characters().contains(npc.entity_id)) life_.register_character(npc.entity_id);
         }

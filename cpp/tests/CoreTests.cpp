@@ -1542,5 +1542,60 @@ int main() {
     save_campaign(final_campaign_restored, final_bytes_b);
     assert(final_bytes_a.str() == final_bytes_b.str());
 
+    // Long-term belief confidence changes at deterministic rates: first-hand and
+    // corroborated accounts persist better, while unresolved conflicting accounts
+    // fade faster. Save/resume must preserve the exact daily progression.
+    WorldState belief_decay_state;
+    NPC direct_observer;
+    direct_observer.entity_id = "direct-observer";
+    direct_observer.beliefs.push_back(NPCBelief{
+        "target", ActionTag::SocialAid, 0.0, 0.8, "direct-observer", true, 0U, 0U});
+    NPC corroborated_listener;
+    corroborated_listener.entity_id = "corroborated-listener";
+    corroborated_listener.beliefs.push_back(NPCBelief{
+        "target", ActionTag::SocialAid, 0.0, 0.8, "speaker", false, 4U, 0U});
+    NPC decay_hearsay_npc;
+    decay_hearsay_npc.entity_id = "hearsay-listener";
+    decay_hearsay_npc.beliefs.push_back(NPCBelief{
+        "target", ActionTag::SocialAid, 0.0, 0.8, "speaker", false, 0U, 0U});
+    NPC disputed_listener;
+    disputed_listener.entity_id = "disputed-listener";
+    disputed_listener.beliefs.push_back(NPCBelief{
+        "target", ActionTag::SocialAid, 0.0, 0.8, "speaker", false, 0U, 3U});
+    belief_decay_state.npcs = {
+        direct_observer, corroborated_listener, decay_hearsay_npc, disputed_listener};
+    SimulationWorld belief_decay_world(belief_decay_state, 0.0, 441U);
+    SimulationWorld belief_decay_resumed(belief_decay_state, 0.0, 441U);
+    (void)belief_decay_world.advance(24.0);
+    (void)belief_decay_resumed.advance(24.0);
+    const auto& decayed_beliefs = belief_decay_world.state().npcs;
+    assert(decayed_beliefs[0].beliefs[0].confidence < 0.8);
+    assert(decayed_beliefs[0].beliefs[0].confidence
+        > decayed_beliefs[2].beliefs[0].confidence);
+    assert(decayed_beliefs[1].beliefs[0].confidence
+        > decayed_beliefs[0].beliefs[0].confidence);
+    assert(decayed_beliefs[3].beliefs[0].confidence
+        < decayed_beliefs[2].beliefs[0].confidence);
+    std::stringstream decay_reference(std::ios::in | std::ios::out | std::ios::binary);
+    std::stringstream decay_resumed_bytes(std::ios::in | std::ios::out | std::ios::binary);
+    save_world(belief_decay_world, decay_reference);
+    save_world(belief_decay_resumed, decay_resumed_bytes);
+    assert(decay_reference.str() == decay_resumed_bytes.str());
+
+    // A save point between days does not change confidence or serialized world state.
+    (void)belief_decay_world.advance(24.0);
+    (void)belief_decay_resumed.advance(24.0);
+    std::stringstream decay_checkpoint(std::ios::in | std::ios::out | std::ios::binary);
+    save_world(belief_decay_resumed, decay_checkpoint);
+    decay_checkpoint.seekg(0);
+    belief_decay_resumed = load_world(decay_checkpoint);
+    (void)belief_decay_resumed.advance(24.0);
+    (void)belief_decay_world.advance(24.0);
+    std::stringstream decay_continuous_bytes(std::ios::in | std::ios::out | std::ios::binary);
+    std::stringstream decay_replayed_bytes(std::ios::in | std::ios::out | std::ios::binary);
+    save_world(belief_decay_world, decay_continuous_bytes);
+    save_world(belief_decay_resumed, decay_replayed_bytes);
+    assert(decay_continuous_bytes.str() == decay_replayed_bytes.str());
+
     return 0;
 }

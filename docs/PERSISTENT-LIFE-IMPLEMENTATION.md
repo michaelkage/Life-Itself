@@ -63,3 +63,9 @@ CI for this branch is the verification authority; report only the checks that ha
 - Aid builds reciprocal relationship trust over repeated encounters, rather than applying only a one-time financial effect.
 - Receiving aid also modestly reduces the recipient's stress and desperation, while money balances remain governed by the existing transfer and daily-life systems.
 - Regression coverage verifies both sides remember the other, event timestamps match simulation time, recipient state changes, and the result remains equivalent after save/resume.
+
+## Long-term belief confidence
+
+- NPC beliefs gradually lose confidence on daily world ticks rather than remaining frozen forever. Direct observation and corroboration slow the decay; unresolved contradictions accelerate it.
+- Decay is bounded and deterministic, consumes no random samples, and uses fields already persisted in world format v8. No save-format change is required.
+- Regression coverage compares direct observation, corroborated hearsay, ordinary hearsay, and disputed accounts, and verifies byte-identical save/resume replay across multiple days.
