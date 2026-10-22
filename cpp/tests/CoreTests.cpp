@@ -591,6 +591,43 @@ int main() {
     assert(aid_story_resumed.state().npcs[2].beliefs[0].action_tag == ActionTag::SocialAid);
     assert(aid_story_resumed.community_reputation("aid-donor", "aid-story-district")
         == aid_story_world.community_reputation("aid-donor", "aid-story-district"));
+    // A conflicting account about the same target and event hour must coexist
+    // with the aid story, reduce its confidence, and lower local standing rather
+    // than silently overwriting the first account.
+    const double aid_confidence_before_contradiction =
+        aid_story_world.state().npcs[2].beliefs[0].confidence;
+    NPC aid_contradictor;
+    aid_contradictor.entity_id = "aid-contradictor";
+    aid_contradictor.district_id = "aid-story-district";
+    NPCMemory contradictory_aid_account;
+    contradictory_aid_account.witness_id = "aid-contradictor";
+    contradictory_aid_account.target_entity_id = "aid-donor";
+    contradictory_aid_account.timestamp_hour = aid_story_world.total_hours();
+    contradictory_aid_account.action_tag = ActionTag::CrimeTheft;
+    contradictory_aid_account.retention = 0.9;
+    aid_contradictor.memories.push_back(contradictory_aid_account);
+    aid_story_world.state().npcs.push_back(aid_contradictor);
+    const Conversation conflicting_aid_story =
+        aid_story_world.talk("aid-listener", "aid-contradictor");
+    assert(conflicting_aid_story.transferred.size() == 1U);
+    const NPC& aid_listener_after_conflict = aid_story_world.state().npcs[2];
+    assert(aid_listener_after_conflict.beliefs.size() == 2U);
+    assert(aid_listener_after_conflict.beliefs[0].action_tag == ActionTag::SocialAid);
+    assert(aid_listener_after_conflict.beliefs[0].confidence < aid_confidence_before_contradiction);
+    assert(aid_listener_after_conflict.beliefs[0].contradictions == 1U);
+    assert(aid_listener_after_conflict.beliefs[1].action_tag == ActionTag::CrimeTheft);
+    assert(aid_listener_after_conflict.beliefs[1].contradictions == 1U);
+    assert(aid_story_world.community_reputation("aid-donor", "aid-story-district") < 0.0);
+    std::stringstream conflicting_aid_snapshot(std::ios::in | std::ios::out | std::ios::binary);
+    save_world(aid_story_world, conflicting_aid_snapshot);
+    conflicting_aid_snapshot.seekg(0);
+    SimulationWorld conflicting_aid_resumed = load_world(conflicting_aid_snapshot);
+    assert(conflicting_aid_resumed.state().npcs[2].beliefs.size() == 2U);
+    assert(conflicting_aid_resumed.state().npcs[2].beliefs[0].confidence
+        == aid_story_world.state().npcs[2].beliefs[0].confidence);
+    assert(conflicting_aid_resumed.state().npcs[2].beliefs[0].contradictions == 1U);
+    assert(conflicting_aid_resumed.community_reputation("aid-donor", "aid-story-district")
+        == aid_story_world.community_reputation("aid-donor", "aid-story-district"));
     CriminalFile world_file = world.build_criminal_file("player");
     // The conflicting assault account is also a separate observed action in the
     // fixture, so it creates a second charge; the original theft remains corroborated.
