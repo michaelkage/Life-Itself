@@ -45,7 +45,6 @@ The proposition key is a stable domain key, not free-form dialogue. Generated di
 
 This is an engine-independent provenance primitive, not a complete media or belief system. It does not yet:
 - Decide whether a proposition is objectively true
-- Decide whether a proposition is objectively true
 - Model news organizations, private channels, access control, or publication incentives
 - Automatically update NPC beliefs from claims
 - Replace the existing gossip/rumour implementation
