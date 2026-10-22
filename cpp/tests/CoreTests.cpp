@@ -628,6 +628,12 @@ int main() {
     assert(contradiction_revision.reason == BeliefRevisionReason::Contradiction);
     assert(contradiction_revision.source_entity_id == "aid-contradictor");
     assert(contradiction_revision.recorded_hour == aid_story_world.total_hours());
+    assert(contradiction_revision.source_reliability >= 0.0
+        && contradiction_revision.source_reliability <= 1.0);
+    assert(contradiction_revision.loyalty_factor >= 0.0);
+    assert(contradiction_revision.compassion_factor >= 0.0);
+    assert(contradiction_revision.skepticism_factor >= 0.0);
+    assert(contradiction_revision.evidence_factor >= 0.0);
     assert(aid_listener_after_conflict.beliefs[1].action_tag == ActionTag::CrimeTheft);
     assert(aid_listener_after_conflict.beliefs[1].contradictions == 1U);
     assert(aid_story_world.community_reputation("aid-donor", "aid-story-district") < 0.0);
@@ -2065,7 +2071,8 @@ int main() {
     revision_history_npc.entity_id = "revision-history-npc";
     revision_history_npc.belief_revision_history.push_back(BeliefRevision{
         "history-target", ActionTag::CrimeTheft, 3.0, 0.4, 0.7,
-        BeliefRevisionReason::IndependentEvidence, "history-source", 4.0});
+        BeliefRevisionReason::IndependentEvidence, "history-source", 4.0,
+        0.8, 1.1, 0.95, 0.8, 0.9});
     information_state.npcs.push_back(revision_history_npc);
     SimulationWorld information_world(information_state, 0.0, 2026U);
     InformationClaim observed_claim;
@@ -2093,6 +2100,11 @@ int main() {
     assert(restored_revision.previous_confidence == 0.4);
     assert(restored_revision.revised_confidence == 0.7);
     assert(restored_revision.source_entity_id == "history-source");
+    assert(restored_revision.source_reliability == 0.8);
+    assert(restored_revision.loyalty_factor == 1.1);
+    assert(restored_revision.compassion_factor == 0.95);
+    assert(restored_revision.skepticism_factor == 0.8);
+    assert(restored_revision.evidence_factor == 0.9);
     assert(information_restored.information_ledger().size() == 2U);
     assert(information_restored.information_ledger().find("claim-relayed") != nullptr);
     assert(information_restored.information_ledger().find("claim-relayed")->hop_count == 1U);
