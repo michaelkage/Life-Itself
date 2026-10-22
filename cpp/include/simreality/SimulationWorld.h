@@ -6,6 +6,7 @@
 #include "simreality/Fixers.h"
 #include "simreality/Gossip.h"
 #include "simreality/LifeSystems.h"
+#include "simreality/Information.h"
 #include "simreality/Justice.h"
 #include "simreality/RandomStream.h"
 #include "simreality/Reputation.h"
@@ -36,6 +37,20 @@ struct WorldAdvanceReport {
     std::size_t memories_swept{0};
 };
 
+// Presentation-neutral explanation data; a signed delta is not a truth or
+// morality score, only the change in this NPC's recorded confidence.
+struct BeliefRevisionExplanation {
+    BeliefRevision revision{};
+    double confidence_delta{0.0};
+};
+
+// One current interpretation paired with only the revisions that explain that
+// same action account and event time. This is not a claim about objective truth.
+struct BeliefAccountExplanation {
+    NPCBelief current_belief{};
+    std::vector<BeliefRevisionExplanation> revisions{};
+};
+
 // Portable coordinator for deterministic, simulation-time-driven world updates.
 // Unreal-facing code should consume snapshots/reports rather than enter this core.
 class SimulationWorld {
@@ -58,6 +73,24 @@ public:
     [[nodiscard]] LifeCoordinator& life_system() noexcept { return life_; }
     [[nodiscard]] const LifeCoordinator& life_system() const noexcept { return life_; }
     [[nodiscard]] std::uint64_t random_state() const noexcept { return random_.state(); }
+    [[nodiscard]] InformationLedger& information_ledger() noexcept { return information_; }
+    [[nodiscard]] const InformationLedger& information_ledger() const noexcept { return information_; }
+
+    // Read-only, presentation-agnostic belief history query. An empty target ID
+    // returns all revisions for the NPC; results are chronologically ordered.
+    [[nodiscard]] std::vector<BeliefRevision> belief_history_for(
+        const EntityId& npc_id, const EntityId& target_id = {}) const;
+    [[nodiscard]] std::vector<BeliefRevisionExplanation> belief_explanations_for(
+        const EntityId& npc_id, const EntityId& target_id = {}) const;
+    // Return every interpretation for one event, including incompatible accounts.
+    [[nodiscard]] std::vector<NPCBelief> beliefs_about_event(
+        const EntityId& npc_id, const EntityId& target_id,
+        SimulationHour event_timestamp_hour) const;
+    // Combines current accounts with revision history matching the exact target,
+    // action interpretation, and event timestamp; accounts without revisions remain.
+    [[nodiscard]] std::vector<BeliefAccountExplanation> belief_account_explanations_for(
+        const EntityId& npc_id, const EntityId& target_id,
+        SimulationHour event_timestamp_hour) const;
 
     // Advances simulation time in a frame-rate-independent way. All due hourly
     // memory sweeps and daily district/NPC updates run in chronological order.
@@ -107,6 +140,7 @@ private:
     SimulationRuntime runtime_;
     RandomStream random_;
     LifeCoordinator life_{};
+    InformationLedger information_{};
 };
 
 } // namespace simreality

@@ -72,6 +72,31 @@ struct NPCBelief {
     std::uint32_t contradictions{0};
 };
 
+enum class BeliefRevisionReason : std::uint8_t {
+    IndependentEvidence,
+    Contradiction,
+    SourceReliability
+};
+
+// Append-only explanation of a confidence change; the belief remains the
+// current interpretation while these entries preserve how it evolved.
+struct BeliefRevision {
+    EntityId target_entity_id{};
+    ActionTag action_tag{ActionTag::InteractionPolite};
+    SimulationHour event_timestamp_hour{0.0};
+    double previous_confidence{0.5};
+    double revised_confidence{0.5};
+    BeliefRevisionReason reason{BeliefRevisionReason::IndependentEvidence};
+    EntityId source_entity_id{};
+    SimulationHour recorded_hour{0.0};
+    // Captured interpretation factors explain a revision without claiming truth.
+    double source_reliability{0.5};
+    double loyalty_factor{1.0};
+    double compassion_factor{1.0};
+    double skepticism_factor{1.0};
+    double evidence_factor{1.0};
+};
+
 struct NPC {
     EntityId entity_id{};
     AgeBand age_band{AgeBand::Adult};
@@ -111,6 +136,8 @@ struct NPC {
     double safety_value{0.5};
     double freedom_value{0.5};
     double self_interest_value{0.5};
+    // Appended for aggregate/source compatibility; entries are never overwritten.
+    std::vector<BeliefRevision> belief_revision_history{};
 };
 
 struct District {

@@ -24,6 +24,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <utility>
+#include <tuple>
 
 int main() {
     using namespace simreality;
@@ -615,6 +616,30 @@ int main() {
     assert(aid_listener_after_conflict.beliefs[0].action_tag == ActionTag::SocialAid);
     assert(aid_listener_after_conflict.beliefs[0].confidence < aid_confidence_before_contradiction);
     assert(aid_listener_after_conflict.beliefs[0].contradictions == 1U);
+    assert(aid_listener_after_conflict.belief_revision_history.size() == 1U);
+    const BeliefRevision& contradiction_revision =
+        aid_listener_after_conflict.belief_revision_history.front();
+    assert(contradiction_revision.target_entity_id == "aid-donor");
+    assert(contradiction_revision.action_tag == ActionTag::SocialAid);
+    assert(contradiction_revision.event_timestamp_hour == aid_story_world.total_hours());
+    assert(contradiction_revision.previous_confidence == aid_confidence_before_contradiction);
+    assert(contradiction_revision.revised_confidence
+        == aid_listener_after_conflict.beliefs[0].confidence);
+    assert(contradiction_revision.reason == BeliefRevisionReason::Contradiction);
+    assert(contradiction_revision.source_entity_id == "aid-contradictor");
+    assert(contradiction_revision.recorded_hour == aid_story_world.total_hours());
+    assert(contradiction_revision.source_reliability >= 0.0
+        && contradiction_revision.source_reliability <= 1.0);
+    assert(contradiction_revision.loyalty_factor >= 0.0);
+    assert(contradiction_revision.compassion_factor >= 0.0);
+    assert(contradiction_revision.skepticism_factor >= 0.0);
+    assert(contradiction_revision.evidence_factor >= 0.0);
+    assert(contradiction_revision.source_reliability >= 0.0
+        && contradiction_revision.source_reliability <= 1.0);
+    assert(contradiction_revision.loyalty_factor >= 0.0);
+    assert(contradiction_revision.compassion_factor >= 0.0);
+    assert(contradiction_revision.skepticism_factor >= 0.0);
+    assert(contradiction_revision.evidence_factor >= 0.0);
     assert(aid_listener_after_conflict.beliefs[1].action_tag == ActionTag::CrimeTheft);
     assert(aid_listener_after_conflict.beliefs[1].contradictions == 1U);
     assert(aid_story_world.community_reputation("aid-donor", "aid-story-district") < 0.0);
@@ -1696,6 +1721,55 @@ int main() {
     assert(repeated_rumour_bytes.str() == repeated_rumour_resumed_bytes.str());
 
 
+    // Confidence about unrelated events must not change a source's reliability
+    // for the specific story being passed on.
+    WorldState claim_reliability_state;
+    NPC low_unrelated_source;
+    low_unrelated_source.entity_id = "low-unrelated-source";
+    low_unrelated_source.district_id = "claim-reliability-district";
+    NPCMemory low_source_story;
+    low_source_story.witness_id = low_unrelated_source.entity_id;
+    low_source_story.target_entity_id = "claim-target-a";
+    low_source_story.action_tag = ActionTag::CrimeTheft;
+    low_source_story.timestamp_hour = 0.0;
+    low_source_story.retention = 0.8;
+    low_unrelated_source.memories.push_back(low_source_story);
+    low_unrelated_source.beliefs.push_back(NPCBelief{
+        "unrelated-target-a", ActionTag::CrimeAssault, 0.0, 0.1,
+        "other-source", false, 0U, 0U});
+    NPC high_unrelated_source = low_unrelated_source;
+    high_unrelated_source.entity_id = "high-unrelated-source";
+    high_unrelated_source.memories.front().witness_id = high_unrelated_source.entity_id;
+    high_unrelated_source.memories.front().target_entity_id = "claim-target-b";
+    high_unrelated_source.beliefs.front().target_entity_id = "unrelated-target-b";
+    high_unrelated_source.beliefs.front().confidence = 0.9;
+    NPC claim_listener_a;
+    claim_listener_a.entity_id = "claim-listener-a";
+    claim_listener_a.district_id = "claim-reliability-district";
+    NPC claim_listener_b = claim_listener_a;
+    claim_listener_b.entity_id = "claim-listener-b";
+    NPC claim_target_a;
+    claim_target_a.entity_id = "claim-target-a";
+    claim_target_a.district_id = "claim-reliability-district";
+    NPC claim_target_b = claim_target_a;
+    claim_target_b.entity_id = "claim-target-b";
+    claim_reliability_state.npcs = {low_unrelated_source, high_unrelated_source,
+        claim_listener_a, claim_listener_b, claim_target_a, claim_target_b};
+    SimulationWorld claim_reliability_world(claim_reliability_state, 0.0, 178U);
+    (void)claim_reliability_world.talk("claim-listener-a", "low-unrelated-source");
+    (void)claim_reliability_world.talk("claim-listener-b", "high-unrelated-source");
+    const auto claim_confidence = [](const NPC& npc, const std::string& target_id) {
+        const auto found = std::find_if(npc.beliefs.begin(), npc.beliefs.end(),
+            [&target_id](const NPCBelief& belief) {
+                return belief.target_entity_id == target_id
+                    && belief.action_tag == ActionTag::CrimeTheft;
+            });
+        assert(found != npc.beliefs.end());
+        return found->confidence;
+    };
+    assert(claim_confidence(claim_reliability_world.state().npcs[2], "claim-target-a")
+        == claim_confidence(claim_reliability_world.state().npcs[3], "claim-target-b"));
+
     // Stable personality traits bias second-hand interpretation without changing
     // the event record or consuming randomness; save/resume preserves the traits.
     WorldState bias_state;
@@ -1850,6 +1924,297 @@ int main() {
         rejected_unknown_consequence = true;
     }
     assert(rejected_unknown_consequence);
+
+
+    // Direct witness observations enter the world-owned provenance ledger.
+    WorldState witnessed_information_state;
+    NPC witnessed_actor;
+    witnessed_actor.entity_id = "observed-actor";
+    witnessed_actor.district_id = "observed-district";
+    NPC witnessed_observer;
+    witnessed_observer.entity_id = "observing-npc";
+    witnessed_observer.district_id = "observed-district";
+    witnessed_information_state.npcs = {witnessed_actor, witnessed_observer};
+    SimulationWorld witnessed_information_world(witnessed_information_state, 2.0, 2025U);
+    assert(witnessed_information_world.record_witnessed_action(
+        "observed-actor", ActionTag::CrimeTheft, Description{},
+        {"observing-npc"}) == 1U);
+    assert(witnessed_information_world.information_ledger().size() == 1U);
+    const InformationClaim* witness_claim = witnessed_information_world.information_ledger().find(
+        "observation:event-1:observing-npc");
+    assert(witness_claim != nullptr);
+    assert(witness_claim->subject_key == "observed-actor");
+    assert(witness_claim->recipient_entity_id == "observing-npc");
+    assert(witness_claim->kind == InformationKind::Observation);
+
+    NPC conversation_listener;
+    conversation_listener.entity_id = "listening-npc";
+    conversation_listener.district_id = "observed-district";
+    witnessed_information_world.state().npcs.push_back(conversation_listener);
+    const Conversation first_conversation = witnessed_information_world.talk(
+        "listening-npc", "observing-npc");
+    assert(first_conversation.transferred.size() == 1U);
+    assert(witnessed_information_world.information_ledger().size() == 2U);
+    const InformationClaim* first_relay = witnessed_information_world.information_ledger().find(
+        "relay:observation:event-1:observing-npc:listening-npc:2000");
+    assert(first_relay != nullptr);
+    assert(first_relay->root_evidence_id == witness_claim->root_evidence_id);
+    assert(first_relay->hop_count == 1U);
+
+    NPC next_listener;
+    next_listener.entity_id = "third-npc";
+    next_listener.district_id = "observed-district";
+    witnessed_information_world.state().npcs.push_back(next_listener);
+    const Conversation second_conversation = witnessed_information_world.talk(
+        "third-npc", "listening-npc");
+    assert(second_conversation.transferred.size() == 1U);
+    assert(witnessed_information_world.information_ledger().size() == 3U);
+    const InformationClaim* second_relay = witnessed_information_world.information_ledger().find(
+        "relay:relay:observation:event-1:observing-npc:listening-npc:2000:third-npc:2000");
+    assert(second_relay != nullptr);
+    assert(second_relay->root_evidence_id == witness_claim->root_evidence_id);
+    assert(second_relay->hop_count == 2U);
+    assert(witnessed_information_world.information_ledger().independent_evidence_count(
+        "observed-actor", std::to_string(static_cast<unsigned int>(ActionTag::CrimeTheft))) == 1U);
+
+    const auto find_observed_theft_belief = [](const NPC& npc) -> const NPCBelief& {
+        const auto found = std::find_if(npc.beliefs.begin(), npc.beliefs.end(),
+            [](const NPCBelief& belief) {
+                return belief.target_entity_id == "observed-actor"
+                    && belief.action_tag == ActionTag::CrimeTheft
+                    && belief.timestamp_hour == 2.0;
+            });
+        assert(found != npc.beliefs.end());
+        return *found;
+    };
+    const NPCBelief before_same_lineage_return = find_observed_theft_belief(
+        witnessed_information_world.state().npcs[2]);
+    const double confidence_before_same_lineage_return = before_same_lineage_return.confidence;
+    const std::uint32_t corroborations_before_same_lineage_return =
+        before_same_lineage_return.corroborations;
+    const double relationship_before_same_lineage_return =
+        witnessed_information_world.state().npcs[2].relationships["observed-actor"];
+    (void)witnessed_information_world.talk("listening-npc", "third-npc");
+    const NPCBelief& after_same_lineage_return = find_observed_theft_belief(
+        witnessed_information_world.state().npcs[2]);
+    assert(after_same_lineage_return.confidence == confidence_before_same_lineage_return);
+    assert(after_same_lineage_return.corroborations == corroborations_before_same_lineage_return);
+    assert(witnessed_information_world.state().npcs[2].relationships["observed-actor"]
+        == relationship_before_same_lineage_return);
+    assert(witnessed_information_world.information_ledger().independent_evidence_count(
+        "observed-actor", std::to_string(static_cast<unsigned int>(ActionTag::CrimeTheft))) == 1U);
+
+    // Independent witnesses can revise an existing second-hand belief,
+    // while skepticism changes how strongly the listener accepts each account.
+    const auto belief_revision_result = [](double skepticism) {
+        WorldState revision_state;
+        NPC revision_actor;
+        revision_actor.entity_id = "revision-actor";
+        revision_actor.district_id = "revision-district";
+        NPC first_witness;
+        first_witness.entity_id = "revision-witness-a";
+        first_witness.district_id = "revision-district";
+        NPC second_witness;
+        second_witness.entity_id = "revision-witness-b";
+        second_witness.district_id = "revision-district";
+        NPC revision_listener;
+        revision_listener.entity_id = "revision-listener";
+        revision_listener.district_id = "revision-district";
+        revision_listener.skepticism = skepticism;
+        revision_state.npcs = {revision_actor, first_witness, second_witness, revision_listener};
+        SimulationWorld revision_world(revision_state, 4.0, 2027U);
+
+        assert(revision_world.record_witnessed_action(
+            "revision-actor", ActionTag::CrimeTheft, Description{},
+            {"revision-witness-a"}) == 1U);
+        (void)revision_world.talk("revision-listener", "revision-witness-a");
+        const auto find_revision_belief = [&revision_world]() -> const NPCBelief& {
+            const auto found = std::find_if(
+                revision_world.state().npcs[3].beliefs.begin(),
+                revision_world.state().npcs[3].beliefs.end(),
+                [](const NPCBelief& belief) {
+                    return belief.target_entity_id == "revision-actor"
+                        && belief.action_tag == ActionTag::CrimeTheft
+                        && belief.timestamp_hour == 4.0;
+                });
+            assert(found != revision_world.state().npcs[3].beliefs.end());
+            return *found;
+        };
+        const double first_confidence = find_revision_belief().confidence;
+        const std::uint32_t first_corroborations = find_revision_belief().corroborations;
+
+        // A second event at the same simulation hour has a distinct root ID;
+        // it is independent evidence, not another relay of the first event.
+        assert(revision_world.record_witnessed_action(
+            "revision-actor", ActionTag::CrimeTheft, Description{},
+            {"revision-witness-b"}) == 1U);
+        (void)revision_world.talk("revision-listener", "revision-witness-b");
+        const double revised_confidence = find_revision_belief().confidence;
+        const std::uint32_t revised_corroborations = find_revision_belief().corroborations;
+        const std::size_t independent_roots =
+            revision_world.information_ledger().independent_evidence_count(
+                "revision-actor",
+                std::to_string(static_cast<unsigned int>(ActionTag::CrimeTheft)));
+        assert(revision_world.state().npcs[3].belief_revision_history.size() == 1U);
+        assert(revision_world.state().npcs[3].belief_revision_history.front().reason
+            == BeliefRevisionReason::IndependentEvidence);
+        return std::tuple<double, double, std::uint32_t, std::uint32_t, std::size_t>{
+            first_confidence, revised_confidence, first_corroborations,
+            revised_corroborations, independent_roots};
+    };
+    const auto open_revision = belief_revision_result(0.0);
+    const auto skeptical_revision = belief_revision_result(1.0);
+    assert(std::get<1>(open_revision) > std::get<0>(open_revision));
+    assert(std::get<3>(open_revision) == std::get<2>(open_revision) + 1U);
+    assert(std::get<4>(open_revision) == 2U);
+    assert(std::get<1>(skeptical_revision) > std::get<0>(skeptical_revision));
+    assert(std::get<1>(open_revision) > std::get<1>(skeptical_revision));
+
+    // Information claim lineage is part of the saved world and remains stable
+    // across save/resume, including deterministic serialized bytes.
+    WorldState information_state;
+    NPC revision_history_npc;
+    revision_history_npc.entity_id = "revision-history-npc";
+    revision_history_npc.belief_revision_history.push_back(BeliefRevision{
+        "history-target", ActionTag::CrimeTheft, 3.0, 0.4, 0.7,
+        BeliefRevisionReason::IndependentEvidence, "history-source", 4.0,
+        0.8, 1.1, 0.95, 0.8, 0.9});
+    information_state.npcs.push_back(revision_history_npc);
+    SimulationWorld information_world(information_state, 0.0, 2026U);
+
+    // Belief history queries are read-only, target-filterable, and chronological.
+    WorldState history_query_state;
+    NPC history_query_npc;
+    history_query_npc.entity_id = "history-query-npc";
+    history_query_npc.belief_revision_history = {
+        BeliefRevision{"target-a", ActionTag::CrimeTheft, 8.0, 0.4, 0.2,
+            BeliefRevisionReason::Contradiction, "source-c", 9.0},
+        BeliefRevision{"target-b", ActionTag::SocialAid, 2.0, 0.1, 0.3,
+            BeliefRevisionReason::IndependentEvidence, "source-a", 3.0},
+        BeliefRevision{"target-a", ActionTag::CrimeTheft, 4.0, 0.4, 0.6,
+            BeliefRevisionReason::IndependentEvidence, "source-b", 5.0}
+    };
+    history_query_state.npcs.push_back(history_query_npc);
+    const SimulationWorld history_query_world(history_query_state, 0.0, 2027U);
+    const auto all_history = history_query_world.belief_history_for("history-query-npc");
+    assert(all_history.size() == 3U);
+    assert(all_history[0].recorded_hour == 3.0);
+    assert(all_history[1].recorded_hour == 5.0);
+    assert(all_history[2].recorded_hour == 9.0);
+    const auto target_history =
+        history_query_world.belief_history_for("history-query-npc", "target-a");
+    assert(target_history.size() == 2U);
+    assert(target_history[0].event_timestamp_hour == 4.0);
+    assert(target_history[1].event_timestamp_hour == 8.0);
+    assert(history_query_world.belief_history_for("missing-npc").empty());
+    const auto explanations =
+        history_query_world.belief_explanations_for("history-query-npc", "target-a");
+    assert(explanations.size() == 2U);
+    assert(std::abs(explanations[0].confidence_delta - 0.2) < 1e-12);
+    assert(std::abs(explanations[1].confidence_delta - (-0.2)) < 1e-12);
+    assert(explanations[0].revision.reason == BeliefRevisionReason::IndependentEvidence);
+    assert(explanations[1].revision.reason == BeliefRevisionReason::Contradiction);
+    assert(history_query_world.belief_explanations_for("missing-npc").empty());
+
+    // Competing interpretations of one event are returned together, not collapsed.
+    WorldState competing_accounts_state;
+    NPC competing_accounts_npc;
+    competing_accounts_npc.entity_id = "competing-accounts-npc";
+    competing_accounts_npc.beliefs = {
+        NPCBelief{"target", ActionTag::CrimeTheft, 12.0, 0.35, "rumour-source", false, 0U, 1U},
+        NPCBelief{"target", ActionTag::SocialAid, 12.0, 0.8, "friend-source", false, 1U, 0U},
+        NPCBelief{"target", ActionTag::CrimeTheft, 13.0, 0.7, "later-source", false, 0U, 0U}
+    };
+    competing_accounts_state.npcs.push_back(competing_accounts_npc);
+    const SimulationWorld competing_accounts_world(competing_accounts_state, 0.0, 2028U);
+    const auto same_event_accounts =
+        competing_accounts_world.beliefs_about_event("competing-accounts-npc", "target", 12.0);
+    assert(same_event_accounts.size() == 2U);
+    assert(same_event_accounts[0].action_tag == ActionTag::CrimeTheft);
+    assert(same_event_accounts[1].action_tag == ActionTag::SocialAid);
+    assert(same_event_accounts[0].source_entity_id == "rumour-source");
+    assert(same_event_accounts[1].source_entity_id == "friend-source");
+    assert(competing_accounts_world.beliefs_about_event("missing-npc", "target", 12.0).empty());
+    assert(competing_accounts_world.beliefs_about_event("competing-accounts-npc", "", 12.0).empty());
+    assert(competing_accounts_world.beliefs_about_event(
+        "competing-accounts-npc", "target", std::numeric_limits<double>::quiet_NaN()).empty());
+    // Account explanations join only revisions for the same interpretation and
+    // event timestamp; accounts without history remain visible.
+    competing_accounts_npc.belief_revision_history = {
+        BeliefRevision{"target", ActionTag::CrimeTheft, 12.0, 0.2, 0.35,
+            BeliefRevisionReason::IndependentEvidence, "rumour-source", 14.0},
+        BeliefRevision{"target", ActionTag::CrimeTheft, 12.0, 0.35, 0.25,
+            BeliefRevisionReason::Contradiction, "other-source", 15.0},
+        BeliefRevision{"target", ActionTag::SocialAid, 12.0, 0.5, 0.8,
+            BeliefRevisionReason::IndependentEvidence, "friend-source", 16.0},
+        BeliefRevision{"target", ActionTag::CrimeTheft, 13.0, 0.4, 0.7,
+            BeliefRevisionReason::IndependentEvidence, "later-source", 17.0}
+    };
+    competing_accounts_state.npcs.clear();
+    competing_accounts_state.npcs.push_back(competing_accounts_npc);
+    const SimulationWorld explained_accounts_world(competing_accounts_state, 0.0, 2029U);
+    const auto account_explanations =
+        explained_accounts_world.belief_account_explanations_for(
+            "competing-accounts-npc", "target", 12.0);
+    assert(account_explanations.size() == 2U);
+    assert(account_explanations[0].current_belief.action_tag == ActionTag::CrimeTheft);
+    assert(account_explanations[0].revisions.size() == 2U);
+    assert(account_explanations[0].revisions[0].revision.recorded_hour == 14.0);
+    assert(account_explanations[0].revisions[1].revision.recorded_hour == 15.0);
+    assert(std::abs(account_explanations[0].revisions[0].confidence_delta - 0.15) < 1e-12);
+    assert(std::abs(account_explanations[0].revisions[1].confidence_delta - (-0.1)) < 1e-12);
+    assert(account_explanations[1].current_belief.action_tag == ActionTag::SocialAid);
+    assert(account_explanations[1].revisions.size() == 1U);
+    assert(account_explanations[1].revisions[0].revision.recorded_hour == 16.0);
+    assert(explained_accounts_world.belief_account_explanations_for(
+        "missing-npc", "target", 12.0).empty());
+    assert(explained_accounts_world.belief_account_explanations_for(
+        "competing-accounts-npc", "target", std::numeric_limits<double>::infinity()).empty());
+    InformationClaim observed_claim;
+    observed_claim.claim_id = "claim-observed";
+    observed_claim.subject_key = "bridge-7";
+    observed_claim.proposition_key = "bridge-unsafe";
+    observed_claim.root_evidence_id = "inspection-42";
+    observed_claim.source_entity_id = "inspector";
+    observed_claim.recipient_entity_id = "resident-a";
+    observed_claim.created_tick = 3;
+    observed_claim.confidence = 0.95;
+    observed_claim.kind = InformationKind::Observation;
+    assert(information_world.information_ledger().record(observed_claim).accepted);
+    assert(information_world.information_ledger().relay(
+        "claim-observed", "claim-relayed", "resident-a", "resident-b", 4, 0.8).accepted);
+    std::stringstream information_snapshot(std::ios::in | std::ios::out | std::ios::binary);
+    save_world(information_world, information_snapshot);
+    information_snapshot.seekg(0);
+    SimulationWorld information_restored = load_world(information_snapshot);
+    assert(information_restored.state().npcs.size() == 1U);
+    assert(information_restored.state().npcs.front().belief_revision_history.size() == 1U);
+    const BeliefRevision& restored_revision =
+        information_restored.state().npcs.front().belief_revision_history.front();
+    assert(restored_revision.reason == BeliefRevisionReason::IndependentEvidence);
+    assert(restored_revision.previous_confidence == 0.4);
+    assert(restored_revision.revised_confidence == 0.7);
+    assert(restored_revision.source_entity_id == "history-source");
+    assert(restored_revision.source_reliability == 0.8);
+    assert(restored_revision.loyalty_factor == 1.1);
+    assert(restored_revision.compassion_factor == 0.95);
+    assert(restored_revision.skepticism_factor == 0.8);
+    assert(restored_revision.evidence_factor == 0.9);
+    assert(restored_revision.source_reliability == 0.8);
+    assert(restored_revision.loyalty_factor == 1.1);
+    assert(restored_revision.compassion_factor == 0.95);
+    assert(restored_revision.skepticism_factor == 0.8);
+    assert(restored_revision.evidence_factor == 0.9);
+    assert(information_restored.information_ledger().size() == 2U);
+    assert(information_restored.information_ledger().find("claim-relayed") != nullptr);
+    assert(information_restored.information_ledger().find("claim-relayed")->hop_count == 1U);
+    assert(information_restored.information_ledger().independent_evidence_count(
+        "bridge-7", "bridge-unsafe") == 1U);
+    std::stringstream information_bytes_a(std::ios::in | std::ios::out | std::ios::binary);
+    std::stringstream information_bytes_b(std::ios::in | std::ios::out | std::ios::binary);
+    save_world(information_world, information_bytes_a);
+    save_world(information_restored, information_bytes_b);
+    assert(information_bytes_a.str() == information_bytes_b.str());
 
     return 0;
 }
