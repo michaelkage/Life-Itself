@@ -48,6 +48,25 @@ class InformationProvenanceTests(unittest.TestCase):
         # A long relay chain contributes only the strongest confidence for its root.
         self.assertAlmostEqual(ledger.independent_evidence_strength("person:7", "was_at:market"), 0.9)
 
+    def test_claims_received_by_is_scoped_and_deterministically_ordered(self):
+        ledger = InformationLedger()
+        self.assertTrue(ledger.record(root_claim(claim_id="later", created_tick=12)).accepted)
+        self.assertTrue(ledger.record(root_claim(
+            claim_id="earlier-z", created_tick=10, recipient_entity_id="witness-c"
+        )).accepted)
+        self.assertTrue(ledger.record(root_claim(
+            claim_id="earlier-a", created_tick=10, recipient_entity_id="witness-c"
+        ).__class__(
+            **{**root_claim(claim_id="earlier-a", created_tick=10, recipient_entity_id="witness-c").__dict__,
+               "root_evidence_id": "evidence:camera-2",
+               "source_entity_id": "witness-x"}
+        )).accepted)
+        received = ledger.claims_received_by("witness-c")
+        self.assertEqual(tuple(claim.claim_id for claim in received), ("earlier-a", "earlier-z"))
+        self.assertEqual(ledger.claims_received_by("witness-b")[0].claim_id, "later")
+        self.assertEqual(ledger.claims_received_by("unknown"), ())
+        self.assertEqual(ledger.claims_received_by(""), ())
+
     def test_distinct_root_evidence_counts_as_independent(self):
         ledger = InformationLedger()
         self.assertTrue(ledger.record(root_claim()).accepted)
