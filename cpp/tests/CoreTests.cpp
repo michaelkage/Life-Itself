@@ -815,6 +815,59 @@ int main() {
     assert(referral_world.state().npcs[2].job_id == "referral-shop");
     assert(referral_world.state().npcs[1].job_id.empty());
 
+    // Community reputation can decide a scarce job slot when applicants have equal referrals.
+    // A directly witnessed polite interaction helps standing; a witnessed theft harms it.
+    WorldState reputation_hiring_state;
+    District reputation_hiring_district;
+    reputation_hiring_district.district_id = "reputation-hiring-district";
+    reputation_hiring_state.districts.push_back(reputation_hiring_district);
+    NPC hiring_witness;
+    hiring_witness.entity_id = "hiring-witness";
+    hiring_witness.district_id = "reputation-hiring-district";
+    hiring_witness.beliefs.push_back(NPCBelief{
+        "trusted-worker", ActionTag::InteractionPolite, 0.0, 0.9,
+        "hiring-witness", true, 1U, 0U});
+    hiring_witness.beliefs.push_back(NPCBelief{
+        "poor-standing-worker", ActionTag::CrimeTheft, 0.0, 0.9,
+        "hiring-witness", true, 1U, 0U});
+    NPC poor_standing_worker;
+    poor_standing_worker.entity_id = "poor-standing-worker";
+    poor_standing_worker.district_id = "reputation-hiring-district";
+    NPC trusted_worker;
+    trusted_worker.entity_id = "trusted-worker";
+    trusted_worker.district_id = "reputation-hiring-district";
+    reputation_hiring_state.npcs = {hiring_witness, poor_standing_worker, trusted_worker};
+    Business reputation_hiring_shop;
+    reputation_hiring_shop.business_id = "reputation-hiring-shop";
+    reputation_hiring_shop.district_id = "reputation-hiring-district";
+    reputation_hiring_shop.cash = 1000.0;
+    reputation_hiring_shop.job_slots = 1;
+    reputation_hiring_state.businesses.push_back(reputation_hiring_shop);
+    SimulationWorld reputation_hiring_reference(reputation_hiring_state, 0.0, 24U);
+    SimulationWorld reputation_hiring_resumed(reputation_hiring_state, 0.0, 24U);
+    (void)reputation_hiring_reference.advance(24.0);
+    (void)reputation_hiring_resumed.advance(12.0);
+    std::stringstream reputation_hiring_snapshot(
+        std::ios::in | std::ios::out | std::ios::binary);
+    save_world(reputation_hiring_resumed, reputation_hiring_snapshot);
+    reputation_hiring_snapshot.seekg(0);
+    reputation_hiring_resumed = load_world(reputation_hiring_snapshot);
+    (void)reputation_hiring_resumed.advance(12.0);
+    assert(reputation_hiring_reference.community_reputation(
+        "trusted-worker", "reputation-hiring-district") > 0.0);
+    assert(reputation_hiring_reference.community_reputation(
+        "poor-standing-worker", "reputation-hiring-district") < 0.0);
+    assert(reputation_hiring_reference.state().npcs[2].job_id == "reputation-hiring-shop");
+    assert(reputation_hiring_reference.state().npcs[1].job_id.empty());
+    assert(reputation_hiring_resumed.state().npcs[2].job_id == "reputation-hiring-shop");
+    assert(reputation_hiring_reference.state().npcs[2].money
+        == reputation_hiring_resumed.state().npcs[2].money);
+    std::stringstream hiring_reference_bytes(std::ios::in | std::ios::out | std::ios::binary);
+    std::stringstream hiring_resumed_bytes(std::ios::in | std::ios::out | std::ios::binary);
+    save_world(reputation_hiring_reference, hiring_reference_bytes);
+    save_world(reputation_hiring_resumed, hiring_resumed_bytes);
+    assert(hiring_reference_bytes.str() == hiring_resumed_bytes.str());
+
     // Trusted sources reinforce retained information; hostile sources spread weaker, less certain rumours.
     WorldState trusted_gossip_state;
     District trusted_gossip_district;

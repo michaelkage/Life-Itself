@@ -362,7 +362,7 @@ WorldAdvanceReport SimulationWorld::advance(
                     if (resident.district_id == district.district_id && resident.job_id == business.business_id) ++employed;
                 while (employed < business.job_slots) {
                     NPC* candidate = nullptr;
-                    double best_referral = -1.0;
+                    double best_hiring_score = -1.0;
                     for (NPC& resident : state_.npcs) {
                         if (resident.district_id != district.district_id || !resident.job_id.empty()) continue;
                         double referral = 0.0;
@@ -375,9 +375,17 @@ WorldAdvanceReport SimulationWorld::advance(
                                 reciprocal == resident.relationships.end() ? 0.0 : reciprocal->second);
                             if (trust >= 0.5) referral = std::max(referral, trust);
                         }
-                        if (candidate == nullptr || referral > best_referral) {
+                        // Hiring weighs reciprocal employee referrals (60%) and
+                        // local reputation (40%). Reputation is a soft signal:
+                        // conflicting or missing accounts do not automatically ban
+                        // a person from work, but can change who gets a scarce slot.
+                        const double reputation = community_reputation(
+                            resident.entity_id, district.district_id);
+                        const double hiring_score = 0.60 * referral
+                            + 0.40 * ((std::clamp(reputation, -1.0, 1.0) + 1.0) * 0.5);
+                        if (candidate == nullptr || hiring_score > best_hiring_score) {
                             candidate = &resident;
-                            best_referral = referral;
+                            best_hiring_score = hiring_score;
                         }
                     }
                     if (candidate == nullptr) break;
