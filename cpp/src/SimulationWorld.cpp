@@ -646,6 +646,16 @@ Conversation SimulationWorld::talk(
                 source_tie = std::clamp(source_tie - 0.015, -1.0, 1.0);
             }
         }
+        if (!rumour.target_entity_id.empty() && rumour.target_entity_id != listener_id) {
+            double& target_tie = listener.relationships[rumour.target_entity_id];
+            const double evidence = std::clamp(account_confidence, 0.0, 1.0);
+            if (believed_action == ActionTag::CrimeTheft || believed_action == ActionTag::CrimeVandalism
+                || believed_action == ActionTag::CrimeAssault || believed_action == ActionTag::CrimeArmedAssault) {
+                target_tie = std::clamp(target_tie - 0.025 * evidence, -1.0, 1.0);
+            } else if (believed_action == ActionTag::InteractionPolite) {
+                target_tie = std::clamp(target_tie + 0.008 * evidence, -1.0, 1.0);
+            }
+        }
         const bool ghost_manifestation = expected_action == "Ghost.Sign"
             || expected_action == "Ghost.Sound" || expected_action == "Ghost.Dream";
         const bool already_knew_manifestation = ghost_manifestation
@@ -815,6 +825,78 @@ std::size_t SimulationWorld::record_witnessed_action(
     for (const NPC* witness : witnesses) event.witness_ids.push_back(witness->entity_id);
     state_.ongoing_events.push_back(std::move(event));
     return witnesses.size();
+}
+
+double SimulationWorld::community_reputation(
+    const EntityId& target_id, const DistrictId& district_id) const {
+    double total = 0.0;
+    double weights = 0.0;
+    for (const NPC& resident : state_.npcs) {
+        if (resident.district_id != district_id || resident.entity_id == target_id) continue;
+        for (const NPCBelief& belief : resident.beliefs) {
+            if (belief.target_entity_id != target_id) continue;
+            double valence = 0.0;
+            switch (belief.action_tag) {
+                case ActionTag::InteractionPolite:
+                    valence = 0.35;
+                    break;
+                case ActionTag::CrimeTheft:
+                case ActionTag::CrimeAssault:
+                case ActionTag::CrimeArmedAssault:
+                case ActionTag::CrimeVandalism:
+                    valence = -0.7;
+                    break;
+                case ActionTag::GhostSign:
+                case ActionTag::GhostSound:
+                case ActionTag::GhostDream:
+                    // Supernatural reports affect relationships, not civic reputation.
+                    continue;
+            }
+            const double confidence = std::clamp(belief.confidence, 0.0, 1.0);
+            const double observation_weight = belief.directly_observed ? 1.25 : 1.0;
+            const double weight = confidence
+                * (1.0 + 0.08 * std::min(5.0, static_cast<double>(belief.corroborations)))
+                / (1.0 + 0.35 * static_cast<double>(belief.contradictions))
+                * observation_weight;
+            total += valence * weight;
+            weights += weight;
+        }
+    }
+    return weights > 0.0 ? std::clamp(total / weights, -1.0, 1.0) : 0.0;
+}
+
+double SimulationWorld::cooperation_score(
+    const EntityId& from_id, const EntityId& to_id) const {
+    const NPC& from = find_npc(from_id);
+    const NPC& to = find_npc(to_id);
+    if (from.district_id != to.district_id) return -1.0;
+    const auto found = from.relationships.find(to_id);
+    const double trust = found == from.relationships.end() ? 0.0
+        : std::clamp(found->second, -1.0, 1.0);
+    return std::clamp(0.65 * trust
+        + 0.35 * community_reputation(to_id, from.district_id), -1.0, 1.0);
+}
+
+bool SimulationWorld::offer_support(
+    const EntityId& from_id, const EntityId& to_id, double amount) {
+    // Invalid support requests are rejected like other unavailable transfers;
+    // callers can safely probe an action without unwinding the simulation tick.
+    if (!std::isfinite(amount) || amount <= 0.0) return false;
+    NPC& donor = find_npc(from_id);
+    NPC& recipient = find_npc(to_id);
+    if (from_id == to_id || donor.district_id != recipient.district_id
+        || donor.money < amount || cooperation_score(from_id, to_id) < -0.15) {
+        return false;
+    }
+    donor.money -= amount;
+    recipient.money += amount;
+    donor.relationships[to_id] = std::clamp(
+        (donor.relationships.contains(to_id) ? donor.relationships[to_id] : 0.0) + 0.025,
+        -1.0, 1.0);
+    recipient.relationships[from_id] = std::clamp(
+        (recipient.relationships.contains(from_id) ? recipient.relationships[from_id] : 0.0) + 0.015,
+        -1.0, 1.0);
+    return true;
 }
 
 CriminalFile SimulationWorld::build_criminal_file(const EntityId& player_id) const {
