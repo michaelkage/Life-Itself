@@ -37,6 +37,13 @@ struct WorldAdvanceReport {
     std::size_t memories_swept{0};
 };
 
+// Presentation-neutral explanation data; a signed delta is not a truth or
+// morality score, only the change in this NPC's recorded confidence.
+struct BeliefRevisionExplanation {
+    BeliefRevision revision{};
+    double confidence_delta{0.0};
+};
+
 // Portable coordinator for deterministic, simulation-time-driven world updates.
 // Unreal-facing code should consume snapshots/reports rather than enter this core.
 class SimulationWorld {
@@ -65,6 +72,8 @@ public:
     // Read-only, presentation-agnostic belief history query. An empty target ID
     // returns all revisions for the NPC; results are chronologically ordered.
     [[nodiscard]] std::vector<BeliefRevision> belief_history_for(
+        const EntityId& npc_id, const EntityId& target_id = {}) const;
+    [[nodiscard]] std::vector<BeliefRevisionExplanation> belief_explanations_for(
         const EntityId& npc_id, const EntityId& target_id = {}) const;
 
     // Advances simulation time in a frame-rate-independent way. All due hourly
