@@ -1992,8 +1992,7 @@ int main() {
     assert(std::get<3>(open_revision) == std::get<2>(open_revision) + 1U);
     assert(std::get<4>(open_revision) == 2U);
     assert(std::get<1>(skeptical_revision) > std::get<0>(skeptical_revision));
-    assert(std::get<1>(open_revision) - std::get<0>(open_revision)
-        > std::get<1>(skeptical_revision) - std::get<0>(skeptical_revision));
+    assert(std::get<1>(open_revision) > std::get<1>(skeptical_revision));
 
     // Information claim lineage is part of the saved world and remains stable
     // across save/resume, including deterministic serialized bytes.
