@@ -150,6 +150,26 @@ class InformationLedger:
             remaining *= 1.0 - confidence
         return min(1.0, max(0.0, 1.0 - remaining))
 
+    def independent_evidence_strength_for_recipient(
+        self, subject_key: str, proposition_key: str, recipient_entity_id: str
+    ) -> float:
+        """Estimate support using only claims received by one NPC."""
+        strongest_by_root: dict[str, float] = {}
+        for claim in self._claims.values():
+            if (
+                claim.subject_key != subject_key
+                or claim.proposition_key != proposition_key
+                or claim.recipient_entity_id != recipient_entity_id
+            ):
+                continue
+            strongest_by_root[claim.root_evidence_id] = max(
+                strongest_by_root.get(claim.root_evidence_id, 0.0), claim.confidence
+            )
+        remaining = 1.0
+        for confidence in strongest_by_root.values():
+            remaining *= 1.0 - confidence
+        return min(1.0, max(0.0, 1.0 - remaining))
+
     def __len__(self) -> int:
         return len(self._claims)
 
