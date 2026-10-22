@@ -17,6 +17,15 @@ This file tracks the portable C++ core independently from Unreal Engine integrat
 - Versioned binary world snapshots that preserve world state, fixer networks, simulation time, and deterministic RNG continuation.
 - Dependency-free C++ regression test executable wired into CMake/CTest.
 
+## Proposed in the information-provenance branch
+
+- Append-only `InformationLedger` for claims, evidence roots, parent claims, source/recipient identity, tick order, confidence, and relay hop count.
+- Repeated retellings share their original root evidence ID and do not count as independent corroboration.
+- Corrections are represented as new claims and do not erase historical claims.
+- A dedicated CTest executable checks lineage validation and repeated-versus-independent evidence.
+
+This branch is a first provenance primitive, not yet a complete information/media system. Integration with NPC belief updates, gossip, world snapshots, access control, and institutional records remains future work.
+
 ## Current validation status
 
 Regression tests cover clock boundaries, seeded RNG repeatability, decay floors,
@@ -25,7 +34,7 @@ hysteresis, evidence and plea calculations, local reputation, fixer network
 propagation, end-to-end world stepping, and save/load continuation of time, state,
 networks, and RNG.
 
-The repository now has CI jobs for the Python reference suite and portable C++ tests on Linux and Windows. Check the latest workflow run before treating either result as current. No Unreal Engine build has been performed. Automated Python/C++ differential tests compile C++ probes and compare decay vectors plus gossip propagation, district dynamics, trauma, justice, reputation, and fixer outcomes against the Python reference at 1e-12 tolerance for numeric values. The C++ regression suite also checks repeatability of identical world steps and save/load continuation, including simulation time, resident state, fixer networks, memory decay, and RNG continuation. These checks are committed to the CI-triggered test suite; verify the latest GitHub Actions run before treating them as passing. Event-log replay remains future work.
+The repository has CI jobs for the Python reference suite and portable C++ tests on Linux and Windows. Check the latest workflow run before treating either result as current. No Unreal Engine build has been performed. Automated Python/C++ differential tests compile C++ probes and compare decay vectors plus gossip propagation, district dynamics, trauma, justice, reputation, and fixer outcomes against the Python reference at 1e-12 tolerance for numeric values. The C++ regression suite also checks repeatability of identical world steps and save/load continuation, including simulation time, resident state, fixer networks, memory decay, and RNG continuation. Event-log replay remains future work.
 
 ## Parity rules
 
