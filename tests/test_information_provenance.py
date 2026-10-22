@@ -133,6 +133,42 @@ class InformationProvenanceTests(unittest.TestCase):
         self.assertEqual(ledger.independent_evidence_count("person:7", "was_at:market"), 1)
         self.assertTrue(math.isclose(ledger.find("c1").confidence, 0.9))
 
+    def test_conflicting_accounts_remain_separate_propositions(self):
+        ledger = InformationLedger()
+        unsafe = root_claim()
+        self.assertTrue(ledger.record(unsafe).accepted)
+        conflicting = root_claim(
+            claim_id="conflicting-account",
+            proposition_key="was_not_at:market",
+            root_evidence_id="evidence:independent-driver",
+            source_entity_id="driver",
+            recipient_entity_id="witness-b",
+            created_tick=12,
+            confidence=0.8,
+            kind=InformationKind.REPORT,
+        )
+        self.assertTrue(ledger.record(conflicting).accepted)
+
+        # Contradiction is preserved for later interpretation, not resolved by
+        # the ledger into an objective verdict or a universal morality score.
+        self.assertEqual(ledger.independent_evidence_count("person:7", "was_at:market"), 1)
+        self.assertEqual(ledger.independent_evidence_count("person:7", "was_not_at:market"), 1)
+        self.assertAlmostEqual(
+            ledger.independent_evidence_strength_for_recipient(
+                "person:7", "was_at:market", "witness-b"
+            ), 0.9
+        )
+        self.assertAlmostEqual(
+            ledger.independent_evidence_strength_for_recipient(
+                "person:7", "was_not_at:market", "witness-b"
+            ), 0.8
+        )
+        self.assertEqual(
+            ledger.independent_evidence_strength_for_recipient(
+                "person:7", "was_not_at:market", "uninformed"
+            ), 0.0
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
