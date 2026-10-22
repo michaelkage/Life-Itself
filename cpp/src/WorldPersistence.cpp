@@ -22,6 +22,7 @@ constexpr std::array<char, 8> kMagicV8{{'S', 'R', 'E', 'C', 'O', 'R', 'E', '8'}}
 constexpr std::array<char, 8> kMagicV9{{'S', 'R', 'E', 'C', 'O', 'R', 'E', '9'}};
 constexpr std::array<char, 8> kMagicV10{{'S', 'R', 'E', 'C', 'O', 'R', 'E', 'A'}};
 constexpr std::array<char, 8> kMagicV11{{'S', 'R', 'E', 'C', 'O', 'R', 'E', 'B'}};
+constexpr std::array<char, 8> kMagicV12{{'S', 'R', 'E', 'C', 'O', 'R', 'E', 'C'}};
 constexpr std::uint32_t kMaxCollectionItems = 1'000'000;
 constexpr std::uint32_t kMaxStringBytes = 16U * 1024U * 1024U;
 static_assert(sizeof(double) == sizeof(std::uint64_t));
@@ -224,6 +225,17 @@ void write_npc(std::ostream& out, const NPC& value) {
     write_double(out, value.safety_value);
     write_double(out, value.freedom_value);
     write_double(out, value.self_interest_value);
+    write_count(out, value.belief_revision_history.size());
+    for (const BeliefRevision& revision : value.belief_revision_history) {
+        write_string(out, revision.target_entity_id);
+        write_u8(out, static_cast<std::uint8_t>(revision.action_tag));
+        write_double(out, revision.event_timestamp_hour);
+        write_double(out, revision.previous_confidence);
+        write_double(out, revision.revised_confidence);
+        write_u8(out, static_cast<std::uint8_t>(revision.reason));
+        write_string(out, revision.source_entity_id);
+        write_double(out, revision.recorded_hour);
+    }
 }
 
 NPC read_npc(std::istream& in, std::uint32_t version) {
@@ -303,6 +315,27 @@ NPC read_npc(std::istream& in, std::uint32_t version) {
             || value.freedom_value < 0.0 || value.freedom_value > 1.0
             || value.self_interest_value < 0.0 || value.self_interest_value > 1.0) {
             throw std::runtime_error("invalid NPC moral value");
+        }
+    }
+    if (version >= 12U) {
+        const std::uint32_t revisions = read_count(in);
+        value.belief_revision_history.reserve(revisions);
+        for (std::uint32_t i = 0; i < revisions; ++i) {
+            BeliefRevision revision;
+            revision.target_entity_id = read_string(in);
+            revision.action_tag = read_enum<ActionTag>(in, 8U, "revision action");
+            revision.event_timestamp_hour = read_double(in);
+            revision.previous_confidence = read_double(in);
+            revision.revised_confidence = read_double(in);
+            if (revision.previous_confidence < 0.0 || revision.previous_confidence > 1.0
+                || revision.revised_confidence < 0.0 || revision.revised_confidence > 1.0)
+                throw std::runtime_error("invalid belief revision confidence");
+            revision.reason = read_enum<BeliefRevisionReason>(in, 2U, "belief revision reason");
+            revision.source_entity_id = read_string(in);
+            revision.recorded_hour = read_double(in);
+            if (revision.event_timestamp_hour < 0.0 || revision.recorded_hour < 0.0)
+                throw std::runtime_error("invalid belief revision timestamp");
+            value.belief_revision_history.push_back(std::move(revision));
         }
     }
     return value;
@@ -687,7 +720,7 @@ void read_information_ledger(std::istream& in, InformationLedger& ledger) {
 } // namespace
 
 void save_world(const SimulationWorld& world, std::ostream& output) {
-    output.write(kMagicV11.data(), static_cast<std::streamsize>(kMagicV11.size()));
+    output.write(kMagicV12.data(), static_cast<std::streamsize>(kMagicV12.size()));
     if (!output) throw std::runtime_error("failed writing world snapshot header");
     write_u32(output, kWorldSaveVersion);
     write_double(output, world.total_hours());
@@ -710,14 +743,15 @@ SimulationWorld load_world(std::istream& input) {
     const bool is_v9 = magic == kMagicV9;
     const bool is_v10 = magic == kMagicV10;
     const bool is_v11 = magic == kMagicV11;
-    if (!is_v5 && !is_v6 && !is_v7 && !is_v8 && !is_v9 && !is_v10 && !is_v11) throw std::runtime_error("invalid world snapshot magic");
+    const bool is_v12 = magic == kMagicV12;
+    if (!is_v5 && !is_v6 && !is_v7 && !is_v8 && !is_v9 && !is_v10 && !is_v11 && !is_v12) throw std::runtime_error("invalid world snapshot magic");
     const std::uint32_t version = read_u32(input);
     if ((version == 5U && !is_v5) || (version == 6U && !is_v6)
         || (version == 7U && !is_v7) || (version == 8U && !is_v8)
         || (version == 9U && !is_v9) || (version == 10U && !is_v10)
-        || (version == 11U && !is_v11)
+        || (version == 11U && !is_v11) || (version == 12U && !is_v12)
         || (version != 5U && version != 6U && version != 7U && version != 8U
-            && version != 9U && version != 10U && version != 11U)) {
+            && version != 9U && version != 10U && version != 11U && version != 12U)) {
         throw std::runtime_error("unsupported world snapshot version");
     }
 
