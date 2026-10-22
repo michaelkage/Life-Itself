@@ -1697,6 +1697,55 @@ int main() {
     assert(repeated_rumour_bytes.str() == repeated_rumour_resumed_bytes.str());
 
 
+    // Confidence about unrelated events must not change a source's reliability
+    // for the specific story being passed on.
+    WorldState claim_reliability_state;
+    NPC low_unrelated_source;
+    low_unrelated_source.entity_id = "low-unrelated-source";
+    low_unrelated_source.district_id = "claim-reliability-district";
+    NPCMemory low_source_story;
+    low_source_story.witness_id = low_unrelated_source.entity_id;
+    low_source_story.target_entity_id = "claim-target-a";
+    low_source_story.action_tag = ActionTag::CrimeTheft;
+    low_source_story.timestamp_hour = 0.0;
+    low_source_story.retention = 0.8;
+    low_unrelated_source.memories.push_back(low_source_story);
+    low_unrelated_source.beliefs.push_back(NPCBelief{
+        "unrelated-target-a", ActionTag::CrimeAssault, 0.0, 0.1,
+        "other-source", false, 0U, 0U});
+    NPC high_unrelated_source = low_unrelated_source;
+    high_unrelated_source.entity_id = "high-unrelated-source";
+    high_unrelated_source.memories.front().witness_id = high_unrelated_source.entity_id;
+    high_unrelated_source.memories.front().target_entity_id = "claim-target-b";
+    high_unrelated_source.beliefs.front().target_entity_id = "unrelated-target-b";
+    high_unrelated_source.beliefs.front().confidence = 0.9;
+    NPC claim_listener_a;
+    claim_listener_a.entity_id = "claim-listener-a";
+    claim_listener_a.district_id = "claim-reliability-district";
+    NPC claim_listener_b = claim_listener_a;
+    claim_listener_b.entity_id = "claim-listener-b";
+    NPC claim_target_a;
+    claim_target_a.entity_id = "claim-target-a";
+    claim_target_a.district_id = "claim-reliability-district";
+    NPC claim_target_b = claim_target_a;
+    claim_target_b.entity_id = "claim-target-b";
+    claim_reliability_state.npcs = {low_unrelated_source, high_unrelated_source,
+        claim_listener_a, claim_listener_b, claim_target_a, claim_target_b};
+    SimulationWorld claim_reliability_world(claim_reliability_state, 0.0, 178U);
+    (void)claim_reliability_world.talk("claim-listener-a", "low-unrelated-source");
+    (void)claim_reliability_world.talk("claim-listener-b", "high-unrelated-source");
+    const auto claim_confidence = [](const NPC& npc, const std::string& target_id) {
+        const auto found = std::find_if(npc.beliefs.begin(), npc.beliefs.end(),
+            [&target_id](const NPCBelief& belief) {
+                return belief.target_entity_id == target_id
+                    && belief.action_tag == ActionTag::CrimeTheft;
+            });
+        assert(found != npc.beliefs.end());
+        return found->confidence;
+    };
+    assert(claim_confidence(claim_reliability_world.state().npcs[2], "claim-target-a")
+        == claim_confidence(claim_reliability_world.state().npcs[3], "claim-target-b"));
+
     // Stable personality traits bias second-hand interpretation without changing
     // the event record or consuming randomness; save/resume preserves the traits.
     WorldState bias_state;
