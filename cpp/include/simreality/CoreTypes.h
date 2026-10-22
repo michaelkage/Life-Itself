@@ -193,6 +193,6 @@ struct WorldState {
     std::vector<HousingUnit> housing_units{};
     // Append-only deterministic history of resolved, scenario-authored choices.
     std::vector<MoralDecisionRecord> moral_decision_history{};
-}
+};
 
 } // namespace simreality
