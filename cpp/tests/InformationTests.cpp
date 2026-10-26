@@ -36,6 +36,13 @@ int main() {
     assert(received_by_c[0].claim_id == "claim-2");
     assert(ledger.claims_received_by("uninformed").empty());
     assert(ledger.claims_received_by("").empty());
+    const auto investigation_c = ledger.investigation_for("resident-c");
+    assert(investigation_c.size() == 1U);
+    assert(investigation_c[0].claim.claim_id == "claim-2");
+    assert(investigation_c[0].lineage.size() == 2U);
+    assert(investigation_c[0].lineage[0].claim_id == "claim-1");
+    assert(investigation_c[0].lineage[1].claim_id == "claim-2");
+    assert(ledger.investigation_for("uninformed").empty());
 
     const InformationClaim* relayed = ledger.find("claim-3");
     assert(relayed != nullptr);
