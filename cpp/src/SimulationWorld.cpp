@@ -49,8 +49,22 @@ std::vector<BeliefRevisionExplanation> SimulationWorld::belief_explanations_for(
     std::vector<BeliefRevisionExplanation> explanations;
     explanations.reserve(history.size());
     for (const BeliefRevision& revision : history) {
-        explanations.push_back(BeliefRevisionExplanation{
-            revision, revision.revised_confidence - revision.previous_confidence});
+        BeliefRevisionExplanation explanation;
+        explanation.revision = revision;
+        explanation.confidence_delta =
+            revision.revised_confidence - revision.previous_confidence;
+        explanation.evidence_claims.reserve(revision.evidence_claim_ids.size());
+        for (const std::string& claim_id : revision.evidence_claim_ids) {
+            BeliefEvidenceClaimExplanation linked_claim;
+            linked_claim.requested_claim_id = claim_id;
+            if (const InformationClaim* claim = information_.find(claim_id)) {
+                linked_claim.resolved = true;
+                linked_claim.claim = *claim;
+                linked_claim.lineage = information_.lineage_for_claim(claim_id);
+            }
+            explanation.evidence_claims.push_back(std::move(linked_claim));
+        }
+        explanations.push_back(std::move(explanation));
     }
     return explanations;
 }
