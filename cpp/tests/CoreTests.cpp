@@ -2186,6 +2186,12 @@ int main() {
             0.7, 1.1, 0.9, 1.2, 0.8}
     };
     investigation_view_state.npcs.push_back(investigating_npc);
+    NPC second_investigator;
+    second_investigator.entity_id = "second-investigator";
+    second_investigator.beliefs = {
+        NPCBelief{"bridge-7", ActionTag::SocialAid, 6.0, 0.9, "witness-c", true, 2U, 0U}
+    };
+    investigation_view_state.npcs.push_back(second_investigator);
     SimulationWorld investigation_view_world(investigation_view_state, 0.0, 2030U);
     InformationClaim view_claim_a;
     view_claim_a.claim_id = "view-claim-a";
@@ -2207,6 +2213,11 @@ int main() {
     private_claim.subject_key = "different-subject";
     private_claim.recipient_entity_id = "another-npc";
     assert(investigation_view_world.information_ledger().record(private_claim).accepted);
+    InformationClaim second_npc_claim = view_claim_b;
+    second_npc_claim.claim_id = "view-claim-second-npc";
+    second_npc_claim.recipient_entity_id = "second-investigator";
+    second_npc_claim.root_evidence_id = "inspection-c";
+    assert(investigation_view_world.information_ledger().record(second_npc_claim).accepted);
 
     const NPCInvestigationView investigation_view =
         investigation_view_world.investigation_view_for("investigating-npc");
@@ -2224,6 +2235,16 @@ int main() {
     assert(filtered_investigation.current_beliefs.size() == 2U);
     assert(investigation_view_world.investigation_view_for("missing-npc").received_information.empty());
     assert(investigation_view_world.investigation_view_for("missing-npc").current_beliefs.empty());
+
+    // The same subject can have different recipient-local evidence and
+    // interpretations; the view exposes the difference without adjudicating it.
+    const NPCInvestigationView second_view =
+        investigation_view_world.investigation_view_for("second-investigator");
+    assert(second_view.received_information.size() == 1U);
+    assert(second_view.received_information[0].proposition_key == "bridge-unsafe");
+    assert(second_view.current_beliefs.size() == 1U);
+    assert(second_view.current_beliefs[0].action_tag == ActionTag::SocialAid);
+    assert(second_view.current_beliefs[0].confidence == 0.9);
     InformationClaim observed_claim;
     observed_claim.claim_id = "claim-observed";
     observed_claim.subject_key = "bridge-7";
