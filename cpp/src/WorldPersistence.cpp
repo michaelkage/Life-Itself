@@ -24,6 +24,7 @@ constexpr std::array<char, 8> kMagicV10{{'S', 'R', 'E', 'C', 'O', 'R', 'E', 'A'}
 constexpr std::array<char, 8> kMagicV11{{'S', 'R', 'E', 'C', 'O', 'R', 'E', 'B'}};
 constexpr std::array<char, 8> kMagicV12{{'S', 'R', 'E', 'C', 'O', 'R', 'E', 'C'}};
 constexpr std::array<char, 8> kMagicV13{{'S', 'R', 'E', 'C', 'O', 'R', 'E', 'D'}};
+constexpr std::array<char, 8> kMagicV14{{'S', 'R', 'E', 'C', 'O', 'R', 'E', 'E'}};
 constexpr std::uint32_t kMaxCollectionItems = 1'000'000;
 constexpr std::uint32_t kMaxStringBytes = 16U * 1024U * 1024U;
 static_assert(sizeof(double) == sizeof(std::uint64_t));
@@ -241,6 +242,10 @@ void write_npc(std::ostream& out, const NPC& value) {
         write_double(out, revision.compassion_factor);
         write_double(out, revision.skepticism_factor);
         write_double(out, revision.evidence_factor);
+        write_count(out, revision.evidence_claim_ids.size());
+        for (const std::string& claim_id : revision.evidence_claim_ids) write_string(out, claim_id);
+        write_count(out, revision.evidence_root_ids.size());
+        for (const std::string& root_id : revision.evidence_root_ids) write_string(out, root_id);
     }
 }
 
@@ -354,6 +359,16 @@ NPC read_npc(std::istream& in, std::uint32_t version) {
                     if (!std::isfinite(factor) || factor < 0.0 || factor > 1.5)
                         throw std::runtime_error("invalid belief revision interpretation factor");
                 }
+            }
+            if (version >= 14U) {
+                const std::uint32_t claim_ids = read_count(in);
+                revision.evidence_claim_ids.reserve(claim_ids);
+                for (std::uint32_t j = 0; j < claim_ids; ++j)
+                    revision.evidence_claim_ids.push_back(read_string(in));
+                const std::uint32_t root_ids = read_count(in);
+                revision.evidence_root_ids.reserve(root_ids);
+                for (std::uint32_t j = 0; j < root_ids; ++j)
+                    revision.evidence_root_ids.push_back(read_string(in));
             }
             if (revision.event_timestamp_hour < 0.0 || revision.recorded_hour < 0.0)
                 throw std::runtime_error("invalid belief revision timestamp");
@@ -742,7 +757,7 @@ void read_information_ledger(std::istream& in, InformationLedger& ledger) {
 } // namespace
 
 void save_world(const SimulationWorld& world, std::ostream& output) {
-    output.write(kMagicV13.data(), static_cast<std::streamsize>(kMagicV13.size()));
+    output.write(kMagicV14.data(), static_cast<std::streamsize>(kMagicV14.size()));
     if (!output) throw std::runtime_error("failed writing world snapshot header");
     write_u32(output, kWorldSaveVersion);
     write_double(output, world.total_hours());
@@ -767,15 +782,16 @@ SimulationWorld load_world(std::istream& input) {
     const bool is_v11 = magic == kMagicV11;
     const bool is_v12 = magic == kMagicV12;
     const bool is_v13 = magic == kMagicV13;
-    if (!is_v5 && !is_v6 && !is_v7 && !is_v8 && !is_v9 && !is_v10 && !is_v11 && !is_v12 && !is_v13) throw std::runtime_error("invalid world snapshot magic");
+    const bool is_v14 = magic == kMagicV14;
+    if (!is_v5 && !is_v6 && !is_v7 && !is_v8 && !is_v9 && !is_v10 && !is_v11 && !is_v12 && !is_v13 && !is_v14) throw std::runtime_error("invalid world snapshot magic");
     const std::uint32_t version = read_u32(input);
     if ((version == 5U && !is_v5) || (version == 6U && !is_v6)
         || (version == 7U && !is_v7) || (version == 8U && !is_v8)
         || (version == 9U && !is_v9) || (version == 10U && !is_v10)
         || (version == 11U && !is_v11) || (version == 12U && !is_v12)
-        || (version == 13U && !is_v13)
+        || (version == 13U && !is_v13) || (version == 14U && !is_v14)
         || (version != 5U && version != 6U && version != 7U && version != 8U
-            && version != 9U && version != 10U && version != 11U && version != 12U && version != 13U)) {
+            && version != 9U && version != 10U && version != 11U && version != 12U && version != 13U && version != 14U)) {
         throw std::runtime_error("unsupported world snapshot version");
     }
 
