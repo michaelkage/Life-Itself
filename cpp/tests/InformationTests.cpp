@@ -89,8 +89,8 @@ int main() {
     assert(grouped[0].independent_evidence_count == 1U);
     assert(std::abs(grouped[0].evidence_strength - 0.7) < 1e-12);
     assert(grouped[1].proposition_key == "bridge-unsafe");
-    assert(grouped[1].independent_evidence_count == 1U);
-    assert(std::abs(grouped[1].evidence_strength - 0.5) < 1e-12);
+    assert(grouped[1].independent_evidence_count == 3U);
+    assert(std::abs(grouped[1].evidence_strength - (1.0 - (0.28 * 0.05 * 0.5))) < 1e-12);
     assert(ledger.investigation_groups_for("uninformed").empty());
 
     // A genuinely separate evidence root can independently corroborate it.
