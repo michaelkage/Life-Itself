@@ -48,9 +48,12 @@ Engine-independent Python reference systems:
 | `simreality/trauma.py` | 4.A Trauma Levels | Personal stress accumulation, behavioural tiers |
 | `simreality/justice.py` | 2.A Legal | Evidence, charges, plea bargaining |
 | `simreality/fixers.py` | 4.B Fixers | Fixer incentives, betrayal, network propagation |
-| `simreality/reputation.py` | 4.A, 4.B | Local reputation from witness memories and convictions |\n| `simreality/goals.py` | NPC autonomy | Deterministic goal tracking, prerequisite checks, deadline urgency, and stable priority selection |
+| `simreality/reputation.py` | 4.A, 4.B | Local reputation from witness memories and convictions |
+| `simreality/goals.py` | NPC autonomy | Deterministic goal tracking, prerequisite checks, deadline urgency, and stable priority selection |
+| `simreality/planning.py` | NPC autonomy | Bounded symbolic action planning with preconditions, effects, costs, and deterministic tie-breaking |
 
-`simreality/model.py` is the contract for the existing C++ domain port — it holds records and\nconstants only, no behaviour. The new NPC goal module is currently Python-only; its\nimplementation boundary and regression coverage are documented in\n[docs/NPC-GOALS-IMPLEMENTATION.md](docs/NPC-GOALS-IMPLEMENTATION.md).
+`simreality/model.py` is the contract for the existing C++ domain port — it holds records and
+constants only, no behaviour. The new NPC goal and planning modules are currently Python-only; their implementation boundaries and regression coverage are documented in [docs/NPC-GOALS-IMPLEMENTATION.md](docs/NPC-GOALS-IMPLEMENTATION.md) and [docs/NPC-PLANNING-IMPLEMENTATION.md](docs/NPC-PLANNING-IMPLEMENTATION.md).
 
 The C++ library under `cpp/` now includes the portable data model, deterministic
 clock/scheduler/RNG, memory decay, gossip, environmental pressure and district
