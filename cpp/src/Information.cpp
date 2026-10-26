@@ -112,6 +112,18 @@ std::vector<InformationClaim> InformationLedger::claims_received_by(
     return received;
 }
 
+std::vector<InvestigationEntry> InformationLedger::investigation_for(
+    const std::string& recipient_entity_id) const {
+    std::vector<InvestigationEntry> investigation;
+    for (const InformationClaim& claim : claims_received_by(recipient_entity_id)) {
+        investigation.push_back(InvestigationEntry{
+            claim,
+            lineage_for_claim(claim.claim_id)
+        });
+    }
+    return investigation;
+}
+
 std::size_t InformationLedger::independent_evidence_count(
     const std::string& subject_key,
     const std::string& proposition_key) const {
