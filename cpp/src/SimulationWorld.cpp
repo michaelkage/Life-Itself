@@ -906,6 +906,28 @@ Conversation SimulationWorld::talk(
             ? 0.75 + 0.25 * received_evidence_strength : 1.0;
         const double account_confidence = std::clamp(
             personality_confidence * evidence_factor, 0.0, 1.0);
+
+        // Preserve exactly which recipient-visible claims supported this incoming
+        // interpretation. The evidence-strength factor is aggregate, so retain
+        // both claim IDs and root IDs rather than implying one claim caused it.
+        std::vector<std::string> evidence_claim_ids;
+        std::vector<std::string> evidence_root_ids;
+        for (const auto& [claim_id, claim] : information_.claims()) {
+            if (claim.recipient_entity_id != listener_id
+                || claim.subject_key != rumour.target_entity_id
+                || claim.proposition_key != proposition_key) continue;
+            evidence_claim_ids.push_back(claim_id);
+            evidence_root_ids.push_back(claim.root_evidence_id);
+        }
+        std::sort(evidence_root_ids.begin(), evidence_root_ids.end());
+        evidence_root_ids.erase(
+            std::unique(evidence_root_ids.begin(), evidence_root_ids.end()),
+            evidence_root_ids.end());
+        const auto attach_evidence_links = [&](BeliefRevision& revision) {
+            revision.evidence_claim_ids = evidence_claim_ids;
+            revision.evidence_root_ids = evidence_root_ids;
+        };
+
         auto belief = std::find_if(listener.beliefs.begin(), listener.beliefs.end(),
             [&rumour, &believed_action](const NPCBelief& candidate) {
                 return candidate.target_entity_id == rumour.target_entity_id
@@ -935,6 +957,7 @@ Conversation SimulationWorld::talk(
                         BeliefRevisionReason::Contradiction, speaker_id, runtime_.total_hours(),
                         source_reliability, loyalty_factor, compassion_factor,
                         skepticism_factor, evidence_factor});
+                    attach_evidence_links(listener.belief_revision_history.back());
                 }
             }
         }
@@ -959,6 +982,7 @@ Conversation SimulationWorld::talk(
                         BeliefRevisionReason::IndependentEvidence, speaker_id, runtime_.total_hours(),
                         source_reliability, loyalty_factor, compassion_factor,
                         skepticism_factor, evidence_factor});
+                    attach_evidence_links(listener.belief_revision_history.back());
                 }
             }
             if (contradicted) ++belief->contradictions;
