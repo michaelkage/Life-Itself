@@ -25,6 +25,7 @@ constexpr std::array<char, 8> kMagicV11{{'S', 'R', 'E', 'C', 'O', 'R', 'E', 'B'}
 constexpr std::array<char, 8> kMagicV12{{'S', 'R', 'E', 'C', 'O', 'R', 'E', 'C'}};
 constexpr std::array<char, 8> kMagicV13{{'S', 'R', 'E', 'C', 'O', 'R', 'E', 'D'}};
 constexpr std::array<char, 8> kMagicV14{{'S', 'R', 'E', 'C', 'O', 'R', 'E', 'E'}};
+constexpr std::array<char, 8> kMagicV15{{'S', 'R', 'E', 'C', 'O', 'R', 'E', 'F'}};
 constexpr std::uint32_t kMaxCollectionItems = 1'000'000;
 constexpr std::uint32_t kMaxStringBytes = 16U * 1024U * 1024U;
 static_assert(sizeof(double) == sizeof(std::uint64_t));
@@ -247,6 +248,34 @@ void write_npc(std::ostream& out, const NPC& value) {
         write_count(out, revision.evidence_root_ids.size());
         for (const std::string& root_id : revision.evidence_root_ids) write_string(out, root_id);
     }
+    write_count(out, value.decision_history.size());
+    for (const NPCDecisionRecord& record : value.decision_history) {
+        write_double(out, record.recorded_hour);
+        write_string(out, record.scenario_id);
+        write_string(out, record.selected_option_id);
+        write_double(out, record.selected_score);
+        write_count(out, record.option_scores.size());
+        for (const auto& item : record.option_scores) {
+            write_string(out, item.first);
+            write_double(out, item.second);
+        }
+        write_count(out, record.relationship_snapshot.size());
+        for (const auto& item : record.relationship_snapshot) {
+            write_string(out, item.first);
+            write_double(out, item.second);
+        }
+        write_count(out, record.evidence_claim_ids.size());
+        for (const std::string& id : record.evidence_claim_ids) write_string(out, id);
+        write_count(out, record.evidence_root_ids.size());
+        for (const std::string& id : record.evidence_root_ids) write_string(out, id);
+        write_double(out, record.loyalty_bias);
+        write_double(out, record.skepticism);
+        write_double(out, record.compassion);
+        write_double(out, record.fairness_value);
+        write_double(out, record.safety_value);
+        write_double(out, record.freedom_value);
+        write_double(out, record.self_interest_value);
+    }
 }
 
 NPC read_npc(std::istream& in, std::uint32_t version) {
@@ -373,6 +402,63 @@ NPC read_npc(std::istream& in, std::uint32_t version) {
             if (revision.event_timestamp_hour < 0.0 || revision.recorded_hour < 0.0)
                 throw std::runtime_error("invalid belief revision timestamp");
             value.belief_revision_history.push_back(std::move(revision));
+        }
+    }
+    if (version >= 15U) {
+        const std::uint32_t records = read_count(in);
+        value.decision_history.reserve(records);
+        for (std::uint32_t i = 0; i < records; ++i) {
+            NPCDecisionRecord record;
+            record.recorded_hour = read_double(in);
+            record.scenario_id = read_string(in);
+            record.selected_option_id = read_string(in);
+            record.selected_score = read_double(in);
+            if (!std::isfinite(record.recorded_hour) || record.recorded_hour < 0.0
+                || record.scenario_id.empty() || record.selected_option_id.empty()
+                || !std::isfinite(record.selected_score)) {
+                throw std::runtime_error("invalid NPC decision record");
+            }
+            const std::uint32_t scores = read_count(in);
+            for (std::uint32_t j = 0; j < scores; ++j) {
+                const std::string id = read_string(in);
+                const double score = read_double(in);
+                if (id.empty() || !std::isfinite(score)
+                    || !record.option_scores.emplace(id, score).second) {
+                    throw std::runtime_error("invalid NPC decision option score");
+                }
+            }
+            const std::uint32_t relationships = read_count(in);
+            for (std::uint32_t j = 0; j < relationships; ++j) {
+                const std::string id = read_string(in);
+                const double strength = read_double(in);
+                if (id.empty() || !std::isfinite(strength)
+                    || !record.relationship_snapshot.emplace(id, strength).second) {
+                    throw std::runtime_error("invalid NPC decision relationship snapshot");
+                }
+            }
+            const std::uint32_t claim_ids = read_count(in);
+            for (std::uint32_t j = 0; j < claim_ids; ++j)
+                record.evidence_claim_ids.push_back(read_string(in));
+            const std::uint32_t root_ids = read_count(in);
+            for (std::uint32_t j = 0; j < root_ids; ++j)
+                record.evidence_root_ids.push_back(read_string(in));
+            record.loyalty_bias = read_double(in);
+            record.skepticism = read_double(in);
+            record.compassion = read_double(in);
+            record.fairness_value = read_double(in);
+            record.safety_value = read_double(in);
+            record.freedom_value = read_double(in);
+            record.self_interest_value = read_double(in);
+            const double traits[] = {record.loyalty_bias, record.skepticism,
+                record.compassion, record.fairness_value, record.safety_value,
+                record.freedom_value, record.self_interest_value};
+            for (double trait : traits) {
+                if (!std::isfinite(trait) || trait < 0.0 || trait > 1.0)
+                    throw std::runtime_error("invalid NPC decision trait snapshot");
+            }
+            if (!record.option_scores.contains(record.selected_option_id))
+                throw std::runtime_error("NPC decision record lacks selected option score");
+            value.decision_history.push_back(std::move(record));
         }
     }
     return value;
@@ -757,7 +843,7 @@ void read_information_ledger(std::istream& in, InformationLedger& ledger) {
 } // namespace
 
 void save_world(const SimulationWorld& world, std::ostream& output) {
-    output.write(kMagicV14.data(), static_cast<std::streamsize>(kMagicV14.size()));
+    output.write(kMagicV15.data(), static_cast<std::streamsize>(kMagicV15.size()));
     if (!output) throw std::runtime_error("failed writing world snapshot header");
     write_u32(output, kWorldSaveVersion);
     write_double(output, world.total_hours());
@@ -783,15 +869,16 @@ SimulationWorld load_world(std::istream& input) {
     const bool is_v12 = magic == kMagicV12;
     const bool is_v13 = magic == kMagicV13;
     const bool is_v14 = magic == kMagicV14;
-    if (!is_v5 && !is_v6 && !is_v7 && !is_v8 && !is_v9 && !is_v10 && !is_v11 && !is_v12 && !is_v13 && !is_v14) throw std::runtime_error("invalid world snapshot magic");
+    const bool is_v15 = magic == kMagicV15;
+    if (!is_v5 && !is_v6 && !is_v7 && !is_v8 && !is_v9 && !is_v10 && !is_v11 && !is_v12 && !is_v13 && !is_v14 && !is_v15) throw std::runtime_error("invalid world snapshot magic");
     const std::uint32_t version = read_u32(input);
     if ((version == 5U && !is_v5) || (version == 6U && !is_v6)
         || (version == 7U && !is_v7) || (version == 8U && !is_v8)
         || (version == 9U && !is_v9) || (version == 10U && !is_v10)
         || (version == 11U && !is_v11) || (version == 12U && !is_v12)
-        || (version == 13U && !is_v13) || (version == 14U && !is_v14)
+        || (version == 13U && !is_v13) || (version == 14U && !is_v14) || (version == 15U && !is_v15)
         || (version != 5U && version != 6U && version != 7U && version != 8U
-            && version != 9U && version != 10U && version != 11U && version != 12U && version != 13U && version != 14U)) {
+            && version != 9U && version != 10U && version != 11U && version != 12U && version != 13U && version != 14U && version != 15U)) {
         throw std::runtime_error("unsupported world snapshot version");
     }
 
