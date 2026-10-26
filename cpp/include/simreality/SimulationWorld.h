@@ -57,6 +57,9 @@ struct NPCInvestigationView {
     EntityId npc_id{};
     std::vector<InvestigationGroup> received_information{};
     std::vector<NPCBelief> current_beliefs{};
+    // Per-account explanations avoid making callers join revisions by hand.
+    // Each account retains incompatible interpretations and their own history.
+    std::vector<BeliefAccountExplanation> belief_accounts{};
     std::vector<BeliefRevisionExplanation> belief_history{};
 };
 
