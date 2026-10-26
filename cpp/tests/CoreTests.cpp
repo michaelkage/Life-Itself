@@ -2189,6 +2189,10 @@ int main() {
             BeliefRevisionReason::Contradiction, "witness-b", 8.0,
             0.7, 1.1, 0.9, 1.2, 0.8}
     };
+    investigating_npc.belief_revision_history.back().evidence_claim_ids = {
+        "view-claim-a", "missing-claim"};
+    investigating_npc.belief_revision_history.back().evidence_root_ids = {
+        "inspection-a", "missing-root"};
     investigation_view_state.npcs.push_back(investigating_npc);
     NPC second_investigator;
     second_investigator.entity_id = "second-investigator";
@@ -2236,6 +2240,15 @@ int main() {
     assert(investigation_view.belief_history[0].revision.compassion_factor == 0.9);
     assert(investigation_view.belief_history[0].revision.skepticism_factor == 1.2);
     assert(investigation_view.belief_history[0].revision.evidence_factor == 0.8);
+    assert(investigation_view.belief_history[0].revision.evidence_root_ids.size() == 2U);
+    assert(investigation_view.belief_history[0].evidence_claims.size() == 2U);
+    assert(investigation_view.belief_history[0].evidence_claims[0].requested_claim_id == "view-claim-a");
+    assert(investigation_view.belief_history[0].evidence_claims[0].resolved);
+    assert(investigation_view.belief_history[0].evidence_claims[0].claim.root_evidence_id == "inspection-a");
+    assert(investigation_view.belief_history[0].evidence_claims[0].lineage.size() == 1U);
+    assert(investigation_view.belief_history[0].evidence_claims[0].lineage.front().claim_id == "view-claim-a");
+    assert(investigation_view.belief_history[0].evidence_claims[1].requested_claim_id == "missing-claim");
+    assert(!investigation_view.belief_history[0].evidence_claims[1].resolved);
     assert(std::abs(investigation_view.belief_history[0].confidence_delta - (-0.15)) < 1e-12);
     assert(investigation_view.belief_accounts.size() == 2U);
     assert(investigation_view.belief_accounts[0].current_belief.action_tag == ActionTag::CrimeTheft);
