@@ -100,6 +100,12 @@ class InformationProvenanceTests(unittest.TestCase):
             investigation[0].claim.proposition_key,
             investigation[1].claim.proposition_key,
         )
+        # Repeated relays of one root remain one source of evidence; a separate
+        # root can be considered independently without erasing the conflict.
+        self.assertEqual(
+            len({entry.claim.root_evidence_id for entry in investigation}),
+            2,
+        )
         self.assertEqual(ledger.investigation_for("uninformed"), ())
 
     def test_distinct_root_evidence_counts_as_independent(self):
