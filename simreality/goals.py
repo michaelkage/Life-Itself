@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
+import math
 
 
 class GoalStatus(str, Enum):
@@ -45,16 +46,16 @@ class NPCGoal:
     def validate(self) -> None:
         if not self.goal_id or not self.owner_id or not self.category:
             raise ValueError("goal_id, owner_id, and category must be non-empty")
-        if self.priority < 0:
-            raise ValueError("priority must be non-negative")
+        if not math.isfinite(self.priority) or self.priority < 0:
+            raise ValueError("priority must be finite and non-negative")
         if self.created_tick < 0 or self.review_tick < 0:
             raise ValueError("goal ticks must be non-negative")
         if self.deadline_tick is not None and self.deadline_tick < self.created_tick:
             raise ValueError("deadline_tick cannot precede created_tick")
-        if not 0.0 <= self.progress <= 1.0:
-            raise ValueError("progress must be between 0 and 1")
-        if not 0.0 <= self.confidence <= 1.0:
-            raise ValueError("confidence must be between 0 and 1")
+        if not math.isfinite(self.progress) or not 0.0 <= self.progress <= 1.0:
+            raise ValueError("progress must be finite and between 0 and 1")
+        if not math.isfinite(self.confidence) or not 0.0 <= self.confidence <= 1.0:
+            raise ValueError("confidence must be finite and between 0 and 1")
         if self.goal_id in self.dependencies:
             raise ValueError("a goal cannot depend on itself")
         if len(set(self.dependencies)) != len(self.dependencies):
@@ -110,10 +111,12 @@ class GoalBook:
 
     def update_progress(self, goal_id: str, progress: float, *, confidence: float | None = None) -> None:
         goal = self.goals[goal_id]
-        if not 0.0 <= progress <= 1.0:
-            raise ValueError("progress must be between 0 and 1")
-        if confidence is not None and not 0.0 <= confidence <= 1.0:
-            raise ValueError("confidence must be between 0 and 1")
+        if not math.isfinite(progress) or not 0.0 <= progress <= 1.0:
+            raise ValueError("progress must be finite and between 0 and 1")
+        if confidence is not None and (
+            not math.isfinite(confidence) or not 0.0 <= confidence <= 1.0
+        ):
+            raise ValueError("confidence must be finite and between 0 and 1")
         if goal.status in _TERMINAL_STATUSES or goal.status == GoalStatus.BLOCKED:
             raise ValueError("cannot update a terminal or blocked goal")
         # Progress may fall when an NPC loses resources or circumstances worsen.
