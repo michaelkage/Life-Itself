@@ -1855,6 +1855,26 @@ int main() {
     assert(std::abs(explained_score - urgent_explanation.total_score) < 1e-12);
     assert(urgent_explanation.total_score
         == evaluate_moral_choice(urgency_focused, urgent_aid).score);
+    WorldState decision_context_state;
+    urgency_focused.relationships["neighbor"] = 0.65;
+    decision_context_state.npcs.push_back(urgency_focused);
+    SimulationWorld decision_context_world(std::move(decision_context_state), 12.0, 91U);
+    const NPCDecisionContextExplanation decision_context =
+        decision_context_world.decision_context_for(
+            "urgency-focused", {urgent_aid, fair_distribution});
+    assert(decision_context.npc_id == "urgency-focused");
+    assert(decision_context.observed_at_hour == 12.0);
+    assert(decision_context.relationships.at("neighbor") == 0.65);
+    assert(decision_context.option_explanations.size() == 2U);
+    assert(decision_context.option_explanations[0].option_id == "urgent-aid");
+    assert(decision_context.option_explanations[0].total_score
+        == evaluate_moral_choice(urgency_focused, urgent_aid).score);
+    assert(decision_context.investigation.npc_id == "urgency-focused");
+    // An unknown NPC yields an explicitly empty context, not fabricated evidence.
+    const NPCDecisionContextExplanation missing_decision_context =
+        decision_context_world.decision_context_for("missing-npc", {urgent_aid});
+    assert(missing_decision_context.option_explanations.empty());
+    assert(missing_decision_context.investigation.received_information.empty());
     NPC out_of_range_values = urgency_focused;
     out_of_range_values.compassion = 2.0;
     MoralChoiceOption out_of_range_option = urgent_aid;
