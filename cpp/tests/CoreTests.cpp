@@ -2228,7 +2228,16 @@ int main() {
     assert(investigation_view.current_beliefs[1].action_tag == ActionTag::SocialAid);
     assert(investigation_view.belief_history.size() == 1U);
     assert(investigation_view.belief_history[0].revision.source_reliability == 0.7);
+    assert(investigation_view.belief_history[0].revision.loyalty_factor == 1.1);
+    assert(investigation_view.belief_history[0].revision.compassion_factor == 0.9);
+    assert(investigation_view.belief_history[0].revision.skepticism_factor == 1.2);
+    assert(investigation_view.belief_history[0].revision.evidence_factor == 0.8);
     assert(std::abs(investigation_view.belief_history[0].confidence_delta - (-0.15)) < 1e-12);
+    assert(investigation_view.belief_accounts.size() == 2U);
+    assert(investigation_view.belief_accounts[0].current_belief.action_tag == ActionTag::CrimeTheft);
+    assert(investigation_view.belief_accounts[0].revisions.size() == 1U);
+    assert(investigation_view.belief_accounts[1].current_belief.action_tag == ActionTag::SocialAid);
+    assert(investigation_view.belief_accounts[1].revisions.empty());
     const NPCInvestigationView filtered_investigation =
         investigation_view_world.investigation_view_for("investigating-npc", "bridge-7");
     assert(filtered_investigation.received_information.size() == 2U);
