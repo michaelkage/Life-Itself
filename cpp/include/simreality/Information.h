@@ -43,6 +43,16 @@ struct InvestigationEntry {
     std::vector<InformationClaim> lineage{};
 };
 
+// A proposition-specific view of what one recipient has received.
+// Evidence support is recipient-local and is not a truth or morality score.
+struct InvestigationGroup {
+    std::string subject_key{};
+    std::string proposition_key{};
+    std::vector<InvestigationEntry> entries{};
+    std::size_t independent_evidence_count{0};
+    double evidence_strength{0.0};
+};
+
 // Append-only provenance ledger. A relay is not independent corroboration:
 // corroboration counts distinct root evidence IDs, not the number of times a
 // claim has been repeated through a social network.
@@ -69,6 +79,10 @@ public:
     // Returns received claims alongside their source chains, preserving
     // conflicting propositions as distinct entries in deterministic order.
     [[nodiscard]] std::vector<InvestigationEntry> investigation_for(
+        const std::string& recipient_entity_id) const;
+    // Groups only received claims by subject/proposition in lexical key order.
+    // Competing propositions remain separate and are not ranked as true/false.
+    [[nodiscard]] std::vector<InvestigationGroup> investigation_groups_for(
         const std::string& recipient_entity_id) const;
     [[nodiscard]] std::size_t independent_evidence_count(
         const std::string& subject_key,
