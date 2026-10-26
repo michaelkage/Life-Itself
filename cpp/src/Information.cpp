@@ -124,6 +124,31 @@ std::vector<InvestigationEntry> InformationLedger::investigation_for(
     return investigation;
 }
 
+std::vector<InvestigationGroup> InformationLedger::investigation_groups_for(
+    const std::string& recipient_entity_id) const {
+    std::map<std::pair<std::string, std::string>, std::vector<InvestigationEntry>> grouped;
+    for (const InvestigationEntry& entry : investigation_for(recipient_entity_id)) {
+        grouped[{entry.claim.subject_key, entry.claim.proposition_key}].push_back(entry);
+    }
+
+    std::vector<InvestigationGroup> result;
+    result.reserve(grouped.size());
+    for (auto& [key, entries] : grouped) {
+        std::set<std::string> roots;
+        for (const InvestigationEntry& entry : entries)
+            roots.insert(entry.claim.root_evidence_id);
+        result.push_back(InvestigationGroup{
+            key.first,
+            key.second,
+            std::move(entries),
+            roots.size(),
+            independent_evidence_strength_for_recipient(
+                key.first, key.second, recipient_entity_id)
+        });
+    }
+    return result;
+}
+
 std::size_t InformationLedger::independent_evidence_count(
     const std::string& subject_key,
     const std::string& proposition_key) const {
