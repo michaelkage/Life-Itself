@@ -1,6 +1,7 @@
 #pragma once
 
 #include "simreality/CoreTypes.h"
+#include "simreality/DecisionSystem.h"
 #include "simreality/Districts.h"
 #include "simreality/Ecosystem.h"
 #include "simreality/Fixers.h"
@@ -73,6 +74,16 @@ struct NPCInvestigationView {
     std::vector<BeliefRevisionExplanation> belief_history{};
 };
 
+ // Current read-only context for comparing moral options. This is a present-time
+// view, not a historical decision record: it must not reconstruct earlier knowledge.
+struct NPCDecisionContextExplanation {
+    EntityId npc_id{};
+    SimulationHour observed_at_hour{0.0};
+    NPCInvestigationView investigation{};
+    std::map<EntityId, double> relationships{};
+    std::vector<MoralChoiceExplanation> option_explanations{};
+};
+
 // Portable coordinator for deterministic, simulation-time-driven world updates.
 // Unreal-facing code should consume snapshots/reports rather than enter this core.
 class SimulationWorld {
@@ -117,6 +128,11 @@ public:
     // An optional target filters claim subject keys and belief target IDs.
     [[nodiscard]] NPCInvestigationView investigation_view_for(
         const EntityId& npc_id, const EntityId& target_id = {}) const;
+    // Snapshot current evidence, beliefs, relationships, and option scores.
+    // This is not historical decision context.
+    [[nodiscard]] NPCDecisionContextExplanation decision_context_for(
+        const EntityId& npc_id, const std::vector<MoralChoiceOption>& options,
+        const EntityId& target_id = {}) const;
 
     // Advances simulation time in a frame-rate-independent way. All due hourly
     // memory sweeps and daily district/NPC updates run in chronological order.
