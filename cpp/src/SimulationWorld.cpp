@@ -110,6 +110,42 @@ std::vector<BeliefAccountExplanation> SimulationWorld::belief_account_explanatio
     return explanations;
 }
 
+NPCInvestigationView SimulationWorld::investigation_view_for(
+    const EntityId& npc_id, const EntityId& target_id) const {
+    NPCInvestigationView view;
+    view.npc_id = npc_id;
+
+    const auto npc = std::find_if(
+        state_.npcs.begin(), state_.npcs.end(),
+        [&npc_id](const NPC& candidate) { return candidate.entity_id == npc_id; });
+    if (npc == state_.npcs.end()) return view;
+
+    for (InvestigationGroup& group :
+        information_.investigation_groups_for(npc_id)) {
+        if (target_id.empty() || group.subject_key == target_id) {
+            view.received_information.push_back(std::move(group));
+        }
+    }
+
+    for (const NPCBelief& belief : npc->beliefs) {
+        if (target_id.empty() || belief.target_entity_id == target_id) {
+            view.current_beliefs.push_back(belief);
+        }
+    }
+    // Stable display order is not a confidence or truth ranking.
+    std::stable_sort(view.current_beliefs.begin(), view.current_beliefs.end(),
+        [](const NPCBelief& left, const NPCBelief& right) {
+            if (left.timestamp_hour != right.timestamp_hour)
+                return left.timestamp_hour < right.timestamp_hour;
+            if (left.action_tag != right.action_tag)
+                return left.action_tag < right.action_tag;
+            return left.source_entity_id < right.source_entity_id;
+        });
+
+    view.belief_history = belief_explanations_for(npc_id, target_id);
+    return view;
+}
+
 GhostInfluenceResult SimulationWorld::attempt_ghost_influence(
     const EntityId& ghost_id, const EntityId& npc_id,
     const std::string& action, double hour_of_day) {
