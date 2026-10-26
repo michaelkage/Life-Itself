@@ -177,6 +177,27 @@ NPCInvestigationView SimulationWorld::investigation_view_for(
     return view;
 }
 
+NPCDecisionContextExplanation SimulationWorld::decision_context_for(
+    const EntityId& npc_id, const std::vector<MoralChoiceOption>& options,
+    const EntityId& target_id) const {
+    NPCDecisionContextExplanation context;
+    context.npc_id = npc_id;
+    context.observed_at_hour = runtime_.total_hours();
+    context.investigation = investigation_view_for(npc_id, target_id);
+
+    const auto npc = std::find_if(
+        state_.npcs.begin(), state_.npcs.end(),
+        [&npc_id](const NPC& candidate) { return candidate.entity_id == npc_id; });
+    if (npc == state_.npcs.end()) return context;
+
+    context.relationships = npc->relationships;
+    context.option_explanations.reserve(options.size());
+    for (const MoralChoiceOption& option : options) {
+        context.option_explanations.push_back(explain_moral_choice(*npc, option));
+    }
+    return context;
+}
+
 GhostInfluenceResult SimulationWorld::attempt_ghost_influence(
     const EntityId& ghost_id, const EntityId& npc_id,
     const std::string& action, double hour_of_day) {
