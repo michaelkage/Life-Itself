@@ -9,17 +9,17 @@ for a bounded least-cost action sequence that could satisfy its desired facts.
 ## Decision sequence
 
 1. Evaluate goals for the requested NPC and simulation tick.
-2. Choose the highest-scoring actionable goal using the goal book's stable tie-break.
-3. Look up the caller-provided desired facts for that exact goal ID.
-4. Ask the planner to find a bounded plan from the supplied current world facts.
-5. Return an immutable `NPCDecision` proposal with the goal, plan result, and reason.
+2. Rank actionable goals by score with stable goal-ID tie-breaking.
+3. Try each goal in that order, using only its caller-provided desired facts.
+4. If a goal has no mapping or no valid plan, try the next goal deterministically.
+5. Return the first feasible proposal; if none is feasible, preserve the highest-ranked failure for diagnosis.
 
 ## Important boundaries
 
 - The cycle never executes actions or mutates world facts or goal progress.
 - Goal categories and metadata are not interpreted as hidden action rules. The caller
   must explicitly map goal IDs to desired facts.
-- Missing mappings, absent goals, and planning failures are represented explicitly.
+- Missing mappings, absent goals, and planning failures are represented explicitly. A lower-ranked goal may be selected when higher-ranked goals are not currently feasible.
 - A successful symbolic plan is a proposal, not a guarantee that actions remain valid
   when later applied to a changing live world. The simulation coordinator must
   revalidate preconditions before execution.
