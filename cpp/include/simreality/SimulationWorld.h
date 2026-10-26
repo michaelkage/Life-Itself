@@ -133,6 +133,14 @@ public:
     [[nodiscard]] NPCDecisionContextExplanation decision_context_for(
         const EntityId& npc_id, const std::vector<MoralChoiceOption>& options,
         const EntityId& target_id = {}) const;
+    // Resolves a scenario choice and records the inputs available at this moment.
+    // Existing historical records are never reconstructed from later world state.
+    [[nodiscard]] MoralChoiceResolution record_moral_choice(
+        const EntityId& npc_id, const std::string& scenario_id,
+        const std::vector<MoralChoiceOption>& options,
+        const std::vector<MoralChoiceConsequence>& consequences);
+    [[nodiscard]] std::vector<NPCDecisionRecord> decision_history_for(
+        const EntityId& npc_id) const;
 
     // Advances simulation time in a frame-rate-independent way. All due hourly
     // memory sweeps and daily district/NPC updates run in chronological order.
