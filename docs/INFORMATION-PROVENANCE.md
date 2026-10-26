@@ -55,6 +55,12 @@ The C++ decision layer also exposes `explain_moral_choice(npc, option)`. It retu
 
 This is an explanation of how a supplied option scores under the NPC's current value priorities. It is not a historical record of a decision, does not capture which information the NPC had at an earlier time, and does not classify the selected option as objectively good or bad. Relationship values and evidence provenance are intentionally not presented as score factors because this scoring function does not currently use them. A later historical decision-context API should capture those inputs at the time of choice rather than reconstructing them from current world state.
 
+## Current NPC decision context
+
+`SimulationWorld::decision_context_for(npc_id, options, target_id)` joins a present-time investigation view with the NPC's current directed relationship values and the score explanation for each supplied moral-choice option. The result includes the simulation hour at which the query was made. Option explanations use the same deterministic factor breakdown as `evaluate_moral_choice`; their order matches the caller-supplied option order. Missing NPC IDs produce an empty context rather than invented knowledge or score factors.
+
+This API is deliberately named and documented as a **current** context query. It does not claim that current relationships or beliefs were the ones available when an earlier choice occurred. Historical decision-time context is not yet recorded by the moral-choice resolver; a future historical record must capture the relevant evidence, relationships, value factors, option scores, and chosen option at the moment of resolution, then persist those records for deterministic replay. Empty investigation sections mean no matching records are available, not that the NPC had evidence against a proposition.
+
 ## What this does not yet do
 
 This is an engine-independent provenance primitive, not a complete media or belief system. It does not yet:
