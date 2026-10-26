@@ -2079,6 +2079,10 @@ int main() {
         "history-target", ActionTag::CrimeTheft, 3.0, 0.4, 0.7,
         BeliefRevisionReason::IndependentEvidence, "history-source", 4.0,
         0.8, 1.1, 0.95, 0.8, 0.9});
+    revision_history_npc.belief_revision_history.back().evidence_claim_ids = {
+        "claim-alpha", "claim-beta"};
+    revision_history_npc.belief_revision_history.back().evidence_root_ids = {
+        "root-alpha", "root-beta"};
     information_state.npcs.push_back(revision_history_npc);
     SimulationWorld information_world(information_state, 0.0, 2026U);
 
@@ -2284,6 +2288,12 @@ int main() {
     assert(restored_revision.compassion_factor == 0.95);
     assert(restored_revision.skepticism_factor == 0.8);
     assert(restored_revision.evidence_factor == 0.9);
+    assert(restored_revision.evidence_claim_ids.size() == 2U);
+    assert(restored_revision.evidence_claim_ids[0] == "claim-alpha");
+    assert(restored_revision.evidence_claim_ids[1] == "claim-beta");
+    assert(restored_revision.evidence_root_ids.size() == 2U);
+    assert(restored_revision.evidence_root_ids[0] == "root-alpha");
+    assert(restored_revision.evidence_root_ids[1] == "root-beta");
     assert(restored_revision.source_reliability == 0.8);
     assert(restored_revision.loyalty_factor == 1.1);
     assert(restored_revision.compassion_factor == 0.95);
