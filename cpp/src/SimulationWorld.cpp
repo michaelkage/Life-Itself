@@ -143,6 +143,23 @@ NPCInvestigationView SimulationWorld::investigation_view_for(
         });
 
     view.belief_history = belief_explanations_for(npc_id, target_id);
+
+    // Build account-local timelines from the same chronological history. Match
+    // the exact target, action interpretation, and event timestamp so revisions
+    // for a competing account are never presented as if they explained this one.
+    for (const NPCBelief& belief : view.current_beliefs) {
+        BeliefAccountExplanation account;
+        account.current_belief = belief;
+        for (const BeliefRevisionExplanation& revision : view.belief_history) {
+            if (revision.revision.target_entity_id == belief.target_entity_id
+                && revision.revision.action_tag == belief.action_tag
+                && revision.revision.event_timestamp_hour == belief.timestamp_hour) {
+                account.revisions.push_back(revision);
+            }
+        }
+        view.belief_accounts.push_back(std::move(account));
+    }
+
     return view;
 }
 
