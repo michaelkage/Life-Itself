@@ -56,6 +56,10 @@ class GoalBookTests(unittest.TestCase):
         book = GoalBook()
         with self.assertRaises(ValueError):
             book.add(NPCGoal("bad", "npc", "work", priority=-1))
+        with self.assertRaises(ValueError):
+            book.add(NPCGoal("nan", "npc", "work", priority=float("nan")))
+        with self.assertRaises(ValueError):
+            book.add(NPCGoal("infinite", "npc", "work", priority=float("inf")))
         book.add(NPCGoal("valid", "npc", "work", priority=1))
         with self.assertRaises(ValueError):
             book.add(NPCGoal("valid", "npc", "work", priority=2))
