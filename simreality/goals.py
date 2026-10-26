@@ -162,8 +162,8 @@ class GoalBook:
         score *= 1.0 - 0.25 * goal.progress
         return GoalEvaluation(goal_id, True, score, "prerequisites satisfied")
 
-    def choose(self, owner_id: str, current_tick: int) -> NPCGoal | None:
-        """Return the highest-scoring actionable goal with a stable tie-break."""
+    def ranked(self, owner_id: str, current_tick: int) -> tuple[NPCGoal, ...]:
+        """Return actionable goals in deterministic priority order."""
         candidates: list[tuple[float, str, NPCGoal]] = []
         for goal in self.goals.values():
             if goal.owner_id != owner_id:
@@ -172,7 +172,12 @@ class GoalBook:
             if result.actionable:
                 candidates.append((-result.score, goal.goal_id, goal))
         candidates.sort(key=lambda item: (item[0], item[1]))
-        return candidates[0][2] if candidates else None
+        return tuple(item[2] for item in candidates)
+
+    def choose(self, owner_id: str, current_tick: int) -> NPCGoal | None:
+        """Return the highest-scoring actionable goal with a stable tie-break."""
+        ranked = self.ranked(owner_id, current_tick)
+        return ranked[0] if ranked else None
 
     def snapshot(self) -> tuple[tuple[object, ...], ...]:
         """Return a stable, immutable representation suitable for save/replay checks."""
