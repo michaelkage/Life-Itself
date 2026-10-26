@@ -121,3 +121,9 @@ __all__ += [
 from .goals import GoalBook, GoalEvaluation, GoalStatus, NPCGoal
 
 __all__ += ["GoalBook", "GoalEvaluation", "GoalStatus", "NPCGoal"]
+
+
+# Bounded deterministic symbolic planner for NPC action sequences.
+from .planning import DeterministicPlanner, PlanResult, PlanningAction
+
+__all__ += ["DeterministicPlanner", "PlanResult", "PlanningAction"]
