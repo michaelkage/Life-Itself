@@ -69,5 +69,24 @@ class NPCDecisionCycleTests(unittest.TestCase):
             self.cycle.decide("npc-1", -1, set(), {})
 
 
+    def test_falls_back_to_lower_ranked_goal_when_top_goal_is_unplannable(self):
+        result = self.cycle.decide(
+            "npc-1", 4, {"available"},
+            {"rent": {"impossible"}, "hobby": {"available"}},
+        )
+        self.assertTrue(result.actionable)
+        self.assertEqual(result.goal_id, "hobby")
+        self.assertIn("feasible fallback", result.reason)
+        self.assertIn("rent", result.reason)
+
+    def test_falls_back_when_top_goal_has_no_mapping(self):
+        result = self.cycle.decide(
+            "npc-1", 4, {"available"}, {"hobby": {"available"}}
+        )
+        self.assertTrue(result.actionable)
+        self.assertEqual(result.goal_id, "hobby")
+        self.assertIn("rent", result.reason)
+
+
 if __name__ == "__main__":
     unittest.main()
