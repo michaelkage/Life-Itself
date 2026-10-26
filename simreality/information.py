@@ -48,6 +48,17 @@ class InvestigationEntry:
     lineage: tuple[InformationClaim, ...]
 
 
+@dataclass(frozen=True)
+class InvestigationGroup:
+    """Received accounts for one proposition, with recipient-local support."""
+
+    subject_key: str
+    proposition_key: str
+    entries: tuple[InvestigationEntry, ...]
+    independent_evidence_count: int
+    evidence_strength: float
+
+
 class InformationLedger:
     """Deterministic claim ledger with explicit source lineage."""
 
@@ -169,6 +180,32 @@ class InformationLedger:
             InvestigationEntry(claim, self.lineage_for_claim(claim.claim_id))
             for claim in self.claims_received_by(recipient_entity_id)
         )
+
+    def investigation_groups_for(self, recipient_entity_id: str) -> tuple[InvestigationGroup, ...]:
+        """Group received claims by proposition without ranking competing accounts.
+
+        Groups are ordered by subject and proposition keys. Support is computed
+        only from claims delivered to this recipient; source reliability and
+        moral interpretation remain separate systems.
+        """
+        grouped: dict[tuple[str, str], list[InvestigationEntry]] = {}
+        for entry in self.investigation_for(recipient_entity_id):
+            key = (entry.claim.subject_key, entry.claim.proposition_key)
+            grouped.setdefault(key, []).append(entry)
+
+        result: list[InvestigationGroup] = []
+        for (subject_key, proposition_key), entries in sorted(grouped.items()):
+            roots = {entry.claim.root_evidence_id for entry in entries}
+            result.append(InvestigationGroup(
+                subject_key=subject_key,
+                proposition_key=proposition_key,
+                entries=tuple(entries),
+                independent_evidence_count=len(roots),
+                evidence_strength=self.independent_evidence_strength_for_recipient(
+                    subject_key, proposition_key, recipient_entity_id
+                ),
+            ))
+        return tuple(result)
 
     def independent_evidence_count(self, subject_key: str, proposition_key: str) -> int:
         return len({
