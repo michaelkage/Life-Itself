@@ -2190,7 +2190,7 @@ int main() {
             0.7, 1.1, 0.9, 1.2, 0.8}
     };
     investigating_npc.belief_revision_history.back().evidence_claim_ids = {
-        "view-claim-a", "missing-claim"};
+        "view-claim-a-relay", "missing-claim"};
     investigating_npc.belief_revision_history.back().evidence_root_ids = {
         "inspection-a", "missing-root"};
     investigation_view_state.npcs.push_back(investigating_npc);
@@ -2206,10 +2206,13 @@ int main() {
     view_claim_a.subject_key = "bridge-7";
     view_claim_a.proposition_key = "bridge-safe";
     view_claim_a.root_evidence_id = "inspection-a";
-    view_claim_a.source_entity_id = "inspector-a";
-    view_claim_a.recipient_entity_id = "investigating-npc";
+    view_claim_a.source_entity_id = "inspector-origin";
+    view_claim_a.recipient_entity_id = "inspector-a";
     view_claim_a.confidence = 0.8;
     assert(investigation_view_world.information_ledger().record(view_claim_a).accepted);
+    assert(investigation_view_world.information_ledger().relay(
+        "view-claim-a", "view-claim-a-relay", "inspector-a",
+        "investigating-npc", 1, 0.9).accepted);
     InformationClaim view_claim_b = view_claim_a;
     view_claim_b.claim_id = "view-claim-b";
     view_claim_b.proposition_key = "bridge-unsafe";
@@ -2242,11 +2245,12 @@ int main() {
     assert(investigation_view.belief_history[0].revision.evidence_factor == 0.8);
     assert(investigation_view.belief_history[0].revision.evidence_root_ids.size() == 2U);
     assert(investigation_view.belief_history[0].evidence_claims.size() == 2U);
-    assert(investigation_view.belief_history[0].evidence_claims[0].requested_claim_id == "view-claim-a");
+    assert(investigation_view.belief_history[0].evidence_claims[0].requested_claim_id == "view-claim-a-relay");
     assert(investigation_view.belief_history[0].evidence_claims[0].resolved);
     assert(investigation_view.belief_history[0].evidence_claims[0].claim.root_evidence_id == "inspection-a");
-    assert(investigation_view.belief_history[0].evidence_claims[0].lineage.size() == 1U);
+    assert(investigation_view.belief_history[0].evidence_claims[0].lineage.size() == 2U);
     assert(investigation_view.belief_history[0].evidence_claims[0].lineage.front().claim_id == "view-claim-a");
+    assert(investigation_view.belief_history[0].evidence_claims[0].lineage.back().claim_id == "view-claim-a-relay");
     assert(investigation_view.belief_history[0].evidence_claims[1].requested_claim_id == "missing-claim");
     assert(!investigation_view.belief_history[0].evidence_claims[1].resolved);
     assert(std::abs(investigation_view.belief_history[0].confidence_delta - (-0.15)) < 1e-12);
