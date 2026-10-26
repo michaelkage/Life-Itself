@@ -37,11 +37,21 @@ struct WorldAdvanceReport {
     std::size_t memories_swept{0};
 };
 
+// Resolves a revision's saved claim ID to its ledger record and full relay chain.
+// Unresolved IDs remain visible so missing provenance is not silently discarded.
+struct BeliefEvidenceClaimExplanation {
+    std::string requested_claim_id{};
+    bool resolved{false};
+    InformationClaim claim{};
+    std::vector<InformationClaim> lineage{};
+};
+
 // Presentation-neutral explanation data; a signed delta is not a truth or
 // morality score, only the change in this NPC's recorded confidence.
 struct BeliefRevisionExplanation {
     BeliefRevision revision{};
     double confidence_delta{0.0};
+    std::vector<BeliefEvidenceClaimExplanation> evidence_claims{};
 };
 
 // One current interpretation paired with only the revisions that explain that
