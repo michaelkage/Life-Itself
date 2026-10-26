@@ -51,6 +51,15 @@ struct BeliefAccountExplanation {
     std::vector<BeliefRevisionExplanation> revisions{};
 };
 
+// Read-only joined view of information delivered to one NPC and their separate
+// interpretations. Empty sections mean no records are available, not disproof.
+struct NPCInvestigationView {
+    EntityId npc_id{};
+    std::vector<InvestigationGroup> received_information{};
+    std::vector<NPCBelief> current_beliefs{};
+    std::vector<BeliefRevisionExplanation> belief_history{};
+};
+
 // Portable coordinator for deterministic, simulation-time-driven world updates.
 // Unreal-facing code should consume snapshots/reports rather than enter this core.
 class SimulationWorld {
@@ -91,6 +100,10 @@ public:
     [[nodiscard]] std::vector<BeliefAccountExplanation> belief_account_explanations_for(
         const EntityId& npc_id, const EntityId& target_id,
         SimulationHour event_timestamp_hour) const;
+    // Join delivered claims, current interpretations, and chronological changes.
+    // An optional target filters claim subject keys and belief target IDs.
+    [[nodiscard]] NPCInvestigationView investigation_view_for(
+        const EntityId& npc_id, const EntityId& target_id = {}) const;
 
     // Advances simulation time in a frame-rate-independent way. All due hourly
     // memory sweeps and daily district/NPC updates run in chronological order.
