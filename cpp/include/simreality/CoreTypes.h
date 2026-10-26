@@ -101,6 +101,26 @@ struct BeliefRevision {
     std::vector<std::string> evidence_root_ids{};
 };
 
+// Durable, compact record of the context used for a consequential option choice.
+// Scores and evidence IDs are historical snapshots, not objective truth labels.
+struct NPCDecisionRecord {
+    SimulationHour recorded_hour{0.0};
+    std::string scenario_id{};
+    std::string selected_option_id{};
+    double selected_score{0.0};
+    std::map<std::string, double> option_scores{};
+    std::map<EntityId, double> relationship_snapshot{};
+    std::vector<std::string> evidence_claim_ids{};
+    std::vector<std::string> evidence_root_ids{};
+    double loyalty_bias{0.5};
+    double skepticism{0.5};
+    double compassion{0.5};
+    double fairness_value{0.5};
+    double safety_value{0.5};
+    double freedom_value{0.5};
+    double self_interest_value{0.5};
+};
+
 struct NPC {
     EntityId entity_id{};
     AgeBand age_band{AgeBand::Adult};
@@ -142,6 +162,8 @@ struct NPC {
     double self_interest_value{0.5};
     // Appended for aggregate/source compatibility; entries are never overwritten.
     std::vector<BeliefRevision> belief_revision_history{};
+    // Appended durable decision records preserve context at choice time.
+    std::vector<NPCDecisionRecord> decision_history{};
 };
 
 struct District {
