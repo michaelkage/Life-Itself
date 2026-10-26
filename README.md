@@ -22,8 +22,7 @@ animation, physics, and asset integration are not implemented.
 python -m unittest discover -s tests -t .
 ```
 
-The Python reference suite currently has 139 tests and no dependencies beyond the
-standard library. Python 3.10+ (needs `X | Y` type syntax).
+The Python reference suite uses only the standard library and is run by GitHub Actions. Python 3.10+ is required (the code uses `X | Y` type syntax).
 
 For the portable C++ core:
 
