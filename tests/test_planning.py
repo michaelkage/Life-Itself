@@ -23,7 +23,7 @@ class DeterministicPlannerTests(unittest.TestCase):
         ])
         self.assertEqual(planner.plan({"start"}, {"goal"}).actions, ("a-route",))
 
-    def test_preconditions_and_delete_effects_are_respected(self):
+    def test_preconditions_are_respected(self):
         planner = DeterministicPlanner([
             PlanningAction("unlock", frozenset({"key"}), frozenset({"door-open"})),
             PlanningAction("enter", frozenset({"door-open"}), frozenset({"inside"})),
@@ -31,7 +31,16 @@ class DeterministicPlannerTests(unittest.TestCase):
         ])
         result = planner.plan({"key"}, {"inside"})
         self.assertEqual(result.actions, ("unlock", "enter"))
-        self.assertNotIn("consume-key", result.actions)
+
+    def test_delete_effects_change_the_planning_state(self):
+        planner = DeterministicPlanner([
+            PlanningAction("use-last-key", frozenset({"key"}), frozenset({"door-open"}), frozenset({"key"})),
+            PlanningAction("open-second-door", frozenset({"key"}), frozenset({"second-open"})),
+            PlanningAction("reach-room", frozenset({"door-open", "second-open"}), frozenset({"inside"})),
+        ])
+        result = planner.plan({"key"}, {"inside"})
+        self.assertFalse(result.success)
+        self.assertEqual(result.reason, "no valid plan found")
 
     def test_unsatisfied_preconditions_do_not_invent_actions(self):
         planner = DeterministicPlanner([
