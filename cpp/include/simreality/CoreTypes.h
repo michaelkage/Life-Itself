@@ -95,6 +95,10 @@ struct BeliefRevision {
     double compassion_factor{1.0};
     double skepticism_factor{1.0};
     double evidence_factor{1.0};
+    // Exact ledger records available to the recipient when this revision occurred.
+    // Empty means the revision was not linked to a recorded information claim.
+    std::vector<std::string> evidence_claim_ids{};
+    std::vector<std::string> evidence_root_ids{};
 };
 
 struct NPC {
