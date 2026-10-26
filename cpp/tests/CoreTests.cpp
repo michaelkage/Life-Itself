@@ -2217,6 +2217,7 @@ int main() {
     view_claim_b.claim_id = "view-claim-b";
     view_claim_b.proposition_key = "bridge-unsafe";
     view_claim_b.root_evidence_id = "inspection-b";
+    view_claim_b.recipient_entity_id = "investigating-npc";
     view_claim_b.confidence = 0.7;
     assert(investigation_view_world.information_ledger().record(view_claim_b).accepted);
     InformationClaim private_claim = view_claim_a;
