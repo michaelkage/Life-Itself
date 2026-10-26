@@ -1870,6 +1870,34 @@ int main() {
     assert(decision_context.option_explanations[0].total_score
         == evaluate_moral_choice(urgency_focused, urgent_aid).score);
     assert(decision_context.investigation.npc_id == "urgency-focused");
+    const MoralChoiceResolution recorded_choice = decision_context_world.record_moral_choice(
+        "urgency-focused", "aid-allocation",
+        {urgent_aid, fair_distribution},
+        {MoralChoiceConsequence{"urgent-aid", -1.0, 0.1, {{"neighbor", -0.2}}}});
+    assert(recorded_choice.choice.option_id == "urgent-aid");
+    const auto recorded_history =
+        decision_context_world.decision_history_for("urgency-focused");
+    assert(recorded_history.size() == 1U);
+    assert(recorded_history.front().recorded_hour == 12.0);
+    assert(recorded_history.front().scenario_id == "aid-allocation");
+    assert(recorded_history.front().selected_option_id == "urgent-aid");
+    assert(recorded_history.front().option_scores.size() == 2U);
+    assert(recorded_history.front().option_scores.at("urgent-aid")
+        == recorded_history.front().selected_score);
+    assert(recorded_history.front().relationship_snapshot.at("neighbor") == 0.65);
+    assert(decision_context_world.state().npcs.front().relationships.at("neighbor") == 0.45);
+    std::stringstream decision_history_snapshot(std::ios::in | std::ios::out | std::ios::binary);
+    save_world(decision_context_world, decision_history_snapshot);
+    decision_history_snapshot.seekg(0);
+    SimulationWorld decision_history_restored = load_world(decision_history_snapshot);
+    const auto restored_decision_history =
+        decision_history_restored.decision_history_for("urgency-focused");
+    assert(restored_decision_history.size() == 1U);
+    assert(restored_decision_history.front().scenario_id == "aid-allocation");
+    assert(restored_decision_history.front().selected_option_id == "urgent-aid");
+    assert(restored_decision_history.front().relationship_snapshot.at("neighbor") == 0.65);
+    assert(restored_decision_history.front().option_scores
+        == recorded_history.front().option_scores);
     // An unknown NPC yields an explicitly empty context, not fabricated evidence.
     const NPCDecisionContextExplanation missing_decision_context =
         decision_context_world.decision_context_for("missing-npc", {urgent_aid});
