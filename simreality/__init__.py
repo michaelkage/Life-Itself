@@ -127,3 +127,9 @@ __all__ += ["GoalBook", "GoalEvaluation", "GoalStatus", "NPCGoal"]
 from .planning import DeterministicPlanner, PlanResult, PlanningAction
 
 __all__ += ["DeterministicPlanner", "PlanResult", "PlanningAction"]
+
+
+# Integrated, read-only NPC goal selection and symbolic planning decision cycle.
+from .npc_autonomy import NPCDecision, NPCDecisionCycle
+
+__all__ += ["NPCDecision", "NPCDecisionCycle"]
