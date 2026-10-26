@@ -108,6 +108,50 @@ class InformationProvenanceTests(unittest.TestCase):
         )
         self.assertEqual(ledger.investigation_for("uninformed"), ())
 
+    def test_investigation_groups_keep_conflicts_separate_and_local(self):
+        ledger = InformationLedger()
+        self.assertTrue(ledger.record(root_claim(
+            claim_id="claim-a", recipient_entity_id="witness-c", confidence=0.8
+        )).accepted)
+        self.assertTrue(ledger.record(root_claim(
+            claim_id="claim-a-copy", recipient_entity_id="witness-c", created_tick=11,
+            confidence=0.6
+        )).accepted)
+        self.assertTrue(ledger.record(root_claim(
+            claim_id="claim-b", recipient_entity_id="witness-c", created_tick=12,
+            root_evidence_id="evidence:independent", source_entity_id="witness-x",
+            confidence=0.5
+        )).accepted)
+        self.assertTrue(ledger.record(root_claim(
+            claim_id="contrary", recipient_entity_id="witness-c", created_tick=13,
+            proposition_key="was_not_at:market", root_evidence_id="evidence:contrary",
+            source_entity_id="witness-y", confidence=0.7
+        )).accepted)
+        # This claim exists in the world but has not reached witness-c.
+        self.assertTrue(ledger.record(root_claim(
+            claim_id="unheard", recipient_entity_id="witness-z", created_tick=14,
+            root_evidence_id="evidence:unheard", source_entity_id="witness-z",
+            confidence=1.0
+        )).accepted)
+
+        groups = ledger.investigation_groups_for("witness-c")
+        self.assertEqual(
+            tuple(group.proposition_key for group in groups),
+            ("was_at:market", "was_not_at:market"),
+        )
+        positive = groups[0]
+        self.assertEqual(
+            tuple(entry.claim.claim_id for entry in positive.entries),
+            ("claim-a", "claim-a-copy", "claim-b"),
+        )
+        # Repeated root contributes once; the second distinct root contributes
+        # independently. The unheard root must not leak into this NPC's view.
+        self.assertEqual(positive.independent_evidence_count, 2)
+        self.assertAlmostEqual(positive.evidence_strength, 1.0 - (0.2 * 0.5))
+        self.assertEqual(groups[1].independent_evidence_count, 1)
+        self.assertAlmostEqual(groups[1].evidence_strength, 0.7)
+        self.assertEqual(ledger.investigation_groups_for("unknown"), ())
+
     def test_distinct_root_evidence_counts_as_independent(self):
         ledger = InformationLedger()
         self.assertTrue(ledger.record(root_claim()).accepted)
