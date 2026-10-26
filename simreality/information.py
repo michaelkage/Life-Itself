@@ -40,6 +40,14 @@ class ClaimResult:
     error: str = ""
 
 
+@dataclass(frozen=True)
+class InvestigationEntry:
+    """One received claim and its source-to-recipient lineage."""
+
+    claim: InformationClaim
+    lineage: tuple[InformationClaim, ...]
+
+
 class InformationLedger:
     """Deterministic claim ledger with explicit source lineage."""
 
@@ -150,6 +158,17 @@ class InformationLedger:
             if claim.recipient_entity_id == recipient_entity_id
         )
         return tuple(sorted(received, key=lambda claim: (claim.created_tick, claim.claim_id)))
+
+    def investigation_for(self, recipient_entity_id: str) -> tuple[InvestigationEntry, ...]:
+        """Return a deterministic investigation packet for one recipient.
+
+        Every received claim remains a separate entry, including conflicting
+        propositions. Lineage is explanatory provenance, not a truth verdict.
+        """
+        return tuple(
+            InvestigationEntry(claim, self.lineage_for_claim(claim.claim_id))
+            for claim in self.claims_received_by(recipient_entity_id)
+        )
 
     def independent_evidence_count(self, subject_key: str, proposition_key: str) -> int:
         return len({
