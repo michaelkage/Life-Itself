@@ -62,6 +62,37 @@ int main() {
     lineage[0].confidence = 0.0;
     assert(std::abs(ledger.find("claim-1")->confidence - 0.9) < 1e-12);
 
+    // Group the investigation by proposition without ranking competing accounts.
+    InformationClaim local_second = first;
+    local_second.claim_id = "claim-local-second";
+    local_second.root_evidence_id = "evidence-local-second";
+    local_second.source_entity_id = "inspector";
+    local_second.recipient_entity_id = "resident-c";
+    local_second.created_tick = 13;
+    local_second.confidence = 0.5;
+    assert(ledger.record(local_second).accepted);
+
+    InformationClaim competing = first;
+    competing.claim_id = "claim-competing";
+    competing.proposition_key = "bridge-safe";
+    competing.root_evidence_id = "evidence-driver-account";
+    competing.source_entity_id = "driver";
+    competing.recipient_entity_id = "resident-c";
+    competing.created_tick = 14;
+    competing.confidence = 0.7;
+    assert(ledger.record(competing).accepted);
+
+    const auto grouped = ledger.investigation_groups_for("resident-c");
+    assert(grouped.size() == 2U);
+    assert(grouped[0].subject_key == "bridge-7");
+    assert(grouped[0].proposition_key == "bridge-safe");
+    assert(grouped[0].independent_evidence_count == 1U);
+    assert(std::abs(grouped[0].evidence_strength - 0.7) < 1e-12);
+    assert(grouped[1].proposition_key == "bridge-unsafe");
+    assert(grouped[1].independent_evidence_count == 1U);
+    assert(std::abs(grouped[1].evidence_strength - 0.5) < 1e-12);
+    assert(ledger.investigation_groups_for("uninformed").empty());
+
     // A genuinely separate evidence root can independently corroborate it.
     InformationClaim second = first;
     second.claim_id = "claim-4";
