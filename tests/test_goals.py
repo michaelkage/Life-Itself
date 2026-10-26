@@ -44,14 +44,13 @@ class GoalBookTests(unittest.TestCase):
         self.assertFalse(result.actionable)
         self.assertIn("no longer", result.reason)
 
-    def test_dependency_cycles_are_rejected_without_corrupting_book(self):
+    def test_unknown_prerequisite_is_rejected_without_corrupting_book(self):
         book = GoalBook()
         book.add(NPCGoal("first", "npc", "work", priority=1))
-        book.add(NPCGoal("second", "npc", "work", priority=1, dependencies=("first",)))
-        with self.assertRaises(ValueError):
-            book.add(NPCGoal("first-again", "npc", "work", priority=1,
-                             dependencies=("second",)))
-        self.assertEqual(set(book.goals), {"first", "second"})
+        with self.assertRaisesRegex(ValueError, "unknown goal dependency"):
+            book.add(NPCGoal("second", "npc", "work", priority=1,
+                             dependencies=("missing",)))
+        self.assertEqual(set(book.goals), {"first"})
 
     def test_invalid_values_and_duplicate_ids_are_rejected(self):
         book = GoalBook()
