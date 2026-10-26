@@ -1,8 +1,7 @@
-"""Connect deterministic goal selection to symbolic planning without side effects.
+"""Connect deterministic goal ranking to symbolic planning without side effects.
 
-The decision cycle selects an actionable goal, resolves its explicitly supplied
-desired facts, and asks the planner for a bounded action sequence. It never
-executes actions, changes world facts, or silently guesses a goal's meaning.
+The decision cycle tries goals in priority order and can fall back when a higher
+priority goal has no configured target facts or cannot currently be planned.
 """
 from __future__ import annotations
 
@@ -45,29 +44,53 @@ class NPCDecisionCycle:
         *,
         max_expansions: int = 10_000,
     ) -> NPCDecision:
-        """Propose a plan for the best actionable goal, leaving state unchanged.
+        """Propose a plan for the highest-ranked goal that can currently be planned.
 
-        ``goal_facts`` explicitly maps goal IDs to their desired world facts. If
-        the selected goal has no mapping, the cycle reports that configuration
-        gap instead of guessing from the goal category or metadata.
+        goal_facts explicitly maps goal IDs to desired world facts. If a higher-ranked
+        goal cannot be planned, lower-ranked goals are tried deterministically.
+        If none can be planned, the highest-ranked failure is returned for inspection.
         """
         if not owner_id or not owner_id.strip():
             raise ValueError("owner_id must be non-empty")
         if current_tick < 0:
             raise ValueError("current_tick must be non-negative")
 
-        goal = self.goals.choose(owner_id, current_tick)
-        if goal is None:
+        ranked_goals = self.goals.ranked(owner_id, current_tick)
+        if not ranked_goals:
             return NPCDecision(owner_id, current_tick, None, None, None,
                                "no actionable goal")
 
-        if goal.goal_id not in goal_facts:
-            return NPCDecision(owner_id, current_tick, goal.goal_id, goal.category,
-                               None, "selected goal has no desired-facts mapping")
+        first_failure: NPCDecision | None = None
+        skipped: list[str] = []
+        for goal in ranked_goals:
+            if goal.goal_id not in goal_facts:
+                failure = NPCDecision(
+                    owner_id, current_tick, goal.goal_id, goal.category, None,
+                    "selected goal has no desired-facts mapping",
+                )
+            else:
+                plan = self.planner.plan(
+                    world_facts, goal_facts[goal.goal_id],
+                    max_expansions=max_expansions,
+                )
+                reason = plan.reason if plan.success else f"planning failed: {plan.reason}"
+                candidate = NPCDecision(
+                    owner_id, current_tick, goal.goal_id, goal.category, plan, reason
+                )
+                if plan.success:
+                    if skipped:
+                        return NPCDecision(
+                            owner_id, current_tick, goal.goal_id, goal.category, plan,
+                            "feasible fallback; higher-ranked goals unavailable: "
+                            + ", ".join(skipped),
+                        )
+                    return candidate
+                failure = candidate
 
-        result = self.planner.plan(
-            world_facts, goal_facts[goal.goal_id], max_expansions=max_expansions
-        )
-        reason = result.reason if result.success else f"planning failed: {result.reason}"
-        return NPCDecision(owner_id, current_tick, goal.goal_id, goal.category,
-                           result, reason)
+            if first_failure is None:
+                first_failure = failure
+            skipped.append(f"{goal.goal_id} ({failure.reason})")
+
+        if first_failure is None:
+            raise RuntimeError("ranked goals produced no decision")
+        return first_failure
