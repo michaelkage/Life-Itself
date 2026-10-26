@@ -67,6 +67,41 @@ class InformationProvenanceTests(unittest.TestCase):
         self.assertEqual(ledger.claims_received_by("unknown"), ())
         self.assertEqual(ledger.claims_received_by(""), ())
 
+    def test_investigation_for_includes_received_claims_and_lineage(self):
+        ledger = InformationLedger()
+        self.assertTrue(ledger.record(root_claim(claim_id="root", created_tick=10)).accepted)
+        self.assertTrue(ledger.relay(
+            "root", "relay", "witness-b", "witness-c", 11, 0.8
+        ).accepted)
+        self.assertTrue(ledger.record(root_claim(
+            claim_id="conflict",
+            proposition_key="was_not_at:market",
+            root_evidence_id="evidence:driver",
+            source_entity_id="driver",
+            recipient_entity_id="witness-c",
+            created_tick=12,
+            confidence=0.7,
+        )).accepted)
+
+        investigation = ledger.investigation_for("witness-c")
+        self.assertEqual(
+            tuple(entry.claim.claim_id for entry in investigation),
+            ("relay", "conflict"),
+        )
+        self.assertEqual(
+            tuple(claim.claim_id for claim in investigation[0].lineage),
+            ("root", "relay"),
+        )
+        self.assertEqual(
+            tuple(claim.claim_id for claim in investigation[1].lineage),
+            ("conflict",),
+        )
+        self.assertNotEqual(
+            investigation[0].claim.proposition_key,
+            investigation[1].claim.proposition_key,
+        )
+        self.assertEqual(ledger.investigation_for("uninformed"), ())
+
     def test_distinct_root_evidence_counts_as_independent(self):
         ledger = InformationLedger()
         self.assertTrue(ledger.record(root_claim()).accepted)
