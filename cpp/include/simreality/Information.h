@@ -36,6 +36,13 @@ struct ClaimResult {
     std::string error{};
 };
 
+// A recipient's investigation packet. Claims remain separate records; each
+// claim carries its own source lineage and is never collapsed into a verdict.
+struct InvestigationEntry {
+    InformationClaim claim{};
+    std::vector<InformationClaim> lineage{};
+};
+
 // Append-only provenance ledger. A relay is not independent corroboration:
 // corroboration counts distinct root evidence IDs, not the number of times a
 // claim has been repeated through a social network.
@@ -58,6 +65,10 @@ public:
         const std::string& claim_id) const;
     // Returns only claims delivered to this recipient, ordered by tick then claim ID.
     [[nodiscard]] std::vector<InformationClaim> claims_received_by(
+        const std::string& recipient_entity_id) const;
+    // Returns received claims alongside their source chains, preserving
+    // conflicting propositions as distinct entries in deterministic order.
+    [[nodiscard]] std::vector<InvestigationEntry> investigation_for(
         const std::string& recipient_entity_id) const;
     [[nodiscard]] std::size_t independent_evidence_count(
         const std::string& subject_key,
