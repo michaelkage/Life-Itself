@@ -2170,6 +2170,60 @@ int main() {
         "missing-npc", "target", 12.0).empty());
     assert(explained_accounts_world.belief_account_explanations_for(
         "competing-accounts-npc", "target", std::numeric_limits<double>::infinity()).empty());
+
+    // The joined investigation view keeps received claims, conflicting current
+    // beliefs, and chronological confidence changes as distinct information.
+    WorldState investigation_view_state;
+    NPC investigating_npc;
+    investigating_npc.entity_id = "investigating-npc";
+    investigating_npc.beliefs = {
+        NPCBelief{"bridge-7", ActionTag::CrimeTheft, 6.0, 0.35, "witness-a", true, 1U, 1U},
+        NPCBelief{"bridge-7", ActionTag::SocialAid, 6.0, 0.65, "witness-b", false, 1U, 0U}
+    };
+    investigating_npc.belief_revision_history = {
+        BeliefRevision{"bridge-7", ActionTag::CrimeTheft, 6.0, 0.5, 0.35,
+            BeliefRevisionReason::Contradiction, "witness-b", 8.0,
+            0.7, 1.1, 0.9, 1.2, 0.8}
+    };
+    investigation_view_state.npcs.push_back(investigating_npc);
+    SimulationWorld investigation_view_world(investigation_view_state, 0.0, 2030U);
+    InformationClaim view_claim_a;
+    view_claim_a.claim_id = "view-claim-a";
+    view_claim_a.subject_key = "bridge-7";
+    view_claim_a.proposition_key = "bridge-safe";
+    view_claim_a.root_evidence_id = "inspection-a";
+    view_claim_a.source_entity_id = "inspector-a";
+    view_claim_a.recipient_entity_id = "investigating-npc";
+    view_claim_a.confidence = 0.8;
+    assert(investigation_view_world.information_ledger().record(view_claim_a).accepted);
+    InformationClaim view_claim_b = view_claim_a;
+    view_claim_b.claim_id = "view-claim-b";
+    view_claim_b.proposition_key = "bridge-unsafe";
+    view_claim_b.root_evidence_id = "inspection-b";
+    view_claim_b.confidence = 0.7;
+    assert(investigation_view_world.information_ledger().record(view_claim_b).accepted);
+    InformationClaim private_claim = view_claim_a;
+    private_claim.claim_id = "view-claim-private";
+    private_claim.subject_key = "different-subject";
+    private_claim.recipient_entity_id = "another-npc";
+    assert(investigation_view_world.information_ledger().record(private_claim).accepted);
+
+    const NPCInvestigationView investigation_view =
+        investigation_view_world.investigation_view_for("investigating-npc");
+    assert(investigation_view.npc_id == "investigating-npc");
+    assert(investigation_view.received_information.size() == 2U);
+    assert(investigation_view.current_beliefs.size() == 2U);
+    assert(investigation_view.current_beliefs[0].action_tag == ActionTag::CrimeTheft);
+    assert(investigation_view.current_beliefs[1].action_tag == ActionTag::SocialAid);
+    assert(investigation_view.belief_history.size() == 1U);
+    assert(investigation_view.belief_history[0].revision.source_reliability == 0.7);
+    assert(std::abs(investigation_view.belief_history[0].confidence_delta - (-0.15)) < 1e-12);
+    const NPCInvestigationView filtered_investigation =
+        investigation_view_world.investigation_view_for("investigating-npc", "bridge-7");
+    assert(filtered_investigation.received_information.size() == 2U);
+    assert(filtered_investigation.current_beliefs.size() == 2U);
+    assert(investigation_view_world.investigation_view_for("missing-npc").received_information.empty());
+    assert(investigation_view_world.investigation_view_for("missing-npc").current_beliefs.empty());
     InformationClaim observed_claim;
     observed_claim.claim_id = "claim-observed";
     observed_claim.subject_key = "bridge-7";
