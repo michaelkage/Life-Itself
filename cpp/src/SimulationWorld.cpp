@@ -198,6 +198,67 @@ NPCDecisionContextExplanation SimulationWorld::decision_context_for(
     return context;
 }
 
+MoralChoiceResolution SimulationWorld::record_moral_choice(
+    const EntityId& npc_id, const std::string& scenario_id,
+    const std::vector<MoralChoiceOption>& options,
+    const std::vector<MoralChoiceConsequence>& consequences) {
+    if (scenario_id.empty()) {
+        throw std::invalid_argument("recorded moral choice requires a scenario ID");
+    }
+    const auto npc = std::find_if(
+        state_.npcs.begin(), state_.npcs.end(),
+        [&npc_id](const NPC& candidate) { return candidate.entity_id == npc_id; });
+    if (npc == state_.npcs.end()) {
+        throw std::invalid_argument("recorded moral choice references an unknown NPC");
+    }
+
+    // Capture only information already delivered to this NPC before applying effects.
+    NPCDecisionRecord record;
+    record.recorded_hour = runtime_.total_hours();
+    record.scenario_id = scenario_id;
+    record.relationship_snapshot = npc->relationships;
+    record.loyalty_bias = npc->loyalty_bias;
+    record.skepticism = npc->skepticism;
+    record.compassion = npc->compassion;
+    record.fairness_value = npc->fairness_value;
+    record.safety_value = npc->safety_value;
+    record.freedom_value = npc->freedom_value;
+    record.self_interest_value = npc->self_interest_value;
+
+    for (const InvestigationGroup& group : information_.investigation_groups_for(npc_id)) {
+        for (const InvestigationEntry& entry : group.entries) {
+            record.evidence_claim_ids.push_back(entry.claim.claim_id);
+            if (std::find(record.evidence_root_ids.begin(), record.evidence_root_ids.end(),
+                    entry.claim.root_evidence_id) == record.evidence_root_ids.end()) {
+                record.evidence_root_ids.push_back(entry.claim.root_evidence_id);
+            }
+        }
+    }
+    std::sort(record.evidence_claim_ids.begin(), record.evidence_claim_ids.end());
+    std::sort(record.evidence_root_ids.begin(), record.evidence_root_ids.end());
+
+    const MoralChoiceResolution resolution =
+        simreality::resolve_moral_choice(*npc, options, consequences);
+    record.selected_option_id = resolution.choice.option_id;
+    record.selected_score = resolution.choice.score;
+    for (const MoralChoiceOption& option : options) {
+        record.option_scores.emplace(
+            option.option_id, evaluate_moral_choice(*npc, option).score);
+    }
+    // Scoring depends on stable value traits, which consequences do not mutate.
+    npc->decision_history.push_back(std::move(record));
+    return resolution;
+}
+
+std::vector<NPCDecisionRecord> SimulationWorld::decision_history_for(
+    const EntityId& npc_id) const {
+    const auto npc = std::find_if(
+        state_.npcs.begin(), state_.npcs.end(),
+        [&npc_id](const NPC& candidate) { return candidate.entity_id == npc_id; });
+    if (npc == state_.npcs.end()) return {};
+    return npc->decision_history;
+}
+
 GhostInfluenceResult SimulationWorld::attempt_ghost_influence(
     const EntityId& ghost_id, const EntityId& npc_id,
     const std::string& action, double hour_of_day) {
