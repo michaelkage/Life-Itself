@@ -1840,6 +1840,29 @@ int main() {
         < evaluate_moral_choice(fairness_focused, fair_distribution).score);
     assert(evaluate_moral_choice(fairness_focused, fair_distribution).score
         == evaluate_moral_choice(fairness_focused, fair_distribution).score);
+    const MoralChoiceExplanation urgent_explanation =
+        explain_moral_choice(urgency_focused, urgent_aid);
+    assert(urgent_explanation.option_id == urgent_aid.option_id);
+    assert(urgent_explanation.factors.size() == 7U);
+    assert(urgent_explanation.factors[0].factor == "urgency");
+    assert(urgent_explanation.factors[0].npc_value == 1.0);
+    assert(urgent_explanation.factors[0].option_value == 1.0);
+    assert(std::abs(urgent_explanation.factors[0].contribution - 0.25) < 1e-12);
+    double explained_score = 0.0;
+    for (const MoralChoiceFactorExplanation& factor : urgent_explanation.factors) {
+        explained_score += factor.contribution;
+    }
+    assert(std::abs(explained_score - urgent_explanation.total_score) < 1e-12);
+    assert(urgent_explanation.total_score
+        == evaluate_moral_choice(urgency_focused, urgent_aid).score);
+    NPC out_of_range_values = urgency_focused;
+    out_of_range_values.compassion = 2.0;
+    MoralChoiceOption out_of_range_option = urgent_aid;
+    out_of_range_option.urgency = 2.0;
+    const MoralChoiceExplanation clamped_explanation =
+        explain_moral_choice(out_of_range_values, out_of_range_option);
+    assert(clamped_explanation.factors.front().npc_value == 1.0);
+    assert(clamped_explanation.factors.front().option_value == 1.0);
     std::stringstream moral_snapshot(std::ios::in | std::ios::out | std::ios::binary);
     WorldState moral_state;
     fairness_focused.fairness_value = 1.0;
