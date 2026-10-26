@@ -115,3 +115,9 @@ __all__ += [
     "PersonProfile", "RecoveryEstimate", "ResponsibilityOutcome",
     "ResponsibilityResolution", "Treatment",
 ]
+
+
+# Deterministic intention tracking, prerequisite resolution, and bounded goal selection.
+from .goals import GoalBook, GoalEvaluation, GoalStatus, NPCGoal
+
+__all__ += ["GoalBook", "GoalEvaluation", "GoalStatus", "NPCGoal"]
