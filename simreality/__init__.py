@@ -185,3 +185,8 @@ __all__ += ["WorldEvent", "WorldEventLedger"]
 # Validate and route per-witness interpretations from the shared world journal.
 from .world_event_social import WorldEventSocialAdapter
 __all__ += ["WorldEventSocialAdapter"]
+
+
+# Event-to-memory bridge for explicit witnesses.
+from .world_event_memory import WorldEventMemoryAdapter
+__all__ += ["WorldEventMemoryAdapter"]
