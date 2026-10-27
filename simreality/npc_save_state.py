@@ -204,3 +204,101 @@ class NPCCollectionSnapshot:
             raise
         except (TypeError, KeyError, json.JSONDecodeError) as exc:
             raise ValueError("NPC collection snapshot has an invalid structure") from exc
+
+
+@dataclass(frozen=True)
+class SocialTrustSnapshot:
+    """Versioned snapshot of trust priors and the interactions that derive trust."""
+
+    priors: tuple[tuple[str, str, float], ...]
+    interactions: tuple[object, ...]
+
+    SCHEMA_VERSION = 1
+
+    def __post_init__(self) -> None:
+        from .social_trust import SocialInteraction
+        if not isinstance(self.priors, tuple) or not isinstance(self.interactions, tuple):
+            raise ValueError("priors and interactions must be tuples")
+        prior_keys = [(observer, target) for observer, target, _ in self.priors]
+        if len(prior_keys) != len(set(prior_keys)):
+            raise ValueError("trust prior pairs must be unique")
+        if prior_keys != sorted(prior_keys):
+            raise ValueError("trust priors must be sorted by observer and target")
+        for observer, target, value in self.priors:
+            if not isinstance(observer, str) or not observer.strip() or not isinstance(target, str) or not target.strip() or observer == target:
+                raise ValueError("trust prior IDs must be distinct non-empty strings")
+            _unit("trust prior", value)
+        if any(not isinstance(item, SocialInteraction) for item in self.interactions):
+            raise ValueError("interactions must contain SocialInteraction records")
+        ids = [item.interaction_id for item in self.interactions]
+        if len(ids) != len(set(ids)):
+            raise ValueError("interaction IDs must be unique")
+        if ids != sorted(ids):
+            raise ValueError("interactions must be sorted by interaction ID")
+
+    @classmethod
+    def capture(cls, ledger: object) -> "SocialTrustSnapshot":
+        from .social_trust import SocialTrustLedger
+        if not isinstance(ledger, SocialTrustLedger):
+            raise TypeError("ledger must be a SocialTrustLedger")
+        priors = tuple(sorted(
+            (observer, target, value)
+            for (observer, target), value in ledger._priors.items()
+        ))
+        interactions = tuple(sorted(ledger._interactions.values(), key=lambda item: item.interaction_id))
+        return cls(priors, interactions)
+
+    def restore(self):
+        from .social_trust import SocialInteraction, SocialTrustLedger
+        ledger = SocialTrustLedger({
+            (observer, target): value for observer, target, value in self.priors
+        })
+        ledger.add_many(self.interactions)
+        return ledger
+
+    def to_json(self) -> str:
+        return json.dumps({
+            "schema_version": self.SCHEMA_VERSION,
+            "priors": [[observer, target, value] for observer, target, value in self.priors],
+            "interactions": [
+                {
+                    "interaction_id": item.interaction_id,
+                    "observer_id": item.observer_id,
+                    "target_id": item.target_id,
+                    "direction": item.direction,
+                    "strength": item.strength,
+                    "observed_tick": item.observed_tick,
+                    "context": item.context,
+                }
+                for item in self.interactions
+            ],
+        }, sort_keys=True, separators=(",", ":"), allow_nan=False)
+
+    @classmethod
+    def from_json(cls, payload: str) -> "SocialTrustSnapshot":
+        from .social_trust import SocialInteraction
+        try:
+            raw = json.loads(payload)
+            if not isinstance(raw, dict) or raw.get("schema_version") != cls.SCHEMA_VERSION:
+                raise ValueError("unsupported social trust schema version")
+            priors = tuple(sorted(
+                ((item[0], item[1], _unit("trust prior", item[2])) for item in raw["priors"]),
+                key=lambda item: (item[0], item[1]),
+            ))
+            interactions = tuple(sorted((
+                SocialInteraction(
+                    interaction_id=item["interaction_id"],
+                    observer_id=item["observer_id"],
+                    target_id=item["target_id"],
+                    direction=item["direction"],
+                    strength=_unit("interaction strength", item["strength"]),
+                    observed_tick=item["observed_tick"],
+                    context=item.get("context", "general"),
+                )
+                for item in raw["interactions"]
+            ), key=lambda item: item.interaction_id))
+            return cls(priors, interactions)
+        except ValueError:
+            raise
+        except (TypeError, KeyError, IndexError, json.JSONDecodeError) as exc:
+            raise ValueError("social trust snapshot has an invalid structure") from exc
