@@ -57,6 +57,7 @@ Engine-independent Python reference systems:
 | `simreality/belief_appraisal.py` | NPC beliefs + choices | Explicitly maps claim confidence into choice impacts or bias cues, with inspectable contributions |
 | `simreality/social_trust.py` | NPC relationships | Tracks observer-specific trust from deterministic interaction history; can supply a trust-based reliability input |
 | `simreality/social_beliefs.py` | NPC relationships + beliefs | Uses source trust and transmitted rumour retention to update observer-specific beliefs |
+| `simreality/social_decisions.py` | NPC social decision-making | Ranks choices using an NPC's own trust-weighted beliefs, values and explicit belief-effect mappings |
 
 `simreality/model.py` is the contract for the existing C++ domain port — it holds records and
 constants only, no behaviour. The new NPC goal and planning modules are currently Python-only; their implementation boundaries and regression coverage are documented in [docs/NPC-GOALS-IMPLEMENTATION.md](docs/NPC-GOALS-IMPLEMENTATION.md) and [docs/NPC-PLANNING-IMPLEMENTATION.md](docs/NPC-PLANNING-IMPLEMENTATION.md).
@@ -209,3 +210,5 @@ Observer-specific trust is documented in [docs/NPC-SOCIAL-TRUST.md](docs/NPC-SOC
 
 
 Trust-aware belief integration is documented in [docs/NPC-SOCIAL-BELIEFS.md](docs/NPC-SOCIAL-BELIEFS.md), with regression coverage in `tests/test_social_beliefs.py`. Trust is sampled when an NPC hears a report; later trust changes do not silently rewrite past beliefs.
+
+The [social belief-aware decision adapter](docs/NPC-SOCIAL-DECISIONS.md) now connects those observer-specific beliefs to choice ranking, preserving each NPC's individual value profile and keeping claim-to-effect mappings explicit. See `tests/test_social_decisions.py` for regression coverage.
