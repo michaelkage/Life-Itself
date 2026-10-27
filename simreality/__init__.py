@@ -160,3 +160,7 @@ __all__ += ["SocialInteraction", "SocialTrustLedger", "SocialTrustState"]
 
 from .social_beliefs import SocialBeliefSystem
 __all__ += ["SocialBeliefSystem"]
+
+# Read-only choice ranking using one NPC's social beliefs and value profile.
+from .social_decisions import SocialBeliefDecisionAdapter, SocialDecisionResult
+__all__ += ["SocialBeliefDecisionAdapter", "SocialDecisionResult"]
