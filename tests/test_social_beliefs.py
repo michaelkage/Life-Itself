@@ -34,6 +34,7 @@ class SocialBeliefSystemTests(unittest.TestCase):
         system = SocialBeliefSystem(trust)
         first = system.observe("observer", self.evidence("first"))
         trust.add(SocialInteraction("later-help", "observer", "witness", 1, 1.0, 2))
+        self.assertEqual(system.observe("observer", self.evidence("first")), first)
         self.assertEqual(system.get("observer", "saw-event"), first)
         second = system.observe("observer", self.evidence("second", tick=3))
         self.assertGreater(second.confidence, first.confidence)
