@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from .beliefs import BeliefLedger, BeliefState, Evidence
 from .social_trust import SocialTrustLedger
+from .gossip import Rumour
 
 
 class SocialBeliefSystem:
@@ -59,6 +60,39 @@ class SocialBeliefSystem:
         state = ledger.add(effective)
         observer_inputs[evidence.evidence_id] = evidence
         return state
+
+    def observe_rumour(
+        self,
+        observer_id: str,
+        source_id: str,
+        rumour: Rumour,
+        evidence_id: str,
+        claim_id: str,
+        observed_tick: int,
+        direction: int = 1,
+    ) -> BeliefState:
+        """Convert a transmitted rumour into attributed evidence for one NPC.
+
+        The caller defines the claim being evaluated. In particular, an
+        unattributed rumour (target_entity_id is None) must not be treated as
+        proof against a named person; callers should use a claim about the event
+        or description instead. Rumour retention becomes evidence strength, and
+        source trust is resolved by :meth:`observe`.
+        """
+        if not isinstance(rumour, Rumour):
+            raise TypeError("rumour must be a Rumour instance")
+        if not isinstance(source_id, str) or not source_id.strip():
+            raise ValueError("source_id must be a non-empty string")
+        evidence = Evidence(
+            evidence_id=evidence_id,
+            claim_id=claim_id,
+            source_id=source_id,
+            direction=direction,
+            strength=rumour.retention,
+            source_reliability=0.5,
+            observed_tick=observed_tick,
+        )
+        return self.observe(observer_id, evidence)
 
     def get(self, observer_id: str, claim_id: str) -> BeliefState:
         """Return one NPC's belief about a claim."""
