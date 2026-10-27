@@ -195,3 +195,8 @@ __all__ += ["WorldEventMemoryAdapter"]
 # Deterministic decay snapshots and rumour preparation from NPC-owned memories.
 from .memory_rumours import MemoryRumourAdapter, MemoryRumourSnapshot
 __all__ += ["MemoryRumourAdapter", "MemoryRumourSnapshot"]
+
+
+# Actual NPC conversation transfer and trust-weighted belief updates.
+from .social_conversations import ConversationBeliefResult, SocialConversationAdapter
+__all__ += ["ConversationBeliefResult", "SocialConversationAdapter"]
