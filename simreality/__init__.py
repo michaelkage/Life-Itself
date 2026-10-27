@@ -145,3 +145,9 @@ __all__ += ["AppraisalResult", "ChoiceOption", "NPCAppraiser", "NPCValueProfile"
 from .beliefs import BeliefLedger, BeliefState, Evidence
 
 __all__ += ["BeliefLedger", "BeliefState", "Evidence"]
+
+
+# Explicit integration between evidence confidence and value-relative NPC appraisal.
+from .belief_appraisal import BeliefAwareAppraiser, BeliefAwareResult
+
+__all__ += ["BeliefAwareAppraiser", "BeliefAwareResult"]
