@@ -200,3 +200,8 @@ __all__ += ["MemoryRumourAdapter", "MemoryRumourSnapshot"]
 # Actual NPC conversation transfer and trust-weighted belief updates.
 from .social_conversations import ConversationBeliefResult, SocialConversationAdapter
 __all__ += ["ConversationBeliefResult", "SocialConversationAdapter"]
+
+
+# Stable tick ordering for explicit event-memory and NPC-conversation work.
+from .simulation_tick import ConversationIntent, SimulationTickCoordinator, SimulationTickResult
+__all__ += ["ConversationIntent", "SimulationTickCoordinator", "SimulationTickResult"]
