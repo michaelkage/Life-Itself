@@ -164,3 +164,14 @@ __all__ += ["SocialBeliefSystem"]
 # Read-only choice ranking using one NPC's social beliefs and value profile.
 from .social_decisions import SocialBeliefDecisionAdapter, SocialDecisionResult
 __all__ += ["SocialBeliefDecisionAdapter", "SocialDecisionResult"]
+
+
+# Witnessed actions that update observer-specific trust and beliefs.
+from .social_consequences import (
+    ObservedClaim, SocialConsequenceRecorder, SocialConsequenceResult,
+    WitnessedSocialEvent,
+)
+__all__ += [
+    "ObservedClaim", "SocialConsequenceRecorder", "SocialConsequenceResult",
+    "WitnessedSocialEvent",
+]
