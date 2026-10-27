@@ -190,3 +190,8 @@ __all__ += ["WorldEventSocialAdapter"]
 # Event-to-memory bridge for explicit witnesses.
 from .world_event_memory import WorldEventMemoryAdapter
 __all__ += ["WorldEventMemoryAdapter"]
+
+
+# Deterministic decay snapshots and rumour preparation from NPC-owned memories.
+from .memory_rumours import MemoryRumourAdapter, MemoryRumourSnapshot
+__all__ += ["MemoryRumourAdapter", "MemoryRumourSnapshot"]
