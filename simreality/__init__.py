@@ -139,3 +139,9 @@ __all__ += ["NPCDecision", "NPCDecisionCycle"]
 from .appraisal import AppraisalResult, ChoiceOption, NPCAppraiser, NPCValueProfile
 
 __all__ += ["AppraisalResult", "ChoiceOption", "NPCAppraiser", "NPCValueProfile"]
+
+
+# Deterministic evidence tracking for NPC claims and confidence.
+from .beliefs import BeliefLedger, BeliefState, Evidence
+
+__all__ += ["BeliefLedger", "BeliefState", "Evidence"]
