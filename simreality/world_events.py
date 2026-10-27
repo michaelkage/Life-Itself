@@ -41,7 +41,8 @@ class WorldEvent:
     """Immutable fact recorded on the simulation's world timeline.
 
     participants preserves role order (for example, victim then actor). Witnesses
-    are canonicalized by the caller or ledger and are not treated as participants.
+    are canonicalized by the caller or ledger. A participant may also be a witness
+    when they directly observe the event (for example, a victim witnessing an assault).
     Attributes are immutable scalar pairs rather than a mutable dictionary.
     """
 
@@ -65,8 +66,6 @@ class WorldEvent:
                 _non_empty(f"{field_name} entry", value)
             if len(values) != len(set(values)):
                 raise ValueError(f"{field_name} entries must be unique")
-        if set(self.participants) & set(self.witnesses):
-            raise ValueError("a character cannot be both participant and witness for one event")
         _validate_attributes(self.attributes)
         if tuple(sorted(self.attributes, key=lambda pair: pair[0])) != self.attributes:
             raise ValueError("attributes must be sorted by key for canonical representation")
