@@ -59,6 +59,9 @@ Engine-independent Python reference systems:
 | `simreality/social_beliefs.py` | NPC relationships + beliefs | Uses source trust and transmitted rumour retention to update observer-specific beliefs |
 | `simreality/social_decisions.py` | NPC social decision-making | Ranks choices using an NPC's own trust-weighted beliefs, values and explicit belief-effect mappings |
 | `simreality/social_consequences.py` | NPC social consequences | Turns an observer's interpretation of a witnessed action into trust changes and claim evidence, with replay-safe event IDs |
+| `simreality/world_events.py` | World event journal | Append-only deterministic event history with stable replay, snapshot restoration, and participant/witness queries |
+
+The authoritative world event journal is documented in [docs/WORLD-EVENT-LEDGER.md](docs/WORLD-EVENT-LEDGER.md); it is deliberately separate from observer-specific beliefs and consequences.
 
 `simreality/model.py` is the contract for the existing C++ domain port — it holds records and
 constants only, no behaviour. The new NPC goal and planning modules are currently Python-only; their implementation boundaries and regression coverage are documented in [docs/NPC-GOALS-IMPLEMENTATION.md](docs/NPC-GOALS-IMPLEMENTATION.md) and [docs/NPC-PLANNING-IMPLEMENTATION.md](docs/NPC-PLANNING-IMPLEMENTATION.md).
