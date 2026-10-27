@@ -62,6 +62,7 @@ Engine-independent Python reference systems:
 | `simreality/world_events.py` | World event journal | Append-only deterministic event history with stable replay, snapshot restoration, and participant/witness queries |
 | `simreality/world_event_social.py` | World event + social bridge | Validates event participants/witnesses and applies independent, explicit interpretations to NPC trust and beliefs |
 | `simreality/world_event_memory.py` | World event + memory bridge | Creates deterministic witness-specific NPC memories from explicitly recorded event details |
+| `simreality/memory_rumours.py` | Memory + gossip bridge | Prepares deterministic decay snapshots and rumours from each NPC's own memories; preserves attribution-loss rules |
 
 The authoritative world event journal is documented in [docs/WORLD-EVENT-LEDGER.md](docs/WORLD-EVENT-LEDGER.md); it is deliberately separate from observer-specific beliefs and consequences. The per-witness social integration is described in [docs/WORLD-EVENT-SOCIAL-INTEGRATION.md](docs/WORLD-EVENT-SOCIAL-INTEGRATION.md), and the event-to-memory bridge in [docs/WORLD-EVENT-MEMORY.md](docs/WORLD-EVENT-MEMORY.md).
 
@@ -220,3 +221,6 @@ Trust-aware belief integration is documented in [docs/NPC-SOCIAL-BELIEFS.md](doc
 The [social belief-aware decision adapter](docs/NPC-SOCIAL-DECISIONS.md) connects observer-specific beliefs to choice ranking, preserving each NPC's individual value profile and keeping claim-to-effect mappings explicit. See `tests/test_social_decisions.py` for regression coverage.
 
 The [witnessed social consequence recorder](docs/NPC-SOCIAL-CONSEQUENCES.md) begins the next loop: a witnessed action can change the observer's trust in its actor and update explicit claims from that event. Identical event replay is idempotent; different observers can interpret the same world event differently. See `tests/test_social_consequences.py`.
+
+
+The [memory-to-rumour adapter](docs/MEMORY-TO-RUMOUR-ADAPTER.md) calculates decay from original memory impact and event time, then reuses the existing rumour transmission rules. It is read-only: only memories already held by that NPC can become rumours, and actual transfer still requires the existing conversation system. Regression coverage is in `tests/test_memory_rumours.py`.
