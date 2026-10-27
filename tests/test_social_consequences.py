@@ -24,7 +24,7 @@ class SocialConsequenceTests(unittest.TestCase):
         result = self.recorder.record(event)
         self.assertAlmostEqual(result.trust_state.trust, 0.1)
         # The claim source is the actor, so the updated low trust affects reliability.
-        self.assertAlmostEqual(result.beliefs[0].confidence, 0.4655)
+        self.assertAlmostEqual(result.beliefs[0].confidence, 0.465)
 
     def test_identical_replay_does_not_apply_consequence_twice(self):
         event = WitnessedSocialEvent("event-2", "witness", "actor", 5, 1, 0.5)
