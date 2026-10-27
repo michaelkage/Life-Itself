@@ -86,11 +86,19 @@ class WorldEventMemoryAdapter:
         jacket_colour = attrs.get("jacket_colour")
         if jacket_colour is not None and not isinstance(jacket_colour, str):
             raise ValueError("jacket_colour must be a string")
+        jacket_confidence = attrs.get("jacket_colour_confidence", 1.0)
+        if isinstance(jacket_confidence, bool) or not isinstance(jacket_confidence, (int, float)) or not math.isfinite(jacket_confidence):
+            raise ValueError("jacket_colour_confidence must be a finite number")
+        if not 0.0 <= jacket_confidence <= 1.0:
+            raise ValueError("jacket_colour_confidence must be in [0, 1]")
+        masked = attrs.get("masked", False)
+        if not isinstance(masked, bool):
+            raise ValueError("masked must be a boolean")
         description = Description(
             height_m=float(height),
             height_uncertainty_m=float(height_uncertainty),
-            jacket_colour_weights={jacket_colour: float(masked_confidence or 1.0)} if jacket_colour else {},
-            masked=bool(attrs.get("masked", False)),
+            jacket_colour_weights={jacket_colour: float(jacket_confidence)} if jacket_colour else {},
+            masked=masked,
             masked_confidence=float(masked_confidence),
         )
         memory = NPCMemory(
