@@ -2,7 +2,7 @@ import unittest
 
 from simreality import (
     ActionTag, AgeBand, Description, NPC, NPCCollectionSnapshot, NPCMemory,
-    NPCStateSnapshot, TraumaLevel,
+    NPCStateSnapshot, SocialInteraction, SocialTrustLedger, SocialTrustSnapshot, TraumaLevel,
 )
 
 
@@ -59,6 +59,20 @@ class NPCStateSnapshotTests(unittest.TestCase):
     def test_unknown_schema_rejected(self):
         with self.assertRaises(ValueError):
             NPCStateSnapshot.from_json('{"schema_version":99}')
+
+    def test_social_trust_round_trip_replays_same_relationship_state(self):
+        ledger = SocialTrustLedger({("witness-1", "actor-9"): 0.2})
+        ledger.add(SocialInteraction("i2", "witness-1", "actor-9", 1, 0.5, 4, "help"))
+        ledger.add(SocialInteraction("i1", "witness-1", "actor-9", -1, 0.3, 2, "threat"))
+        snapshot = SocialTrustSnapshot.capture(ledger)
+        payload = snapshot.to_json()
+        restored = SocialTrustSnapshot.from_json(payload).restore()
+        self.assertEqual(restored.snapshot(), ledger.snapshot())
+        self.assertEqual(SocialTrustSnapshot.capture(restored).to_json(), payload)
+
+    def test_social_trust_snapshot_rejects_unknown_schema(self):
+        with self.assertRaises(ValueError):
+            SocialTrustSnapshot.from_json('{"schema_version":9}')
 
     def test_non_finite_json_rejected(self):
         with self.assertRaises(ValueError):
