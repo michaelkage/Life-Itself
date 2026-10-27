@@ -56,7 +56,7 @@ Engine-independent Python reference systems:
 | `simreality/beliefs.py` | NPC beliefs | Deterministic confidence updates from explicit supporting and contradictory evidence |
 | `simreality/belief_appraisal.py` | NPC beliefs + choices | Explicitly maps claim confidence into choice impacts or bias cues, with inspectable contributions |
 | `simreality/social_trust.py` | NPC relationships | Tracks observer-specific trust from deterministic interaction history; can supply a trust-based reliability input |
-| `simreality/social_beliefs.py` | NPC relationships + beliefs | Uses each observer's trust in a report source as the evidence reliability at observation time |
+| `simreality/social_beliefs.py` | NPC relationships + beliefs | Uses source trust and transmitted rumour retention to update observer-specific beliefs |
 
 `simreality/model.py` is the contract for the existing C++ domain port — it holds records and
 constants only, no behaviour. The new NPC goal and planning modules are currently Python-only; their implementation boundaries and regression coverage are documented in [docs/NPC-GOALS-IMPLEMENTATION.md](docs/NPC-GOALS-IMPLEMENTATION.md) and [docs/NPC-PLANNING-IMPLEMENTATION.md](docs/NPC-PLANNING-IMPLEMENTATION.md).
