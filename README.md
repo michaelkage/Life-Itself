@@ -61,8 +61,9 @@ Engine-independent Python reference systems:
 | `simreality/social_consequences.py` | NPC social consequences | Turns an observer's interpretation of a witnessed action into trust changes and claim evidence, with replay-safe event IDs |
 | `simreality/world_events.py` | World event journal | Append-only deterministic event history with stable replay, snapshot restoration, and participant/witness queries |
 | `simreality/world_event_social.py` | World event + social bridge | Validates event participants/witnesses and applies independent, explicit interpretations to NPC trust and beliefs |
+| `simreality/world_event_memory.py` | World event + memory bridge | Creates deterministic witness-specific NPC memories from explicitly recorded event details |
 
-The authoritative world event journal is documented in [docs/WORLD-EVENT-LEDGER.md](docs/WORLD-EVENT-LEDGER.md); it is deliberately separate from observer-specific beliefs and consequences. The per-witness integration is described in [docs/WORLD-EVENT-SOCIAL-INTEGRATION.md](docs/WORLD-EVENT-SOCIAL-INTEGRATION.md).
+The authoritative world event journal is documented in [docs/WORLD-EVENT-LEDGER.md](docs/WORLD-EVENT-LEDGER.md); it is deliberately separate from observer-specific beliefs and consequences. The per-witness social integration is described in [docs/WORLD-EVENT-SOCIAL-INTEGRATION.md](docs/WORLD-EVENT-SOCIAL-INTEGRATION.md), and the event-to-memory bridge in [docs/WORLD-EVENT-MEMORY.md](docs/WORLD-EVENT-MEMORY.md).
 
 `simreality/model.py` is the contract for the existing C++ domain port — it holds records and
 constants only, no behaviour. The new NPC goal and planning modules are currently Python-only; their implementation boundaries and regression coverage are documented in [docs/NPC-GOALS-IMPLEMENTATION.md](docs/NPC-GOALS-IMPLEMENTATION.md) and [docs/NPC-PLANNING-IMPLEMENTATION.md](docs/NPC-PLANNING-IMPLEMENTATION.md).
