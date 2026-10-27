@@ -38,6 +38,11 @@ skeptical_view = beliefs.observe("skeptical-npc", report)
 loyal_view = beliefs.observe("loyal-npc", report)
 ```
 
+
+## Rumour integration
+
+`SocialBeliefSystem.observe_rumour(...)` adapts a `Rumour` from the gossip system into evidence. The rumour retention becomes evidence strength, while source trust is resolved at observation time. The caller must explicitly supply the claim ID; this matters because a rumour that has lost `target_entity_id` may support a claim that an event occurred, but it must not be used as proof against a named suspect.
+
 ## Boundaries
 
 Trust is a social relationship signal, not proof of truth. A highly trusted source
