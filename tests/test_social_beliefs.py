@@ -7,8 +7,8 @@ from simreality.social_trust import SocialInteraction, SocialTrustLedger
 
 
 class SocialBeliefSystemTests(unittest.TestCase):
-    def evidence(self, eid="report", direction=1, source="witness", tick=1, strength=1.0, reliability=1.0):
-        return Evidence(eid, "saw-event", source, direction, strength, reliability, tick)
+    def evidence(self, eid="report", direction=1, source="witness", tick=1, strength=1.0, reliability=1.0, claim="saw-event"):
+        return Evidence(eid, claim, source, direction, strength, reliability, tick)
 
     def test_same_report_changes_beliefs_differently_by_observer_trust(self):
         trust = SocialTrustLedger({("skeptic", "witness"): 0.1, ("supporter", "witness"): 0.9})
@@ -54,8 +54,8 @@ class SocialBeliefSystemTests(unittest.TestCase):
 
     def test_snapshots_are_stably_sorted(self):
         system = SocialBeliefSystem(SocialTrustLedger())
-        system.observe("z", self.evidence("z-report", claim="unused") if False else Evidence("z-report", "z-claim", "witness", 1, 1, 1, 1))
-        system.observe("a", Evidence("a-report", "a-claim", "witness", -1, 1, 1, 1))
+        system.observe("z", self.evidence("z-report", claim="z-claim"))
+        system.observe("a", self.evidence("a-report", direction=-1, claim="a-claim"))
         self.assertEqual([(owner, state.claim_id) for owner, state in system.snapshot()], [("a", "a-claim"), ("z", "z-claim")])
 
 
