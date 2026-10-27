@@ -180,3 +180,8 @@ __all__ += [
 # Shared deterministic journal of authoritative world events.
 from .world_events import WorldEvent, WorldEventLedger
 __all__ += ["WorldEvent", "WorldEventLedger"]
+
+
+# Validate and route per-witness interpretations from the shared world journal.
+from .world_event_social import WorldEventSocialAdapter
+__all__ += ["WorldEventSocialAdapter"]
