@@ -2,6 +2,8 @@
 import unittest
 
 from simreality.beliefs import Evidence
+from simreality.gossip import Rumour
+from simreality.model import Description
 from simreality.social_beliefs import SocialBeliefSystem
 from simreality.social_trust import SocialInteraction, SocialTrustLedger
 
@@ -52,6 +54,20 @@ class SocialBeliefSystemTests(unittest.TestCase):
         system.observe("bob", self.evidence(direction=-1))
         self.assertGreater(system.get("alice", "saw-event").confidence, 0.5)
         self.assertLess(system.get("bob", "saw-event").confidence, 0.5)
+
+    def test_rumour_strength_and_source_trust_feed_belief(self):
+        trust = SocialTrustLedger({("observer", "witness"): 0.8})
+        system = SocialBeliefSystem(trust)
+        rumour = Rumour("Crime.Theft", "suspect-1", Description(1.8, 0.2, {"dark": 0.7}, False, 0.6), 0.5)
+        state = system.observe_rumour("observer", "witness", rumour, "rumour-1", "saw-theft", 12)
+        self.assertAlmostEqual(state.confidence, 0.7)
+
+    def test_unattributed_rumour_can_support_event_claim_without_naming_suspect(self):
+        system = SocialBeliefSystem(SocialTrustLedger({("observer", "witness"): 1.0}))
+        rumour = Rumour("Crime.Theft", None, Description(1.8, 0.2, {"dark": 0.7}, False, 0.6), 0.4)
+        state = system.observe_rumour("observer", "witness", rumour, "rumour-2", "theft-happened", 13)
+        self.assertAlmostEqual(state.confidence, 0.7)
+        self.assertNotIn("suspect", state.claim_id)
 
     def test_snapshots_are_stably_sorted(self):
         system = SocialBeliefSystem(SocialTrustLedger())
