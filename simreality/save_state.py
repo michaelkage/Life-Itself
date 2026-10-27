@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import json
+import math
 from typing import Any
 
 from .world_events import WorldEvent, WorldEventLedger
@@ -45,6 +46,8 @@ class SimulationSaveEnvelope:
                 raise ValueError("metadata keys must be non-empty strings")
             if value is not None and not isinstance(value, (str, int, float, bool)):
                 raise ValueError("metadata values must be JSON scalar values")
+            if isinstance(value, float) and not math.isfinite(value):
+                raise ValueError("metadata float values must be finite")
             keys.append(key)
         if len(keys) != len(set(keys)):
             raise ValueError("metadata keys must be unique")
