@@ -65,6 +65,7 @@ class BeliefLedger:
 
     def __init__(self, initial_confidence: dict[str, float] | None = None) -> None:
         self._confidence: dict[str, float] = {}
+        self._priors: dict[str, float] = {}
         self._evidence: dict[str, Evidence] = {}
         self._claim_evidence: dict[str, set[str]] = {}
         self._last_tick: dict[str, int] = {}
@@ -73,6 +74,7 @@ class BeliefLedger:
                 raise ValueError("claim IDs must be non-empty strings")
             _unit_interval("initial confidence", confidence)
             self._confidence[claim_id] = float(confidence)
+            self._priors[claim_id] = float(confidence)
             self._claim_evidence[claim_id] = set()
             self._last_tick[claim_id] = 0
 
