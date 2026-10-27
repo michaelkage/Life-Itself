@@ -6,7 +6,8 @@ from simreality.world_events import WorldEvent, WorldEventLedger
 
 class WorldEventLedgerTests(unittest.TestCase):
     def event(self, event_id, tick, **kwargs):
-        return WorldEventLedger.make_event(event_id, tick, "interaction", **kwargs)
+        event_type = kwargs.pop("event_type", "interaction")
+        return WorldEventLedger.make_event(event_id, tick, event_type, **kwargs)
 
     def test_snapshot_order_does_not_depend_on_ingestion_order(self):
         first = self.event("later-id", 4, participants=("actor",))
