@@ -48,6 +48,11 @@ class WorldEventLedgerTests(unittest.TestCase):
         self.assertEqual(tuple(e.event_id for e in ledger.query(witness_id="witness")), ("one", "three"))
         self.assertEqual(tuple(e.event_id for e in ledger.query(event_type="arrest")), ("two",))
 
+    def test_participant_may_also_be_a_witness(self):
+        event = self.event("incident", 1, participants=("victim", "actor"), witnesses=("victim",))
+        self.assertIn("victim", event.participants)
+        self.assertIn("victim", event.witnesses)
+
     def test_attribute_mapping_is_canonical(self):
         event = self.event("event-1", 1, attributes={"z": 2, "a": "value"})
         self.assertEqual(event.attributes, (("a", "value"), ("z", 2)))
