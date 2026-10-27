@@ -22,7 +22,7 @@ class SocialBeliefDecisionTests(unittest.TestCase):
             ChoiceOption("report", {"justice": 0.5}),
             ChoiceOption("protect", {"loyalty": 0.5}),
         ]
-        effects = {"guard-bribed": {"justice": 1.0, "loyalty": -1.0}}
+        effects = {"guard-bribed": {"justice": 1.0, "loyalty": 1.0}}
         justice_profile = NPCValueProfile("skeptic", {"justice": 1.0, "loyalty": 0.0})
         loyalty_profile = NPCValueProfile("supporter", {"justice": 0.0, "loyalty": 1.0})
 
