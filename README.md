@@ -63,6 +63,7 @@ Engine-independent Python reference systems:
 | `simreality/world_event_social.py` | World event + social bridge | Validates event participants/witnesses and applies independent, explicit interpretations to NPC trust and beliefs |
 | `simreality/world_event_memory.py` | World event + memory bridge | Creates deterministic witness-specific NPC memories from explicitly recorded event details |
 | `simreality/memory_rumours.py` | Memory + gossip bridge | Prepares deterministic decay snapshots and rumours from each NPC's own memories; preserves attribution-loss rules |
+| `simreality/social_conversations.py` | NPC conversation integration | Runs actual memory transfer and updates each listener's beliefs using their own trust in the speaker |
 
 The authoritative world event journal is documented in [docs/WORLD-EVENT-LEDGER.md](docs/WORLD-EVENT-LEDGER.md); it is deliberately separate from observer-specific beliefs and consequences. The per-witness social integration is described in [docs/WORLD-EVENT-SOCIAL-INTEGRATION.md](docs/WORLD-EVENT-SOCIAL-INTEGRATION.md), and the event-to-memory bridge in [docs/WORLD-EVENT-MEMORY.md](docs/WORLD-EVENT-MEMORY.md).
 
@@ -224,3 +225,6 @@ The [witnessed social consequence recorder](docs/NPC-SOCIAL-CONSEQUENCES.md) beg
 
 
 The [memory-to-rumour adapter](docs/MEMORY-TO-RUMOUR-ADAPTER.md) calculates decay from original memory impact and event time, then reuses the existing rumour transmission rules. It is read-only: only memories already held by that NPC can become rumours, and actual transfer still requires the existing conversation system. Regression coverage is in `tests/test_memory_rumours.py`.
+
+
+The [social conversation adapter](docs/NPC-SOCIAL-CONVERSATIONS.md) connects real gossip transfer to observer-specific belief updates. Conversation IDs make replay idempotent, and appearance-only rumours remain unattributed. Tests are in `tests/test_social_conversations.py`.
