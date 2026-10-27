@@ -16,6 +16,11 @@ class BeliefLedgerTests(unittest.TestCase):
         contradicted = ledger.add(evidence("e2", -1, tick=2))
         self.assertEqual(contradicted.confidence, 0.0)
 
+    def test_initial_prior_is_preserved_as_evidence_baseline(self):
+        ledger = BeliefLedger({"saw-event": 0.2})
+        result = ledger.add(evidence("partial", 1, strength=0.5, reliability=0.5))
+        self.assertAlmostEqual(result.confidence, 0.4)
+
     def test_strength_and_source_reliability_scale_influence(self):
         ledger = BeliefLedger({"saw-event": 0.5})
         result = ledger.add(evidence("weak", 1, strength=0.5, reliability=0.4))
