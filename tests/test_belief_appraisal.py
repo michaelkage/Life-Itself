@@ -28,6 +28,13 @@ class Tests(unittest.TestCase):
         beliefs.add(Evidence("e1", "claim", "witness", 1, 1.0, 1.0, 1))
         self.assertEqual(BeliefAwareAppraiser.rank(profile, options, beliefs, value_effects=effects)[0].choice_id, "act")
 
+    def test_adjustments_saturate_at_valid_impact_bounds(self):
+        profile = NPCValueProfile("npc", {"security": 1.0})
+        option = ChoiceOption("x", {"security": 0.9})
+        result = BeliefAwareAppraiser.appraise(profile, option, BeliefLedger({"claim": 1.0}), value_effects={"claim": {"security": 0.8}})
+        self.assertEqual(result.score, 1.0)
+        self.assertAlmostEqual(result.belief_value_contributions[0][2], 0.1)
+
     def test_bias_effects_are_explained(self):
         profile = NPCValueProfile("npc", {}, {"authority": 1.0})
         result = BeliefAwareAppraiser.appraise(profile, ChoiceOption("x", {}), BeliefLedger({"claim": 1.0}), bias_effects={"claim": {"authority": 0.4}})
