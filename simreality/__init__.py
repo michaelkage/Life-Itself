@@ -133,3 +133,9 @@ __all__ += ["DeterministicPlanner", "PlanResult", "PlanningAction"]
 from .npc_autonomy import NPCDecision, NPCDecisionCycle
 
 __all__ += ["NPCDecision", "NPCDecisionCycle"]
+
+
+# Transparent, deterministic appraisal of NPC choices using individual values and bias cues.
+from .appraisal import AppraisalResult, ChoiceOption, NPCAppraiser, NPCValueProfile
+
+__all__ += ["AppraisalResult", "ChoiceOption", "NPCAppraiser", "NPCValueProfile"]
