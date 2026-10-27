@@ -215,3 +215,7 @@ __all__ += ["SimulationSaveEnvelope"]
 # Versioned NPC identity and witnessed-memory snapshots.
 from .npc_save_state import NPCCollectionSnapshot, NPCStateSnapshot
 __all__ += ["NPCCollectionSnapshot", "NPCStateSnapshot"]
+
+# Trust priors and interaction history for deterministic relationship restoration.
+from .npc_save_state import SocialTrustSnapshot
+__all__ += ["SocialTrustSnapshot"]
