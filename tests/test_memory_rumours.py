@@ -48,7 +48,15 @@ class MemoryRumourAdapterTests(unittest.TestCase):
         self.assertEqual(self.npc.memories[0].retention, 1.0)
 
     def test_weak_memory_cannot_create_an_attributed_accusation(self):
-        self.npc.memories[0] = self.npc.memories[0].decayed_to(0.4)
+        self.npc.memories[0] = NPCMemory(
+            witness_id="witness",
+            target_entity_id="suspect",
+            initial_impact=0.4,
+            retention=0.4,
+            timestamp_hour=0.0,
+            action_tag=ActionTag.CRIME_THEFT,
+            description=self.npc.memories[0].description,
+        )
         result = self.adapter.prepare(self.npc, 0.0, Weather.CLEAR)
         self.assertEqual(len(result.rumours), 1)
         self.assertIsNone(result.rumours[0].target_entity_id)
