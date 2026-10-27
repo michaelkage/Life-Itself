@@ -175,3 +175,8 @@ __all__ += [
     "ObservedClaim", "SocialConsequenceRecorder", "SocialConsequenceResult",
     "WitnessedSocialEvent",
 ]
+
+
+# Shared deterministic journal of authoritative world events.
+from .world_events import WorldEvent, WorldEventLedger
+__all__ += ["WorldEvent", "WorldEventLedger"]
