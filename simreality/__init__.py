@@ -157,3 +157,6 @@ __all__ += ["BeliefAwareAppraiser", "BeliefAwareResult"]
 from .social_trust import SocialInteraction, SocialTrustLedger, SocialTrustState
 
 __all__ += ["SocialInteraction", "SocialTrustLedger", "SocialTrustState"]
+
+from .social_beliefs import SocialBeliefSystem
+__all__ += ["SocialBeliefSystem"]
