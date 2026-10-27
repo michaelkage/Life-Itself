@@ -58,6 +58,7 @@ Engine-independent Python reference systems:
 | `simreality/social_trust.py` | NPC relationships | Tracks observer-specific trust from deterministic interaction history; can supply a trust-based reliability input |
 | `simreality/social_beliefs.py` | NPC relationships + beliefs | Uses source trust and transmitted rumour retention to update observer-specific beliefs |
 | `simreality/social_decisions.py` | NPC social decision-making | Ranks choices using an NPC's own trust-weighted beliefs, values and explicit belief-effect mappings |
+| `simreality/social_consequences.py` | NPC social consequences | Turns an observer's interpretation of a witnessed action into trust changes and claim evidence, with replay-safe event IDs |
 
 `simreality/model.py` is the contract for the existing C++ domain port — it holds records and
 constants only, no behaviour. The new NPC goal and planning modules are currently Python-only; their implementation boundaries and regression coverage are documented in [docs/NPC-GOALS-IMPLEMENTATION.md](docs/NPC-GOALS-IMPLEMENTATION.md) and [docs/NPC-PLANNING-IMPLEMENTATION.md](docs/NPC-PLANNING-IMPLEMENTATION.md).
@@ -211,4 +212,6 @@ Observer-specific trust is documented in [docs/NPC-SOCIAL-TRUST.md](docs/NPC-SOC
 
 Trust-aware belief integration is documented in [docs/NPC-SOCIAL-BELIEFS.md](docs/NPC-SOCIAL-BELIEFS.md), with regression coverage in `tests/test_social_beliefs.py`. Trust is sampled when an NPC hears a report; later trust changes do not silently rewrite past beliefs.
 
-The [social belief-aware decision adapter](docs/NPC-SOCIAL-DECISIONS.md) now connects those observer-specific beliefs to choice ranking, preserving each NPC's individual value profile and keeping claim-to-effect mappings explicit. See `tests/test_social_decisions.py` for regression coverage.
+The [social belief-aware decision adapter](docs/NPC-SOCIAL-DECISIONS.md) connects observer-specific beliefs to choice ranking, preserving each NPC's individual value profile and keeping claim-to-effect mappings explicit. See `tests/test_social_decisions.py` for regression coverage.
+
+The [witnessed social consequence recorder](docs/NPC-SOCIAL-CONSEQUENCES.md) begins the next loop: a witnessed action can change the observer's trust in its actor and update explicit claims from that event. Identical event replay is idempotent; different observers can interpret the same world event differently. See `tests/test_social_consequences.py`.
