@@ -210,3 +210,8 @@ __all__ += ["ConversationIntent", "SimulationTickCoordinator", "SimulationTickRe
 # Versioned JSON envelope for simulation clock and authoritative event history.
 from .save_state import SimulationSaveEnvelope
 __all__ += ["SimulationSaveEnvelope"]
+
+
+# Versioned NPC identity and witnessed-memory snapshots.
+from .npc_save_state import NPCCollectionSnapshot, NPCStateSnapshot
+__all__ += ["NPCCollectionSnapshot", "NPCStateSnapshot"]
