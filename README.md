@@ -51,6 +51,7 @@ Engine-independent Python reference systems:
 | `simreality/reputation.py` | 4.A, 4.B | Local reputation from witness memories and convictions |
 | `simreality/goals.py` | NPC autonomy | Deterministic goal tracking, prerequisite checks, deadline urgency, and stable priority selection |
 | `simreality/planning.py` | NPC autonomy | Bounded symbolic action planning with preconditions, effects, costs, and deterministic tie-breaking |\n| `simreality/npc_autonomy.py` | NPC autonomy | Read-only decision cycle that connects selected goals to explicit desired facts and bounded plans |
+| `simreality/appraisal.py` | NPC values and bias | Transparent value-weighted choice appraisal; different NPCs can rank the same hard choice differently |
 
 `simreality/model.py` is the contract for the existing C++ domain port — it holds records and
 constants only, no behaviour. The new NPC goal and planning modules are currently Python-only; their implementation boundaries and regression coverage are documented in [docs/NPC-GOALS-IMPLEMENTATION.md](docs/NPC-GOALS-IMPLEMENTATION.md) and [docs/NPC-PLANNING-IMPLEMENTATION.md](docs/NPC-PLANNING-IMPLEMENTATION.md).
@@ -188,3 +189,6 @@ they do not mutate authoritative world state.
 Daily work hours and commute disruption are reset after the daily payroll and
 resident update, preventing yesterday's attendance from being counted again on
 subsequent days.
+
+
+NPC choice appraisal is documented in [docs/NPC-CHOICE-APPRAISAL.md](docs/NPC-CHOICE-APPRAISAL.md). It scores caller-supplied impacts and bias cues against an individual NPC's value profile, reports per-axis contributions, and avoids a universal good/bad label. Regression tests are in `tests/test_appraisal.py`.
