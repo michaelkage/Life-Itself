@@ -205,3 +205,8 @@ __all__ += ["ConversationBeliefResult", "SocialConversationAdapter"]
 # Stable tick ordering for explicit event-memory and NPC-conversation work.
 from .simulation_tick import ConversationIntent, SimulationTickCoordinator, SimulationTickResult
 __all__ += ["ConversationIntent", "SimulationTickCoordinator", "SimulationTickResult"]
+
+
+# Versioned JSON envelope for simulation clock and authoritative event history.
+from .save_state import SimulationSaveEnvelope
+__all__ += ["SimulationSaveEnvelope"]
