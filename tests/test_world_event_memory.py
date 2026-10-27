@@ -20,6 +20,7 @@ class WorldEventMemoryAdapterTests(unittest.TestCase):
                     "height_m": 1.82,
                     "height_uncertainty_m": 0.2,
                     "jacket_colour": "dark",
+                    "jacket_colour_confidence": 0.7,
                     "masked": True,
                     "masked_confidence": 0.9,
                 },
@@ -35,7 +36,7 @@ class WorldEventMemoryAdapterTests(unittest.TestCase):
         self.assertAlmostEqual(memory.timestamp_hour, 4.0)
         self.assertAlmostEqual(memory.retention, 0.8)
         self.assertTrue(memory.description.masked)
-        self.assertEqual(memory.description.jacket_colour_weights, {"dark": 0.9})
+        self.assertEqual(memory.description.jacket_colour_weights, {"dark": 0.7})
         self.assertEqual(len(self.npcs["guard"].memories), 1)
 
     def test_replay_is_idempotent(self):
