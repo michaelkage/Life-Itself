@@ -50,10 +50,12 @@ Engine-independent Python reference systems:
 | `simreality/fixers.py` | 4.B Fixers | Fixer incentives, betrayal, network propagation |
 | `simreality/reputation.py` | 4.A, 4.B | Local reputation from witness memories and convictions |
 | `simreality/goals.py` | NPC autonomy | Deterministic goal tracking, prerequisite checks, deadline urgency, and stable priority selection |
-| `simreality/planning.py` | NPC autonomy | Bounded symbolic action planning with preconditions, effects, costs, and deterministic tie-breaking |\n| `simreality/npc_autonomy.py` | NPC autonomy | Read-only decision cycle that connects selected goals to explicit desired facts and bounded plans |
+| `simreality/planning.py` | NPC autonomy | Bounded symbolic action planning with preconditions, effects, costs, and deterministic tie-breaking |
+| `simreality/npc_autonomy.py` | NPC autonomy | Read-only decision cycle that connects selected goals to explicit desired facts and bounded plans |
 | `simreality/appraisal.py` | NPC values and bias | Transparent value-weighted choice appraisal; different NPCs can rank the same hard choice differently |
 | `simreality/beliefs.py` | NPC beliefs | Deterministic confidence updates from explicit supporting and contradictory evidence |
 | `simreality/belief_appraisal.py` | NPC beliefs + choices | Explicitly maps claim confidence into choice impacts or bias cues, with inspectable contributions |
+| `simreality/social_trust.py` | NPC relationships | Tracks observer-specific trust from deterministic interaction history; can supply a trust-based reliability input |
 
 `simreality/model.py` is the contract for the existing C++ domain port — it holds records and
 constants only, no behaviour. The new NPC goal and planning modules are currently Python-only; their implementation boundaries and regression coverage are documented in [docs/NPC-GOALS-IMPLEMENTATION.md](docs/NPC-GOALS-IMPLEMENTATION.md) and [docs/NPC-PLANNING-IMPLEMENTATION.md](docs/NPC-PLANNING-IMPLEMENTATION.md).
@@ -200,3 +202,6 @@ The [NPC Belief Ledger](docs/NPC-BELIEF-LEDGER.md) records evidence provenance a
 
 
 Belief-aware choice appraisal is documented in [docs/NPC-BELIEF-AWARE-APPRAISAL.md](docs/NPC-BELIEF-AWARE-APPRAISAL.md) with regression coverage in `tests/test_belief_appraisal.py`. Claim-to-impact mappings remain explicit inputs; the system does not infer objective truth or silently assign moral labels.
+
+
+Observer-specific trust is documented in [docs/NPC-SOCIAL-TRUST.md](docs/NPC-SOCIAL-TRUST.md), with regression tests in `tests/test_social_trust.py`. Trust remains distinct from objective truth and global reputation.
