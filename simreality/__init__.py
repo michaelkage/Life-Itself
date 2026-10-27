@@ -151,3 +151,9 @@ __all__ += ["BeliefLedger", "BeliefState", "Evidence"]
 from .belief_appraisal import BeliefAwareAppraiser, BeliefAwareResult
 
 __all__ += ["BeliefAwareAppraiser", "BeliefAwareResult"]
+
+
+# Observer-specific social trust from deterministic interaction history.
+from .social_trust import SocialInteraction, SocialTrustLedger, SocialTrustState
+
+__all__ += ["SocialInteraction", "SocialTrustLedger", "SocialTrustState"]
