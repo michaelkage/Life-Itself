@@ -52,7 +52,7 @@ Engine-independent Python reference systems:
 | `simreality/goals.py` | NPC autonomy | Deterministic goal tracking, prerequisite checks, deadline urgency, and stable priority selection |
 | `simreality/planning.py` | NPC autonomy | Bounded symbolic action planning with preconditions, effects, costs, and deterministic tie-breaking |\n| `simreality/npc_autonomy.py` | NPC autonomy | Read-only decision cycle that connects selected goals to explicit desired facts and bounded plans |
 | `simreality/appraisal.py` | NPC values and bias | Transparent value-weighted choice appraisal; different NPCs can rank the same hard choice differently |
-| `simreality/beliefs.py` | NPC beliefs | Deterministic confidence updates from explicit supporting and contradictory evidence |
+| `simreality/beliefs.py` | NPC beliefs | Deterministic confidence updates from explicit supporting and contradictory evidence |\n| `simreality/belief_appraisal.py` | NPC beliefs + choices | Explicitly maps claim confidence into choice impacts or bias cues, with inspectable contributions |
 
 `simreality/model.py` is the contract for the existing C++ domain port — it holds records and
 constants only, no behaviour. The new NPC goal and planning modules are currently Python-only; their implementation boundaries and regression coverage are documented in [docs/NPC-GOALS-IMPLEMENTATION.md](docs/NPC-GOALS-IMPLEMENTATION.md) and [docs/NPC-PLANNING-IMPLEMENTATION.md](docs/NPC-PLANNING-IMPLEMENTATION.md).
@@ -196,3 +196,6 @@ NPC choice appraisal is documented in [docs/NPC-CHOICE-APPRAISAL.md](docs/NPC-CH
 
 
 The [NPC Belief Ledger](docs/NPC-BELIEF-LEDGER.md) records evidence provenance and reproducible confidence updates. It is a transparent heuristic, not a claim to determine objective truth.
+
+
+Belief-aware choice appraisal is documented in [docs/NPC-BELIEF-AWARE-APPRAISAL.md](docs/NPC-BELIEF-AWARE-APPRAISAL.md) with regression coverage in `tests/test_belief_appraisal.py`. Claim-to-impact mappings remain explicit inputs; the system does not infer objective truth or silently assign moral labels.
