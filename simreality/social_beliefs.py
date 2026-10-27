@@ -28,6 +28,7 @@ class SocialBeliefSystem:
             raise TypeError("trust must be a SocialTrustLedger")
         self.trust = trust
         self._ledgers: dict[str, BeliefLedger] = {}
+        self._inputs: dict[str, dict[str, Evidence]] = {}
 
     def observe(self, observer_id: str, evidence: Evidence) -> BeliefState:
         """Record one source-attributed observation for a particular NPC."""
@@ -36,6 +37,12 @@ class SocialBeliefSystem:
         if not isinstance(evidence, Evidence):
             raise TypeError("evidence must be an Evidence instance")
         ledger = self._ledgers.setdefault(observer_id, BeliefLedger())
+        observer_inputs = self._inputs.setdefault(observer_id, {})
+        prior_input = observer_inputs.get(evidence.evidence_id)
+        if prior_input is not None:
+            if prior_input != evidence:
+                raise ValueError(f"evidence ID reused with different input: {evidence.evidence_id}")
+            return ledger.get(evidence.claim_id)
         try:
             reliability = self.trust.get(observer_id, evidence.source_id).trust
         except KeyError:
@@ -49,7 +56,9 @@ class SocialBeliefSystem:
             source_reliability=reliability,
             observed_tick=evidence.observed_tick,
         )
-        return ledger.add(effective)
+        state = ledger.add(effective)
+        observer_inputs[evidence.evidence_id] = evidence
+        return state
 
     def get(self, observer_id: str, claim_id: str) -> BeliefState:
         """Return one NPC's belief about a claim."""
