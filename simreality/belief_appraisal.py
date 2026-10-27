@@ -81,17 +81,21 @@ class BeliefAwareAppraiser:
             confidence = beliefs.get(claim_id).confidence
             signed_confidence = 2.0 * confidence - 1.0
             for axis in sorted(value_effects[claim_id]):
-                adjustment = value_effects[claim_id][axis] * signed_confidence
-                impacts[axis] = impacts.get(axis, 0.0) + adjustment
-                value_adjustments.append((claim_id, axis, adjustment))
+                requested = value_effects[claim_id][axis] * signed_confidence
+                before = impacts.get(axis, 0.0)
+                after = min(1.0, max(-1.0, before + requested))
+                impacts[axis] = after
+                value_adjustments.append((claim_id, axis, after - before))
 
         for claim_id in sorted(bias_effects):
             confidence = beliefs.get(claim_id).confidence
             signed_confidence = 2.0 * confidence - 1.0
             for cue in sorted(bias_effects[claim_id]):
-                adjustment = bias_effects[claim_id][cue] * signed_confidence
-                cues[cue] = cues.get(cue, 0.0) + adjustment
-                bias_adjustments.append((claim_id, cue, adjustment))
+                requested = bias_effects[claim_id][cue] * signed_confidence
+                before = cues.get(cue, 0.0)
+                after = min(1.0, max(-1.0, before + requested))
+                cues[cue] = after
+                bias_adjustments.append((claim_id, cue, after - before))
 
         adjusted_option = ChoiceOption(option.choice_id, impacts, cues)
         result = NPCAppraiser.appraise(profile, adjusted_option)
