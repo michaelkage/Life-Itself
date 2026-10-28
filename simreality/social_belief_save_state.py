@@ -135,7 +135,8 @@ class SocialBeliefSnapshot:
                 observers.append(_ObserverSnapshot(
                     item["observer_id"],
                     BeliefLedgerSnapshot.from_json(json.dumps(item["ledger"], allow_nan=False)),
-                    tuple(sorted((_evidence_from(x) for x in item["inputs"]), key=lambda x: x.evidence_id)))
+                    tuple(sorted((_evidence_from(x) for x in item["inputs"]), key=lambda x: x.evidence_id)),
+                ))
             return cls(tuple(sorted(observers, key=lambda x: x.observer_id)))
         except ValueError:
             raise
