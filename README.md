@@ -246,3 +246,6 @@ Belief history persistence is documented in [docs/BELIEF-HISTORY-PERSISTENCE.md]
 
 
 The coordinator replay codec is documented in [docs/TICK-REPLAY-PERSISTENCE.md](docs/TICK-REPLAY-PERSISTENCE.md). It restores cached tick results only after the referenced adapter state is restored; it is not a single-file full-world checkpoint.
+
+
+The composite [world checkpoint](docs/WORLD-CHECKPOINT.md) now joins the event journal, NPC state, social trust and beliefs, adapter replay indexes, and coordinator replay history into one canonical JSON boundary. Its integration tests are in `tests/test_world_checkpoint.py`; the checkpoint does not yet include the separate witnessed-consequence recorder.
