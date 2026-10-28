@@ -152,7 +152,8 @@ class SimulationWorldCheckpoint:
             metadata = tuple(sorted(((item[0], item[1]) for item in raw.get("metadata", ())), key=lambda pair: pair[0]))
             return cls(raw["current_tick"], nested("events"), nested("npcs"), nested("trust"),
                        nested("beliefs"), nested("memory_replay"), nested("conversations"),
-                       nested("tick_replay"), raw.get("ticks_per_hour", 1.0), metadata,\n                       json.dumps(raw["consequence_replay"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("consequence_replay") is not None else None)
+                       nested("tick_replay"), raw.get("ticks_per_hour", 1.0), metadata,
+                       json.dumps(raw["consequence_replay"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("consequence_replay") is not None else None)
         except ValueError:
             raise
         except (TypeError, KeyError, IndexError, json.JSONDecodeError) as exc:
