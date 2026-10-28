@@ -138,6 +138,8 @@ class SimulationWorldCheckpoint:
             "ticks_per_hour": self.ticks_per_hour,
             "metadata": [list(pair) for pair in self.metadata],
         }
+        if consequence is not None:
+            payload["consequence_replay"] = json.loads(consequence.to_json())
         return json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False)
 
     @classmethod
