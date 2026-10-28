@@ -228,3 +228,8 @@ __all__ += ["BeliefLedgerSnapshot", "SocialBeliefSnapshot"]
 # Replay-index persistence for witness-memory materialization.
 from .adapter_replay_state import WorldEventMemoryReplaySnapshot
 __all__ += ["WorldEventMemoryReplaySnapshot"]
+
+
+# Versioned replay indexes for social conversations and witnessed consequences.
+from .social_replay_save_state import SocialConversationReplaySnapshot, SocialConsequenceReplaySnapshot
+__all__ += ["SocialConversationReplaySnapshot", "SocialConsequenceReplaySnapshot"]
