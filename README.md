@@ -65,6 +65,7 @@ Engine-independent Python reference systems:
 | `simreality/memory_rumours.py` | Memory + gossip bridge | Prepares deterministic decay snapshots and rumours from each NPC's own memories; preserves attribution-loss rules |
 | `simreality/social_conversations.py` | NPC conversation integration | Runs actual memory transfer and updates each listener's beliefs using their own trust in the speaker |\n| `simreality/simulation_tick.py` | Deterministic tick orchestration | Applies explicitly scheduled event memories before explicitly scheduled conversations; enforces stable order and same-tick replay rules |\n| `simreality/save_state.py` | Versioned save boundary | Canonical JSON envelope for simulation tick, authoritative world events, and scalar metadata; explicitly scopes what is not yet restored |
 | `simreality/npc_save_state.py` | NPC/social persistence | Versioned canonical snapshots for NPC identity, held witness memories, and trust priors plus interaction history |
+| `simreality/social_belief_save_state.py` | Belief persistence | Saves claim priors, effective evidence histories, observer-specific beliefs, and original replay inputs |
 
 The authoritative world event journal is documented in [docs/WORLD-EVENT-LEDGER.md](docs/WORLD-EVENT-LEDGER.md); it is deliberately separate from observer-specific beliefs and consequences. The per-witness social integration is described in [docs/WORLD-EVENT-SOCIAL-INTEGRATION.md](docs/WORLD-EVENT-SOCIAL-INTEGRATION.md), and the event-to-memory bridge in [docs/WORLD-EVENT-MEMORY.md](docs/WORLD-EVENT-MEMORY.md).
 
@@ -235,3 +236,6 @@ The [versioned simulation save envelope](docs/SIMULATION-SAVE-STATE.md) persists
 
 
 NPC model persistence is documented in [docs/NPC-STATE-SNAPSHOT.md](docs/NPC-STATE-SNAPSHOT.md). It restores current NPC fields and held memories, and restores trust by replaying the saved relationship interactions; evidence histories and adapter replay indexes remain separate.
+
+
+Belief history persistence is documented in [docs/BELIEF-HISTORY-PERSISTENCE.md](docs/BELIEF-HISTORY-PERSISTENCE.md), including sampled trust reliability and the remaining adapter-restoration boundaries.
