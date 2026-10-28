@@ -69,7 +69,7 @@ Engine-independent Python reference systems:
 | `simreality/adapter_replay_state.py` | Adapter replay persistence | Saves processed event/witness memory keys and requires matching restored NPC memories |
 | `simreality/social_replay_save_state.py` | Social adapter replay persistence | Saves conversation signatures/results and witnessed-consequence inputs/results so identical replays return recorded outcomes |
 | `simreality/tick_replay_save_state.py` | Simulation tick replay persistence | Saves completed tick request history and cached-result references; restore requires the world, NPCs, memory adapter, and conversation adapter to be restored first |
-| `simreality/world_checkpoint.py` | Composite world checkpoint | Combines event, NPC, trust, belief, memory replay, conversation replay, and tick replay snapshots in one versioned JSON checkpoint |
+| `simreality/world_checkpoint.py` | Composite world checkpoint | Combines event, NPC, trust, belief, memory, conversation and tick replay snapshots, plus optional witnessed-consequence replay, in one canonical JSON checkpoint |
 
 The authoritative world event journal is documented in [docs/WORLD-EVENT-LEDGER.md](docs/WORLD-EVENT-LEDGER.md); it is deliberately separate from observer-specific beliefs and consequences. The per-witness social integration is described in [docs/WORLD-EVENT-SOCIAL-INTEGRATION.md](docs/WORLD-EVENT-SOCIAL-INTEGRATION.md), and the event-to-memory bridge in [docs/WORLD-EVENT-MEMORY.md](docs/WORLD-EVENT-MEMORY.md).
 
@@ -248,4 +248,4 @@ Belief history persistence is documented in [docs/BELIEF-HISTORY-PERSISTENCE.md]
 The coordinator replay codec is documented in [docs/TICK-REPLAY-PERSISTENCE.md](docs/TICK-REPLAY-PERSISTENCE.md). It restores cached tick results only after the referenced adapter state is restored; it is not a single-file full-world checkpoint.
 
 
-The composite [world checkpoint](docs/WORLD-CHECKPOINT.md) now joins the event journal, NPC state, social trust and beliefs, adapter replay indexes, and coordinator replay history into one canonical JSON boundary. Its integration tests are in `tests/test_world_checkpoint.py`; the checkpoint does not yet include the separate witnessed-consequence recorder.
+The composite [world checkpoint](docs/WORLD-CHECKPOINT.md) joins the event journal, NPC state, social trust and beliefs, adapter replay indexes, and coordinator replay history into one canonical JSON boundary. An optional witnessed-consequence recorder can also be captured and restored; its replay history is persisted when supplied. Its integration tests are in `tests/test_world_checkpoint.py`. Capture is not yet a cross-component atomic operation.
