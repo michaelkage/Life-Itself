@@ -67,6 +67,7 @@ Engine-independent Python reference systems:
 | `simreality/npc_save_state.py` | NPC/social persistence | Versioned canonical snapshots for NPC identity, held witness memories, and trust priors plus interaction history |
 | `simreality/social_belief_save_state.py` | Belief persistence | Saves claim priors, effective evidence histories, observer-specific beliefs, and original replay inputs |
 | `simreality/adapter_replay_state.py` | Adapter replay persistence | Saves processed event/witness memory keys and requires matching restored NPC memories |
+| `simreality/social_replay_save_state.py` | Social adapter replay persistence | Saves conversation signatures/results and witnessed-consequence inputs/results so identical replays return recorded outcomes |
 
 The authoritative world event journal is documented in [docs/WORLD-EVENT-LEDGER.md](docs/WORLD-EVENT-LEDGER.md); it is deliberately separate from observer-specific beliefs and consequences. The per-witness social integration is described in [docs/WORLD-EVENT-SOCIAL-INTEGRATION.md](docs/WORLD-EVENT-SOCIAL-INTEGRATION.md), and the event-to-memory bridge in [docs/WORLD-EVENT-MEMORY.md](docs/WORLD-EVENT-MEMORY.md).
 
