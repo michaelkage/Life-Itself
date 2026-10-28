@@ -1,3 +1,4 @@
+import json
 import unittest
 
 from simreality import (
@@ -102,6 +103,43 @@ class SimulationWorldCheckpointTests(unittest.TestCase):
             SimulationWorldCheckpoint.capture(
                 4, coordinator, npcs, metadata={"not-finite": float("nan")},
             )
+
+
+    def test_checkpoint_rejects_event_replay_reference_to_missing_event(self):
+        coordinator, npcs, _ = self.make_simulation()
+        payload = json.loads(SimulationWorldCheckpoint.capture(4, coordinator, npcs).to_json())
+        payload["tick_replay"]["entries"][0]["event_ids"] = ["missing-event"]
+        checkpoint = SimulationWorldCheckpoint.from_json(json.dumps(payload))
+        with self.assertRaises((ValueError, KeyError)):
+            checkpoint.restore()
+
+    def test_checkpoint_rejects_clock_that_disagrees_with_event_envelope(self):
+        coordinator, npcs, _ = self.make_simulation()
+        payload = json.loads(SimulationWorldCheckpoint.capture(4, coordinator, npcs).to_json())
+        payload["events"]["current_tick"] = 5
+        with self.assertRaises(ValueError):
+            SimulationWorldCheckpoint.from_json(json.dumps(payload))
+
+    def test_checkpoint_rejects_memory_replay_for_non_witness(self):
+        coordinator, npcs, _ = self.make_simulation()
+        payload = json.loads(SimulationWorldCheckpoint.capture(4, coordinator, npcs).to_json())
+        payload["memory_replay"]["entries"][0]["witness_id"] = "listener"
+        checkpoint = SimulationWorldCheckpoint.from_json(json.dumps(payload))
+        with self.assertRaises(ValueError):
+            checkpoint.restore()
+
+    def test_checkpoint_json_is_canonical_after_whitespace_and_key_reordering(self):
+        coordinator, npcs, consequences = self.make_simulation()
+        checkpoint = SimulationWorldCheckpoint.capture(
+            4, coordinator, npcs, metadata={"world": "alpha", "seed": 42},
+            consequence_recorder=consequences,
+        )
+        parsed = json.loads(checkpoint.to_json())
+        reformatted = json.dumps(parsed, indent=2, sort_keys=False)
+        self.assertEqual(
+            SimulationWorldCheckpoint.from_json(reformatted).to_json(),
+            checkpoint.to_json(),
+        )
 
 
 if __name__ == "__main__":
