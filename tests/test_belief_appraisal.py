@@ -19,14 +19,19 @@ class Tests(unittest.TestCase):
         result = BeliefAwareAppraiser.appraise(NPCValueProfile("npc", {"security": 1.0}), ChoiceOption("x", {}), BeliefLedger({"claim": 0.5}), value_effects={"claim": {"security": 0.8}})
         self.assertEqual(result.score, 0.0)
 
-    def test_new_evidence_changes_choice_ranking(self):
+    def test_new_evidence_updates_scores_without_claim_specific_choice_mapping(self):
         profile = NPCValueProfile("npc", {"security": 1.0})
         beliefs = BeliefLedger({"claim": 0.5})
         options = [ChoiceOption("act", {}), ChoiceOption("wait", {"security": 0.2})]
         effects = {"claim": {"security": 0.8}}
-        self.assertEqual(BeliefAwareAppraiser.rank(profile, options, beliefs, value_effects=effects)[0].choice_id, "wait")
+        before = BeliefAwareAppraiser.rank(profile, options, beliefs, value_effects=effects)
+        self.assertEqual(before[0].choice_id, "wait")
+        before_act_score = next(item.score for item in before if item.choice_id == "act")
         beliefs.add(Evidence("e1", "claim", "witness", 1, 1.0, 1.0, 1))
-        self.assertEqual(BeliefAwareAppraiser.rank(profile, options, beliefs, value_effects=effects)[0].choice_id, "act")
+        after = BeliefAwareAppraiser.rank(profile, options, beliefs, value_effects=effects)
+        self.assertEqual(after[0].choice_id, "wait")
+        after_act_score = next(item.score for item in after if item.choice_id == "act")
+        self.assertGreater(after_act_score, before_act_score)
 
     def test_adjustments_saturate_at_valid_impact_bounds(self):
         profile = NPCValueProfile("npc", {"security": 1.0})
