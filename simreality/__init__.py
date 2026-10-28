@@ -219,3 +219,7 @@ __all__ += ["NPCCollectionSnapshot", "NPCStateSnapshot"]
 # Trust priors and interaction history for deterministic relationship restoration.
 from .npc_save_state import SocialTrustSnapshot
 __all__ += ["SocialTrustSnapshot"]
+
+# Versioned persistence for evidence history and observer-specific beliefs.
+from .social_belief_save_state import BeliefLedgerSnapshot, SocialBeliefSnapshot
+__all__ += ["BeliefLedgerSnapshot", "SocialBeliefSnapshot"]
