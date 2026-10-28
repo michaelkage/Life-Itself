@@ -73,6 +73,23 @@ class SimulationWorldCheckpointTests(unittest.TestCase):
             payload,
         )
 
+    def test_consequence_section_is_optional(self):
+        coordinator, npcs, _ = self.make_simulation()
+        payload = SimulationWorldCheckpoint.capture(4, coordinator, npcs).to_json()
+        self.assertNotIn("consequence_replay", payload)
+        restored = SimulationWorldCheckpoint.from_json(payload).restore()
+        self.assertIsNone(restored.consequence_recorder)
+
+    def test_consequence_recorder_must_share_checkpoint_ledgers(self):
+        coordinator, npcs, _ = self.make_simulation()
+        unrelated_trust = SocialTrustLedger()
+        unrelated_beliefs = SocialBeliefSystem(unrelated_trust)
+        unrelated_recorder = SocialConsequenceRecorder(unrelated_trust, unrelated_beliefs)
+        with self.assertRaises(ValueError):
+            SimulationWorldCheckpoint.capture(
+                4, coordinator, npcs, consequence_recorder=unrelated_recorder,
+            )
+
     def test_unknown_schema_rejected(self):
         with self.assertRaises(ValueError):
             SimulationWorldCheckpoint.from_json('{"schema_version":99}')
