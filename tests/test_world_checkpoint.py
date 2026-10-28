@@ -125,9 +125,8 @@ class SimulationWorldCheckpointTests(unittest.TestCase):
         coordinator, npcs, _ = self.make_simulation()
         payload = json.loads(SimulationWorldCheckpoint.capture(4, coordinator, npcs).to_json())
         payload["memory_replay"]["entries"][0]["witness_id"] = "listener"
-        checkpoint = SimulationWorldCheckpoint.from_json(json.dumps(payload))
         with self.assertRaises(ValueError):
-            checkpoint.restore()
+            SimulationWorldCheckpoint.from_json(json.dumps(payload))
 
     def test_checkpoint_json_is_canonical_after_whitespace_and_key_reordering(self):
         coordinator, npcs, consequences = self.make_simulation()
