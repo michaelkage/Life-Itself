@@ -223,3 +223,8 @@ __all__ += ["SocialTrustSnapshot"]
 # Versioned persistence for evidence history and observer-specific beliefs.
 from .social_belief_save_state import BeliefLedgerSnapshot, SocialBeliefSnapshot
 __all__ += ["BeliefLedgerSnapshot", "SocialBeliefSnapshot"]
+
+
+# Replay-index persistence for witness-memory materialization.
+from .adapter_replay_state import WorldEventMemoryReplaySnapshot
+__all__ += ["WorldEventMemoryReplaySnapshot"]
