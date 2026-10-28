@@ -127,7 +127,7 @@ class SimulationWorldCheckpoint:
         )
 
     def to_json(self):
-        envelope, npcs, trust, beliefs, memory, conversations, ticks = self._components()
+        envelope, npcs, trust, beliefs, memory, conversations, ticks, consequence = self._components()
         payload = {
             "schema_version": self.SCHEMA_VERSION, "current_tick": self.current_tick,
             "events": json.loads(envelope.to_json()), "npcs": json.loads(npcs.to_json()),
