@@ -238,3 +238,8 @@ __all__ += ["SocialConversationReplaySnapshot", "SocialConsequenceReplaySnapshot
 # Coordinator request/result replay persistence; dependent adapters restore first.
 from .tick_replay_save_state import SimulationTickReplaySnapshot
 __all__ += ["SimulationTickReplaySnapshot"]
+
+
+# Composite canonical checkpoint for the integrated simulation pipeline.
+from .world_checkpoint import RestoredSimulation, SimulationWorldCheckpoint
+__all__ += ["RestoredSimulation", "SimulationWorldCheckpoint"]
