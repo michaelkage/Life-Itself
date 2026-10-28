@@ -233,3 +233,8 @@ __all__ += ["WorldEventMemoryReplaySnapshot"]
 # Versioned replay indexes for social conversations and witnessed consequences.
 from .social_replay_save_state import SocialConversationReplaySnapshot, SocialConsequenceReplaySnapshot
 __all__ += ["SocialConversationReplaySnapshot", "SocialConsequenceReplaySnapshot"]
+
+
+# Coordinator request/result replay persistence; dependent adapters restore first.
+from .tick_replay_save_state import SimulationTickReplaySnapshot
+__all__ += ["SimulationTickReplaySnapshot"]
