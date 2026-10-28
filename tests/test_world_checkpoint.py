@@ -5,6 +5,7 @@ from simreality import (
     ActionTag, NPC, ConversationIntent, SocialBeliefSystem,
     ObservedClaim, SocialConsequenceRecorder, SocialConversationAdapter, SocialTrustLedger, SimulationTickCoordinator,
     SimulationWorldCheckpoint, WitnessedSocialEvent, WorldEventLedger, WorldEventMemoryAdapter,
+    LifeItselfCampaign, LifeState,
 )
 
 
@@ -140,6 +141,42 @@ class SimulationWorldCheckpointTests(unittest.TestCase):
             SimulationWorldCheckpoint.from_json(reformatted).to_json(),
             checkpoint.to_json(),
         )
+
+
+    def test_campaign_lifecycle_round_trips_inside_world_checkpoint(self):
+        coordinator, npcs, _ = self.make_simulation()
+        campaign = LifeItselfCampaign()
+        campaign.begin_first_life("first-life")
+        campaign.active_world.money["first-life"] = 75.0
+        campaign.record_death("illness")
+        campaign.continue_as_ghost()
+        payload = SimulationWorldCheckpoint.capture(
+            4, coordinator, npcs, campaign=campaign,
+        ).to_json()
+
+        restored = SimulationWorldCheckpoint.from_json(payload).restore()
+        self.assertIsNotNone(restored.campaign)
+        self.assertEqual(restored.campaign.active_world.life.state, LifeState.GHOST)
+        self.assertEqual(restored.campaign.active_world.life.death_cause, "illness")
+        self.assertEqual(restored.campaign.active_world.money["first-life"], 75.0)
+
+        restored.campaign.start_fresh_world("second-life")
+        self.assertEqual(restored.campaign.active_world.life.character_id, "second-life")
+        self.assertEqual(len(restored.campaign.archived_worlds), 1)
+        self.assertEqual(
+            restored.campaign.visit_archive(restored.campaign.archived_worlds[0].archive_id)
+            .money["first-life"],
+            75.0,
+        )
+
+    def test_campaign_section_is_optional_and_invalid_campaign_is_rejected(self):
+        coordinator, npcs, _ = self.make_simulation()
+        payload = SimulationWorldCheckpoint.capture(4, coordinator, npcs).to_json()
+        self.assertNotIn('"campaign"', payload)
+        altered = json.loads(payload)
+        altered["campaign"] = {"schema_version": 99}
+        with self.assertRaises(ValueError):
+            SimulationWorldCheckpoint.from_json(json.dumps(altered))
 
 
 if __name__ == "__main__":
