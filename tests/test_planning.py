@@ -35,7 +35,7 @@ class DeterministicPlannerTests(unittest.TestCase):
     def test_delete_effects_change_the_planning_state(self):
         planner = DeterministicPlanner([
             PlanningAction("use-last-key", frozenset({"key"}), frozenset({"door-open"}), frozenset({"key"})),
-            PlanningAction("open-second-door", frozenset({"key"}), frozenset({"second-open"})),
+            PlanningAction("open-second-door", frozenset({"key", "door-open"}), frozenset({"second-open"})),
             PlanningAction("reach-room", frozenset({"door-open", "second-open"}), frozenset({"inside"})),
         ])
         result = planner.plan({"key"}, {"inside"})
