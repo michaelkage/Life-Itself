@@ -21,4 +21,4 @@ Restore the matching trust ledger first, then pass it to `SocialBeliefSnapshot.r
 
 ## Boundaries
 
-These codecs preserve claim priors, evidence, per-observer belief separation, and evidence-ID replay protection. They do not yet serialize social conversation IDs, social consequence recorder IDs, memory-adapter processed keys, or simulation coordinator replay history. Those remain separate work before a full save can guarantee that every adapter resumes without duplicate side effects.
+These codecs preserve claim priors, evidence, per-observer belief separation, and evidence-ID replay protection. `WorldEventMemoryReplaySnapshot` now separately preserves the event-memory adapter's processed keys, provided the corresponding NPC memories are restored first. Social conversation IDs/results, social consequence recorder IDs/results, and simulation coordinator replay history are still not persisted, so this is not yet a full save that guarantees every adapter resumes without duplicate side effects.
