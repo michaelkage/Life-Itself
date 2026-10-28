@@ -133,6 +133,16 @@ class SimulationTickReplaySnapshot:
                 raise ValueError("saved event tick does not match coordinator request")
             if tuple(event.event_id for event in ordered_events) != entry.event_ids:
                 raise ValueError("saved event IDs are not in canonical order")
+            expected_memory_keys = tuple(
+                (event.event_id, witness_id)
+                for event in ordered_events
+                for witness_id in sorted(event.witnesses)
+            )
+            actual_memory_keys = tuple((event_id, witness_id) for event_id, witness_id, _ in entry.memory_refs)
+            if actual_memory_keys != expected_memory_keys:
+                raise ValueError("saved memory references do not match the tick's event witnesses")
+            if tuple(item.conversation_id for item in entry.conversations) != entry.conversation_ids:
+                raise ValueError("saved conversation IDs do not match the tick request")
             memories = []
             for event_id, witness_id, was_none in entry.memory_refs:
                 event = coordinator.events.get(event_id)
@@ -152,6 +162,13 @@ class SimulationTickReplaySnapshot:
                 result = coordinator.conversation_adapter._results.get(conversation_id)
                 if result is None:
                     raise ValueError("required conversation result was not restored")
+                intent = entry.conversations[len(conversations)]
+                if (
+                    result.conversation.npc_a != intent.speaker_id
+                    or result.conversation.npc_b != intent.listener_id
+                    or result.conversation.district_id != intent.district_id
+                ):
+                    raise ValueError("restored conversation result conflicts with tick request")
                 conversations.append(result)
             signature = (entry.event_ids, entry.conversations)
             result = SimulationTickResult(entry.tick, tuple(memories), tuple(conversations))
