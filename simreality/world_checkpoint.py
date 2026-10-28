@@ -6,6 +6,7 @@ import json
 import math
 
 from .adapter_replay_state import WorldEventMemoryReplaySnapshot
+from .campaign import LifeItselfCampaign
 from .npc_save_state import NPCCollectionSnapshot, SocialTrustSnapshot
 from .save_state import SimulationSaveEnvelope
 from .social_belief_save_state import SocialBeliefSnapshot
@@ -31,6 +32,7 @@ class RestoredSimulation:
     coordinator: SimulationTickCoordinator
     metadata: tuple
     consequence_recorder: SocialConsequenceRecorder | None = None
+    campaign: LifeItselfCampaign | None = None
 
 
 @dataclass(frozen=True)
@@ -51,6 +53,7 @@ class SimulationWorldCheckpoint:
     ticks_per_hour: float = 1.0
     metadata: tuple = ()
     consequence_replay_json: str | None = None
+    campaign_json: str | None = None
 
     SCHEMA_VERSION = 1
 
@@ -78,7 +81,7 @@ class SimulationWorldCheckpoint:
         self._components()
 
     @classmethod
-    def capture(cls, current_tick, coordinator, npcs, *, metadata=None, consequence_recorder=None):
+    def capture(cls, current_tick, coordinator, npcs, *, metadata=None, consequence_recorder=None, campaign=None):
         if not isinstance(coordinator, SimulationTickCoordinator):
             raise TypeError("coordinator must be a SimulationTickCoordinator")
         if not isinstance(npcs, dict):
@@ -97,6 +100,8 @@ class SimulationWorldCheckpoint:
                 raise TypeError("consequence_recorder must be a SocialConsequenceRecorder or None")
             if consequence_recorder.trust is not trust or consequence_recorder.beliefs is not beliefs:
                 raise ValueError("consequence recorder must share the checkpoint trust and belief systems")
+        if campaign is not None and not isinstance(campaign, LifeItselfCampaign):
+            raise TypeError("campaign must be a LifeItselfCampaign or None")
         envelope = SimulationSaveEnvelope.capture(current_tick, coordinator.events)
         return cls(
             current_tick, envelope.to_json(),
@@ -109,6 +114,7 @@ class SimulationWorldCheckpoint:
             coordinator.memory_adapter.ticks_per_hour,
             tuple(sorted((metadata or {}).items())),
             SocialConsequenceReplaySnapshot.capture(consequence_recorder).to_json() if consequence_recorder is not None else None,
+            campaign.to_json() if campaign is not None else None,
         )
 
     def _components(self):
@@ -124,6 +130,7 @@ class SimulationWorldCheckpoint:
             SocialConversationReplaySnapshot.from_json(self.conversations_json),
             SimulationTickReplaySnapshot.from_json(self.tick_replay_json),
             SocialConsequenceReplaySnapshot.from_json(self.consequence_replay_json) if self.consequence_replay_json is not None else None,
+            LifeItselfCampaign.from_json(self.campaign_json) if self.campaign_json is not None else None,
         )
 
     def to_json(self):
@@ -140,6 +147,8 @@ class SimulationWorldCheckpoint:
         }
         if consequence is not None:
             payload["consequence_replay"] = json.loads(consequence.to_json())
+        if self.campaign_json is not None:
+            payload["campaign"] = json.loads(self.campaign_json)
         return json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False)
 
     @classmethod
@@ -153,14 +162,15 @@ class SimulationWorldCheckpoint:
             return cls(raw["current_tick"], nested("events"), nested("npcs"), nested("trust"),
                        nested("beliefs"), nested("memory_replay"), nested("conversations"),
                        nested("tick_replay"), raw.get("ticks_per_hour", 1.0), metadata,
-                       json.dumps(raw["consequence_replay"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("consequence_replay") is not None else None)
+                       json.dumps(raw["consequence_replay"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("consequence_replay") is not None else None,
+                       json.dumps(raw["campaign"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("campaign") is not None else None)
         except ValueError:
             raise
         except (TypeError, KeyError, IndexError, json.JSONDecodeError) as exc:
             raise ValueError("invalid simulation world checkpoint") from exc
 
     def restore(self):
-        envelope, npc_snapshot, trust_snapshot, belief_snapshot, memory_snapshot, conversation_snapshot, tick_snapshot, consequence_snapshot = self._components()
+        envelope, npc_snapshot, trust_snapshot, belief_snapshot, memory_snapshot, conversation_snapshot, tick_snapshot, consequence_snapshot, campaign = self._components()
         events = envelope.restore_event_ledger()
         npcs = npc_snapshot.restore()
         trust = trust_snapshot.restore()
@@ -175,4 +185,4 @@ class SimulationWorldCheckpoint:
         if consequence_snapshot is not None:
             consequence_snapshot.restore(consequence_recorder)
         return RestoredSimulation(self.current_tick, events, npcs, trust, beliefs,
-                                  memory, conversations, coordinator, self.metadata, consequence_recorder)
+                                  memory, conversations, coordinator, self.metadata, consequence_recorder, campaign)
