@@ -9,6 +9,8 @@ from .adapter_replay_state import WorldEventMemoryReplaySnapshot
 from .campaign import LifeItselfCampaign
 from .misconduct import MisconductReportingSystem
 from .misconduct_save_state import MisconductSnapshot
+from .routine_save_state import RoutineBookSnapshot
+from .routines import RoutineBook
 from .npc_save_state import NPCCollectionSnapshot, SocialTrustSnapshot
 from .save_state import SimulationSaveEnvelope
 from .social_belief_save_state import SocialBeliefSnapshot
@@ -36,6 +38,7 @@ class RestoredSimulation:
     consequence_recorder: SocialConsequenceRecorder | None = None
     campaign: LifeItselfCampaign | None = None
     misconduct: MisconductReportingSystem | None = None
+    routines: RoutineBook | None = None
 
 
 @dataclass(frozen=True)
@@ -59,6 +62,7 @@ class SimulationWorldCheckpoint:
     consequence_replay_json: str | None = None
     campaign_json: str | None = None
     misconduct_json: str | None = None
+    routines_json: str | None = None
 
     SCHEMA_VERSION = 1
 
@@ -87,7 +91,7 @@ class SimulationWorldCheckpoint:
 
     @classmethod
     def capture(cls, current_tick, coordinator, npcs, *, metadata=None,
-                consequence_recorder=None, campaign=None, misconduct=None):
+                consequence_recorder=None, campaign=None, misconduct=None, routines=None):
         if not isinstance(coordinator, SimulationTickCoordinator):
             raise TypeError("coordinator must be a SimulationTickCoordinator")
         if not isinstance(npcs, dict):
@@ -108,6 +112,9 @@ class SimulationWorldCheckpoint:
                 raise ValueError("consequence recorder must share the checkpoint trust and belief systems")
         if campaign is not None and not isinstance(campaign, LifeItselfCampaign):
             raise TypeError("campaign must be a LifeItselfCampaign or None")
+        if routines is not None and not isinstance(routines, RoutineBook):
+            raise TypeError("routines must be a RoutineBook or None")
+        routines_snapshot = RoutineBookSnapshot.capture(routines) if routines is not None else None
         misconduct_snapshot = None
         if misconduct is not None:
             if not isinstance(misconduct, MisconductReportingSystem):
@@ -132,6 +139,7 @@ class SimulationWorldCheckpoint:
             SocialConsequenceReplaySnapshot.capture(consequence_recorder).to_json() if consequence_recorder is not None else None,
             campaign.to_json() if campaign is not None else None,
             misconduct_snapshot.to_json() if misconduct_snapshot is not None else None,
+            routines_snapshot.to_json() if routines_snapshot is not None else None,
         )
 
     def _components(self):
@@ -149,10 +157,11 @@ class SimulationWorldCheckpoint:
             SocialConsequenceReplaySnapshot.from_json(self.consequence_replay_json) if self.consequence_replay_json is not None else None,
             LifeItselfCampaign.from_json(self.campaign_json) if self.campaign_json is not None else None,
             MisconductSnapshot.from_json(self.misconduct_json) if self.misconduct_json is not None else None,
+            RoutineBookSnapshot.from_json(self.routines_json) if self.routines_json is not None else None,
         )
 
     def to_json(self):
-        envelope, npcs, trust, beliefs, memory, conversations, ticks, consequence, campaign, misconduct = self._components()
+        envelope, npcs, trust, beliefs, memory, conversations, ticks, consequence, campaign, misconduct, routines = self._components()
         payload = {
             "schema_version": self.SCHEMA_VERSION, "current_tick": self.current_tick,
             "events": json.loads(envelope.to_json()), "npcs": json.loads(npcs.to_json()),
@@ -169,6 +178,8 @@ class SimulationWorldCheckpoint:
             payload["campaign"] = json.loads(self.campaign_json)
         if misconduct is not None:
             payload["misconduct"] = json.loads(misconduct.to_json())
+        if routines is not None:
+            payload["routines"] = json.loads(routines.to_json())
         return json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False)
 
     @classmethod
@@ -184,14 +195,15 @@ class SimulationWorldCheckpoint:
                        nested("tick_replay"), raw.get("ticks_per_hour", 1.0), metadata,
                        json.dumps(raw["consequence_replay"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("consequence_replay") is not None else None,
                        json.dumps(raw["campaign"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("campaign") is not None else None,
-                       json.dumps(raw["misconduct"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("misconduct") is not None else None)
+                       json.dumps(raw["misconduct"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("misconduct") is not None else None,
+                       json.dumps(raw["routines"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("routines") is not None else None)
         except ValueError:
             raise
         except (TypeError, KeyError, IndexError, json.JSONDecodeError) as exc:
             raise ValueError("invalid simulation world checkpoint") from exc
 
     def restore(self):
-        envelope, npc_snapshot, trust_snapshot, belief_snapshot, memory_snapshot, conversation_snapshot, tick_snapshot, consequence_snapshot, campaign, misconduct_snapshot = self._components()
+        envelope, npc_snapshot, trust_snapshot, belief_snapshot, memory_snapshot, conversation_snapshot, tick_snapshot, consequence_snapshot, campaign, misconduct_snapshot, routine_snapshot = self._components()
         events = envelope.restore_event_ledger()
         npcs = npc_snapshot.restore()
         trust = trust_snapshot.restore()
@@ -211,6 +223,7 @@ class SimulationWorldCheckpoint:
                 raise ValueError("misconduct reports cannot be after the checkpoint tick")
             if any(decision.tick > self.current_tick for decision in misconduct.snapshot()[1]):
                 raise ValueError("misconduct decisions cannot be after the checkpoint tick")
+        routines = routine_snapshot.restore() if routine_snapshot is not None else None
         return RestoredSimulation(self.current_tick, events, npcs, trust, beliefs,
                                   memory, conversations, coordinator, self.metadata,
-                                  consequence_recorder, campaign, misconduct)
+                                  consequence_recorder, campaign, misconduct, routines)
