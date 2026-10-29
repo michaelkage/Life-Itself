@@ -93,6 +93,16 @@ class TickCoordinatorTests(unittest.TestCase):
         self.assertEqual(first[0].execution_id, "3:shift-1")
         self.assertEqual(first[0].resolution.routine_id, "shift-1")
 
+    def test_routine_phase_rejects_a_stale_tick(self):
+        self.coordinator.step(3, self.npcs)
+        self.coordinator.step(4, self.npcs)
+        book = RoutineBook((RoutineBlock("shift-1", "speaker", "work", "shop", 480, 960),))
+        with self.assertRaisesRegex(ValueError, "latest completed world tick"):
+            self.coordinator.execute_routines(
+                3, 500, book, RoutineExecutionLedger(),
+                outcome_samples={"shift-1": 0.2},
+            )
+
     def test_routine_phase_requires_world_tick_and_explicit_samples(self):
         book = RoutineBook((RoutineBlock("shift-1", "speaker", "work", "shop", 480, 960),))
         ledger = RoutineExecutionLedger()
