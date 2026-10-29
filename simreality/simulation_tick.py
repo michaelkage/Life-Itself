@@ -197,6 +197,8 @@ class SimulationTickCoordinator:
             raise ValueError("tick must be a non-negative integer")
         if tick not in self._results:
             raise ValueError("routine execution requires a completed world tick")
+        if tick != self._last_tick:
+            raise ValueError("routine execution must run on the latest completed world tick")
         if not isinstance(book, RoutineBook):
             raise TypeError("book must be a RoutineBook")
         if not isinstance(ledger, RoutineExecutionLedger):
