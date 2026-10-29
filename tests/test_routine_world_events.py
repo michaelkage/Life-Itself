@@ -11,7 +11,7 @@ class RoutineWorldEventAdapterTests(unittest.TestCase):
     def setUp(self):
         self.events = WorldEventLedger()
         self.adapter = RoutineWorldEventAdapter(self.events)
-        self.block = RoutineBlock("shift-1", "npc-1", "work", "bakery", 480, 960)
+        self.block = RoutineBlock("shift-1", "npc-1", "work", "bakery", 480, 960, flexibility_minutes=30)
         self.book = RoutineBook((self.block,))
         self.ledger = RoutineExecutionLedger()
 
