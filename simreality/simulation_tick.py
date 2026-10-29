@@ -7,9 +7,12 @@ and which NPCs converse. The coordinator imposes a stable order and replay rules
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Mapping
+from typing import Iterable, Mapping
 
 from .model import NPC, NPCMemory
+from .routine_execution import RoutineExecutionLedger, RoutineExecution
+from .routine_tick import RoutineTickAdapter
+from .routines import RoutineBook, RoutineDisruption
 from .social_conversations import ConversationBeliefResult, SocialConversationAdapter
 from .world_event_memory import WorldEventMemoryAdapter
 from .world_events import WorldEventLedger
@@ -170,6 +173,41 @@ class SimulationTickCoordinator:
         self._results[tick] = result
         self._last_tick = tick
         return result
+
+    def execute_routines(
+        self,
+        tick: int,
+        minute_of_day: int,
+        book: RoutineBook,
+        ledger: RoutineExecutionLedger,
+        *,
+        disruptions: Iterable[RoutineDisruption] = (),
+        outcome_samples: Mapping[str, float],
+        owner_ids: Iterable[str] | None = None,
+    ) -> tuple[RoutineExecution, ...]:
+        """Resolve scheduled NPC activities as a named phase of a world tick.
+
+        This phase must be called for a tick that has already been processed by
+        step(). It uses the same world tick number in execution IDs, so its
+        results are replay-safe through the supplied RoutineExecutionLedger and
+        can be persisted in the world checkpoint. Inputs and samples remain
+        explicit; the coordinator never creates disruptions or randomness.
+        """
+        if isinstance(tick, bool) or not isinstance(tick, int) or tick < 0:
+            raise ValueError("tick must be a non-negative integer")
+        if tick not in self._results:
+            raise ValueError("routine execution requires a completed world tick")
+        if not isinstance(book, RoutineBook):
+            raise TypeError("book must be a RoutineBook")
+        if not isinstance(ledger, RoutineExecutionLedger):
+            raise TypeError("ledger must be a RoutineExecutionLedger")
+        adapter = RoutineTickAdapter(ledger)
+        return adapter.execute_due(
+            str(tick), book, minute_of_day,
+            disruptions=disruptions,
+            outcome_samples=outcome_samples,
+            owner_ids=owner_ids,
+        )
 
     def snapshot(self) -> tuple[SimulationTickResult, ...]:
         """Return completed ticks in chronological order."""
