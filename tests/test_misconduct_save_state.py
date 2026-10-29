@@ -61,7 +61,9 @@ class MisconductSnapshotTests(unittest.TestCase):
 
     def test_snapshot_rejects_noncanonical_report_order(self):
         payload = json.loads(MisconductSnapshot.capture(self.system).to_json())
-        payload["reports"].append(dict(payload["reports"][0], report_id="report-2"))
+        payload["reports"].append(dict(
+            payload["reports"][0], report_id="report-0", filed_tick=1,
+        ))
         with self.assertRaises(ValueError):
             MisconductSnapshot.from_json(json.dumps(payload))
 
