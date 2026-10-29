@@ -51,6 +51,7 @@ Engine-independent Python reference systems:
 | `simreality/reputation.py` | 4.A, 4.B | Local reputation from witness memories and convictions |
 | `simreality/goals.py` | NPC autonomy | Deterministic goal tracking, prerequisite checks, deadline urgency, and stable priority selection |
 | `simreality/planning.py` | NPC autonomy | Bounded symbolic action planning with preconditions, effects, costs, and deterministic tie-breaking |
+| `simreality/routines.py` | Persistent NPC routines | Time-windowed routines resolved against explicit disruptions; intended plans can be delayed, redirected, or missed with deterministic replay inputs |
 | `simreality/npc_autonomy.py` | NPC autonomy | Read-only decision cycle that connects selected goals to explicit desired facts and bounded plans |
 | `simreality/appraisal.py` | NPC values and bias | Transparent value-weighted choice appraisal; different NPCs can rank the same hard choice differently |
 | `simreality/beliefs.py` | NPC beliefs | Deterministic confidence updates from explicit supporting and contradictory evidence |
@@ -249,3 +250,6 @@ The coordinator replay codec is documented in [docs/TICK-REPLAY-PERSISTENCE.md](
 
 
 The composite [world checkpoint](docs/WORLD-CHECKPOINT.md) joins the event journal, NPC state, social trust and beliefs, adapter replay indexes, and coordinator replay history into one canonical JSON boundary. An optional witnessed-consequence recorder and `LifeItselfCampaign` lifecycle can also be captured and restored; campaign snapshots preserve death/spectator/ghost state and archived timelines. Integration and corruption tests are in `tests/test_world_checkpoint.py`. Capture is not yet a cross-component atomic operation.
+
+
+The first [persistent NPC routine slice](docs/NPC-ROUTINES.md) treats routines as intentions, not guaranteed presence. Traffic, weather, failed alarms, low motivation, unexpected events, illness, social obligations, and remembered-location avoidance can alter a planned activity. This module is not yet wired into the world coordinator or C++ runtime.
