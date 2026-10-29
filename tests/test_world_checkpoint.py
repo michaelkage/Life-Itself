@@ -187,7 +187,7 @@ class SimulationWorldCheckpointTests(unittest.TestCase):
             "A concern was raised about the incident.", False,
         )
         decision = ReviewDecision(
-            "review-1", "report-1", 5, "reviewer-1",
+            "review-1", "report-1", 4, "reviewer-1",
             ReviewOutcome.UNDER_REVIEW, ("dispatch-record-1",),
             "The available records are being reviewed.",
         )
@@ -219,6 +219,20 @@ class SimulationWorldCheckpointTests(unittest.TestCase):
         )
         reporting = MisconductReportingSystem((report,))
         with self.assertRaisesRegex(ValueError, "missing world events"):
+            SimulationWorldCheckpoint.capture(4, coordinator, npcs, misconduct=reporting)
+
+    def test_checkpoint_rejects_misconduct_decisions_from_the_future(self):
+        coordinator, npcs, _ = self.make_simulation()
+        report = MisconductReport(
+            "report-future", 4, "listener", "speaker", "police-east",
+            MisconductType.CORRUPTION, ("event-1",), "Report description.", False,
+        )
+        decision = ReviewDecision(
+            "decision-future", "report-future", 5, "reviewer-1",
+            ReviewOutcome.UNDER_REVIEW, (), "Review has not occurred yet.",
+        )
+        reporting = MisconductReportingSystem((report,), (decision,))
+        with self.assertRaisesRegex(ValueError, "after the checkpoint tick"):
             SimulationWorldCheckpoint.capture(4, coordinator, npcs, misconduct=reporting)
 
 
