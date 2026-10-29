@@ -195,7 +195,7 @@ Not started — Blender is not installed. The specification is fixed by the brie
    scenario traces.
 2. Add a deterministic command/event journal so a complete run can be replayed;
    versioned world snapshots now preserve state and RNG continuation.
-3. Add explicit social/spatial scheduling and autonomous world-event generation;
+3. Integrate `simreality/routines.py` into persistent NPC/world state, derive disruptions from traffic, weather, phone/alarms, obligations and witnessed incidents, then add explicit social/spatial scheduling and autonomous world-event generation;
    the current coordinator advances systems but does not simulate pedestrian
    movement or behavior-tree schedules.
 4. Build the Unreal adapter and validate worker lifecycle, snapshot handoff, and
@@ -207,7 +207,7 @@ Not started — Blender is not installed. The specification is fixed by the brie
 
 Unresolved, and each is a decision rather than a bug:
 
-- **No autonomous schedules yet.** Daily behavior and trauma tiers are computed,
+- **Routine resolution is a first Python slice, not yet integrated.** `simreality/routines.py` can resolve explicit routine blocks against explicit disruptions, but it does not yet generate schedules for all NPCs or connect movement, traffic, businesses, memory, and world ticks. Daily behavior and trauma tiers are computed,
   but no pedestrian movement, routine schedule, or behavior tree consumes them.
 - **No event replay log yet.** Versioned snapshots preserve the world and RNG
   state, but the engine does not yet record commands/events to reproduce an
