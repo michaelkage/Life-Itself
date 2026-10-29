@@ -307,3 +307,6 @@ __all__ += ["RoutineConsequenceAdapter", "RoutineImpactPolicy"]
 
 from .routine_institution_ledger import InstitutionalRecord, RoutineInstitutionLedger
 __all__ += ["InstitutionalRecord", "RoutineInstitutionLedger"]
+
+from .routine_institution_save_state import RoutineInstitutionSnapshot
+__all__ += ["RoutineInstitutionSnapshot"]
