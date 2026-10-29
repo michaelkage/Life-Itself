@@ -1,6 +1,6 @@
 # Persistent NPC Routines — First Implementation Slice
 
-**Status:** Python reference implementation now includes canonical schedule persistence and a standalone idempotent execution ledger. Both can be included in `SimulationWorldCheckpoint`. Automatic world-tick scheduling, NPC memory-driven disruption generation, route simulation, and C++ runtime integration are still pending.
+**Status:** Python reference implementation includes canonical schedule persistence, an idempotent execution ledger, and a standalone deterministic tick adapter. Schedules and execution history can be included in `SimulationWorldCheckpoint`. The adapter is not yet called automatically by `SimulationTickCoordinator`; NPC memory associations must still be supplied explicitly. Route simulation and C++ runtime integration remain pending.
 
 ## Design contract
 
@@ -49,3 +49,10 @@ resolution = book.resolve(block, 9 * 60, disruptions, outcome_sample=seeded_samp
 For a linked memory, its current retention is multiplied by the association scale. Associations below the caller's threshold do not contribute. Multiple linked memories at the same location compound deterministically into one `LOCATION_AVOIDANCE` disruption, with a stable ID and optional alternative location. Different NPC memory retention can therefore produce different outcomes for the same location. The rule is a transparent simulation heuristic, not a claim that all people respond to frightening events in the same way.
 
 The caller still supplies the time window and decides when the resulting disruption is relevant. This adapter does not autonomously discover where an event happened, modify the routine schedule, generate random samples, or route around a real road graph. For save/load replay, persist the explicit associations and pass the derived disruptions into `RoutineExecutionLedger`; the execution ledger preserves the exact disruption inputs and resolved result.
+
+
+## Explicit routine tick adapter
+
+`RoutineTickAdapter.execute_due` bridges schedule definitions to the execution ledger for one caller-supplied tick ID and minute of day. It selects active blocks in stable routine-ID order, filters the explicit disruption list to each routine owner's NPC, and requires a caller-supplied outcome sample for every active routine. Execution IDs are formed from the tick ID and routine ID, so retries with the same inputs return the stored record and conflicting inputs are rejected by the ledger.
+
+This is a composable adapter, not yet an automatic extension of `SimulationTickCoordinator`. The world-tick caller remains responsible for providing the tick ID, simulation minute, disruption events, and deterministic samples from its own seeded stream. No wall clock, global random generator, travel graph, or inferred event is introduced. An optional owner filter supports bounded updates; all active routines for selected owners must still have explicit samples.
