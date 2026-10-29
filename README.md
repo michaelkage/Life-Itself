@@ -259,3 +259,6 @@ Routine outcomes can also be evaluated by [explicit routine consequence policies
 
 
 The [misconduct reporting system](docs/MISCONDUCT-REPORTING.md) records allegations of discrimination, racial discrimination, corruption, abuse of authority, bribery, favouritism, and neglect of duty with evidence references and an append-only review history. Filing is not a verdict; review outcomes distinguish substantiated, not substantiated, and insufficient evidence. Reports and review history can now be included in the composite checkpoint, and every cited incident must exist in the authoritative event journal. An in-game UI and a separate evidence registry are not implemented.
+
+
+The [routine institution ledger](docs/NPC-ROUTINES.md) accumulates explicit workplace lateness and missed-appointment events into per-person, per-institution records, with replay-safe event handling. It is not yet included in world checkpoints or connected to employment termination, wages, or appointment scheduling.
