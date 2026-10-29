@@ -1,6 +1,6 @@
 # Misconduct Reporting and Institutional Accountability
 
-**Status:** Engine-independent Python core added. Reports and review decisions are not yet part of the composite world checkpoint, and no automatic misconduct detection or policing simulation is implied.
+**Status:** Engine-independent reporting core and canonical persistence are implemented. Reports can be included in the composite world checkpoint, with incident references validated against the authoritative event ledger. No automatic misconduct detection or policing simulation is implied.
 
 ## Purpose
 
@@ -22,12 +22,10 @@ The module does not infer misconduct from race, neighbourhood, job title, report
 
 ## Next integration work
 
-1. Persist reports and decisions in the composite world checkpoint.
-2. Link incident references to the authoritative world-event ledger and validate missing references during checkpoint restore.
-3. Add institutional policy, investigation capacity, conflicts of interest, evidence tampering, whistleblower protection, and appeal records.
+1. Add institutional policy, investigation capacity, conflicts of interest, evidence tampering, whistleblower protection, and appeal records.
 4. Model enforcement and public service allocation as stateful resource decisions. Differences between neighbourhoods should emerge from budget, staffing, influence, prejudice, corruption, priorities, and recorded decisions—not a hard-coded rule that poor areas deserve less protection.
 5. Provide a player-facing report action and clear status history once the game UI exists.
 
 ## Regression coverage
 
-`tests/test_misconduct.py` covers allegation-versus-finding, review history, anonymous reporting, distinct evidence outcomes, conflicting IDs, unknown references, and time ordering.
+`tests/test_misconduct.py` covers allegation-versus-finding, review history, anonymous reporting, distinct evidence outcomes, conflicting IDs, unknown references, and time ordering. `tests/test_misconduct_save_state.py` covers canonical JSON, complete review-history round trips, schema validation, and missing world-event references. `tests/test_world_checkpoint.py` covers optional checkpoint integration and round-trip replay.
