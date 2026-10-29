@@ -40,3 +40,12 @@ resolution = book.resolve(block, 9 * 60, disruptions, outcome_sample=seeded_samp
 ## Regression coverage
 
 `tests/test_routine_save_state.py` covers canonical schedule JSON round trips and rejects malformed, overlapping, or non-canonical schedules. `tests/test_routine_execution.py` covers idempotent executions, conflicting ID reuse, deterministic input ordering, and exact outcome persistence. `tests/test_world_checkpoint.py` covers optional schedule and execution-history integration. `tests/test_routines.py` covers non-guaranteed attendance, alarm/phone failure, traffic, weather, low motivation, location avoidance, stable replay under reordered inputs, overlap validation, and NPC-independent routines.
+
+
+## Personal memory-driven avoidance
+
+`MemoryRoutineAdapter` is the first bridge from existing NPC memories to routine disruptions. It requires an explicit `MemoryLocationAssociation`: the memory index, location, optional alternate location, and association scale. This explicit link is necessary because the current `NPCMemory` record contains the witnessed target and action but does not contain a location. The adapter never infers a location from a crime tag, identity, or neighbourhood.
+
+For a linked memory, its current retention is multiplied by the association scale. Associations below the caller's threshold do not contribute. Multiple linked memories at the same location compound deterministically into one `LOCATION_AVOIDANCE` disruption, with a stable ID and optional alternative location. Different NPC memory retention can therefore produce different outcomes for the same location. The rule is a transparent simulation heuristic, not a claim that all people respond to frightening events in the same way.
+
+The caller still supplies the time window and decides when the resulting disruption is relevant. This adapter does not autonomously discover where an event happened, modify the routine schedule, generate random samples, or route around a real road graph. For save/load replay, persist the explicit associations and pass the derived disruptions into `RoutineExecutionLedger`; the execution ledger preserves the exact disruption inputs and resolved result.
