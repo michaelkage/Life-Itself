@@ -113,6 +113,10 @@ class SimulationWorldCheckpoint:
             if not isinstance(misconduct, MisconductReportingSystem):
                 raise TypeError("misconduct must be a MisconductReportingSystem or None")
             misconduct_snapshot = MisconductSnapshot.capture(misconduct)
+            if any(report.filed_tick > current_tick for report in misconduct_snapshot.reports):
+                raise ValueError("misconduct reports cannot be filed after the checkpoint tick")
+            if any(decision.tick > current_tick for decision in misconduct_snapshot.decisions):
+                raise ValueError("misconduct review decisions cannot occur after the checkpoint tick")
             misconduct_snapshot.restore(coordinator.events)  # validate incident references before saving
         envelope = SimulationSaveEnvelope.capture(current_tick, coordinator.events)
         return cls(
