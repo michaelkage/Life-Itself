@@ -5,7 +5,8 @@ from simreality import (
     ActionTag, NPC, ConversationIntent, SocialBeliefSystem,
     ObservedClaim, SocialConsequenceRecorder, SocialConversationAdapter, SocialTrustLedger, SimulationTickCoordinator,
     SimulationWorldCheckpoint, WitnessedSocialEvent, WorldEventLedger, WorldEventMemoryAdapter,
-    LifeItselfCampaign, LifeState,
+    LifeItselfCampaign, LifeState, MisconductReport, MisconductReportingSystem,
+    MisconductType, ReviewDecision, ReviewOutcome,
 )
 
 
