@@ -270,3 +270,8 @@ __all__ += [
 # Canonical persistence for misconduct reports and review history.
 from .misconduct_save_state import MisconductSnapshot
 __all__ += ["MisconductSnapshot"]
+
+
+# Canonical persistence for planned NPC routine schedules.
+from .routine_save_state import RoutineBookSnapshot
+__all__ += ["RoutineBookSnapshot"]
