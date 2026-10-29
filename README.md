@@ -265,3 +265,7 @@ The [routine institution ledger](docs/NPC-ROUTINES.md) accumulates explicit work
 
 
 Institutional routine records can now be included in `SimulationWorldCheckpoint` via `routine_institutions=...`; restored worlds expose `RestoredSimulation.routine_institutions`, including replay-protection signatures.
+
+
+
+The new [context-aware institutional review evaluator](docs/INSTITUTIONAL-REVIEW.md) turns accumulated late-arrival, missed-appointment and delay records into a transparent review recommendation. Explicit context signals can raise or lower review pressure without erasing recorded history; it never automatically fires, punishes, or judges an NPC. Regression tests are in `tests/test_institutional_review.py`.
