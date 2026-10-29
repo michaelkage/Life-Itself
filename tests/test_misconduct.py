@@ -47,6 +47,8 @@ class MisconductReportingSystemTests(unittest.TestCase):
         self.assertEqual(status.outcome, ReviewOutcome.SUBSTANTIATED)
         self.assertEqual(len(status.decision_history), 2)
         self.assertEqual(system.snapshot()[1], (first, final))
+        system.add_decision(first)  # replaying an older identical decision remains idempotent
+        self.assertEqual(system.snapshot()[1], (first, final))
 
     def test_unsubstantiated_and_insufficient_are_distinct(self):
         system = MisconductReportingSystem((self.report(),))
@@ -83,6 +85,11 @@ class MisconductReportingSystemTests(unittest.TestCase):
         system.add_decision(valid)
         with self.assertRaises(ValueError):
             system.add_decision(self.decision("older", tick=7))
+        with self.assertRaises(ValueError):
+            system.add_decisions((
+                self.decision("newer-first", tick=10),
+                self.decision("older-second", tick=9),
+            ))
 
 
 if __name__ == "__main__":
