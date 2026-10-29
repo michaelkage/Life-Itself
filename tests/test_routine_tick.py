@@ -34,7 +34,7 @@ class RoutineTickAdapterTests(unittest.TestCase):
             outcome_samples={"work-a": 0.0, "shop-b": 0.0},
         )
         by_id = {r.routine_id: r.resolution for r in result}
-        self.assertEqual(by_id["work-a"].outcome, RoutineOutcome.DELAYED)
+        self.assertEqual(by_id["work-a"].outcome, RoutineOutcome.MISSED)
         self.assertEqual(by_id["shop-b"].outcome, RoutineOutcome.ON_TIME)
 
     def test_retry_returns_same_ledger_records(self):
