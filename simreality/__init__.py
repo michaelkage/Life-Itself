@@ -254,3 +254,14 @@ __all__ += [
     "DisruptionKind", "RoutineBlock", "RoutineBook", "RoutineDisruption",
     "RoutineOutcome", "RoutineResolution",
 ]
+
+
+# Evidence-aware reporting and review history for institutional misconduct.
+from .misconduct import (
+    MisconductReport, MisconductReportingSystem, MisconductType,
+    ReportStatus, ReviewDecision, ReviewOutcome,
+)
+__all__ += [
+    "MisconductReport", "MisconductReportingSystem", "MisconductType",
+    "ReportStatus", "ReviewDecision", "ReviewOutcome",
+]
