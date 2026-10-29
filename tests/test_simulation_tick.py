@@ -2,6 +2,8 @@
 import unittest
 
 from simreality.model import ActionTag, NPC
+from simreality.routine_execution import RoutineExecutionLedger
+from simreality.routines import DisruptionKind, RoutineBlock, RoutineBook, RoutineDisruption
 from simreality.social_beliefs import SocialBeliefSystem
 from simreality.social_conversations import SocialConversationAdapter
 from simreality.social_trust import SocialTrustLedger
@@ -69,6 +71,38 @@ class TickCoordinatorTests(unittest.TestCase):
         with self.assertRaises(KeyError):
             self.coordinator.step(3, {"listener": self.npcs["listener"]}, event_ids=("event-1",))
         self.assertEqual(self.npcs["speaker"].memories, [])
+
+    def test_routine_phase_is_tick_scoped_and_checkpointable(self):
+        self.coordinator.step(3, self.npcs)
+        block = RoutineBlock("shift-1", "speaker", "work", "shop", 480, 960)
+        book = RoutineBook((block,))
+        ledger = RoutineExecutionLedger()
+        traffic = RoutineDisruption(
+            "traffic-1", "speaker", DisruptionKind.TRAFFIC,
+            1.0, 480, 600, delay_minutes=20,
+        )
+        first = self.coordinator.execute_routines(
+            3, 500, book, ledger,
+            disruptions=(traffic,), outcome_samples={"shift-1": 0.2},
+        )
+        replay = self.coordinator.execute_routines(
+            3, 500, book, ledger,
+            disruptions=(traffic,), outcome_samples={"shift-1": 0.2},
+        )
+        self.assertEqual(first, replay)
+        self.assertEqual(first[0].execution_id, "3:shift-1")
+        self.assertEqual(first[0].resolution.routine_id, "shift-1")
+
+    def test_routine_phase_requires_world_tick_and_explicit_samples(self):
+        book = RoutineBook((RoutineBlock("shift-1", "speaker", "work", "shop", 480, 960),))
+        ledger = RoutineExecutionLedger()
+        with self.assertRaisesRegex(ValueError, "completed world tick"):
+            self.coordinator.execute_routines(
+                3, 500, book, ledger, outcome_samples={"shift-1": 0.2},
+            )
+        self.coordinator.step(3, self.npcs)
+        with self.assertRaisesRegex(ValueError, "missing outcome sample"):
+            self.coordinator.execute_routines(3, 500, book, ledger, outcome_samples={})
 
     def test_missing_conversation_participant_rejected(self):
         with self.assertRaises(KeyError):
