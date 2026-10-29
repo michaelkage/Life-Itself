@@ -147,6 +147,7 @@ class MisconductReportingSystem:
     def add_decisions(self, decisions: Iterable[ReviewDecision]) -> tuple[ReviewDecision, ...]:
         items = tuple(decisions)
         seen: set[str] = set()
+        last_tick_by_report: dict[str, int] = {}
         for decision in items:
             if not isinstance(decision, ReviewDecision):
                 raise TypeError("decisions must contain ReviewDecision instances")
@@ -159,12 +160,18 @@ class MisconductReportingSystem:
             if decision.tick < report.filed_tick:
                 raise ValueError("review decision cannot predate its report")
             prior = self._decisions.get(decision.decision_id)
-            if prior is not None and prior != decision:
-                raise ValueError(f"decision ID reused with different content: {decision.decision_id}")
-            existing = [self._decisions[key] for key in self._decision_order
-                        if self._decisions[key].report_id == decision.report_id]
-            if existing and decision.tick < existing[-1].tick:
+            if prior is not None:
+                if prior != decision:
+                    raise ValueError(f"decision ID reused with different content: {decision.decision_id}")
+                # Exact replay is idempotent even after later decisions were recorded.
+                continue
+            if decision.report_id not in last_tick_by_report:
+                existing = [self._decisions[key] for key in self._decision_order
+                            if self._decisions[key].report_id == decision.report_id]
+                last_tick_by_report[decision.report_id] = existing[-1].tick if existing else report.filed_tick
+            if decision.tick < last_tick_by_report[decision.report_id]:
                 raise ValueError("review decisions must not move backward in time")
+            last_tick_by_report[decision.report_id] = decision.tick
         for decision in items:
             if decision.decision_id not in self._decisions:
                 self._decisions[decision.decision_id] = decision
