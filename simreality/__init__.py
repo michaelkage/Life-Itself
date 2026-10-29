@@ -243,3 +243,14 @@ __all__ += ["SimulationTickReplaySnapshot"]
 # Composite canonical checkpoint for the integrated simulation pipeline.
 from .world_checkpoint import RestoredSimulation, SimulationWorldCheckpoint
 __all__ += ["RestoredSimulation", "SimulationWorldCheckpoint"]
+
+
+# Disruption-aware, deterministic NPC routine resolution.
+from .routines import (
+    DisruptionKind, RoutineBlock, RoutineBook, RoutineDisruption,
+    RoutineOutcome, RoutineResolution,
+)
+__all__ += [
+    "DisruptionKind", "RoutineBlock", "RoutineBook", "RoutineDisruption",
+    "RoutineOutcome", "RoutineResolution",
+]
