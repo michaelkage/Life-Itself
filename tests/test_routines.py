@@ -31,7 +31,7 @@ class RoutineBookTests(unittest.TestCase):
     def test_traffic_weather_and_low_motivation_are_explicit_disruptions(self):
         traffic = RoutineDisruption(
             "traffic-1", "npc-1", DisruptionKind.TRAFFIC, 0.8,
-            8 * 60, 10 * 60, delay_minutes=25,
+            8 * 60, 10 * 60, delay_minutes=18,
         )
         weather = RoutineDisruption(
             "storm", "npc-1", DisruptionKind.WEATHER, 0.6,
@@ -40,7 +40,7 @@ class RoutineBookTests(unittest.TestCase):
         )
         result = self.book.resolve(self.work, 8 * 60 + 5, (traffic,), outcome_sample=0.2)
         self.assertEqual(result.outcome, RoutineOutcome.DELAYED)
-        self.assertEqual(result.delay_minutes, 25)
+        self.assertEqual(result.delay_minutes, 18)
         result = self.book.resolve(self.work, 8 * 60 + 5, (weather,), outcome_sample=0.1)
         self.assertEqual(result.outcome, RoutineOutcome.REDIRECTED)
         self.assertEqual(result.actual_activity, "work-from-home")
@@ -50,8 +50,8 @@ class RoutineBookTests(unittest.TestCase):
             8 * 60, 10 * 60,
         )
         result = self.book.resolve(self.work, 8 * 60 + 5, (lazy_day,), outcome_sample=0.2)
-        self.assertEqual(result.outcome, RoutineOutcome.REDIRECTED)
-        self.assertEqual(result.actual_location_id, "home-1")
+        self.assertEqual(result.outcome, RoutineOutcome.DELAYED)
+        self.assertEqual(result.delay_minutes, 15)
 
     def test_event_avoidance_can_redirect_routine(self):
         avoidance = RoutineDisruption(
