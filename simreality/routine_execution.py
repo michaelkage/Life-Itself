@@ -82,14 +82,23 @@ class RoutineExecutionLedger:
         if not isinstance(book, RoutineBook):
             raise TypeError("book must be a RoutineBook")
         supplied = tuple(sorted(disruptions, key=lambda d: d.disruption_id))
+        existing = self._records.get(execution_id)
+        if existing is not None:
+            # A replay is identified from its request inputs before resolving
+            # anything again. This returns the authoritative stored result even
+            # if downstream tuning changes after the original execution.
+            same_request = (
+                existing.routine_id == block.routine_id
+                and existing.minute_of_day == minute_of_day
+                and existing.disruptions == supplied
+                and existing.outcome_sample == outcome_sample
+            )
+            if not same_request:
+                raise ValueError(f"conflicting routine execution ID: {execution_id}")
+            return existing
         resolution = book.resolve(block, minute_of_day, supplied, outcome_sample=outcome_sample)
         record = RoutineExecution(execution_id, block.routine_id, minute_of_day,
                                   supplied, outcome_sample, resolution)
-        existing = self._records.get(execution_id)
-        if existing is not None:
-            if _execution_signature(existing) != _execution_signature(record):
-                raise ValueError(f"conflicting routine execution ID: {execution_id}")
-            return existing
         self._records[execution_id] = record
         return record
 
