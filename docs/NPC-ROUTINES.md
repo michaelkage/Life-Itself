@@ -1,6 +1,6 @@
 # Persistent NPC Routines — First Implementation Slice
 
-**Status:** Python reference implementation includes canonical schedule persistence, an idempotent execution ledger, and a standalone deterministic tick adapter. Schedules and execution history can be included in `SimulationWorldCheckpoint`. The adapter is not yet called automatically by `SimulationTickCoordinator`; NPC memory associations must still be supplied explicitly. Route simulation and C++ runtime integration remain pending.
+**Status:** Python reference implementation includes canonical schedule persistence, an idempotent execution ledger, a deterministic tick adapter, and an explicit routine-execution phase on `SimulationTickCoordinator`. Callers run the ordinary world tick first, then call `execute_routines` for that latest tick with a schedule, ledger, minute, disruptions, and outcome samples. Schedules and execution history can be included in `SimulationWorldCheckpoint`. This is an explicit two-phase API, not an automatic routine call inside `step`; callers must pass the same ledger into checkpoint capture. NPC memory associations still need to be translated into explicit disruptions. Route simulation and C++ runtime integration remain pending.
 
 ## Design contract
 
@@ -56,3 +56,24 @@ The caller still supplies the time window and decides when the resulting disrupt
 `RoutineTickAdapter.execute_due` bridges schedule definitions to the execution ledger for one caller-supplied tick ID and minute of day. It selects active blocks in stable routine-ID order, filters the explicit disruption list to each routine owner's NPC, and requires a caller-supplied outcome sample for every active routine. Execution IDs are formed from the tick ID and routine ID, so retries with the same inputs return the stored record and conflicting inputs are rejected by the ledger.
 
 This is a composable adapter, not yet an automatic extension of `SimulationTickCoordinator`. The world-tick caller remains responsible for providing the tick ID, simulation minute, disruption events, and deterministic samples from its own seeded stream. No wall clock, global random generator, travel graph, or inferred event is introduced. An optional owner filter supports bounded updates; all active routines for selected owners must still have explicit samples.
+
+
+## Coordinator integration boundary
+
+After `SimulationTickCoordinator.step(tick, ...)` completes, the caller can run
+`coordinator.execute_routines(tick, minute_of_day, book, ledger, ...)`. It only
+accepts the latest completed world tick, preventing routine outcomes from being
+inserted into an older part of the timeline after later ticks have run. It
+returns the ledger's canonical `RoutineExecution` records. Execution IDs use
+`{tick}:{routine_id}`; repeated calls with identical inputs reuse stored
+results, and conflicting requests are rejected.
+
+This is deliberately a named phase rather than silently running routines in
+`step`: simulation time-of-day, disruption generation, and seeded outcome
+samples belong to the world driver. Persist the same `RoutineBook` and
+`RoutineExecutionLedger` in `SimulationWorldCheckpoint` alongside coordinator
+history. The checkpoint preserves routine execution results; the routine phase
+is not yet represented as a separate field in `SimulationTickResult`, so the
+world driver should treat its returned execution tuple as part of its tick
+record. Full atomic checkpointing across concurrent component updates remains
+outside this implementation slice.
