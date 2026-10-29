@@ -6,7 +6,7 @@ from simreality import (
     ObservedClaim, SocialConsequenceRecorder, SocialConversationAdapter, SocialTrustLedger, SimulationTickCoordinator,
     SimulationWorldCheckpoint, WitnessedSocialEvent, WorldEventLedger, WorldEventMemoryAdapter,
     LifeItselfCampaign, LifeState, MisconductReport, MisconductReportingSystem,
-    MisconductType, ReviewDecision, ReviewOutcome,
+    MisconductType, ReviewDecision, ReviewOutcome, RoutineBlock, RoutineBook,
 )
 
 
@@ -234,6 +234,35 @@ class SimulationWorldCheckpointTests(unittest.TestCase):
         reporting = MisconductReportingSystem((report,), (decision,))
         with self.assertRaisesRegex(ValueError, "after the checkpoint tick"):
             SimulationWorldCheckpoint.capture(4, coordinator, npcs, misconduct=reporting)
+
+
+    def test_routine_schedules_round_trip_in_world_checkpoint(self):
+        coordinator, npcs, _ = self.make_simulation()
+        routines = RoutineBook((
+            RoutineBlock(
+                "shift-1", "speaker", "work", "shop-1", 480, 960,
+                priority=0.9, flexibility_minutes=15,
+                fallback_activity="call manager", fallback_location_id="home-1",
+            ),
+        ))
+        payload = SimulationWorldCheckpoint.capture(
+            4, coordinator, npcs, routines=routines,
+        ).to_json()
+        restored = SimulationWorldCheckpoint.from_json(payload).restore()
+        self.assertEqual(restored.routines.snapshot(), routines.snapshot())
+        self.assertEqual(restored.routines.for_period("speaker", 500)[0].activity, "work")
+        self.assertEqual(
+            SimulationWorldCheckpoint.capture(
+                4, restored.coordinator, restored.npcs, routines=restored.routines,
+            ).to_json(),
+            payload,
+        )
+
+    def test_routine_checkpoint_section_is_optional(self):
+        coordinator, npcs, _ = self.make_simulation()
+        payload = SimulationWorldCheckpoint.capture(4, coordinator, npcs).to_json()
+        self.assertNotIn('"routines"', payload)
+        self.assertIsNone(SimulationWorldCheckpoint.from_json(payload).restore().routines)
 
 
 if __name__ == "__main__":
