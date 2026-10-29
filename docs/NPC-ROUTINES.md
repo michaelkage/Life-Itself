@@ -1,6 +1,6 @@
 # Persistent NPC Routines — First Implementation Slice
 
-**Status:** Python reference implementation and canonical schedule persistence committed. `RoutineBook` definitions can now be included in `SimulationWorldCheckpoint`; disruptions, resolved attendance, world-tick execution, NPC memory-driven schedule adaptation, and C++ runtime integration are still pending.
+**Status:** Python reference implementation now includes canonical schedule persistence and a standalone idempotent execution ledger. Both can be included in `SimulationWorldCheckpoint`. Automatic world-tick scheduling, NPC memory-driven disruption generation, route simulation, and C++ runtime integration are still pending.
 
 ## Design contract
 
@@ -23,7 +23,7 @@ Examples:
 
 The outcome is not encoded as a public percentage forecast. The caller draws a sample from the simulation's deterministic random stream; the resolver compares that sample to each relevant disruption's severity. A stable seed makes a replay identical, while different seeds can produce different histories. No option is guaranteed by the routine alone. Scenario rules should still preserve ordinary baseline functionality: a shop may usually have stock, but stock is state and may run out; a business can open late if its owner is delayed.
 
-The `RoutineBookSnapshot` codec persists intended routine blocks and validates schema, canonical ordering, and overlap constraints. The composite world checkpoint can include this schedule section. It deliberately does not claim to save disruption inputs or resolved attendance: the current routine resolver is stateless and does not yet maintain an execution ledger. This first slice is intentionally modest. It does not yet simulate routes, calculate traffic from vehicles, derive disruption probability from a phone's battery, generate schedules for every citizen, or execute movement. Those require world state and an integrated scheduler.
+The `RoutineBookSnapshot` codec persists intended routine blocks and validates schema, canonical ordering, and overlap constraints. `RoutineExecutionLedger` records a caller-named execution ID, minute, complete disruption inputs, outcome sample, and exact resolution. Reusing the same execution ID and inputs is idempotent; reusing it with conflicting inputs or outcomes is rejected. `RoutineExecutionSnapshot` canonically persists this history, and `SimulationWorldCheckpoint` can store both the schedule and execution ledger. Checkpoint capture requires the execution records to reference routine IDs in that schedule. The ledger is currently standalone: it is not automatically invoked by the world tick coordinator, and it does not generate disruptions from NPC memories on its own. This first slice is intentionally modest. It does not yet simulate routes, calculate traffic from vehicles, derive disruption probability from a phone's battery, generate schedules for every citizen, or execute movement. Those require world state and an integrated scheduler.
 
 ## API sketch
 
@@ -39,4 +39,4 @@ resolution = book.resolve(block, 9 * 60, disruptions, outcome_sample=seeded_samp
 
 ## Regression coverage
 
-`tests/test_routine_save_state.py` covers canonical JSON round trips and rejects malformed, overlapping, or non-canonical schedules. `tests/test_world_checkpoint.py` covers optional schedule integration. `tests/test_routines.py` covers non-guaranteed attendance, alarm/phone failure, traffic, weather, low motivation, location avoidance, stable replay under reordered inputs, overlap validation, and NPC-independent routines.
+`tests/test_routine_save_state.py` covers canonical schedule JSON round trips and rejects malformed, overlapping, or non-canonical schedules. `tests/test_routine_execution.py` covers idempotent executions, conflicting ID reuse, deterministic input ordering, and exact outcome persistence. `tests/test_world_checkpoint.py` covers optional schedule and execution-history integration. `tests/test_routines.py` covers non-guaranteed attendance, alarm/phone failure, traffic, weather, low motivation, location avoidance, stable replay under reordered inputs, overlap validation, and NPC-independent routines.
