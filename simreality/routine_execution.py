@@ -89,6 +89,9 @@ class RoutineExecutionLedger:
             # if downstream tuning changes after the original execution.
             same_request = (
                 existing.routine_id == block.routine_id
+                and existing.resolution.owner_id == block.owner_id
+                and existing.resolution.intended_activity == block.activity
+                and existing.resolution.intended_location_id == block.location_id
                 and existing.minute_of_day == minute_of_day
                 and existing.disruptions == supplied
                 and existing.outcome_sample == outcome_sample
