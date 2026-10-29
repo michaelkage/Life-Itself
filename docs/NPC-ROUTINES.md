@@ -130,3 +130,13 @@ processed-event signatures needed to keep retries from double-counting after
 restoration. It can be captured and restored independently. Composite
 `SimulationWorldCheckpoint` integration remains a separate task, so callers
 must currently include this snapshot alongside their world checkpoint.
+
+
+### Composite world-checkpoint integration
+
+`SimulationWorldCheckpoint.capture(..., routine_institutions=ledger)` now
+includes institutional records in the canonical world checkpoint. Restoring
+returns the ledger as `RestoredSimulation.routine_institutions`; its processed
+event signatures are preserved, so reapplying an already recorded consequence
+does not increment counts again. The section is optional for worlds that do
+not use institution-facing records.
