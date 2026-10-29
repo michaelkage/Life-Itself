@@ -265,3 +265,8 @@ __all__ += [
     "MisconductReport", "MisconductReportingSystem", "MisconductType",
     "ReportStatus", "ReviewDecision", "ReviewOutcome",
 ]
+
+
+# Canonical persistence for misconduct reports and review history.
+from .misconduct_save_state import MisconductSnapshot
+__all__ += ["MisconductSnapshot"]
