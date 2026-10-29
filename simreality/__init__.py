@@ -281,3 +281,10 @@ __all__ += ["RoutineBookSnapshot"]
 from .routine_execution import RoutineExecution, RoutineExecutionLedger
 from .routine_execution_save_state import RoutineExecutionSnapshot
 __all__ += ["RoutineExecution", "RoutineExecutionLedger", "RoutineExecutionSnapshot"]
+
+
+# Personal, deterministic routine avoidance from explicitly location-linked memories.
+from .memory_routines import (
+    MemoryLocationAssociation, MemoryRoutineAdapter, RoutineAvoidanceProfile,
+)
+__all__ += ["MemoryLocationAssociation", "MemoryRoutineAdapter", "RoutineAvoidanceProfile"]
