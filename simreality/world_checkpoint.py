@@ -206,6 +206,11 @@ class SimulationWorldCheckpoint:
         if consequence_snapshot is not None:
             consequence_snapshot.restore(consequence_recorder)
         misconduct = misconduct_snapshot.restore(events) if misconduct_snapshot is not None else None
+        if misconduct is not None:
+            if any(report.filed_tick > self.current_tick for report in misconduct.snapshot()[0]):
+                raise ValueError("misconduct reports cannot be after the checkpoint tick")
+            if any(decision.tick > self.current_tick for decision in misconduct.snapshot()[1]):
+                raise ValueError("misconduct decisions cannot be after the checkpoint tick")
         return RestoredSimulation(self.current_tick, events, npcs, trust, beliefs,
                                   memory, conversations, coordinator, self.metadata,
                                   consequence_recorder, campaign, misconduct)
