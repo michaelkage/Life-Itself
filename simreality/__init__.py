@@ -293,3 +293,8 @@ __all__ += ["MemoryLocationAssociation", "MemoryRoutineAdapter", "RoutineAvoidan
 # Deterministic bridge from schedule definitions to tick-level executions.
 from .routine_tick import RoutineTickAdapter
 __all__ += ["RoutineTickAdapter"]
+
+
+# Materialize explicit routine outcomes in the authoritative world event journal.
+from .routine_world_events import RoutineWorldEventAdapter
+__all__ += ["RoutineWorldEventAdapter"]
