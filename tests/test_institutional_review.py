@@ -20,7 +20,7 @@ class InstitutionalReviewTests(unittest.TestCase):
     def test_repeated_events_cross_configured_thresholds(self):
         record = InstitutionalRecord("bakery", "worker", late_arrivals=2, total_delay_minutes=120)
         result = self.evaluator.assess(record)
-        self.assertEqual(result.level, ReviewLevel.CHECK_IN)
+        self.assertEqual(result.level, ReviewLevel.FORMAL_REVIEW)
         self.assertEqual(result.score, 4.0)
         self.assertEqual(result.policy_id, "balanced")
 
@@ -31,7 +31,7 @@ class InstitutionalReviewTests(unittest.TestCase):
             ContextAdjustment("bus-service", -2.5, "A documented city transit disruption affected the shift."),
         ))
         self.assertEqual(base.level, ReviewLevel.FORMAL_REVIEW)
-        self.assertEqual(adjusted.level, ReviewLevel.CHECK_IN)
+        self.assertEqual(adjusted.level, ReviewLevel.NONE)
         self.assertEqual(record.late_arrivals, 3)
         self.assertEqual(adjusted.contributions[-1].source, "context:bus-service")
 
@@ -50,6 +50,7 @@ class InstitutionalReviewTests(unittest.TestCase):
         first = self.evaluator.assess(record, (a, b))
         second = self.evaluator.assess(record, (b, a))
         self.assertEqual(first, second)
+        self.assertEqual(first.level, ReviewLevel.FORMAL_REVIEW)
 
     def test_invalid_policy_and_duplicate_context_are_rejected(self):
         with self.assertRaisesRegex(ValueError, "thresholds must be ordered"):
