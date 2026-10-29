@@ -7,6 +7,7 @@ from simreality import (
     SimulationWorldCheckpoint, WitnessedSocialEvent, WorldEventLedger, WorldEventMemoryAdapter,
     LifeItselfCampaign, LifeState, MisconductReport, MisconductReportingSystem,
     MisconductType, ReviewDecision, ReviewOutcome, RoutineBlock, RoutineBook,
+    RoutineDisruption, DisruptionKind, RoutineExecutionLedger,
 )
 
 
@@ -263,6 +264,44 @@ class SimulationWorldCheckpointTests(unittest.TestCase):
         payload = SimulationWorldCheckpoint.capture(4, coordinator, npcs).to_json()
         self.assertNotIn('"routines"', payload)
         self.assertIsNone(SimulationWorldCheckpoint.from_json(payload).restore().routines)
+
+
+    def test_routine_execution_history_round_trips_and_replays_idempotently(self):
+        coordinator, npcs, _ = self.make_simulation()
+        block = RoutineBlock("shift-exec", "speaker", "work", "shop-1", 480, 960,
+                             flexibility_minutes=10, fallback_activity="call manager",
+                             fallback_location_id="home-1")
+        routines = RoutineBook((block,))
+        executions = RoutineExecutionLedger()
+        disruption = RoutineDisruption("traffic-a", "speaker", DisruptionKind.TRAFFIC,
+                                       1.0, 480, 600, delay_minutes=25)
+        original = executions.execute("attendance-1", routines, block, 500,
+                                      (disruption,), outcome_sample=0.1)
+        payload = SimulationWorldCheckpoint.capture(
+            4, coordinator, npcs, routines=routines, routine_executions=executions,
+        ).to_json()
+        restored = SimulationWorldCheckpoint.from_json(payload).restore()
+        self.assertEqual(restored.routine_executions.get("attendance-1"), original)
+        replay = restored.routine_executions.execute(
+            "attendance-1", restored.routines, block, 500, (disruption,), outcome_sample=0.1,
+        )
+        self.assertEqual(replay, original)
+        self.assertEqual(
+            SimulationWorldCheckpoint.capture(
+                4, restored.coordinator, restored.npcs,
+                routines=restored.routines, routine_executions=restored.routine_executions,
+            ).to_json(),
+            payload,
+        )
+
+    def test_routine_execution_history_requires_matching_schedule(self):
+        coordinator, npcs, _ = self.make_simulation()
+        block = RoutineBlock("shift-exec", "speaker", "work", "shop-1", 480, 960)
+        routines = RoutineBook((block,))
+        executions = RoutineExecutionLedger()
+        executions.execute("attendance-1", routines, block, 500)
+        with self.assertRaisesRegex(ValueError, "requires the corresponding RoutineBook"):
+            SimulationWorldCheckpoint.capture(4, coordinator, npcs, routine_executions=executions)
 
 
 if __name__ == "__main__":
