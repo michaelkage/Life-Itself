@@ -106,3 +106,19 @@ either effect, and no policy means no consequence is invented. This is a
 transparent rule layer, not a complete employer, clinic, or relationship AI.
 Consequence IDs are derived from the source event and policy, so identical
 retries are idempotent. Tests live in `tests/test_routine_consequences.py`.
+
+
+## Persistent institution-facing records
+
+`RoutineInstitutionLedger` accumulates explicit `workplace_late_arrival` and
+`appointment_missed` consequence events into per-person, per-institution
+records. It tracks late-arrival count, missed-appointment count, total recorded
+delay, and the last event tick. Records are separate for each institution and
+person, and reapplying the same event does not double-count it.
+
+This is a first persistence-in-memory layer, not yet a checkpoint codec or a
+complete employment/healthcare model. It does not terminate employment, cancel
+future appointments, alter wages, or infer intent. The world driver must use
+the established event types and explicitly decide how these records affect
+future institutional decisions. Tests are in
+`tests/test_routine_institution_ledger.py`.
