@@ -47,6 +47,8 @@ class RoutineTickAdapter:
             raise ValueError("tick_id must be a non-empty string")
         if not isinstance(book, RoutineBook):
             raise TypeError("book must be a RoutineBook")
+        if isinstance(minute_of_day, bool) or not isinstance(minute_of_day, int) or not 0 <= minute_of_day < 1440:
+            raise ValueError("minute_of_day must be an integer from 0 to 1439")
         if not isinstance(outcome_samples, Mapping):
             raise TypeError("outcome_samples must be a mapping of routine IDs to samples")
 
