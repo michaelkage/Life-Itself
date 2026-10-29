@@ -51,7 +51,7 @@ Engine-independent Python reference systems:
 | `simreality/reputation.py` | 4.A, 4.B | Local reputation from witness memories and convictions |
 | `simreality/goals.py` | NPC autonomy | Deterministic goal tracking, prerequisite checks, deadline urgency, and stable priority selection |
 | `simreality/planning.py` | NPC autonomy | Bounded symbolic action planning with preconditions, effects, costs, and deterministic tie-breaking |
-| `simreality/routines.py` | Persistent NPC routines | Time-windowed routines resolved against explicit disruptions; intended plans can be delayed, redirected, or missed with deterministic replay inputs |\n| `simreality/routine_tick.py` | Routine tick adapter | Selects active routines for an explicit tick, scopes supplied disruptions per NPC, and records replay-safe executions using explicit samples |
+| `simreality/routines.py` | Persistent NPC routines | Time-windowed routines resolved against explicit disruptions; intended plans can be delayed, redirected, or missed with deterministic replay inputs |\n| `simreality/routine_tick.py` | Routine tick adapter | Selects active routines for an explicit tick, scopes supplied disruptions per NPC, and records replay-safe executions using explicit samples; called by the coordinator's named routine phase |
 | `simreality/npc_autonomy.py` | NPC autonomy | Read-only decision cycle that connects selected goals to explicit desired facts and bounded plans |
 | `simreality/appraisal.py` | NPC values and bias | Transparent value-weighted choice appraisal; different NPCs can rank the same hard choice differently |
 | `simreality/beliefs.py` | NPC beliefs | Deterministic confidence updates from explicit supporting and contradictory evidence |
