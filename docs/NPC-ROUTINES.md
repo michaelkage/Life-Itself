@@ -94,3 +94,15 @@ reacts, change workplace state, or create secondary consequences. Replaying the
 same execution at the same tick is idempotent; reusing its event ID at a
 different tick conflicts and is rejected. Regression coverage is in
 `tests/test_routine_world_events.py`.
+
+
+## Explicit routine consequences
+
+`RoutineConsequenceAdapter` applies location/activity-specific `RoutineImpactPolicy`
+rules to routine events already in the world journal. A configured workplace may
+emit a late-arrival event only when delay exceeds its tolerance; a configured
+appointment provider may emit a missed-appointment event. Policies can disable
+either effect, and no policy means no consequence is invented. This is a
+transparent rule layer, not a complete employer, clinic, or relationship AI.
+Consequence IDs are derived from the source event and policy, so identical
+retries are idempotent. Tests live in `tests/test_routine_consequences.py`.
