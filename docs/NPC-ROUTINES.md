@@ -122,3 +122,11 @@ future appointments, alter wages, or infer intent. The world driver must use
 the established event types and explicitly decide how these records affect
 future institutional decisions. Tests are in
 `tests/test_routine_institution_ledger.py`.
+
+
+The institutional ledger also has a standalone canonical JSON codec,
+`RoutineInstitutionSnapshot`. It preserves both accumulated records and the
+processed-event signatures needed to keep retries from double-counting after
+restoration. It can be captured and restored independently. Composite
+`SimulationWorldCheckpoint` integration remains a separate task, so callers
+must currently include this snapshot alongside their world checkpoint.
