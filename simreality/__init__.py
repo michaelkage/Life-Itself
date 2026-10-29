@@ -298,3 +298,8 @@ __all__ += ["RoutineTickAdapter"]
 # Materialize explicit routine outcomes in the authoritative world event journal.
 from .routine_world_events import RoutineWorldEventAdapter
 __all__ += ["RoutineWorldEventAdapter"]
+
+
+# Explicit policy-driven effects of routine outcomes.
+from .routine_consequences import RoutineConsequenceAdapter, RoutineImpactPolicy
+__all__ += ["RoutineConsequenceAdapter", "RoutineImpactPolicy"]
