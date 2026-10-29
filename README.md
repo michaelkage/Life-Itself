@@ -262,3 +262,6 @@ The [misconduct reporting system](docs/MISCONDUCT-REPORTING.md) records allegati
 
 
 The [routine institution ledger](docs/NPC-ROUTINES.md) accumulates explicit workplace lateness and missed-appointment events into per-person, per-institution records, with replay-safe event handling. It is not yet included in world checkpoints or connected to employment termination, wages, or appointment scheduling.
+
+
+Institutional routine records can now be included in `SimulationWorldCheckpoint` via `routine_institutions=...`; restored worlds expose `RestoredSimulation.routine_institutions`, including replay-protection signatures.
