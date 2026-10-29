@@ -253,3 +253,6 @@ The composite [world checkpoint](docs/WORLD-CHECKPOINT.md) joins the event journ
 
 
 The first [persistent NPC routine slice](docs/NPC-ROUTINES.md) treats routines as intentions, not guaranteed presence. Traffic, weather, failed alarms, low motivation, unexpected events, illness, social obligations, and remembered-location avoidance can alter a planned activity. This module is not yet wired into the world coordinator or C++ runtime.
+
+
+The [misconduct reporting system](docs/MISCONDUCT-REPORTING.md) records allegations of discrimination, racial discrimination, corruption, abuse of authority, bribery, favouritism, and neglect of duty with evidence references and an append-only review history. Filing is not a verdict; review outcomes distinguish substantiated, not substantiated, and insufficient evidence. The module is not yet part of the composite checkpoint or an in-game UI.
