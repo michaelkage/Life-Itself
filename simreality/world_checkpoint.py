@@ -10,6 +10,8 @@ from .campaign import LifeItselfCampaign
 from .misconduct import MisconductReportingSystem
 from .misconduct_save_state import MisconductSnapshot
 from .routine_save_state import RoutineBookSnapshot
+from .routine_execution import RoutineExecutionLedger
+from .routine_execution_save_state import RoutineExecutionSnapshot
 from .routines import RoutineBook
 from .npc_save_state import NPCCollectionSnapshot, SocialTrustSnapshot
 from .save_state import SimulationSaveEnvelope
@@ -39,6 +41,7 @@ class RestoredSimulation:
     campaign: LifeItselfCampaign | None = None
     misconduct: MisconductReportingSystem | None = None
     routines: RoutineBook | None = None
+    routine_executions: RoutineExecutionLedger | None = None
 
 
 @dataclass(frozen=True)
@@ -63,6 +66,7 @@ class SimulationWorldCheckpoint:
     campaign_json: str | None = None
     misconduct_json: str | None = None
     routines_json: str | None = None
+    routine_executions_json: str | None = None
 
     SCHEMA_VERSION = 1
 
@@ -91,7 +95,8 @@ class SimulationWorldCheckpoint:
 
     @classmethod
     def capture(cls, current_tick, coordinator, npcs, *, metadata=None,
-                consequence_recorder=None, campaign=None, misconduct=None, routines=None):
+                consequence_recorder=None, campaign=None, misconduct=None, routines=None,
+                routine_executions=None):
         if not isinstance(coordinator, SimulationTickCoordinator):
             raise TypeError("coordinator must be a SimulationTickCoordinator")
         if not isinstance(npcs, dict):
@@ -115,6 +120,15 @@ class SimulationWorldCheckpoint:
         if routines is not None and not isinstance(routines, RoutineBook):
             raise TypeError("routines must be a RoutineBook or None")
         routines_snapshot = RoutineBookSnapshot.capture(routines) if routines is not None else None
+        if routine_executions is not None and not isinstance(routine_executions, RoutineExecutionLedger):
+            raise TypeError("routine_executions must be a RoutineExecutionLedger or None")
+        if routine_executions is not None and routines is None:
+            raise ValueError("routine execution history requires the corresponding RoutineBook")
+        execution_snapshot = RoutineExecutionSnapshot.capture(routine_executions) if routine_executions is not None else None
+        if execution_snapshot is not None:
+            known_routines = {block.routine_id for block in routines.snapshot()}
+            if any(record.routine_id not in known_routines for record in execution_snapshot.records):
+                raise ValueError("routine execution history references an unknown routine")
         misconduct_snapshot = None
         if misconduct is not None:
             if not isinstance(misconduct, MisconductReportingSystem):
@@ -140,6 +154,7 @@ class SimulationWorldCheckpoint:
             campaign.to_json() if campaign is not None else None,
             misconduct_snapshot.to_json() if misconduct_snapshot is not None else None,
             routines_snapshot.to_json() if routines_snapshot is not None else None,
+            execution_snapshot.to_json() if execution_snapshot is not None else None,
         )
 
     def _components(self):
@@ -158,10 +173,11 @@ class SimulationWorldCheckpoint:
             LifeItselfCampaign.from_json(self.campaign_json) if self.campaign_json is not None else None,
             MisconductSnapshot.from_json(self.misconduct_json) if self.misconduct_json is not None else None,
             RoutineBookSnapshot.from_json(self.routines_json) if self.routines_json is not None else None,
+            RoutineExecutionSnapshot.from_json(self.routine_executions_json) if self.routine_executions_json is not None else None,
         )
 
     def to_json(self):
-        envelope, npcs, trust, beliefs, memory, conversations, ticks, consequence, campaign, misconduct, routines = self._components()
+        envelope, npcs, trust, beliefs, memory, conversations, ticks, consequence, campaign, misconduct, routines, routine_executions = self._components()
         payload = {
             "schema_version": self.SCHEMA_VERSION, "current_tick": self.current_tick,
             "events": json.loads(envelope.to_json()), "npcs": json.loads(npcs.to_json()),
@@ -180,6 +196,8 @@ class SimulationWorldCheckpoint:
             payload["misconduct"] = json.loads(misconduct.to_json())
         if routines is not None:
             payload["routines"] = json.loads(routines.to_json())
+        if routine_executions is not None:
+            payload["routine_executions"] = json.loads(routine_executions.to_json())
         return json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False)
 
     @classmethod
@@ -196,14 +214,15 @@ class SimulationWorldCheckpoint:
                        json.dumps(raw["consequence_replay"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("consequence_replay") is not None else None,
                        json.dumps(raw["campaign"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("campaign") is not None else None,
                        json.dumps(raw["misconduct"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("misconduct") is not None else None,
-                       json.dumps(raw["routines"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("routines") is not None else None)
+                       json.dumps(raw["routines"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("routines") is not None else None,
+                       json.dumps(raw["routine_executions"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("routine_executions") is not None else None)
         except ValueError:
             raise
         except (TypeError, KeyError, IndexError, json.JSONDecodeError) as exc:
             raise ValueError("invalid simulation world checkpoint") from exc
 
     def restore(self):
-        envelope, npc_snapshot, trust_snapshot, belief_snapshot, memory_snapshot, conversation_snapshot, tick_snapshot, consequence_snapshot, campaign, misconduct_snapshot, routine_snapshot = self._components()
+        envelope, npc_snapshot, trust_snapshot, belief_snapshot, memory_snapshot, conversation_snapshot, tick_snapshot, consequence_snapshot, campaign, misconduct_snapshot, routine_snapshot, execution_snapshot = self._components()
         events = envelope.restore_event_ledger()
         npcs = npc_snapshot.restore()
         trust = trust_snapshot.restore()
@@ -224,6 +243,13 @@ class SimulationWorldCheckpoint:
             if any(decision.tick > self.current_tick for decision in misconduct.snapshot()[1]):
                 raise ValueError("misconduct decisions cannot be after the checkpoint tick")
         routines = routine_snapshot.restore() if routine_snapshot is not None else None
+        routine_executions = execution_snapshot.restore() if execution_snapshot is not None else None
+        if routine_executions is not None:
+            if routines is None:
+                raise ValueError("routine execution history requires a routine schedule")
+            known_routines = {block.routine_id for block in routines.snapshot()}
+            if any(record.routine_id not in known_routines for record in routine_executions.snapshot()):
+                raise ValueError("routine execution history references an unknown routine")
         return RestoredSimulation(self.current_tick, events, npcs, trust, beliefs,
                                   memory, conversations, coordinator, self.metadata,
-                                  consequence_recorder, campaign, misconduct, routines)
+                                  consequence_recorder, campaign, misconduct, routines, routine_executions)
