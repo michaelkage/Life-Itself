@@ -275,3 +275,9 @@ __all__ += ["MisconductSnapshot"]
 # Canonical persistence for planned NPC routine schedules.
 from .routine_save_state import RoutineBookSnapshot
 __all__ += ["RoutineBookSnapshot"]
+
+
+# Idempotent execution history and canonical persistence for NPC routines.
+from .routine_execution import RoutineExecution, RoutineExecutionLedger
+from .routine_execution_save_state import RoutineExecutionSnapshot
+__all__ += ["RoutineExecution", "RoutineExecutionLedger", "RoutineExecutionSnapshot"]
