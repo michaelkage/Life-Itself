@@ -7,7 +7,7 @@
 
 namespace simreality {
 
-MoralChoiceEvaluation evaluate_moral_choice(
+MoralChoiceExplanation explain_moral_choice(
     const NPC& npc, const MoralChoiceOption& option) {
     const auto unit = [](double value) { return std::clamp(value, 0.0, 1.0); };
     const double compassion = unit(npc.compassion);
@@ -16,14 +16,35 @@ MoralChoiceEvaluation evaluate_moral_choice(
     const double freedom = unit(npc.freedom_value);
     const double loyalty = unit(npc.loyalty_bias);
     const double self_interest = unit(npc.self_interest_value);
-    const double score = 0.25 * compassion * unit(option.urgency)
-        + 0.20 * compassion * unit(option.people_helped)
-        + 0.20 * fairness * unit(option.fairness)
-        + 0.15 * safety * unit(option.safety)
-        + 0.10 * freedom * unit(option.freedom)
-        + 0.10 * loyalty * unit(option.loyalty)
-        + 0.20 * self_interest * (1.0 - unit(option.personal_cost));
-    return {option.option_id, score};
+
+    MoralChoiceExplanation explanation;
+    explanation.option_id = option.option_id;
+    explanation.factors = {
+        {"urgency", compassion, unit(option.urgency),
+            0.25 * compassion * unit(option.urgency)},
+        {"people_helped", compassion, unit(option.people_helped),
+            0.20 * compassion * unit(option.people_helped)},
+        {"fairness", fairness, unit(option.fairness),
+            0.20 * fairness * unit(option.fairness)},
+        {"safety", safety, unit(option.safety),
+            0.15 * safety * unit(option.safety)},
+        {"freedom", freedom, unit(option.freedom),
+            0.10 * freedom * unit(option.freedom)},
+        {"loyalty", loyalty, unit(option.loyalty),
+            0.10 * loyalty * unit(option.loyalty)},
+        {"personal_cost", self_interest, unit(option.personal_cost),
+            0.20 * self_interest * (1.0 - unit(option.personal_cost))}
+    };
+    for (const MoralChoiceFactorExplanation& factor : explanation.factors) {
+        explanation.total_score += factor.contribution;
+    }
+    return explanation;
+}
+
+MoralChoiceEvaluation evaluate_moral_choice(
+    const NPC& npc, const MoralChoiceOption& option) {
+    const MoralChoiceExplanation explanation = explain_moral_choice(npc, option);
+    return {explanation.option_id, explanation.total_score};
 }
 
 MoralChoiceEvaluation choose_moral_option(

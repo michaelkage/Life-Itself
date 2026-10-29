@@ -10,6 +10,7 @@ add_library(simreality_core
     src/SimulationRuntime.cpp
     src/Decay.cpp
     src/Gossip.cpp
+    src/Information.cpp
     src/Ecosystem.cpp
     src/Districts.cpp
     src/Trauma.cpp
@@ -36,4 +37,8 @@ if(SIMREALITY_BUILD_TESTS)
     add_executable(simreality_core_tests tests/CoreTests.cpp)
     target_link_libraries(simreality_core_tests PRIVATE simreality_core)
     add_test(NAME simreality_core_tests COMMAND simreality_core_tests)
+
+    add_executable(simreality_information_tests tests/InformationTests.cpp)
+    target_link_libraries(simreality_information_tests PRIVATE simreality_core)
+    add_test(NAME simreality_information_tests COMMAND simreality_information_tests)
 endif()

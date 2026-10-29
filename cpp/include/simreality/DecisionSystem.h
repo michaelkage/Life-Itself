@@ -38,6 +38,28 @@ struct MoralChoiceEvaluation {
     double score{0.0};
 };
 
+// A named contribution to a moral-choice score. Values are the normalized
+// inputs actually used by the scorer; contribution is not a moral verdict.
+struct MoralChoiceFactorExplanation {
+    std::string factor{};
+    double npc_value{0.0};
+    double option_value{0.0};
+    double contribution{0.0};
+};
+
+// Read-only breakdown of one option under the NPC's current value priorities.
+// This describes the supplied scenario and current traits, not a historical
+// decision record, objective truth, or a universal good/bad classification.
+struct MoralChoiceExplanation {
+    std::string option_id{};
+    std::vector<MoralChoiceFactorExplanation> factors{};
+    double total_score{0.0};
+};
+
+// Exposes each weighted contribution used by the existing deterministic scorer.
+[[nodiscard]] MoralChoiceExplanation explain_moral_choice(
+    const NPC& npc, const MoralChoiceOption& option);
+
 // Deterministic value-weighted evaluation. It scores options but does not
 // dictate a universal good/bad answer or mutate the NPC/world.
 [[nodiscard]] MoralChoiceEvaluation evaluate_moral_choice(
