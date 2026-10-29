@@ -77,3 +77,20 @@ is not yet represented as a separate field in `SimulationTickResult`, so the
 world driver should treat its returned execution tuple as part of its tick
 record. Full atomic checkpointing across concurrent component updates remains
 outside this implementation slice.
+
+
+## Routine outcomes on the shared world timeline
+
+`RoutineWorldEventAdapter` materializes each resolved execution as a canonical
+`routine_execution` event at an explicit world tick. The event records the
+owner, intended and actual activity/location, outcome, delay, reason, and
+disruption IDs. Other adapters can then consume it through the existing world
+event journal, including witness-memory and social interpretation systems.
+
+Witnesses are never inferred from the routine itself: the world driver may pass
+a per-execution witness list only when visibility or hearing has been established
+by other world state. The adapter does not move NPCs, decide whether a manager
+reacts, change workplace state, or create secondary consequences. Replaying the
+same execution at the same tick is idempotent; reusing its event ID at a
+different tick conflicts and is rejected. Regression coverage is in
+`tests/test_routine_world_events.py`.
