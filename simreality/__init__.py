@@ -288,3 +288,8 @@ from .memory_routines import (
     MemoryLocationAssociation, MemoryRoutineAdapter, RoutineAvoidanceProfile,
 )
 __all__ += ["MemoryLocationAssociation", "MemoryRoutineAdapter", "RoutineAvoidanceProfile"]
+
+
+# Deterministic bridge from schedule definitions to tick-level executions.
+from .routine_tick import RoutineTickAdapter
+__all__ += ["RoutineTickAdapter"]
