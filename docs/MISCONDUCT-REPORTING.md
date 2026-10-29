@@ -23,8 +23,8 @@ The module does not infer misconduct from race, neighbourhood, job title, report
 ## Next integration work
 
 1. Add institutional policy, investigation capacity, conflicts of interest, evidence tampering, whistleblower protection, and appeal records.
-4. Model enforcement and public service allocation as stateful resource decisions. Differences between neighbourhoods should emerge from budget, staffing, influence, prejudice, corruption, priorities, and recorded decisions—not a hard-coded rule that poor areas deserve less protection.
-5. Provide a player-facing report action and clear status history once the game UI exists.
+2. Model enforcement and public service allocation as stateful resource decisions. Differences between neighbourhoods should emerge from budget, staffing, influence, prejudice, corruption, priorities, and recorded decisions—not a hard-coded rule that poor areas deserve less protection.
+3. Provide a player-facing report action and clear status history once the game UI exists.
 
 ## Regression coverage
 
