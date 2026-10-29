@@ -178,5 +178,48 @@ class SimulationWorldCheckpointTests(unittest.TestCase):
             SimulationWorldCheckpoint.from_json(json.dumps(altered))
 
 
+    def test_misconduct_history_round_trips_and_validates_world_incidents(self):
+        coordinator, npcs, _ = self.make_simulation()
+        report = MisconductReport(
+            "report-1", 4, "listener", "speaker", "police-east",
+            MisconductType.CORRUPTION, ("event-1",),
+            "A concern was raised about the incident.", False,
+        )
+        decision = ReviewDecision(
+            "review-1", "report-1", 5, "reviewer-1",
+            ReviewOutcome.UNDER_REVIEW, ("dispatch-record-1",),
+            "The available records are being reviewed.",
+        )
+        reporting = MisconductReportingSystem((report,), (decision,))
+        payload = SimulationWorldCheckpoint.capture(
+            4, coordinator, npcs, misconduct=reporting,
+        ).to_json()
+        restored = SimulationWorldCheckpoint.from_json(payload).restore()
+        self.assertIsNotNone(restored.misconduct)
+        self.assertEqual(restored.misconduct.snapshot(), reporting.snapshot())
+        self.assertEqual(restored.misconduct.status("report-1").outcome, ReviewOutcome.UNDER_REVIEW)
+        self.assertEqual(
+            SimulationWorldCheckpoint.capture(
+                4, restored.coordinator, restored.npcs, misconduct=restored.misconduct,
+            ).to_json(),
+            payload,
+        )
+
+    def test_misconduct_section_is_optional_and_missing_incident_is_rejected(self):
+        coordinator, npcs, _ = self.make_simulation()
+        payload = SimulationWorldCheckpoint.capture(4, coordinator, npcs).to_json()
+        self.assertNotIn('"misconduct"', payload)
+        self.assertIsNone(SimulationWorldCheckpoint.from_json(payload).restore().misconduct)
+
+        report = MisconductReport(
+            "report-2", 4, "listener", "speaker", "police-east",
+            MisconductType.NEGLECT_OF_DUTY, ("missing-event",),
+            "An incident reference that is not in the world journal.", False,
+        )
+        reporting = MisconductReportingSystem((report,))
+        with self.assertRaisesRegex(ValueError, "missing world events"):
+            SimulationWorldCheckpoint.capture(4, coordinator, npcs, misconduct=reporting)
+
+
 if __name__ == "__main__":
     unittest.main()
