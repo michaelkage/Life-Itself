@@ -11,7 +11,7 @@ from simreality.world_events import WorldEventLedger
 class RoutineConsequenceAdapterTests(unittest.TestCase):
     def setUp(self):
         self.events = WorldEventLedger()
-        self.block = RoutineBlock("shift", "worker", "work", "bakery", 480, 960)
+        self.block = RoutineBlock("shift", "worker", "work", "bakery", 480, 960, flexibility_minutes=30)
         book = RoutineBook((self.block,))
         disruption = RoutineDisruption(
             "traffic", "worker", DisruptionKind.TRAFFIC, 1.0, 480, 600,
