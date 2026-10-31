@@ -19,11 +19,11 @@ Review outcomes map as follows:
 | Review outcome | Political finding status |
 | --- | --- |
 | filed | alleged |
-| under review | alleged |
+| under review | under_review |
 | substantiated | substantiated |
 | not substantiated | not_substantiated |
 | insufficient evidence | insufficient_evidence |
-| dismissed | not_substantiated |
+| dismissed | dismissed |
 
 Each review decision remains a separate dated event. If a later review changes
 the finding, policy can define a separate effect for that later status; prior
