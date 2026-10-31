@@ -19,11 +19,11 @@ class MisconductPoliticalBridge:
 
     _FINDING_STATUS = {
         ReviewOutcome.FILED: "alleged",
-        ReviewOutcome.UNDER_REVIEW: "alleged",
+        ReviewOutcome.UNDER_REVIEW: "under_review",
         ReviewOutcome.SUBSTANTIATED: "substantiated",
         ReviewOutcome.NOT_SUBSTANTIATED: "not_substantiated",
         ReviewOutcome.INSUFFICIENT_EVIDENCE: "insufficient_evidence",
-        ReviewOutcome.DISMISSED: "not_substantiated",
+        ReviewOutcome.DISMISSED: "dismissed",
     }
 
     def __init__(self, outcomes: InstitutionalOutcomeAdapter | None = None) -> None:
