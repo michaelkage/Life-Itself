@@ -29,7 +29,7 @@ class InstitutionalPoliticalLedgerTests(unittest.TestCase):
             priority_tag="housing", leadership_priority_delta=0.25,
         ))
         state = ledger.state()
-        self.assertEqual(dict(state.department_influence)["planning"], 0.6)
+        self.assertAlmostEqual(dict(state.department_influence)["planning"], 0.6)
         self.assertEqual(dict(state.leadership_priorities)["housing"], 0.55)
 
     def test_relationships_are_symmetric_and_signed(self):
