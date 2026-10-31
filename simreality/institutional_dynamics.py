@@ -31,7 +31,11 @@ def _weights(values: tuple[tuple[str, float], ...], name: str, *, signed: bool =
         key, value = item
         if not isinstance(key, str) or not key.strip():
             raise ValueError(f"{name} keys must be non-empty strings")
-        if signed:\n            if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or not -1.0 <= value <= 1.0:\n                raise ValueError(f"{name}[{key}] must be finite and between -1 and 1")\n        else:\n            _unit(value, f"{name}[{key}]")
+        if signed:
+            if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or not -1.0 <= value <= 1.0:
+                raise ValueError(f"{name}[{key}] must be finite and between -1 and 1")
+        else:
+            _unit(value, f"{name}[{key}]")
         names.append(key)
     if len(names) != len(set(names)):
         raise ValueError(f"{name} keys must be unique")
