@@ -356,3 +356,14 @@ __all__ += [
     "DepartmentAllocation", "DepartmentResourceRequest", "InstitutionalResourceAllocator",
     "ResourceAllocationPlan", "ResourceAllocationPolicy",
 ]
+
+
+# Event-sourced departmental alliances, rivalries, lobbying effects, and influence.
+from .institutional_politics import (
+    InstitutionalPoliticalEvent, InstitutionalPoliticalLedger,
+    InstitutionalPoliticalState,
+)
+__all__ += [
+    "InstitutionalPoliticalEvent", "InstitutionalPoliticalLedger",
+    "InstitutionalPoliticalState",
+]
