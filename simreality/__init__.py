@@ -367,3 +367,14 @@ __all__ += [
     "InstitutionalPoliticalEvent", "InstitutionalPoliticalLedger",
     "InstitutionalPoliticalState",
 ]
+
+
+# Coalition-aware lobbying and transparent institutional political outcomes.
+from .institutional_lobbying import (
+    InstitutionalLobbyEvaluator, PoliticalLobbyAssessment,
+    PoliticalLobbyPolicy, PoliticalLobbyRequest,
+)
+__all__ += [
+    "InstitutionalLobbyEvaluator", "PoliticalLobbyAssessment",
+    "PoliticalLobbyPolicy", "PoliticalLobbyRequest",
+]
