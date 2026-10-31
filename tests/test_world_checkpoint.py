@@ -8,7 +8,7 @@ from simreality import (
     LifeItselfCampaign, LifeState, MisconductReport, MisconductReportingSystem,
     MisconductType, ReviewDecision, ReviewOutcome, RoutineBlock, RoutineBook,
     RoutineDisruption, DisruptionKind, RoutineExecutionLedger,
-    RoutineInstitutionLedger,
+    RoutineInstitutionLedger, InstitutionalPoliticalLedger,
 )
 
 
@@ -336,6 +336,42 @@ class SimulationWorldCheckpointTests(unittest.TestCase):
         self.assertIsNone(
             SimulationWorldCheckpoint.from_json(payload).restore().routine_institutions
         )
+
+
+    def test_institutional_political_history_round_trips_in_world_checkpoint(self):
+        coordinator, npcs, _ = self.make_simulation()
+        politics = InstitutionalPoliticalLedger(
+            "city_hall",
+            initial_influence=(("planning", 0.4),),
+            leadership_priorities=(("housing", 0.3),),
+        )
+        from simreality import InstitutionalPoliticalEvent
+        politics.append(InstitutionalPoliticalEvent(
+            "coalition-formed", "city_hall", 2, "planning",
+            influence_delta=0.15, other_department_id="transport",
+            relationship_delta=0.6, priority_tag="housing",
+            leadership_priority_delta=0.2, rationale="joint housing plan",
+        ))
+        payload = SimulationWorldCheckpoint.capture(
+            4, coordinator, npcs, institutional_politics=politics,
+        ).to_json()
+        restored = SimulationWorldCheckpoint.from_json(payload).restore()
+        self.assertIsNotNone(restored.institutional_politics)
+        self.assertEqual(restored.institutional_politics.state(), politics.state())
+        self.assertEqual(
+            SimulationWorldCheckpoint.capture(
+                4, restored.coordinator, restored.npcs,
+                institutional_politics=restored.institutional_politics,
+            ).to_json(),
+            payload,
+        )
+
+    def test_institutional_political_history_is_optional(self):
+        coordinator, npcs, _ = self.make_simulation()
+        payload = SimulationWorldCheckpoint.capture(4, coordinator, npcs).to_json()
+        self.assertNotIn("institutional_politics", json.loads(payload))
+        restored = SimulationWorldCheckpoint.from_json(payload).restore()
+        self.assertIsNone(restored.institutional_politics)
 
 
 if __name__ == "__main__":
