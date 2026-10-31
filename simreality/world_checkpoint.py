@@ -26,6 +26,7 @@ from .social_trust import SocialTrustLedger
 from .tick_replay_save_state import SimulationTickReplaySnapshot
 from .world_event_memory import WorldEventMemoryAdapter
 from .world_events import WorldEventLedger
+from .institutional_politics import InstitutionalPoliticalLedger
 
 
 @dataclass(frozen=True)
@@ -45,6 +46,7 @@ class RestoredSimulation:
     routines: RoutineBook | None = None
     routine_executions: RoutineExecutionLedger | None = None
     routine_institutions: RoutineInstitutionLedger | None = None
+    institutional_politics: InstitutionalPoliticalLedger | None = None
 
 
 @dataclass(frozen=True)
@@ -71,6 +73,7 @@ class SimulationWorldCheckpoint:
     routines_json: str | None = None
     routine_executions_json: str | None = None
     routine_institutions_json: str | None = None
+    institutional_politics_json: str | None = None
 
     SCHEMA_VERSION = 1
 
@@ -100,7 +103,7 @@ class SimulationWorldCheckpoint:
     @classmethod
     def capture(cls, current_tick, coordinator, npcs, *, metadata=None,
                 consequence_recorder=None, campaign=None, misconduct=None, routines=None,
-                routine_executions=None, routine_institutions=None):
+                routine_executions=None, routine_institutions=None, institutional_politics=None):
         if not isinstance(coordinator, SimulationTickCoordinator):
             raise TypeError("coordinator must be a SimulationTickCoordinator")
         if not isinstance(npcs, dict):
@@ -132,6 +135,9 @@ class SimulationWorldCheckpoint:
         if routine_institutions is not None and not isinstance(routine_institutions, RoutineInstitutionLedger):
             raise TypeError("routine_institutions must be a RoutineInstitutionLedger or None")
         institution_snapshot = RoutineInstitutionSnapshot.capture(routine_institutions) if routine_institutions is not None else None
+        if institutional_politics is not None and not isinstance(institutional_politics, InstitutionalPoliticalLedger):
+            raise TypeError("institutional_politics must be an InstitutionalPoliticalLedger or None")
+        political_snapshot_json = json.dumps(institutional_politics.snapshot(), sort_keys=True, separators=(",", ":"), allow_nan=False) if institutional_politics is not None else None
         if execution_snapshot is not None:
             known_routines = {block.routine_id for block in routines.snapshot()}
             if any(record.routine_id not in known_routines for record in execution_snapshot.records):
@@ -163,6 +169,7 @@ class SimulationWorldCheckpoint:
             routines_snapshot.to_json() if routines_snapshot is not None else None,
             execution_snapshot.to_json() if execution_snapshot is not None else None,
             institution_snapshot.to_json() if institution_snapshot is not None else None,
+            political_snapshot_json,
         )
 
     def _components(self):
@@ -183,10 +190,11 @@ class SimulationWorldCheckpoint:
             RoutineBookSnapshot.from_json(self.routines_json) if self.routines_json is not None else None,
             RoutineExecutionSnapshot.from_json(self.routine_executions_json) if self.routine_executions_json is not None else None,
             RoutineInstitutionSnapshot.from_json(self.routine_institutions_json) if self.routine_institutions_json is not None else None,
+            InstitutionalPoliticalLedger.from_snapshot(json.loads(self.institutional_politics_json)) if self.institutional_politics_json is not None else None,
         )
 
     def to_json(self):
-        envelope, npcs, trust, beliefs, memory, conversations, ticks, consequence, campaign, misconduct, routines, routine_executions, routine_institutions = self._components()
+        envelope, npcs, trust, beliefs, memory, conversations, ticks, consequence, campaign, misconduct, routines, routine_executions, routine_institutions, institutional_politics = self._components()
         payload = {
             "schema_version": self.SCHEMA_VERSION, "current_tick": self.current_tick,
             "events": json.loads(envelope.to_json()), "npcs": json.loads(npcs.to_json()),
@@ -209,6 +217,8 @@ class SimulationWorldCheckpoint:
             payload["routine_executions"] = json.loads(routine_executions.to_json())
         if routine_institutions is not None:
             payload["routine_institutions"] = json.loads(routine_institutions.to_json())
+        if institutional_politics is not None:
+            payload["institutional_politics"] = institutional_politics.snapshot()
         return json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False)
 
     @classmethod
@@ -227,14 +237,15 @@ class SimulationWorldCheckpoint:
                        json.dumps(raw["misconduct"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("misconduct") is not None else None,
                        json.dumps(raw["routines"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("routines") is not None else None,
                        json.dumps(raw["routine_executions"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("routine_executions") is not None else None,
-                       json.dumps(raw["routine_institutions"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("routine_institutions") is not None else None)
+                       json.dumps(raw["routine_institutions"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("routine_institutions") is not None else None,
+                       json.dumps(raw["institutional_politics"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("institutional_politics") is not None else None)
         except ValueError:
             raise
         except (TypeError, KeyError, IndexError, json.JSONDecodeError) as exc:
             raise ValueError("invalid simulation world checkpoint") from exc
 
     def restore(self):
-        envelope, npc_snapshot, trust_snapshot, belief_snapshot, memory_snapshot, conversation_snapshot, tick_snapshot, consequence_snapshot, campaign, misconduct_snapshot, routine_snapshot, execution_snapshot, institution_snapshot = self._components()
+        envelope, npc_snapshot, trust_snapshot, belief_snapshot, memory_snapshot, conversation_snapshot, tick_snapshot, consequence_snapshot, campaign, misconduct_snapshot, routine_snapshot, execution_snapshot, institution_snapshot, institutional_politics = self._components()
         events = envelope.restore_event_ledger()
         npcs = npc_snapshot.restore()
         trust = trust_snapshot.restore()
@@ -266,4 +277,4 @@ class SimulationWorldCheckpoint:
         return RestoredSimulation(self.current_tick, events, npcs, trust, beliefs,
                                   memory, conversations, coordinator, self.metadata,
                                   consequence_recorder, campaign, misconduct, routines, routine_executions,
-                                  routine_institutions)
+                                  routine_institutions, institutional_politics)
