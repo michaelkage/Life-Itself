@@ -79,7 +79,7 @@ class InstitutionalLobbyingTests(unittest.TestCase):
             self.request("opposed", opposing_departments=("transport",)),
             self.policy,
         )
-        self.assertGreater(opposed.coalition_score, neutral.coalition_score)
+        self.assertLess(opposed.coalition_score, neutral.coalition_score)
 
     def test_commit_changes_priority_and_department_influence(self):
         assessment = self.evaluator.assess(self.ledger, self.request(), self.policy)
@@ -110,9 +110,15 @@ class InstitutionalLobbyingTests(unittest.TestCase):
     def test_batch_assessment_uses_same_pre_resolution_state(self):
         first = self.request("a")
         second = self.request("b", department_id="housing")
+        before = self.ledger.state()
         results = self.evaluator.assess_many(self.ledger, (second, first), self.policy)
         self.assertEqual(tuple(x.request_id for x in results), ("a", "b"))
-        self.assertEqual(results[0].score, results[1].score)
+        expected = {
+            "a": self.evaluator.assess(self.ledger, first, self.policy).score,
+            "b": self.evaluator.assess(self.ledger, second, self.policy).score,
+        }
+        self.assertEqual({x.request_id: x.score for x in results}, expected)
+        self.assertEqual(self.ledger.state(), before)
 
     def test_invalid_requests_and_duplicate_batch_departments_rejected(self):
         with self.assertRaises(ValueError):
