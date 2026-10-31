@@ -6,7 +6,9 @@ outcome. Committing an assessment emits a canonical political-history event.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
+import hashlib
+import json
 import math
 
 from .institutional_politics import InstitutionalPoliticalEvent, InstitutionalPoliticalLedger
@@ -159,7 +161,9 @@ class InstitutionalLobbyEvaluator:
 
         priority_delta = request.requested_priority_delta if decision == "approved" else 0.0
         influence_delta = 0.04 if decision == "approved" else (-0.02 if decision == "rejected" else 0.0)
-        rationale = f"lobby:{request.request_id};decision:{decision};policy:{policy.policy_id}"
+        signature_payload = json.dumps({"request": asdict(request), "policy": asdict(policy)}, sort_keys=True, separators=(",", ":"), allow_nan=False)
+        signature = hashlib.sha256(signature_payload.encode("utf-8")).hexdigest()
+        rationale = f"lobby:{request.request_id};decision:{decision};policy:{policy.policy_id};signature:{signature}"
         event = InstitutionalPoliticalEvent(
             event_id=f"lobby:{request.request_id}",
             institution_id=request.institution_id,
