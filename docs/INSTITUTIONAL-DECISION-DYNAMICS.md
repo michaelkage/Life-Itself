@@ -32,3 +32,12 @@ Bias weights may be positive or negative. For example, an employee can favour a 
 - The result is one component for an NPC decision-maker to consider alongside goals, beliefs, personality, and world events.
 
 This is a first institutional dynamics slice, not a complete organization simulator.
+
+
+## Department resource competition
+
+`simreality/institutional_resources.py` adds a deterministic allocation-planning phase. Departments submit one request per period for budget and staff. The allocator ranks requests using four explicit score components: alignment with leadership priorities, service impact, urgency, and department influence. The policy controls the weight of each component.
+
+The allocator processes requests in descending score order with department ID as a stable tie-break. Each department receives the same fulfilment ratio for its requested budget and staff, limited by the remaining pools. This means a shortage can produce partial fulfilment, and no allocation can exceed the institution's total budget or staff pool. A request may ask for budget only or staff only.
+
+The returned plan includes each score contribution, allocation ratio, allocated amount, and unmet request. It is a proposal only: it does not mutate `DepartmentState`, spend money, hire staff, or alter future periods. The simulation must explicitly commit a plan before updating department resources. This first version uses priority-ordered rationing rather than negotiation or a proportional/fair-share formula; influence is a configured pressure, not proof that a department's request is more deserving.
