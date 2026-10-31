@@ -276,3 +276,6 @@ The new [context-aware institutional review evaluator](docs/INSTITUTIONAL-REVIEW
 Institutional review can now be followed by a separate [institution-specific response planner](docs/INSTITUTIONAL-RESPONSE.md). It exposes configured options such as check-ins, fact-finding, schedule review, and accommodations without choosing or executing an action. This keeps institutional decisions distinct from accumulated history and review recommendations.
 
 | `simreality/institutional_resources.py` | Institutional resource allocation | Ranks department requests by configured leadership priorities, service impact, urgency, and influence; allocates constrained budget and staffing with transparent partial-fulfilment results |
+
+
+The [institutional political history ledger](docs/INSTITUTIONAL-POLITICAL-HISTORY.md) records explicit changes in departmental influence, signed inter-department relationships (alliances and rivalries), and leadership priorities. Its canonical event replay is append-order independent and snapshot-restorable; integration into the composite world checkpoint remains future work. Regression coverage is in `tests/test_institutional_politics.py`.
