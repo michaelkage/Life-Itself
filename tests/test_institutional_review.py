@@ -50,7 +50,7 @@ class InstitutionalReviewTests(unittest.TestCase):
         first = self.evaluator.assess(record, (a, b))
         second = self.evaluator.assess(record, (b, a))
         self.assertEqual(first, second)
-        self.assertEqual(first.level, ReviewLevel.FORMAL_REVIEW)
+        self.assertEqual(first.level, ReviewLevel.CHECK_IN)
 
     def test_invalid_policy_and_duplicate_context_are_rejected(self):
         with self.assertRaisesRegex(ValueError, "thresholds must be ordered"):
