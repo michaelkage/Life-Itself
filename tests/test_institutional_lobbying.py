@@ -98,6 +98,17 @@ class InstitutionalLobbyingTests(unittest.TestCase):
         self.evaluator.commit(self.ledger, (assessment,))
         self.assertEqual(len(self.ledger.events), 1)
 
+    def test_reusing_request_id_with_changed_inputs_is_rejected(self):
+        original = self.evaluator.assess(self.ledger, self.request(), self.policy)
+        changed = self.evaluator.assess(
+            self.ledger,
+            self.request(service_impact=0.9),
+            self.policy,
+        )
+        self.evaluator.commit(self.ledger, (original,))
+        with self.assertRaises(ValueError):
+            self.evaluator.commit(self.ledger, (changed,))
+
     def test_deferred_request_does_not_change_leadership_priority(self):
         policy = PoliticalLobbyPolicy(
             "strict", approval_threshold=0.95, defer_threshold=0.1,
