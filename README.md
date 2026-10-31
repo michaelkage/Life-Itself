@@ -282,3 +282,12 @@ The [institutional political history ledger](docs/INSTITUTIONAL-POLITICAL-HISTOR
 
 
 The [institutional lobbying system](docs/INSTITUTIONAL-LOBBYING.md) lets departments explicitly lobby leadership, with evidence, service value, transparency, urgency, public pressure, personal advantage, influence, and named allies or opponents shaping transparent approve/defer/reject outcomes. Committed results become replay-safe institutional political events and are preserved by world checkpoints. Tests: `tests/test_institutional_lobbying.py`.
+
+
+The [institutional outcome adapter](docs/INSTITUTIONAL-OUTCOMES.md) converts
+explicitly classified project successes, scandals, public complaints, and
+leadership changes into policy-configured political-history events. Allegations
+are not findings: only an exact outcome-type/finding-status rule can change
+influence, inter-department relationships, or leadership priorities. Evidence
+IDs are retained as provenance labels; review and evidence verification remain
+separate systems. Tests: `tests/test_institutional_outcomes.py`.
