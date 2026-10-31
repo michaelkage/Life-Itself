@@ -21,7 +21,7 @@ def _nonnegative(value: float, name: str) -> None:
         raise ValueError(f"{name} must be finite and non-negative")
 
 
-def _weights(values: tuple[tuple[str, float], ...], name: str) -> None:
+def _weights(values: tuple[tuple[str, float], ...], name: str, *, signed: bool = False) -> None:
     if not isinstance(values, tuple):
         raise TypeError(f"{name} must be a tuple of (name, weight) pairs")
     names = []
@@ -31,7 +31,7 @@ def _weights(values: tuple[tuple[str, float], ...], name: str) -> None:
         key, value = item
         if not isinstance(key, str) or not key.strip():
             raise ValueError(f"{name} keys must be non-empty strings")
-        _unit(value, f"{name}[{key}]")
+        if signed:\n            if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or not -1.0 <= value <= 1.0:\n                raise ValueError(f"{name}[{key}] must be finite and between -1 and 1")\n        else:\n            _unit(value, f"{name}[{key}]")
         names.append(key)
     if len(names) != len(set(names)):
         raise ValueError(f"{name} keys must be unique")
@@ -87,7 +87,7 @@ class InstitutionalEmployee:
             raise ValueError("person_id must be a non-empty string")
         for name in ("integrity", "ambition", "leadership_loyalty", "favouritism"):
             _unit(getattr(self, name), name)
-        _weights(self.bias_weights, "bias_weights")
+        _weights(self.bias_weights, "bias_weights", signed=True)
 
 
 @dataclass(frozen=True)
