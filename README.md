@@ -279,3 +279,6 @@ Institutional review can now be followed by a separate [institution-specific res
 
 
 The [institutional political history ledger](docs/INSTITUTIONAL-POLITICAL-HISTORY.md) records explicit changes in departmental influence, signed inter-department relationships (alliances and rivalries), and leadership priorities. Its canonical event replay is append-order independent and snapshot-restorable, and it can be included in `SimulationWorldCheckpoint` with `institutional_politics=...` and restored through `RestoredSimulation.institutional_politics`. Regression coverage is in `tests/test_institutional_politics.py`.
+
+
+The [institutional lobbying system](docs/INSTITUTIONAL-LOBBYING.md) lets departments explicitly lobby leadership, with evidence, service value, transparency, urgency, public pressure, personal advantage, influence, and named allies or opponents shaping transparent approve/defer/reject outcomes. Committed results become replay-safe institutional political events and are preserved by world checkpoints. Tests: `tests/test_institutional_lobbying.py`.
