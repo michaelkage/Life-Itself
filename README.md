@@ -274,3 +274,5 @@ The new [context-aware institutional review evaluator](docs/INSTITUTIONAL-REVIEW
 
 
 Institutional review can now be followed by a separate [institution-specific response planner](docs/INSTITUTIONAL-RESPONSE.md). It exposes configured options such as check-ins, fact-finding, schedule review, and accommodations without choosing or executing an action. This keeps institutional decisions distinct from accumulated history and review recommendations.
+
+| `simreality/institutional_resources.py` | Institutional resource allocation | Ranks department requests by configured leadership priorities, service impact, urgency, and influence; allocates constrained budget and staffing with transparent partial-fulfilment results |
