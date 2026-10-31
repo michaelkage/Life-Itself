@@ -378,3 +378,16 @@ __all__ += [
     "InstitutionalLobbyEvaluator", "PoliticalLobbyAssessment",
     "PoliticalLobbyPolicy", "PoliticalLobbyRequest",
 ]
+
+
+# Policy-driven effects of explicit institutional outcomes and review findings.
+from .institutional_outcomes import (
+    InstitutionalOutcome, InstitutionalOutcomeAdapter,
+    InstitutionalOutcomeAssessment, InstitutionalOutcomePolicy,
+    InstitutionalOutcomeRule,
+)
+__all__ += [
+    "InstitutionalOutcome", "InstitutionalOutcomeAdapter",
+    "InstitutionalOutcomeAssessment", "InstitutionalOutcomePolicy",
+    "InstitutionalOutcomeRule",
+]
