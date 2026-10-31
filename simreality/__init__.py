@@ -332,3 +332,16 @@ __all__ += [
     "InstitutionalResponseOption", "InstitutionalResponsePlan",
     "InstitutionalResponsePlanner", "InstitutionalResponsePolicy",
 ]
+
+
+# Leadership, resource pressure, departmental priorities, and employee bias in institutional choices.
+from .institutional_dynamics import (
+    DepartmentState, InstitutionalDecisionEvaluator, InstitutionalDecisionOption,
+    InstitutionalDecisionResult, InstitutionalEmployee, InstitutionalOptionAssessment,
+    InstitutionalProfile, InstitutionalScoreContribution,
+)
+__all__ += [
+    "DepartmentState", "InstitutionalDecisionEvaluator", "InstitutionalDecisionOption",
+    "InstitutionalDecisionResult", "InstitutionalEmployee", "InstitutionalOptionAssessment",
+    "InstitutionalProfile", "InstitutionalScoreContribution",
+]
