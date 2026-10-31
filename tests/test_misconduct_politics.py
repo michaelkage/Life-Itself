@@ -78,6 +78,25 @@ class MisconductPoliticalBridgeTests(unittest.TestCase):
                 self.ledger, status, department_id="", policy=policy
             )
 
+    def test_under_review_and_dismissed_remain_distinct(self):
+        self.system.add_decision(ReviewDecision(
+            "decision-review", "report-1", 3, "reviewer-a",
+            ReviewOutcome.UNDER_REVIEW, (), "Review remains open",
+        ))
+        self.system.add_decision(ReviewDecision(
+            "decision-dismissed", "report-1", 4, "reviewer-a",
+            ReviewOutcome.DISMISSED, (), "Procedural dismissal",
+        ))
+        policy = InstitutionalOutcomePolicy("status-labels", ())
+        assessments = self.bridge.assess_status(
+            self.ledger, self.system.status("report-1"),
+            department_id="procurement", policy=policy,
+        )
+        self.assertEqual(
+            [item.event.rationale.split(";")[2] for item in assessments],
+            ["finding:alleged", "finding:under_review", "finding:dismissed"],
+        )
+
     def test_wrong_institution_is_rejected(self):
         other = InstitutionalPoliticalLedger("another_institution")
         with self.assertRaises(ValueError):
