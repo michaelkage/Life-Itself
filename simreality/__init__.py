@@ -345,3 +345,14 @@ __all__ += [
     "InstitutionalDecisionResult", "InstitutionalEmployee", "InstitutionalOptionAssessment",
     "InstitutionalProfile", "InstitutionalScoreContribution",
 ]
+
+
+# Deterministic competition for institutional budgets and staffing.
+from .institutional_resources import (
+    DepartmentAllocation, DepartmentResourceRequest, InstitutionalResourceAllocator,
+    ResourceAllocationPlan, ResourceAllocationPolicy,
+)
+__all__ += [
+    "DepartmentAllocation", "DepartmentResourceRequest", "InstitutionalResourceAllocator",
+    "ResourceAllocationPlan", "ResourceAllocationPolicy",
+]
