@@ -25,12 +25,13 @@ Repeated identical event IDs are idempotent; reusing an ID with different
 content is rejected. Influence, relationships, and leadership priorities are
 clamped to their documented ranges.
 
-The ledger supports a versioned dictionary snapshot and restoration. This
-first slice is not yet integrated into `SimulationWorldCheckpoint`; the
-world-level checkpoint must explicitly include it before it can survive a
-whole-world save/load cycle.
+The ledger supports a versioned dictionary snapshot and restoration. It is
+also integrated as the optional `institutional_politics` section of
+`SimulationWorldCheckpoint.capture(...)`; restored worlds expose
+`RestoredSimulation.institutional_politics`. Existing checkpoints remain
+compatible when the optional section is absent.
 
-## Boundaries and next integration
+## Boundaries and future integration
 
 The ledger stores outcomes, not the social process that creates them. It does
 not yet model lobbying conversations, coalition bargaining, leadership
