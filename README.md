@@ -291,3 +291,10 @@ are not findings: only an exact outcome-type/finding-status rule can change
 influence, inter-department relationships, or leadership priorities. Evidence
 IDs are retained as provenance labels; review and evidence verification remain
 separate systems. Tests: `tests/test_institutional_outcomes.py`.
+
+
+The [misconduct-to-politics bridge](docs/MISCONDUCT-POLITICAL-INTEGRATION.md)
+translates filed reports and each later review decision into separate,
+replay-safe institutional outcomes. Subject-to-department mapping is explicit;
+filing remains an allegation, and only configured finding-status rules can
+change political influence. Tests: `tests/test_misconduct_politics.py`.
