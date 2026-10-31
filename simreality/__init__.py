@@ -391,3 +391,8 @@ __all__ += [
     "InstitutionalOutcomeAssessment", "InstitutionalOutcomePolicy",
     "InstitutionalOutcomeRule",
 ]
+
+
+# Connect append-only misconduct findings to institutional political history.
+from .misconduct_politics import MisconductPoliticalBridge
+__all__ += ["MisconductPoliticalBridge"]
