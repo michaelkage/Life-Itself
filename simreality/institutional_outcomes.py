@@ -22,6 +22,8 @@ _FINDING_STATUSES = {
     "insufficient_evidence",
     "confirmed",
     "retracted",
+    "under_review",
+    "dismissed",
 }
 
 
