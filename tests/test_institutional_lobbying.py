@@ -69,7 +69,7 @@ class InstitutionalLobbyingTests(unittest.TestCase):
 
     def test_opposing_rival_department_reduces_coalition_pressure(self):
         self.ledger.append(InstitutionalPoliticalEvent(
-            "rivalry", "planning", 1, "planning",
+            "rivalry", "city_hall", 1, "planning",
             other_department_id="transport", relationship_delta=-1.0,
             influence_delta=0.0,
         ))
