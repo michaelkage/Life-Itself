@@ -1,6 +1,9 @@
-"""Deterministic NPC identity proposals."""
+"""Deterministic, read-only proposals for gradual NPC identity change."""
 from dataclasses import dataclass
-from typing import Mapping
+from typing import Iterable, Mapping
+import math
+from .world_events import WorldEvent
+
 
 @dataclass(frozen=True)
 class NPCIdentityProfile:
@@ -8,4 +11,103 @@ class NPCIdentityProfile:
     traits: Mapping[str, float]
     sensitivities: Mapping[str, float] | None = None
 
-# Per-event changes are proposed, never silently applied.
+    def __post_init__(self):
+        if not isinstance(self.npc_id, str) or not self.npc_id.strip():
+            raise ValueError("npc_id must be non-empty")
+        for values, low, high in ((self.traits, -1.0, 1.0),
+                                  (self.sensitivities or {}, 0.0, 2.0)):
+            if not isinstance(values, Mapping):
+                raise ValueError("identity axes must be mappings")
+            for key, value in values.items():
+                if (not isinstance(key, str) or not key.strip()
+                    or isinstance(value, bool) or not isinstance(value, (int, float))
+                    or not math.isfinite(value) or not low <= value <= high):
+                    raise ValueError("invalid identity axis")
+
+
+@dataclass(frozen=True)
+class IdentityChangePolicy:
+    policy_id: str
+    event_type: str
+    axis: str
+    delta: float
+    strength_attribute: str | None = None
+    minimum_strength: float = 0.0
+    maximum_delta: float = 0.05
+    include_witnesses: bool = True
+
+    def __post_init__(self):
+        if not all(isinstance(v, str) and v.strip()
+                   for v in (self.policy_id, self.event_type, self.axis)):
+            raise ValueError("policy identifiers must be non-empty")
+        if not math.isfinite(self.delta) or not -1 <= self.delta <= 1:
+            raise ValueError("delta must be in [-1, 1]")
+        if not 0 <= self.minimum_strength <= 1:
+            raise ValueError("minimum_strength must be in [0, 1]")
+        if not 0 < self.maximum_delta <= 0.1:
+            raise ValueError("maximum_delta must be in (0, 0.1]")
+
+
+@dataclass(frozen=True)
+class IdentityChangeProposal:
+    event_id: str
+    npc_id: str
+    policy_id: str
+    axis: str
+    before: float
+    after: float
+    delta: float
+    evidence_strength: float
+    role: str
+
+
+class IdentityEvolutionEvaluator:
+    """Evaluate explicit event policies without mutating identity profiles."""
+
+    def __init__(self, profiles: Iterable[NPCIdentityProfile],
+                 policies: Iterable[IdentityChangePolicy]):
+        profiles, policies = tuple(profiles), tuple(policies)
+        if len({p.npc_id for p in profiles}) != len(profiles):
+            raise ValueError("duplicate NPC profile")
+        if len({p.policy_id for p in policies}) != len(policies):
+            raise ValueError("duplicate identity policy")
+        self.profiles = {p.npc_id: p for p in profiles}
+        self.policies = tuple(sorted(policies, key=lambda p: p.policy_id))
+
+    def assess(self, events: Iterable[WorldEvent]) -> tuple[IdentityChangeProposal, ...]:
+        events = tuple(events)
+        if any(not isinstance(e, WorldEvent) for e in events):
+            raise TypeError("events must be WorldEvent values")
+        if len({e.event_id for e in events}) != len(events):
+            raise ValueError("duplicate event IDs in batch")
+        result = []
+        for event in sorted(events, key=lambda e: (e.tick, e.event_id)):
+            attrs = dict(event.attributes)
+            for policy in self.policies:
+                if event.event_type != policy.event_type:
+                    continue
+                strength = 1.0 if policy.strength_attribute is None else attrs.get(policy.strength_attribute)
+                if (isinstance(strength, bool) or not isinstance(strength, (int, float))
+                    or not math.isfinite(strength) or not 0 <= strength <= 1
+                    or strength < policy.minimum_strength):
+                    continue
+                for npc_id, profile in sorted(self.profiles.items()):
+                    if npc_id in event.participants:
+                        role = "participant"
+                    elif policy.include_witnesses and npc_id in event.witnesses:
+                        role = "witness"
+                    else:
+                        continue
+                    if policy.axis not in profile.traits:
+                        continue
+                    sensitivity = (profile.sensitivities or {}).get(policy.axis, 1.0)
+                    raw = policy.delta * sensitivity * strength
+                    shift = max(-policy.maximum_delta, min(policy.maximum_delta, raw))
+                    before = profile.traits[policy.axis]
+                    after = max(-1.0, min(1.0, before + shift))
+                    if after != before:
+                        result.append(IdentityChangeProposal(
+                            event.event_id, npc_id, policy.policy_id, policy.axis,
+                            before, after, after - before, float(strength), role))
+        return tuple(sorted(result, key=lambda p: (
+            p.event_id, p.npc_id, p.axis, p.policy_id)))
