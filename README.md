@@ -304,3 +304,6 @@ The [goal progress event bridge](docs/GOAL-EVENT-INTEGRATION.md) connects the au
 
 
 The [NPC goal persistence layer](docs/GOAL-PERSISTENCE.md) adds canonical, versioned component snapshots for goal books and goal-event replay indexes, now integrated into `SimulationWorldCheckpoint` with `goal_book=...` and `goal_event_adapter=...`. Restored worlds expose `RestoredSimulation.goals` and the replay snapshot as `RestoredSimulation.goal_event_replay`; callers reattach their configured policies before resuming event processing. Replay entries are cross-checked against the authoritative world-event journal. Tests: `tests/test_goal_save_state.py`, `tests/test_goal_events_save_state.py`, and `tests/test_world_checkpoint.py`.
+
+
+The new [goal-aware daily routine bridge](docs/GOAL-AWARE-ROUTINES.md) connects explicit NPC goal categories to matching routine activities. Goal priority, confidence, discretionary time/resources, stress, obligations, social support, and recent setbacks shape transparent routine-priority proposals. The adapter is read-only: it does not execute plans, spend resources, mutate routines, or auto-complete goals. Tests: `tests/test_goal_life.py`.
