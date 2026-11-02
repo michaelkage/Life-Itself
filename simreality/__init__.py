@@ -245,6 +245,17 @@ from .world_checkpoint import RestoredSimulation, SimulationWorldCheckpoint
 __all__ += ["RestoredSimulation", "SimulationWorldCheckpoint"]
 
 
+# Goal intentions can raise matching daily routine priority within explicit life budgets.
+from .goal_life import (
+    GoalLifeAdapter, GoalLifeAssessment, GoalLifeContext,
+    GoalRoutinePolicy, GoalRoutineProposal,
+)
+__all__ += [
+    "GoalLifeAdapter", "GoalLifeAssessment", "GoalLifeContext",
+    "GoalRoutinePolicy", "GoalRoutineProposal",
+]
+
+
 # Disruption-aware, deterministic NPC routine resolution.
 from .routines import (
     DisruptionKind, RoutineBlock, RoutineBook, RoutineDisruption,
