@@ -101,7 +101,9 @@ class GoalReviewDecisionLedger:
         if len({item.decision_id for item in items}) != len(items):
             raise ValueError("decision IDs must be unique within a batch")
         # Validate the entire batch against a temporary ledger before committing.
-        trial = GoalReviewDecisionLedger()
+        trial = GoalReviewDecisionLedger.__new__(GoalReviewDecisionLedger)
+        trial._decisions = {}
+        trial._proposal_index = {}
         for item in self.entries():
             trial.record(item)
         for item in sorted(items, key=lambda value: (value.decision_tick, value.decision_id)):
