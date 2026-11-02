@@ -27,6 +27,10 @@ from .tick_replay_save_state import SimulationTickReplaySnapshot
 from .world_event_memory import WorldEventMemoryAdapter
 from .world_events import WorldEventLedger
 from .institutional_politics import InstitutionalPoliticalLedger
+from .goals import GoalBook
+from .goal_events import GoalEventAdapter
+from .goal_save_state import GoalBookSnapshot
+from .goal_events_save_state import GoalEventReplaySnapshot
 
 
 @dataclass(frozen=True)
@@ -47,6 +51,8 @@ class RestoredSimulation:
     routine_executions: RoutineExecutionLedger | None = None
     routine_institutions: RoutineInstitutionLedger | None = None
     institutional_politics: InstitutionalPoliticalLedger | None = None
+    goals: GoalBook | None = None
+    goal_event_replay: GoalEventReplaySnapshot | None = None
 
 
 @dataclass(frozen=True)
@@ -74,6 +80,8 @@ class SimulationWorldCheckpoint:
     routine_executions_json: str | None = None
     routine_institutions_json: str | None = None
     institutional_politics_json: str | None = None
+    goals_json: str | None = None
+    goal_event_replay_json: str | None = None
 
     SCHEMA_VERSION = 1
 
@@ -103,7 +111,8 @@ class SimulationWorldCheckpoint:
     @classmethod
     def capture(cls, current_tick, coordinator, npcs, *, metadata=None,
                 consequence_recorder=None, campaign=None, misconduct=None, routines=None,
-                routine_executions=None, routine_institutions=None, institutional_politics=None):
+                routine_executions=None, routine_institutions=None, institutional_politics=None,
+                goal_book=None, goal_event_adapter=None):
         if not isinstance(coordinator, SimulationTickCoordinator):
             raise TypeError("coordinator must be a SimulationTickCoordinator")
         if not isinstance(npcs, dict):
@@ -137,6 +146,15 @@ class SimulationWorldCheckpoint:
         institution_snapshot = RoutineInstitutionSnapshot.capture(routine_institutions) if routine_institutions is not None else None
         if institutional_politics is not None and not isinstance(institutional_politics, InstitutionalPoliticalLedger):
             raise TypeError("institutional_politics must be an InstitutionalPoliticalLedger or None")
+        if goal_book is not None and not isinstance(goal_book, GoalBook):
+            raise TypeError("goal_book must be a GoalBook or None")
+        if goal_event_adapter is not None:
+            if not isinstance(goal_event_adapter, GoalEventAdapter):
+                raise TypeError("goal_event_adapter must be a GoalEventAdapter or None")
+            if goal_book is None or goal_event_adapter.goals is not goal_book:
+                raise ValueError("goal event adapter must share the checkpoint GoalBook")
+        goal_snapshot_json = GoalBookSnapshot.capture(goal_book).to_json() if goal_book is not None else None
+        goal_replay_json = GoalEventReplaySnapshot.capture(goal_event_adapter).to_json() if goal_event_adapter is not None else None
         political_snapshot_json = json.dumps(institutional_politics.snapshot(), sort_keys=True, separators=(",", ":"), allow_nan=False) if institutional_politics is not None else None
         if execution_snapshot is not None:
             known_routines = {block.routine_id for block in routines.snapshot()}
@@ -170,13 +188,15 @@ class SimulationWorldCheckpoint:
             execution_snapshot.to_json() if execution_snapshot is not None else None,
             institution_snapshot.to_json() if institution_snapshot is not None else None,
             political_snapshot_json,
+            goal_snapshot_json,
+            goal_replay_json,
         )
 
     def _components(self):
         envelope = SimulationSaveEnvelope.from_json(self.events_json)
         if envelope.current_tick != self.current_tick:
             raise ValueError("checkpoint clock does not match event envelope")
-        return (
+        components = (
             envelope,
             NPCCollectionSnapshot.from_json(self.npcs_json),
             SocialTrustSnapshot.from_json(self.trust_json),
@@ -191,10 +211,27 @@ class SimulationWorldCheckpoint:
             RoutineExecutionSnapshot.from_json(self.routine_executions_json) if self.routine_executions_json is not None else None,
             RoutineInstitutionSnapshot.from_json(self.routine_institutions_json) if self.routine_institutions_json is not None else None,
             InstitutionalPoliticalLedger.from_snapshot(json.loads(self.institutional_politics_json)) if self.institutional_politics_json is not None else None,
+            GoalBookSnapshot.from_json(self.goals_json) if self.goals_json is not None else None,
+            GoalEventReplaySnapshot.from_json(self.goal_event_replay_json) if self.goal_event_replay_json is not None else None,
         )
+        goals_snapshot, goal_replay = components[14], components[15]
+        if goal_replay is not None and goals_snapshot is None:
+            raise ValueError("goal event replay history requires the corresponding GoalBook")
+        if goal_replay is not None:
+            journal = envelope.restore_event_ledger()
+            for event_id, signature in goal_replay.entries:
+                try:
+                    event = journal.get(event_id)
+                except KeyError:
+                    raise ValueError(f"goal replay references missing world event: {event_id}") from None
+                expected = (event.tick, event.event_type, tuple(event.participants),
+                            tuple(event.witnesses), repr(event.attributes))
+                if signature != expected:
+                    raise ValueError(f"goal replay signature disagrees with world event: {event_id}")
+        return components
 
     def to_json(self):
-        envelope, npcs, trust, beliefs, memory, conversations, ticks, consequence, campaign, misconduct, routines, routine_executions, routine_institutions, institutional_politics = self._components()
+        envelope, npcs, trust, beliefs, memory, conversations, ticks, consequence, campaign, misconduct, routines, routine_executions, routine_institutions, institutional_politics, goals, goal_event_replay = self._components()
         payload = {
             "schema_version": self.SCHEMA_VERSION, "current_tick": self.current_tick,
             "events": json.loads(envelope.to_json()), "npcs": json.loads(npcs.to_json()),
@@ -219,6 +256,10 @@ class SimulationWorldCheckpoint:
             payload["routine_institutions"] = json.loads(routine_institutions.to_json())
         if institutional_politics is not None:
             payload["institutional_politics"] = institutional_politics.snapshot()
+        if goals is not None:
+            payload["goals"] = json.loads(goals.to_json())
+        if goal_event_replay is not None:
+            payload["goal_event_replay"] = json.loads(goal_event_replay.to_json())
         return json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False)
 
     @classmethod
@@ -238,14 +279,16 @@ class SimulationWorldCheckpoint:
                        json.dumps(raw["routines"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("routines") is not None else None,
                        json.dumps(raw["routine_executions"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("routine_executions") is not None else None,
                        json.dumps(raw["routine_institutions"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("routine_institutions") is not None else None,
-                       json.dumps(raw["institutional_politics"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("institutional_politics") is not None else None)
+                       json.dumps(raw["institutional_politics"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("institutional_politics") is not None else None,
+                       json.dumps(raw["goals"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("goals") is not None else None,
+                       json.dumps(raw["goal_event_replay"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("goal_event_replay") is not None else None)
         except ValueError:
             raise
         except (TypeError, KeyError, IndexError, json.JSONDecodeError) as exc:
             raise ValueError("invalid simulation world checkpoint") from exc
 
     def restore(self):
-        envelope, npc_snapshot, trust_snapshot, belief_snapshot, memory_snapshot, conversation_snapshot, tick_snapshot, consequence_snapshot, campaign, misconduct_snapshot, routine_snapshot, execution_snapshot, institution_snapshot, institutional_politics = self._components()
+        envelope, npc_snapshot, trust_snapshot, belief_snapshot, memory_snapshot, conversation_snapshot, tick_snapshot, consequence_snapshot, campaign, misconduct_snapshot, routine_snapshot, execution_snapshot, institution_snapshot, institutional_politics, goals_snapshot, goal_event_replay = self._components()
         events = envelope.restore_event_ledger()
         npcs = npc_snapshot.restore()
         trust = trust_snapshot.restore()
@@ -274,7 +317,8 @@ class SimulationWorldCheckpoint:
             if any(record.routine_id not in known_routines for record in routine_executions.snapshot()):
                 raise ValueError("routine execution history references an unknown routine")
         routine_institutions = institution_snapshot.restore() if institution_snapshot is not None else None
+        goals = goals_snapshot.restore() if goals_snapshot is not None else None
         return RestoredSimulation(self.current_tick, events, npcs, trust, beliefs,
                                   memory, conversations, coordinator, self.metadata,
                                   consequence_recorder, campaign, misconduct, routines, routine_executions,
-                                  routine_institutions, institutional_politics)
+                                  routine_institutions, institutional_politics, goals, goal_event_replay)
