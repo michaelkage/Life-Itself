@@ -123,7 +123,7 @@ class GoalReviewEvaluator:
                     confidence = min(1.0, max(0.0,
                         goal.confidence + policy.confidence_delta))
                     if policy.action == GoalReviewAction.REPRIORITIZE:
-                        priority += policy.priority_delta
+                        priority = max(0.0, priority + policy.priority_delta)
                     category = (policy.target_category
                                 if policy.action == GoalReviewAction.REFRAME
                                 else goal.category)
