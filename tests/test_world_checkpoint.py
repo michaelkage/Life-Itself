@@ -9,6 +9,7 @@ from simreality import (
     MisconductType, ReviewDecision, ReviewOutcome, RoutineBlock, RoutineBook,
     RoutineDisruption, DisruptionKind, RoutineExecutionLedger,
     RoutineInstitutionLedger, InstitutionalPoliticalLedger,
+    GoalBook, NPCGoal, GoalEventAdapter, GoalProgressPolicy,
 )
 
 
@@ -372,6 +373,85 @@ class SimulationWorldCheckpointTests(unittest.TestCase):
         self.assertNotIn("institutional_politics", json.loads(payload))
         restored = SimulationWorldCheckpoint.from_json(payload).restore()
         self.assertIsNone(restored.institutional_politics)
+
+
+    def test_goal_book_and_event_replay_round_trip_in_world_checkpoint(self):
+        coordinator, npcs, _ = self.make_simulation()
+        goals = GoalBook()
+        goals.add(NPCGoal("goal-1", "speaker", "civic", 0.8, progress=0.25))
+        adapter = GoalEventAdapter(goals, (
+            GoalProgressPolicy("policy-1", "incident", "civic", 0.2),
+        ))
+        updates = adapter.apply(coordinator.events.snapshot())
+        self.assertEqual(len(updates), 1)
+        self.assertAlmostEqual(goals.goals["goal-1"].progress, 0.45)
+
+        payload = SimulationWorldCheckpoint.capture(
+            4, coordinator, npcs, goal_book=goals, goal_event_adapter=adapter,
+        ).to_json()
+        restored = SimulationWorldCheckpoint.from_json(payload).restore()
+        self.assertEqual(restored.goals.snapshot(), goals.snapshot())
+        self.assertIsNotNone(restored.goal_event_replay)
+
+        restored_adapter = GoalEventAdapter(restored.goals, (
+            GoalProgressPolicy("policy-1", "incident", "civic", 0.2),
+        ))
+        restored.goal_event_replay.restore(restored_adapter)
+        self.assertEqual(restored_adapter.apply(restored.events.snapshot()), ())
+        self.assertAlmostEqual(restored.goals.goals["goal-1"].progress, 0.45)
+        self.assertEqual(
+            SimulationWorldCheckpoint.capture(
+                4, restored.coordinator, restored.npcs,
+                goal_book=restored.goals, goal_event_adapter=restored_adapter,
+            ).to_json(),
+            payload,
+        )
+
+    def test_goal_checkpoint_sections_are_optional_and_replay_requires_goals(self):
+        coordinator, npcs, _ = self.make_simulation()
+        payload = SimulationWorldCheckpoint.capture(4, coordinator, npcs).to_json()
+        self.assertNotIn('"goals"', payload)
+        self.assertNotIn('"goal_event_replay"', payload)
+        restored = SimulationWorldCheckpoint.from_json(payload).restore()
+        self.assertIsNone(restored.goals)
+        self.assertIsNone(restored.goal_event_replay)
+
+        altered = json.loads(payload)
+        altered["goal_event_replay"] = {
+            "schema_version": 1,
+            "entries": [["event-1", [3, "incident", ["speaker", "subject"],
+                                     ["speaker"], repr((("action_tag", "crime_theft"),
+                                                        ("memory_impact", 0.9),
+                                                        ("target_entity_id", "subject")))]]],
+        }
+        with self.assertRaisesRegex(ValueError, "requires the corresponding GoalBook"):
+            SimulationWorldCheckpoint.from_json(json.dumps(altered))
+
+    def test_goal_replay_checkpoint_rejects_missing_or_changed_world_events(self):
+        coordinator, npcs, _ = self.make_simulation()
+        goals = GoalBook()
+        goals.add(NPCGoal("goal-2", "speaker", "civic", 0.5))
+        adapter = GoalEventAdapter(goals, (
+            GoalProgressPolicy("policy-1", "incident", "civic", 0.1),
+        ))
+        adapter.apply(coordinator.events.snapshot())
+        payload = json.loads(SimulationWorldCheckpoint.capture(
+            4, coordinator, npcs, goal_book=goals, goal_event_adapter=adapter,
+        ).to_json())
+        payload["goal_event_replay"]["entries"][0][0] = "missing-event"
+        with self.assertRaisesRegex(ValueError, "references missing world event"):
+            SimulationWorldCheckpoint.from_json(json.dumps(payload))
+
+    def test_goal_event_adapter_must_share_checkpoint_goal_book(self):
+        coordinator, npcs, _ = self.make_simulation()
+        goals = GoalBook()
+        other_goals = GoalBook()
+        adapter = GoalEventAdapter(other_goals, ())
+        with self.assertRaisesRegex(ValueError, "must share"):
+            SimulationWorldCheckpoint.capture(
+                4, coordinator, npcs, goal_book=goals, goal_event_adapter=adapter,
+            )
+
 
 
 if __name__ == "__main__":
