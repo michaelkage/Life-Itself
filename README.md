@@ -50,6 +50,7 @@ Engine-independent Python reference systems:
 | `simreality/fixers.py` | 4.B Fixers | Fixer incentives, betrayal, network propagation |
 | `simreality/reputation.py` | 4.A, 4.B | Local reputation from witness memories and convictions |
 | `simreality/goals.py` | NPC autonomy | Deterministic goal tracking, prerequisite checks, deadline urgency, and stable priority selection |
+| `simreality/identity_evolution.py` | NPC identity evolution | Deterministic, read-only proposals for gradual, individual-specific changes to configurable long-term traits; bounded per-event effects and explicit event policies |
 | `simreality/goal_review.py` | NPC goal evolution | Converts explicit life events into deterministic persist, reprioritize, pause, reframe, or abandon proposals without silently changing NPC intentions |
 | `simreality/goal_review_decisions.py` | NPC goal decision history | Records explicit accepted/rejected goal-review proposals as an append-only, idempotent ledger; `goal_review_decisions_save_state.py` provides canonical persistence |
 | `simreality/planning.py` | NPC autonomy | Bounded symbolic action planning with preconditions, effects, costs, and deterministic tie-breaking |
