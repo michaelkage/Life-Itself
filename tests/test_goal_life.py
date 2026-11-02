@@ -75,7 +75,7 @@ class GoalLifeAdapterTests(unittest.TestCase):
                                if p.routine_id == "market-research")
         self.assertGreater(supported_boost.proposed_priority,
                            pressured_boost.proposed_priority)
-        self.assertEqual(pressured_boost.life_capacity, 0.15)
+        self.assertAlmostEqual(pressured_boost.life_capacity, 0.15)
 
     def test_insufficient_resources_do_not_create_a_routine_boost(self):
         result = self.adapter.assess(GoalLifeContext(
