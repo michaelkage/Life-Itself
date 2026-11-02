@@ -33,6 +33,8 @@ from .goal_save_state import GoalBookSnapshot
 from .goal_events_save_state import GoalEventReplaySnapshot
 from .goal_review_decisions import GoalReviewDecisionLedger
 from .goal_review_decisions_save_state import GoalReviewDecisionSnapshot
+from .identity_decisions import IdentityDecisionLedger
+from .identity_decisions_save_state import IdentityDecisionSnapshot
 
 
 @dataclass(frozen=True)
@@ -56,6 +58,7 @@ class RestoredSimulation:
     goals: GoalBook | None = None
     goal_event_replay: GoalEventReplaySnapshot | None = None
     goal_review_decisions: GoalReviewDecisionLedger | None = None
+    identity_decisions: IdentityDecisionLedger | None = None
 
 
 @dataclass(frozen=True)
@@ -86,6 +89,7 @@ class SimulationWorldCheckpoint:
     goals_json: str | None = None
     goal_event_replay_json: str | None = None
     goal_review_decisions_json: str | None = None
+    identity_decisions_json: str | None = None
 
     SCHEMA_VERSION = 1
 
@@ -116,7 +120,7 @@ class SimulationWorldCheckpoint:
     def capture(cls, current_tick, coordinator, npcs, *, metadata=None,
                 consequence_recorder=None, campaign=None, misconduct=None, routines=None,
                 routine_executions=None, routine_institutions=None, institutional_politics=None,
-                goal_book=None, goal_event_adapter=None, goal_review_decisions=None):
+                goal_book=None, goal_event_adapter=None, goal_review_decisions=None, identity_decisions=None):
         if not isinstance(coordinator, SimulationTickCoordinator):
             raise TypeError("coordinator must be a SimulationTickCoordinator")
         if not isinstance(npcs, dict):
@@ -177,6 +181,22 @@ class SimulationWorldCheckpoint:
                     raise ValueError(f"goal review decision references missing world event: {record[1]}") from None
                 if source_event.tick > record[7] or record[2] not in source_event.participants:
                     raise ValueError("goal review decision does not match its source event")
+        if identity_decisions is not None and not isinstance(identity_decisions, IdentityDecisionLedger):
+            raise TypeError("identity_decisions must be an IdentityDecisionLedger or None")
+        identity_snapshot = IdentityDecisionSnapshot.capture(identity_decisions) if identity_decisions is not None else None
+        if identity_snapshot is not None:
+            for record in identity_snapshot.decisions:
+                if record[6] > current_tick:
+                    raise ValueError("identity decisions cannot occur after the checkpoint tick")
+                try:
+                    source_event = coordinator.events.get(record[1])
+                except KeyError:
+                    raise ValueError(f"identity decision references missing world event: {record[1]}") from None
+                if source_event.tick > record[6]:
+                    raise ValueError("identity decision predates its source event")
+                present = record[2] in source_event.participants if record[12] == "participant" else record[2] in source_event.witnesses
+                if not present:
+                    raise ValueError("identity decision role does not match its source event")
         political_snapshot_json = json.dumps(institutional_politics.snapshot(), sort_keys=True, separators=(",", ":"), allow_nan=False) if institutional_politics is not None else None
         if execution_snapshot is not None:
             known_routines = {block.routine_id for block in routines.snapshot()}
@@ -238,7 +258,7 @@ class SimulationWorldCheckpoint:
             GoalEventReplaySnapshot.from_json(self.goal_event_replay_json) if self.goal_event_replay_json is not None else None,
             GoalReviewDecisionSnapshot.from_json(self.goal_review_decisions_json) if self.goal_review_decisions_json is not None else None,
         )
-        goals_snapshot, goal_replay, goal_review_decisions = components[14], components[15], components[16]
+        goals_snapshot, goal_replay, goal_review_decisions = components[14], components[15], components[16]\n        identity_decisions = components[17]\n        if identity_decisions is not None:\n            journal = envelope.restore_event_ledger()\n            for record in identity_decisions.decisions:\n                if record[6] > self.current_tick:\n                    raise ValueError("identity decisions cannot occur after the checkpoint tick")\n                try:\n                    event = journal.get(record[1])\n                except KeyError:\n                    raise ValueError(f"identity decision references missing world event: {record[1]}") from None\n                if event.tick > record[6]:\n                    raise ValueError("identity decision predates its source event")\n                present = record[2] in event.participants if record[12] == "participant" else record[2] in event.witnesses\n                if not present:\n                    raise ValueError("identity decision role does not match its source event")
         if goal_review_decisions is not None and any(record[7] > self.current_tick for record in goal_review_decisions.records):
             raise ValueError("goal review decisions cannot occur after the checkpoint tick")
         if goal_review_decisions is not None:
@@ -271,7 +291,7 @@ class SimulationWorldCheckpoint:
         return components
 
     def to_json(self):
-        envelope, npcs, trust, beliefs, memory, conversations, ticks, consequence, campaign, misconduct, routines, routine_executions, routine_institutions, institutional_politics, goals, goal_event_replay, goal_review_decisions = self._components()
+        envelope, npcs, trust, beliefs, memory, conversations, ticks, consequence, campaign, misconduct, routines, routine_executions, routine_institutions, institutional_politics, goals, goal_event_replay, goal_review_decisions, identity_decisions = self._components()
         payload = {
             "schema_version": self.SCHEMA_VERSION, "current_tick": self.current_tick,
             "events": json.loads(envelope.to_json()), "npcs": json.loads(npcs.to_json()),
@@ -324,14 +344,14 @@ class SimulationWorldCheckpoint:
                        json.dumps(raw["institutional_politics"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("institutional_politics") is not None else None,
                        json.dumps(raw["goals"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("goals") is not None else None,
                        json.dumps(raw["goal_event_replay"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("goal_event_replay") is not None else None,
-                       json.dumps(raw["goal_review_decisions"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("goal_review_decisions") is not None else None)
+                       json.dumps(raw["goal_review_decisions"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("goal_review_decisions") is not None else None,\n                       json.dumps(raw["identity_decisions"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("identity_decisions") is not None else None)
         except ValueError:
             raise
         except (TypeError, KeyError, IndexError, json.JSONDecodeError) as exc:
             raise ValueError("invalid simulation world checkpoint") from exc
 
     def restore(self):
-        envelope, npc_snapshot, trust_snapshot, belief_snapshot, memory_snapshot, conversation_snapshot, tick_snapshot, consequence_snapshot, campaign, misconduct_snapshot, routine_snapshot, execution_snapshot, institution_snapshot, institutional_politics, goals_snapshot, goal_event_replay, goal_review_decisions_snapshot = self._components()
+        envelope, npc_snapshot, trust_snapshot, belief_snapshot, memory_snapshot, conversation_snapshot, tick_snapshot, consequence_snapshot, campaign, misconduct_snapshot, routine_snapshot, execution_snapshot, institution_snapshot, institutional_politics, goals_snapshot, goal_event_replay, goal_review_decisions_snapshot, identity_decisions_snapshot = self._components()
         events = envelope.restore_event_ledger()
         npcs = npc_snapshot.restore()
         trust = trust_snapshot.restore()
@@ -361,9 +381,9 @@ class SimulationWorldCheckpoint:
                 raise ValueError("routine execution history references an unknown routine")
         routine_institutions = institution_snapshot.restore() if institution_snapshot is not None else None
         goals = goals_snapshot.restore() if goals_snapshot is not None else None
-        goal_review_decisions = goal_review_decisions_snapshot.restore() if goal_review_decisions_snapshot is not None else None
+        goal_review_decisions = goal_review_decisions_snapshot.restore() if goal_review_decisions_snapshot is not None else None\n        identity_decisions = identity_decisions_snapshot.restore() if identity_decisions_snapshot is not None else None
         return RestoredSimulation(self.current_tick, events, npcs, trust, beliefs,
                                   memory, conversations, coordinator, self.metadata,
                                   consequence_recorder, campaign, misconduct, routines, routine_executions,
                                   routine_institutions, institutional_politics, goals, goal_event_replay,
-                                  goal_review_decisions)
+                                  goal_review_decisions, identity_decisions)
