@@ -233,6 +233,7 @@ class SimulationWorldCheckpoint:
             goal_snapshot_json,
             goal_replay_json,
             goal_decisions_snapshot.to_json() if goal_decisions_snapshot is not None else None,
+            identity_snapshot.to_json() if identity_snapshot is not None else None,
         )
 
     def _components(self):
