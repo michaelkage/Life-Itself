@@ -414,6 +414,12 @@ from .goal_review import GoalReviewAction, GoalReviewEvaluator, GoalReviewPolicy
 __all__ += ["GoalReviewAction", "GoalReviewEvaluator", "GoalReviewPolicy", "GoalReviewProposal"]
 
 
+# Append-only NPC decisions on goal reassessment proposals, with canonical persistence.
+from .goal_review_decisions import GoalReviewDecision, GoalReviewDecisionLedger
+from .goal_review_decisions_save_state import GoalReviewDecisionSnapshot
+__all__ += ["GoalReviewDecision", "GoalReviewDecisionLedger", "GoalReviewDecisionSnapshot"]
+
+
 # Explicit world-event evidence can advance matching active NPC goals.
 from .goal_events import GoalEventAdapter, GoalProgressPolicy, GoalProgressUpdate
 __all__ += ["GoalEventAdapter", "GoalProgressPolicy", "GoalProgressUpdate"]
