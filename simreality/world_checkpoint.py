@@ -262,7 +262,20 @@ class SimulationWorldCheckpoint:
         )
         goals_snapshot, goal_replay, goal_review_decisions = components[14], components[15], components[16]
         identity_decisions = components[17]
-        if identity_decisions is not None:\n            journal = envelope.restore_event_ledger()\n            for record in identity_decisions.decisions:\n                if record[6] > self.current_tick:\n                    raise ValueError("identity decisions cannot occur after the checkpoint tick")\n                try:\n                    event = journal.get(record[1])\n                except KeyError:\n                    raise ValueError(f"identity decision references missing world event: {record[1]}") from None\n                if event.tick > record[6]:\n                    raise ValueError("identity decision predates its source event")\n                present = record[2] in event.participants if record[12] == "participant" else record[2] in event.witnesses\n                if not present:\n                    raise ValueError("identity decision role does not match its source event")
+        if identity_decisions is not None:
+            journal = envelope.restore_event_ledger()
+            for record in identity_decisions.decisions:
+                if record[6] > self.current_tick:
+                    raise ValueError("identity decisions cannot occur after the checkpoint tick")
+                try:
+                    event = journal.get(record[1])
+                except KeyError:
+                    raise ValueError(f"identity decision references missing world event: {record[1]}") from None
+                if event.tick > record[6]:
+                    raise ValueError("identity decision predates its source event")
+                present = record[2] in event.participants if record[12] == "participant" else record[2] in event.witnesses
+                if not present:
+                    raise ValueError("identity decision role does not match its source event")
         if goal_review_decisions is not None and any(record[7] > self.current_tick for record in goal_review_decisions.records):
             raise ValueError("goal review decisions cannot occur after the checkpoint tick")
         if goal_review_decisions is not None:
@@ -350,7 +363,8 @@ class SimulationWorldCheckpoint:
                        json.dumps(raw["institutional_politics"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("institutional_politics") is not None else None,
                        json.dumps(raw["goals"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("goals") is not None else None,
                        json.dumps(raw["goal_event_replay"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("goal_event_replay") is not None else None,
-                       json.dumps(raw["goal_review_decisions"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("goal_review_decisions") is not None else None,\n                       json.dumps(raw["identity_decisions"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("identity_decisions") is not None else None)
+                       json.dumps(raw["goal_review_decisions"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("goal_review_decisions") is not None else None,
+                       json.dumps(raw["identity_decisions"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("identity_decisions") is not None else None)
         except ValueError:
             raise
         except (TypeError, KeyError, IndexError, json.JSONDecodeError) as exc:
@@ -387,7 +401,8 @@ class SimulationWorldCheckpoint:
                 raise ValueError("routine execution history references an unknown routine")
         routine_institutions = institution_snapshot.restore() if institution_snapshot is not None else None
         goals = goals_snapshot.restore() if goals_snapshot is not None else None
-        goal_review_decisions = goal_review_decisions_snapshot.restore() if goal_review_decisions_snapshot is not None else None\n        identity_decisions = identity_decisions_snapshot.restore() if identity_decisions_snapshot is not None else None
+        goal_review_decisions = goal_review_decisions_snapshot.restore() if goal_review_decisions_snapshot is not None else None
+        identity_decisions = identity_decisions_snapshot.restore() if identity_decisions_snapshot is not None else None
         return RestoredSimulation(self.current_tick, events, npcs, trust, beliefs,
                                   memory, conversations, coordinator, self.metadata,
                                   consequence_recorder, campaign, misconduct, routines, routine_executions,
