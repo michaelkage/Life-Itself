@@ -301,3 +301,6 @@ change political influence. Tests: `tests/test_misconduct_politics.py`.
 
 
 The [goal progress event bridge](docs/GOAL-EVENT-INTEGRATION.md) connects the authoritative world-event journal to active NPC goals through explicit event-type, goal-category, and attribute policies. Only participant-owned goals advance; witnesses do not count as actors. Progress is capped, deterministic, and replay-safe within the adapter instance. Its processed-event index is not yet included in the composite checkpoint. Tests: `tests/test_goal_events.py`.
+
+
+The [NPC goal persistence layer](docs/GOAL-PERSISTENCE.md) adds canonical, versioned component snapshots for goal books and goal-event replay indexes. It preserves goal progress and prevents already-applied events from advancing goals again after the adapter is restored. Composite `SimulationWorldCheckpoint` integration remains outstanding. Tests: `tests/test_goal_save_state.py` and `tests/test_goal_events_save_state.py`.
