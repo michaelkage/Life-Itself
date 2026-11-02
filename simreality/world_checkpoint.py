@@ -257,8 +257,11 @@ class SimulationWorldCheckpoint:
             GoalBookSnapshot.from_json(self.goals_json) if self.goals_json is not None else None,
             GoalEventReplaySnapshot.from_json(self.goal_event_replay_json) if self.goal_event_replay_json is not None else None,
             GoalReviewDecisionSnapshot.from_json(self.goal_review_decisions_json) if self.goal_review_decisions_json is not None else None,
+            IdentityDecisionSnapshot.from_json(self.identity_decisions_json) if self.identity_decisions_json is not None else None,
         )
-        goals_snapshot, goal_replay, goal_review_decisions = components[14], components[15], components[16]\n        identity_decisions = components[17]\n        if identity_decisions is not None:\n            journal = envelope.restore_event_ledger()\n            for record in identity_decisions.decisions:\n                if record[6] > self.current_tick:\n                    raise ValueError("identity decisions cannot occur after the checkpoint tick")\n                try:\n                    event = journal.get(record[1])\n                except KeyError:\n                    raise ValueError(f"identity decision references missing world event: {record[1]}") from None\n                if event.tick > record[6]:\n                    raise ValueError("identity decision predates its source event")\n                present = record[2] in event.participants if record[12] == "participant" else record[2] in event.witnesses\n                if not present:\n                    raise ValueError("identity decision role does not match its source event")
+        goals_snapshot, goal_replay, goal_review_decisions = components[14], components[15], components[16]
+        identity_decisions = components[17]
+        if identity_decisions is not None:\n            journal = envelope.restore_event_ledger()\n            for record in identity_decisions.decisions:\n                if record[6] > self.current_tick:\n                    raise ValueError("identity decisions cannot occur after the checkpoint tick")\n                try:\n                    event = journal.get(record[1])\n                except KeyError:\n                    raise ValueError(f"identity decision references missing world event: {record[1]}") from None\n                if event.tick > record[6]:\n                    raise ValueError("identity decision predates its source event")\n                present = record[2] in event.participants if record[12] == "participant" else record[2] in event.witnesses\n                if not present:\n                    raise ValueError("identity decision role does not match its source event")
         if goal_review_decisions is not None and any(record[7] > self.current_tick for record in goal_review_decisions.records):
             raise ValueError("goal review decisions cannot occur after the checkpoint tick")
         if goal_review_decisions is not None:
@@ -322,6 +325,8 @@ class SimulationWorldCheckpoint:
             payload["goal_event_replay"] = json.loads(goal_event_replay.to_json())
         if goal_review_decisions is not None:
             payload["goal_review_decisions"] = json.loads(goal_review_decisions.to_json())
+        if identity_decisions is not None:
+            payload["identity_decisions"] = json.loads(identity_decisions.to_json())
         return json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False)
 
     @classmethod
