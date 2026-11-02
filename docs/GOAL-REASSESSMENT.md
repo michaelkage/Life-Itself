@@ -1,0 +1,81 @@
+# Evidence-Based NPC Goal Reviews
+
+NPC intentions should evolve when life changes, but the simulation should not
+silently decide what an NPC now wants. This module adds a deterministic,
+read-only review layer between authoritative world events and goal changes.
+
+## How it works
+
+A `GoalReviewPolicy` explicitly maps:
+- a world-event type,
+- a goal category,
+- an optional set of exact event-attribute matches,
+- a review action,
+- optional priority and confidence adjustments,
+- and, for a reframe, a target category.
+
+The supported actions are:
+
+| Action | Meaning |
+| --- | --- |
+| `persist` | Evidence supports continuing to pursue the existing goal |
+| `reprioritize` | Suggest a different priority and/or confidence |
+| `pause` | Suggest temporarily stepping back |
+| `reframe` | Suggest pursuing a related goal under a different category |
+| `abandon` | Suggest giving up the goal |
+
+The evaluator only considers active goals owned by event participants. It also
+checks the goal's `review_tick`, so evidence older than the goal's most recent
+review point cannot prompt another review. Results are ordered by event,
+owner, goal, and policy identifiers.
+
+## Example
+
+```python
+from simreality.goal_review import (
+    GoalReviewAction, GoalReviewEvaluator, GoalReviewPolicy,
+)
+
+policies = (
+    GoalReviewPolicy(
+        policy_id="career-setback",
+        event_type="promotion_denied",
+        goal_category="career",
+        action=GoalReviewAction.REPRIORITIZE,
+        priority_delta=-1.5,
+        confidence_delta=-0.1,
+        required_attributes=(("department", "engineering"),),
+    ),
+    GoalReviewPolicy(
+        policy_id="career-pivot",
+        event_type="business_opportunity",
+        goal_category="career",
+        action=GoalReviewAction.REFRAME,
+        target_category="entrepreneurship",
+    ),
+)
+reviewer = GoalReviewEvaluator(goal_book, policies)
+proposals = reviewer.assess(world_events)
+```
+
+The returned proposals include the current and suggested values. They do not
+change the `GoalBook`, status, progress, or routine schedule. The caller must
+decide whether the NPC accepts a proposal and then record that decision through
+the normal goal-management path. This preserves individual agency and makes
+acceptance, rejection, and the reasons behind either decision available to the
+larger simulation.
+
+## Determinism and boundaries
+
+- No randomness, hidden inference, or implicit event-to-intention mapping.
+- Events must have unique IDs within an assessment batch.
+- Exact configured attributes are required when a policy specifies them.
+- A policy cannot reframe without an explicit target category.
+- Priority suggestions are clamped at zero; confidence suggestions are clamped
+  to the valid 0–1 range.
+- Repeating an assessment with the same inputs returns the same proposals.
+- The evaluator is read-only; it does not own replay state or persist decisions.
+
+This is an advisory layer, not an autonomous goal mutation system. A later
+integration can record NPC acceptance or rejection as its own authoritative
+decision event, allowing save/load and replay to reproduce the choice.
