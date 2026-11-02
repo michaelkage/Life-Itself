@@ -429,3 +429,8 @@ __all__ += ["GoalEventAdapter", "GoalProgressPolicy", "GoalProgressUpdate"]
 from .goal_save_state import GoalBookSnapshot
 from .goal_events_save_state import GoalEventReplaySnapshot
 __all__ += ["GoalBookSnapshot", "GoalEventReplaySnapshot"]
+
+
+# Gradual, individual-specific NPC identity evolution proposals.
+from .identity_evolution import IdentityChangePolicy, IdentityChangeProposal, IdentityEvolutionEvaluator, NPCIdentityProfile
+__all__ += ["IdentityChangePolicy", "IdentityChangeProposal", "IdentityEvolutionEvaluator", "NPCIdentityProfile"]
