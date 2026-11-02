@@ -401,3 +401,9 @@ __all__ += ["MisconductPoliticalBridge"]
 # Explicit world-event evidence can advance matching active NPC goals.
 from .goal_events import GoalEventAdapter, GoalProgressPolicy, GoalProgressUpdate
 __all__ += ["GoalEventAdapter", "GoalProgressPolicy", "GoalProgressUpdate"]
+
+
+# Canonical component snapshots for NPC goals and goal-event replay protection.
+from .goal_save_state import GoalBookSnapshot
+from .goal_events_save_state import GoalEventReplaySnapshot
+__all__ += ["GoalBookSnapshot", "GoalEventReplaySnapshot"]
