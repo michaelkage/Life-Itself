@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import math
 from typing import Iterable
 
 from .goal_review import GoalReviewAction, GoalReviewProposal
@@ -43,7 +44,7 @@ class GoalReviewDecision:
             value = getattr(self, name)
             if isinstance(value, bool) or not isinstance(value, (int, float)):
                 raise ValueError(f"{name} must be numeric")
-            if not __import__("math").isfinite(value):
+            if not math.isfinite(value):
                 raise ValueError(f"{name} must be finite")
         if self.current_priority < 0 or self.proposed_priority < 0:
             raise ValueError("priorities cannot be negative")
