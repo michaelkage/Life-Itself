@@ -396,3 +396,8 @@ __all__ += [
 # Connect append-only misconduct findings to institutional political history.
 from .misconduct_politics import MisconductPoliticalBridge
 __all__ += ["MisconductPoliticalBridge"]
+
+
+# Explicit world-event evidence can advance matching active NPC goals.
+from .goal_events import GoalEventAdapter, GoalProgressPolicy, GoalProgressUpdate
+__all__ += ["GoalEventAdapter", "GoalProgressPolicy", "GoalProgressUpdate"]
