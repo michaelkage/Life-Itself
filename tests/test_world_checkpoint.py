@@ -10,6 +10,8 @@ from simreality import (
     RoutineDisruption, DisruptionKind, RoutineExecutionLedger,
     RoutineInstitutionLedger, InstitutionalPoliticalLedger,
     GoalBook, NPCGoal, GoalEventAdapter, GoalProgressPolicy,
+    GoalReviewAction, GoalReviewEvaluator, GoalReviewPolicy,
+    GoalReviewDecision, GoalReviewDecisionLedger,
 )
 
 
@@ -441,6 +443,63 @@ class SimulationWorldCheckpointTests(unittest.TestCase):
         payload["goal_event_replay"]["entries"][0][0] = "missing-event"
         with self.assertRaisesRegex(ValueError, "references missing world event"):
             SimulationWorldCheckpoint.from_json(json.dumps(payload))
+
+    def test_goal_review_decisions_round_trip_in_world_checkpoint(self):
+        coordinator, npcs, _ = self.make_simulation()
+        goals = GoalBook()
+        goals.add(NPCGoal("goal-review-1", "speaker", "career", 5.0, confidence=0.8))
+        evaluator = GoalReviewEvaluator(goals, (
+            GoalReviewPolicy(
+                "career-setback", "incident", "career",
+                GoalReviewAction.REPRIORITIZE, priority_delta=-1.0,
+            ),
+        ))
+        proposal = evaluator.assess(coordinator.events.snapshot())[0]
+        decisions = GoalReviewDecisionLedger((
+            GoalReviewDecision.from_proposal(
+                "decision-1", proposal, accepted=True, decision_tick=4,
+                rationale="The NPC chooses to lower this ambition's priority.",
+            ),
+        ))
+        payload = SimulationWorldCheckpoint.capture(
+            4, coordinator, npcs, goal_book=goals,
+            goal_review_decisions=decisions,
+        ).to_json()
+        restored = SimulationWorldCheckpoint.from_json(payload).restore()
+        self.assertIsNotNone(restored.goal_review_decisions)
+        self.assertEqual(restored.goal_review_decisions.entries(), decisions.entries())
+        self.assertEqual(
+            SimulationWorldCheckpoint.capture(
+                4, restored.coordinator, restored.npcs, goal_book=restored.goals,
+                goal_review_decisions=restored.goal_review_decisions,
+            ).to_json(),
+            payload,
+        )
+
+    def test_goal_review_decisions_are_optional_and_future_decisions_rejected(self):
+        coordinator, npcs, _ = self.make_simulation()
+        payload = SimulationWorldCheckpoint.capture(4, coordinator, npcs).to_json()
+        self.assertNotIn("goal_review_decisions", json.loads(payload))
+        self.assertIsNone(
+            SimulationWorldCheckpoint.from_json(payload).restore().goal_review_decisions
+        )
+
+        goals = GoalBook()
+        goals.add(NPCGoal("goal-review-2", "speaker", "career", 2.0))
+        proposal = GoalReviewEvaluator(goals, (
+            GoalReviewPolicy("persist", "incident", "career", GoalReviewAction.PERSIST),
+        )).assess(coordinator.events.snapshot())[0]
+        decisions = GoalReviewDecisionLedger((
+            GoalReviewDecision.from_proposal(
+                "future-decision", proposal, accepted=False, decision_tick=5,
+                rationale="The NPC declines the suggestion.",
+            ),
+        ))
+        with self.assertRaisesRegex(ValueError, "after the checkpoint tick"):
+            SimulationWorldCheckpoint.capture(
+                4, coordinator, npcs, goal_book=goals,
+                goal_review_decisions=decisions,
+            )
 
     def test_goal_event_adapter_must_share_checkpoint_goal_book(self):
         coordinator, npcs, _ = self.make_simulation()
