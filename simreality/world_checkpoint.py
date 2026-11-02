@@ -164,6 +164,19 @@ class SimulationWorldCheckpoint:
         goal_decisions_snapshot = GoalReviewDecisionSnapshot.capture(goal_review_decisions) if goal_review_decisions is not None else None
         if goal_decisions_snapshot is not None and any(record[7] > current_tick for record in goal_decisions_snapshot.records):
             raise ValueError("goal review decisions cannot occur after the checkpoint tick")
+        if goal_decisions_snapshot is not None:
+            if goal_book is None:
+                raise ValueError("goal review decisions require the corresponding GoalBook")
+            known_goals = {goal.goal_id: goal.owner_id for goal in goal_book.goals.values()}
+            for record in goal_decisions_snapshot.records:
+                if known_goals.get(record[3]) != record[2]:
+                    raise ValueError("goal review decision references an unknown goal or owner")
+                try:
+                    source_event = coordinator.events.get(record[1])
+                except KeyError:
+                    raise ValueError(f"goal review decision references missing world event: {record[1]}") from None
+                if source_event.tick > record[7] or record[2] not in source_event.participants:
+                    raise ValueError("goal review decision does not match its source event")
         political_snapshot_json = json.dumps(institutional_politics.snapshot(), sort_keys=True, separators=(",", ":"), allow_nan=False) if institutional_politics is not None else None
         if execution_snapshot is not None:
             known_routines = {block.routine_id for block in routines.snapshot()}
@@ -228,6 +241,20 @@ class SimulationWorldCheckpoint:
         goals_snapshot, goal_replay, goal_review_decisions = components[14], components[15], components[16]
         if goal_review_decisions is not None and any(record[7] > self.current_tick for record in goal_review_decisions.records):
             raise ValueError("goal review decisions cannot occur after the checkpoint tick")
+        if goal_review_decisions is not None:
+            if goals_snapshot is None:
+                raise ValueError("goal review decisions require the corresponding GoalBook")
+            known_goals = {record[0]: record[1] for record in goals_snapshot.records}
+            journal = envelope.restore_event_ledger()
+            for record in goal_review_decisions.records:
+                if known_goals.get(record[3]) != record[2]:
+                    raise ValueError("goal review decision references an unknown goal or owner")
+                try:
+                    source_event = journal.get(record[1])
+                except KeyError:
+                    raise ValueError(f"goal review decision references missing world event: {record[1]}") from None
+                if source_event.tick > record[7] or record[2] not in source_event.participants:
+                    raise ValueError("goal review decision does not match its source event")
         if goal_replay is not None and goals_snapshot is None:
             raise ValueError("goal event replay history requires the corresponding GoalBook")
         if goal_replay is not None:
