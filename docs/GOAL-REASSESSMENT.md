@@ -59,11 +59,11 @@ proposals = reviewer.assess(world_events)
 ```
 
 The returned proposals include the current and suggested values. They do not
-change the `GoalBook`, status, progress, or routine schedule. The caller must
-decide whether the NPC accepts a proposal and then record that decision through
-the normal goal-management path. This preserves individual agency and makes
-acceptance, rejection, and the reasons behind either decision available to the
-larger simulation.
+change the `GoalBook`, status, progress, or routine schedule. The caller must decide whether the NPC accepts a proposal. The
+`GoalReviewDecisionLedger` records either acceptance or rejection, along with
+the decision tick and an explicit rationale. Recording a decision does not
+silently apply the proposed change to the GoalBook; a later goal-management
+step must apply accepted changes through the normal goal API.
 
 ## Determinism and boundaries
 
@@ -75,7 +75,12 @@ larger simulation.
   to the valid 0–1 range.
 - Repeating an assessment with the same inputs returns the same proposals.
 - The evaluator is read-only; it does not own replay state or persist decisions.
+- The decision ledger is append-only, idempotent for identical decision IDs, and
+  rejects conflicting reuse or multiple decisions for the same proposal.
+- `GoalReviewDecisionSnapshot` stores the decision history in canonical JSON;
+  restoring it recreates the same ordered ledger.
 
-This is an advisory layer, not an autonomous goal mutation system. A later
-integration can record NPC acceptance or rejection as its own authoritative
-decision event, allowing save/load and replay to reproduce the choice.
+This is an advisory layer plus a persistent decision record, not an autonomous
+goal mutation system. The authoritative world-event bridge can later materialize
+these decisions as world events, while accepted changes remain a separate,
+explicit goal-management operation.
