@@ -46,8 +46,6 @@ class GoalReviewPolicy:
                             ("minimum_confidence", self.minimum_confidence)):
             if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
                 raise ValueError(f"{name} must be finite")
-        if self.priority_delta < 0:
-            raise ValueError("priority_delta cannot be negative")
         if not -1.0 <= self.confidence_delta <= 1.0:
             raise ValueError("confidence_delta must be between -1 and 1")
         if not 0.0 <= self.minimum_confidence <= 1.0:
