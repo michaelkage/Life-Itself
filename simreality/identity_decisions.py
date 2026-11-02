@@ -161,6 +161,7 @@ class IdentityDecisionSnapshot:
         for d in self.decisions:
             if len(d) != 13:
                 raise ValueError("invalid identity decision record")
+        for d in sorted(self.decisions, key=lambda item: (item[6], item[0])):
             ledger.record(IdentityChangeDecision(*d))
         expected = tuple((p.npc_id, tuple(sorted(p.traits.items())),
                           tuple(sorted((p.sensitivities or {}).items()))) for p in ledger.profiles())
@@ -193,5 +194,5 @@ class IdentityDecisionSnapshot:
 
     def restore(self):
         profiles = tuple(NPCIdentityProfile(p[0], dict(p[1]), dict(p[2])) for p in self.profiles)
-        decisions = tuple(IdentityChangeDecision(*d) for d in self.decisions)
+        decisions = tuple(IdentityChangeDecision(*d) for d in sorted(self.decisions, key=lambda item: (item[6], item[0])))
         return IdentityDecisionLedger(profiles, decisions)
