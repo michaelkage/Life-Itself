@@ -298,3 +298,6 @@ translates filed reports and each later review decision into separate,
 replay-safe institutional outcomes. Subject-to-department mapping is explicit;
 filing remains an allegation, and only configured finding-status rules can
 change political influence. Tests: `tests/test_misconduct_politics.py`.
+
+
+The [goal progress event bridge](docs/GOAL-EVENT-INTEGRATION.md) connects the authoritative world-event journal to active NPC goals through explicit event-type, goal-category, and attribute policies. Only participant-owned goals advance; witnesses do not count as actors. Progress is capped, deterministic, and replay-safe within the adapter instance. Its processed-event index is not yet included in the composite checkpoint. Tests: `tests/test_goal_events.py`.
