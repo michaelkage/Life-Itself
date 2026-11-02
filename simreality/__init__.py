@@ -434,3 +434,9 @@ __all__ += ["GoalBookSnapshot", "GoalEventReplaySnapshot"]
 # Gradual, individual-specific NPC identity evolution proposals.
 from .identity_evolution import IdentityChangePolicy, IdentityChangeProposal, IdentityEvolutionEvaluator, NPCIdentityProfile
 __all__ += ["IdentityChangePolicy", "IdentityChangeProposal", "IdentityEvolutionEvaluator", "NPCIdentityProfile"]
+
+
+# Explicit, replay-safe NPC identity decisions and durable accepted trait changes.
+from .identity_decisions import IdentityChangeDecision, IdentityDecisionLedger
+from .identity_decisions_save_state import IdentityDecisionSnapshot
+__all__ += ["IdentityChangeDecision", "IdentityDecisionLedger", "IdentityDecisionSnapshot"]
