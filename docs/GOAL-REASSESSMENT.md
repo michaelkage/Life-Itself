@@ -84,3 +84,19 @@ This is an advisory layer plus a persistent decision record, not an autonomous
 goal mutation system. The authoritative world-event bridge can later materialize
 these decisions as world events, while accepted changes remain a separate,
 explicit goal-management operation.
+
+## Decision history and checkpoints
+
+`GoalReviewDecisionLedger` stores one accepted or rejected decision per review
+proposal. Each record preserves the source event, NPC, goal, policy, proposed
+change, decision tick, and rationale. Identical retries with the same decision
+ID are harmless; reusing an ID with different content or attempting a second
+decision for the same proposal is rejected. The ledger does not apply accepted
+changes automatically.
+
+`GoalReviewDecisionSnapshot` provides canonical JSON save/load. It is also an
+optional section of `SimulationWorldCheckpoint`: when included, the checkpoint
+requires the matching GoalBook, verifies each referenced goal and owner, checks
+the source event exists and names the NPC as a participant, and rejects
+future-dated decisions. Older checkpoints without this optional section remain
+readable.
