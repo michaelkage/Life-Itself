@@ -64,6 +64,7 @@ class IdentityDecisionLedger:
         if len({p.npc_id for p in profiles}) != len(profiles):
             raise ValueError("duplicate NPC identity profile")
         self._traits = {p.npc_id: dict(p.traits) for p in profiles}
+        self._initial_traits = {p.npc_id: dict(p.traits) for p in profiles}
         self._sensitivities = {p.npc_id: dict(p.sensitivities or {}) for p in profiles}
         self._decisions = {}
         self._proposal_index = {}
@@ -109,6 +110,11 @@ class IdentityDecisionLedger:
             raise KeyError(npc_id)
         return dict(sorted(self._traits[npc_id].items()))
 
+    def initial_profiles(self):
+        return tuple(NPCIdentityProfile(npc_id, dict(sorted(self._initial_traits[npc_id].items())),
+                                        dict(sorted(self._sensitivities[npc_id].items())))
+                     for npc_id in sorted(self._initial_traits))
+
     def profiles(self):
         return tuple(NPCIdentityProfile(npc_id, self.traits_for(npc_id),
                                         dict(sorted(self._sensitivities[npc_id].items())))
@@ -126,7 +132,9 @@ class IdentityDecisionSnapshot:
         if not isinstance(ledger, IdentityDecisionLedger):
             raise TypeError("ledger must be IdentityDecisionLedger")
         profiles = tuple((p.npc_id, tuple(sorted(p.traits.items())),
-                          tuple(sorted((p.sensitivities or {}).items()))) for p in ledger.profiles())
+                          tuple(sorted((p.sensitivities or {}).items())),
+                          tuple(sorted(ledger.traits_for(p.npc_id).items())))
+                         for p in ledger.initial_profiles())
         decisions = tuple((d.decision_id, d.event_id, d.npc_id, d.policy_id, d.axis,
                            d.accepted, d.decision_tick, d.rationale, d.before,
                            d.proposed_after, d.delta, d.evidence_strength, d.role)
@@ -140,9 +148,10 @@ class IdentityDecisionSnapshot:
         if ids != sorted(ids) or len(ids) != len(set(ids)):
             raise ValueError("profile IDs must be unique and sorted")
         for p in self.profiles:
-            if len(p) != 3:
+            if len(p) != 4:
                 raise ValueError("invalid identity profile record")
             NPCIdentityProfile(p[0], dict(p[1]), dict(p[2]))
+            NPCIdentityProfile(p[0], dict(p[3]), dict(p[2]))
         decision_ids = [d[0] for d in self.decisions]
         if decision_ids != sorted(decision_ids) or len(decision_ids) != len(set(decision_ids)):
             raise ValueError("decision IDs must be unique and sorted")
@@ -155,12 +164,14 @@ class IdentityDecisionSnapshot:
             ledger.record(IdentityChangeDecision(*d))
         expected = tuple((p.npc_id, tuple(sorted(p.traits.items())),
                           tuple(sorted((p.sensitivities or {}).items()))) for p in ledger.profiles())
-        if expected != self.profiles:
+        expected_current = tuple((p[0], tuple(sorted(ledger.traits_for(p[0]).items()))) for p in self.profiles)
+        stored_current = tuple((p[0], p[3]) for p in self.profiles)
+        if expected_current != stored_current:
             raise ValueError("saved identity traits disagree with decision history")
 
     def to_json(self):
         return json.dumps({"schema_version": self.SCHEMA_VERSION,
-                           "profiles": [[p[0], [list(x) for x in p[1]], [list(x) for x in p[2]]]
+                           "profiles": [[p[0], [list(x) for x in p[1]], [list(x) for x in p[2]], [list(x) for x in p[3]]]
                                         for p in self.profiles],
                            "decisions": [list(d) for d in self.decisions]},
                           sort_keys=True, separators=(",", ":"), allow_nan=False)
@@ -171,7 +182,7 @@ class IdentityDecisionSnapshot:
             raw = json.loads(payload)
             if not isinstance(raw, dict) or raw.get("schema_version") != cls.SCHEMA_VERSION:
                 raise ValueError("unsupported identity snapshot schema")
-            profiles = tuple((p[0], tuple(tuple(x) for x in p[1]), tuple(tuple(x) for x in p[2]))
+            profiles = tuple((p[0], tuple(tuple(x) for x in p[1]), tuple(tuple(x) for x in p[2]), tuple(tuple(x) for x in p[3]))
                              for p in raw["profiles"])
             result = cls(profiles, tuple(tuple(d) for d in raw["decisions"]))
             if result.to_json() != payload:
