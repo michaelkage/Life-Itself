@@ -409,6 +409,11 @@ from .misconduct_politics import MisconductPoliticalBridge
 __all__ += ["MisconductPoliticalBridge"]
 
 
+# Evidence-based, read-only proposals to reassess NPC intentions after events.
+from .goal_review import GoalReviewAction, GoalReviewEvaluator, GoalReviewPolicy, GoalReviewProposal
+__all__ += ["GoalReviewAction", "GoalReviewEvaluator", "GoalReviewPolicy", "GoalReviewProposal"]
+
+
 # Explicit world-event evidence can advance matching active NPC goals.
 from .goal_events import GoalEventAdapter, GoalProgressPolicy, GoalProgressUpdate
 __all__ += ["GoalEventAdapter", "GoalProgressPolicy", "GoalProgressUpdate"]
