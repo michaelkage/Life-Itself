@@ -83,9 +83,23 @@ class GoalReviewDecisionTests(unittest.TestCase):
             self.decision(tick=-1)
 
     def test_snapshot_round_trip_and_stable_order(self):
+        second_event = WorldEventLedger.make_event(
+            "promotion-denied-2", 5, "promotion_denied", participants=("npc-1",),
+        )
+        second_proposal = GoalReviewEvaluator(self.goals, (
+            GoalReviewPolicy(
+                "career-review", "promotion_denied", "career",
+                GoalReviewAction.REPRIORITIZE, priority_delta=-2.0,
+                confidence_delta=-0.1,
+            ),
+        )).assess((second_event,))[0]
+        second_decision = GoalReviewDecision.from_proposal(
+            "a-decision", second_proposal, accepted=False, decision_tick=6,
+            rationale="The NPC rejects this suggestion.",
+        )
         ledger = GoalReviewDecisionLedger((
             self.decision("z-decision", tick=8),
-            self.decision("a-decision", tick=6, accepted=False),
+            second_decision,
         ))
         snapshot = GoalReviewDecisionSnapshot.capture(ledger)
         payload = snapshot.to_json()
