@@ -101,3 +101,8 @@ several independent context layers are enabled together. Omitted inputs are
 neutral; relationship associations require a trust ledger, and memory links
 require an available NPC/memory entry. The method is read-only and still leaves
 acceptance or rejection to `IdentityDecisionLedger`.
+
+
+## Individual values
+
+The comprehensive appraisal accepts `NPCIdentityValues`, a normalized, immutable profile of signed priorities such as loyalty, fairness, freedom, or duty. `IdentityValueRule` explicitly maps a value axis to a policy and supplies the signed coefficient. No value is inherently good or bad in the engine: its influence depends on the authored policy mapping. Contributions are reported separately, missing axes are neutral, and the combined result remains bounded by the original proposal cap.
