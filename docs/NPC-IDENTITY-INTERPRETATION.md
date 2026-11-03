@@ -137,3 +137,32 @@ whether that tendency pushes a particular interpretation in either direction.
 Likewise, the same fear or grief intensity can have different effects under
 different authored policy rules. This keeps emotional reactions contextual
 rather than treating an emotion as a permanent personality change.
+
+
+## Event-driven emotional state
+
+`NPCEmotionalEventLedger` connects the authoritative `WorldEvent` journal
+to temporary `NPCEmotionalState` snapshots. It does not decide that a person
+must feel a particular way: authors provide `EmotionalEventRule` entries
+matching an exact event type and an explicit participant or witness role.
+Rules apply a signed intensity change to one named emotion axis. For example,
+a project-defined `bereavement` event can raise grief for listed participants,
+while a separate witness rule may affect observers differently.
+
+`EmotionalDecayRule` defines the fraction of an emotion retained per
+simulation tick. Event impulses are applied at the event's own tick, then
+decayed forward to the requested current tick. This avoids treating an old
+event as if it happened just now. Missing decay rules mean that axis is held
+constant; no universal decay rate is silently assumed.
+
+The ledger sorts events by (tick, event ID), applies each event once, rejects
+conflicting event-ID reuse and rejects newly arriving events older than its
+current tick. Exact retries are no-ops. Its canonical versioned snapshot stores
+current intensities, applied event/rule keys, and source event facts so a
+restored ledger can continue without applying the same emotional impulse twice.
+
+This layer deliberately does not infer who was close to the deceased, who
+caused a betrayal, or whether a witness felt threatened. Those facts must be
+represented explicitly by the event's participants/witnesses and authored
+rules. The result is deterministic and inspectable, while allowing different
+NPCs to react differently to the same event.
