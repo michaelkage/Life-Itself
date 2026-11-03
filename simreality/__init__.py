@@ -442,6 +442,17 @@ from .identity_decisions_save_state import IdentityDecisionSnapshot
 __all__ += ["IdentityChangeDecision", "IdentityDecisionLedger", "IdentityDecisionSnapshot"]
 
 
+# Cognitive biases and temporary emotional-state appraisal remain separate from personality.
+from .identity_context import (
+    ContextualIdentityChange, IdentityCognitiveBiasRule, IdentityCognitiveContextInterpreter,
+    IdentityEmotionRule, NPCCognitiveBiasProfile, NPCEmotionalState,
+)
+__all__ += [
+    "ContextualIdentityChange", "IdentityCognitiveBiasRule", "IdentityCognitiveContextInterpreter",
+    "IdentityEmotionRule", "NPCCognitiveBiasProfile", "NPCEmotionalState",
+]
+
+
 # Belief-conditioned interpretation remains separate from explicit acceptance.
 from .identity_interpretation import (
     IdentityBeliefInterpreter, IdentityInterpretationRule, IdentityMemoryAssociation,
