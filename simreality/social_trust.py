@@ -126,6 +126,31 @@ class SocialTrustLedger:
     def snapshot(self) -> tuple[SocialTrustState, ...]:
         return tuple(self.get(*pair) for pair in sorted(self._trust))
 
+    def trust_at(self, observer_id: str, target_id: str, tick: int) -> float:
+        """Return trust as it stood at an event tick, ignoring later interactions.
+
+        Unknown pairs use the neutral 0.5 prior. This is a historical read and
+        never changes the live ledger or its current trust values.
+        """
+        for name, value in (("observer_id", observer_id), ("target_id", target_id)):
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError(f"{name} must be a non-empty string")
+        if isinstance(tick, bool) or not isinstance(tick, int) or tick < 0:
+            raise ValueError("tick must be a non-negative integer")
+        if observer_id == target_id:
+            return 0.5
+        pair = (observer_id, target_id)
+        trust = self._priors.get(pair, 0.5)
+        events = sorted(
+            (item for item in self._interactions.values()
+             if (item.observer_id, item.target_id) == pair and item.observed_tick <= tick),
+            key=lambda item: (item.observed_tick, item.interaction_id),
+        )
+        for item in events:
+            target = 1.0 if item.direction > 0 else 0.0
+            trust += (target - trust) * item.strength
+        return min(1.0, max(0.0, trust))
+
     def _rebuild(self, pair: tuple[str, str]) -> None:
         events = sorted(
             (item for item in self._interactions.values()
