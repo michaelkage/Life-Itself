@@ -58,6 +58,12 @@ class IdentityDecisionTests(unittest.TestCase):
         self.assertEqual([d.accepted for d in restored.entries()], [True, False])
         self.assertEqual(IdentityDecisionSnapshot.capture(restored).to_json(), encoded)
 
+    def test_snapshot_rejects_boolean_schema_version(self):
+        encoded = IdentityDecisionSnapshot.capture(IdentityDecisionLedger((self.profile,))).to_json()
+        malformed = encoded.replace('"schema_version":1', '"schema_version":true', 1)
+        with self.assertRaisesRegex(ValueError, "schema"):
+            IdentityDecisionSnapshot.from_json(malformed)
+
     def test_noncanonical_snapshot_rejected(self):
         encoded = IdentityDecisionSnapshot.capture(IdentityDecisionLedger((self.profile,))).to_json()
         with self.assertRaises(ValueError):
