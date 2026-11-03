@@ -27,6 +27,37 @@ class InquiryInvestigationPipelineTests(unittest.TestCase):
         self.assertEqual(len(result.belief_states), 2)
         self.assertEqual(len(beliefs.beliefs_for("observer")), 2)
 
+    def test_reprocessing_answer_is_idempotent_across_all_pipeline_stages(self):
+        inquiries = TestimonyInquiryLedger((
+            TestimonyInquiry("q-replay", "evt", "alice", "coat", 1),
+        ))
+        inquiries.append_response(TestimonyResponse("q-replay", 2, True, "green", 0.9))
+        testimony = TestimonyLedger((
+            TestimonyRecord("t-bob", "evt", "bob", 1, 0.0, 0.0,
+                (TestimonyDetail("d-bob", "coat", "black", 0.8),), ()),
+        ))
+        beliefs = SocialBeliefSystem(SocialTrustLedger())
+        pipeline = InquiryInvestigationPipeline()
+
+        first = pipeline.process(
+            inquiries, testimony, beliefs, "q-replay", "t-alice", 3.0,
+            "observer", 4,
+        )
+        testimony_after_first = testimony.to_json()
+        beliefs_after_first = beliefs.to_json()
+
+        replay = pipeline.process(
+            inquiries, testimony, beliefs, "q-replay", "t-alice", 3.0,
+            "observer", 4,
+        )
+
+        self.assertEqual(replay.materialized, first.materialized)
+        self.assertEqual(replay.report, first.report)
+        self.assertEqual(testimony.to_json(), testimony_after_first)
+        self.assertEqual(beliefs.to_json(), beliefs_after_first)
+        self.assertEqual(len(testimony.snapshot()), 2)
+        self.assertEqual(len(beliefs.beliefs_for("observer")), 2)
+
     def test_refusal_does_not_create_testimony_or_claim(self):
         inquiries = TestimonyInquiryLedger((
             TestimonyInquiry("q1", "evt", "alice", "coat", 1),
