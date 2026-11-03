@@ -226,6 +226,8 @@ subsequent days.
 NPC choice appraisal is documented in [docs/NPC-CHOICE-APPRAISAL.md](docs/NPC-CHOICE-APPRAISAL.md). It scores caller-supplied impacts and bias cues against an individual NPC's value profile, reports per-axis contributions, and avoids a universal good/bad label. Regression tests are in `tests/test_appraisal.py`.
 
 
+The belief-conditioned [NPC identity interpretation](docs/NPC-IDENTITY-INTERPRETATION.md) can now consume either direct belief ledgers or observer-specific `SocialBeliefSystem` snapshots, retaining each NPC’s sampled source trust. See `tests/test_identity_interpretation.py`.
+
 The [NPC Belief Ledger](docs/NPC-BELIEF-LEDGER.md) records evidence provenance and reproducible confidence updates. It is a transparent heuristic, not a claim to determine objective truth.
 
 
