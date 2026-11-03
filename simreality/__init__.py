@@ -466,3 +466,10 @@ __all__ += [
     "NPCIdentityValues", "IdentityValueRule",
     "InterpretedIdentityChange",
 ]
+
+
+# Event-driven transient emotion changes with deterministic decay and replay safety.
+from .emotional_events import (
+    EmotionalDecayRule, EmotionalEventRule, NPCEmotionalEventLedger,
+)
+__all__ += ["EmotionalDecayRule", "EmotionalEventRule", "NPCEmotionalEventLedger"]
