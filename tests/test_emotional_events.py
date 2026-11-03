@@ -1,9 +1,11 @@
 import unittest
 
 from simreality.emotional_events import (
-    EmotionalDecayRule, EmotionalEventRule, NPCEmotionalEventLedger,
+    EmotionalDecayRule, EmotionalEventRule, EmotionalRelationshipRule, NPCEmotionalEventLedger,
 )
 from simreality.world_events import WorldEventLedger
+from simreality.social_trust import SocialInteraction, SocialTrustLedger
+from simreality.identity_context import NPCEmotionalState
 
 
 class NPCEmotionalEventLedgerTests(unittest.TestCase):
@@ -54,6 +56,58 @@ class NPCEmotionalEventLedgerTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "before current_tick"):
             self.ledger.advance(4, (self.event("late-arrival", tick=1),),
                                 event_rules=(self.grief,))
+
+    def test_relationship_is_sampled_at_event_tick_not_processing_tick(self):
+        trust = SocialTrustLedger({
+            ("npc-a", "npc-target"): 0.9,
+            ("npc-b", "npc-target"): 0.1,
+        })
+        # These later interactions reverse the live relationship direction.
+        trust.add(SocialInteraction("later-a", "npc-a", "npc-target", -1, 1.0, 7))
+        trust.add(SocialInteraction("later-b", "npc-b", "npc-target", 1, 1.0, 7))
+        event = WorldEventLedger.make_event(
+            "betrayal-1", 5, "betrayal",
+            participants=("npc-a", "npc-b"),
+            attributes={"target_id": "npc-target"},
+        )
+        initial = {
+            npc_id: NPCEmotionalState(npc_id, 5, {"anger": 0.5})
+            for npc_id in ("npc-a", "npc-b")
+        }
+        ledger = NPCEmotionalEventLedger(initial, current_tick=5)
+        rule = EmotionalRelationshipRule(
+            "trusted-target-anger", "betrayal", "participant",
+            "anger", "target_id", 0.5,
+        )
+        states = ledger.advance(
+            5, (event,), event_rules=(), relationship_rules=(rule,),
+            trust_ledger=trust,
+        )
+        by_id = {state.npc_id: state.intensities["anger"] for state in states}
+        self.assertAlmostEqual(by_id["npc-a"], 0.9)
+        self.assertAlmostEqual(by_id["npc-b"], 0.1)
+        # Replaying after more relationship history cannot rewrite the event reaction.
+        trust.add(SocialInteraction("much-later-a", "npc-a", "npc-target", 1, 1.0, 9))
+        ledger.advance(6, (event,), event_rules=(), relationship_rules=(rule,),
+                       trust_ledger=trust)
+        self.assertAlmostEqual(ledger.state_for("npc-a").intensities["anger"], 0.9)
+
+    def test_relationship_rule_missing_target_is_neutral_and_requires_trust(self):
+        event = WorldEventLedger.make_event(
+            "ambiguous", 1, "betrayal", participants=("npc-a",),
+        )
+        rule = EmotionalRelationshipRule(
+            "relationship-anger", "betrayal", "participant",
+            "anger", "target_id", 0.5,
+        )
+        with self.assertRaisesRegex(TypeError, "SocialTrustLedger"):
+            self.ledger.advance(1, (event,), event_rules=(),
+                                relationship_rules=(rule,))
+        states = self.ledger.advance(
+            1, (event,), event_rules=(), relationship_rules=(rule,),
+            trust_ledger=SocialTrustLedger(),
+        )
+        self.assertEqual(states[0].intensities, {})
 
     def test_decay_without_events_and_validation(self):
         self.ledger.advance(2, (self.event(),), event_rules=(self.grief,))
