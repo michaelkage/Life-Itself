@@ -168,31 +168,44 @@ class IdentityDecisionSnapshot:
     def __post_init__(self):
         if not isinstance(self.profiles, tuple) or not isinstance(self.decisions, tuple):
             raise ValueError("snapshot collections must be tuples")
+
+        # Validate record shape and scalar identifiers before sorting or hashing.
+        # Malformed external data should fail with a stable ValueError, not leak
+        # incidental IndexError/TypeError from canonicalization.
+        if any(not isinstance(p, tuple) or len(p) != 4 for p in self.profiles):
+            raise ValueError("invalid identity profile record")
         ids = [p[0] for p in self.profiles]
+        if any(not isinstance(npc_id, str) or not npc_id.strip() for npc_id in ids):
+            raise ValueError("profile IDs must be non-empty strings")
         if ids != sorted(ids) or len(ids) != len(set(ids)):
             raise ValueError("profile IDs must be unique and sorted")
+
         for p in self.profiles:
-            if len(p) != 4:
-                raise ValueError("invalid identity profile record")
             for entries in p[1:]:
                 if not isinstance(entries, tuple):
                     raise ValueError("identity profile entries must be tuples")
                 if any(not isinstance(entry, tuple) or len(entry) != 2 for entry in entries):
                     raise ValueError("identity profile entries must be key/value pairs")
                 keys = [entry[0] for entry in entries]
+                if any(not isinstance(key, str) or not key.strip() for key in keys):
+                    raise ValueError("identity profile axis keys must be non-empty strings")
                 if keys != sorted(keys) or len(keys) != len(set(keys)):
                     raise ValueError("identity profile entries must be uniquely sorted")
             NPCIdentityProfile(p[0], dict(p[1]), dict(p[2]))
             NPCIdentityProfile(p[0], dict(p[3]), dict(p[2]))
+
+        if any(not isinstance(d, tuple) or len(d) != 13 for d in self.decisions):
+            raise ValueError("invalid identity decision record")
         decision_ids = [d[0] for d in self.decisions]
+        if any(not isinstance(decision_id, str) or not decision_id.strip()
+               for decision_id in decision_ids):
+            raise ValueError("decision IDs must be non-empty strings")
         if decision_ids != sorted(decision_ids) or len(decision_ids) != len(set(decision_ids)):
             raise ValueError("decision IDs must be unique and sorted")
+
         # Rebuild to validate decisions and ensure accepted history produces saved traits.
         ledger = IdentityDecisionLedger(tuple(NPCIdentityProfile(p[0], dict(p[1]), dict(p[2]))
                                               for p in self.profiles))
-        for d in self.decisions:
-            if len(d) != 13:
-                raise ValueError("invalid identity decision record")
         for d in sorted(self.decisions, key=lambda item: (item[6], item[0])):
             ledger.record(IdentityChangeDecision(*d))
         expected_current = tuple((p[0], tuple(sorted(ledger.traits_for(p[0]).items()))) for p in self.profiles)
