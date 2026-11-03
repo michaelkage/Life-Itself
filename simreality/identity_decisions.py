@@ -68,7 +68,7 @@ class IdentityDecisionLedger:
         self._sensitivities = {p.npc_id: dict(p.sensitivities or {}) for p in profiles}
         self._decisions = {}
         self._proposal_index = {}
-        for decision in decisions:
+        for decision in sorted(tuple(decisions), key=lambda item: (item.decision_tick, item.decision_id)):
             self.record(decision)
 
     @staticmethod
@@ -96,6 +96,19 @@ class IdentityDecisionLedger:
         self._decisions[decision.decision_id] = decision
         self._proposal_index[key] = decision.decision_id
         return decision
+
+    def record_many(self, decisions):
+        """Atomically append a batch in deterministic decision-time order."""
+        items = tuple(decisions)
+        if any(not isinstance(item, IdentityChangeDecision) for item in items):
+            raise TypeError("decisions must contain IdentityChangeDecision values")
+        candidate = IdentityDecisionLedger(self.initial_profiles(), self.entries())
+        for item in sorted(items, key=lambda d: (d.decision_tick, d.decision_id)):
+            candidate.record(item)
+        self._traits = candidate._traits
+        self._decisions = candidate._decisions
+        self._proposal_index = candidate._proposal_index
+        return tuple(candidate._decisions[item.decision_id] for item in items)
 
     def decide(self, decision_id, proposal, *, accepted, decision_tick, rationale=""):
         return self.record(IdentityChangeDecision.from_proposal(
