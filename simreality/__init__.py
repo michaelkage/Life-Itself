@@ -446,10 +446,12 @@ __all__ += ["IdentityChangeDecision", "IdentityDecisionLedger", "IdentityDecisio
 from .identity_interpretation import (
     IdentityBeliefInterpreter, IdentityInterpretationRule, IdentityMemoryAssociation,
     IdentityRelationshipAssociation, IdentityPersonalityRule, NPCIdentityPersonality,
+    NPCIdentityValues, IdentityValueRule,
     InterpretedIdentityChange,
 )
 __all__ += [
     "IdentityBeliefInterpreter", "IdentityInterpretationRule", "IdentityMemoryAssociation",
     "IdentityRelationshipAssociation", "IdentityPersonalityRule", "NPCIdentityPersonality",
+    "NPCIdentityValues", "IdentityValueRule",
     "InterpretedIdentityChange",
 ]
