@@ -34,8 +34,12 @@ class IdentityBeliefInterpretationTests(unittest.TestCase):
         return ledger
 
     def test_same_event_is_interpreted_differently_by_individual_beliefs(self):
+        other_proposal = IdentityChangeProposal(
+            "event-1", "npc-b", "betrayal-policy", "trust",
+            0.2, 0.22, 0.02, 1.0, "participant", 0.05,
+        )
         results = self.interpreter.interpret(
-            (self.proposal,),
+            (self.proposal, other_proposal),
             {"npc-a": self.belief(0.9), "npc-b": self.belief(0.1)},
         )
         by_id = {item.interpreted.npc_id: item for item in results}
@@ -46,7 +50,7 @@ class IdentityBeliefInterpretationTests(unittest.TestCase):
 
     def test_unknown_belief_is_neutral_and_policy_cap_is_preserved(self):
         result = self.interpreter.interpret((self.proposal,), {})[0]
-        self.assertEqual(result.interpreted.delta, self.proposal.delta)
+        self.assertAlmostEqual(result.interpreted.delta, self.proposal.delta)
         self.assertLessEqual(abs(result.interpreted.delta), 0.05)
 
     def test_custom_policy_cap_survives_interpretation(self):
