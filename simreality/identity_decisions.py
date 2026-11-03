@@ -174,6 +174,14 @@ class IdentityDecisionSnapshot:
         for p in self.profiles:
             if len(p) != 4:
                 raise ValueError("invalid identity profile record")
+            for entries in p[1:]:
+                if not isinstance(entries, tuple):
+                    raise ValueError("identity profile entries must be tuples")
+                if any(not isinstance(entry, tuple) or len(entry) != 2 for entry in entries):
+                    raise ValueError("identity profile entries must be key/value pairs")
+                keys = [entry[0] for entry in entries]
+                if keys != sorted(keys) or len(keys) != len(set(keys)):
+                    raise ValueError("identity profile entries must be uniquely sorted")
             NPCIdentityProfile(p[0], dict(p[1]), dict(p[2]))
             NPCIdentityProfile(p[0], dict(p[3]), dict(p[2]))
         decision_ids = [d[0] for d in self.decisions]
@@ -187,8 +195,6 @@ class IdentityDecisionSnapshot:
                 raise ValueError("invalid identity decision record")
         for d in sorted(self.decisions, key=lambda item: (item[6], item[0])):
             ledger.record(IdentityChangeDecision(*d))
-        expected = tuple((p.npc_id, tuple(sorted(p.traits.items())),
-                          tuple(sorted((p.sensitivities or {}).items()))) for p in ledger.profiles())
         expected_current = tuple((p[0], tuple(sorted(ledger.traits_for(p[0]).items()))) for p in self.profiles)
         stored_current = tuple((p[0], p[3]) for p in self.profiles)
         if expected_current != stored_current:
