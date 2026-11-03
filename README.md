@@ -50,11 +50,14 @@ Engine-independent Python reference systems:
 | `simreality/fixers.py` | 4.B Fixers | Fixer incentives, betrayal, network propagation |
 | `simreality/reputation.py` | 4.A, 4.B | Local reputation from witness memories and convictions |
 | `simreality/goals.py` | NPC autonomy | Deterministic goal tracking, prerequisite checks, deadline urgency, and stable priority selection |
-| `simreality/identity_evolution.py` | NPC identity evolution | Deterministic, read-only proposals for gradual, individual-specific changes to configurable long-term traits; bounded per-event effects and explicit event policies |\n| `simreality/identity_decisions.py` | NPC identity decisions | Append-only acceptance/rejection decisions; accepted changes update durable traits exactly once, rejected changes remain history; canonical snapshots and world-checkpoint integration |
+| `simreality/identity_evolution.py` | NPC identity evolution | Deterministic, read-only proposals for gradual, individual-specific changes to configurable long-term traits; bounded per-event effects and explicit event policies |
+| `simreality/identity_interpretation.py` | NPC identity interpretation | Applies each NPC’s own belief confidence to an event proposal through explicit, inspectable rules; preserves caps and requires a separate accept/reject decision |
+| `simreality/identity_decisions.py` | NPC identity decisions | Append-only acceptance/rejection decisions; accepted changes update durable traits exactly once, rejected changes remain history; canonical snapshots and world-checkpoint integration |
 | `simreality/goal_review.py` | NPC goal evolution | Converts explicit life events into deterministic persist, reprioritize, pause, reframe, or abandon proposals without silently changing NPC intentions |
 | `simreality/goal_review_decisions.py` | NPC goal decision history | Records explicit accepted/rejected goal-review proposals as an append-only, idempotent ledger; `goal_review_decisions_save_state.py` provides canonical persistence |
 | `simreality/planning.py` | NPC autonomy | Bounded symbolic action planning with preconditions, effects, costs, and deterministic tie-breaking |
-| `simreality/routines.py` | Persistent NPC routines | Time-windowed routines resolved against explicit disruptions; intended plans can be delayed, redirected, or missed with deterministic replay inputs |\n| `simreality/routine_tick.py` | Routine tick adapter | Selects active routines for an explicit tick, scopes supplied disruptions per NPC, and records replay-safe executions using explicit samples; called by the coordinator's named routine phase |
+| `simreality/routines.py` | Persistent NPC routines | Time-windowed routines resolved against explicit disruptions; intended plans can be delayed, redirected, or missed with deterministic replay inputs |
+| `simreality/routine_tick.py` | Routine tick adapter | Selects active routines for an explicit tick, scopes supplied disruptions per NPC, and records replay-safe executions using explicit samples; called by the coordinator's named routine phase |
 | `simreality/npc_autonomy.py` | NPC autonomy | Read-only decision cycle that connects selected goals to explicit desired facts and bounded plans |
 | `simreality/appraisal.py` | NPC values and bias | Transparent value-weighted choice appraisal; different NPCs can rank the same hard choice differently |
 | `simreality/beliefs.py` | NPC beliefs | Deterministic confidence updates from explicit supporting and contradictory evidence |
@@ -67,13 +70,16 @@ Engine-independent Python reference systems:
 | `simreality/world_event_social.py` | World event + social bridge | Validates event participants/witnesses and applies independent, explicit interpretations to NPC trust and beliefs |
 | `simreality/world_event_memory.py` | World event + memory bridge | Creates deterministic witness-specific NPC memories from explicitly recorded event details |
 | `simreality/memory_rumours.py` | Memory + gossip bridge | Prepares deterministic decay snapshots and rumours from each NPC's own memories; preserves attribution-loss rules |
-| `simreality/social_conversations.py` | NPC conversation integration | Runs actual memory transfer and updates each listener's beliefs using their own trust in the speaker |\n| `simreality/simulation_tick.py` | Deterministic tick orchestration | Applies explicitly scheduled event memories before explicitly scheduled conversations; enforces stable order and same-tick replay rules |\n| `simreality/save_state.py` | Versioned save boundary | Canonical JSON envelope for simulation tick, authoritative world events, and scalar metadata; explicitly scopes what is not yet restored |
+| `simreality/social_conversations.py` | NPC conversation integration | Runs actual memory transfer and updates each listener's beliefs using their own trust in the speaker |
+| `simreality/simulation_tick.py` | Deterministic tick orchestration | Applies explicitly scheduled event memories before explicitly scheduled conversations; enforces stable order and same-tick replay rules |
+| `simreality/save_state.py` | Versioned save boundary | Canonical JSON envelope for simulation tick, authoritative world events, and scalar metadata; explicitly scopes what is not yet restored |
 | `simreality/npc_save_state.py` | NPC/social persistence | Versioned canonical snapshots for NPC identity, held witness memories, and trust priors plus interaction history |
 | `simreality/social_belief_save_state.py` | Belief persistence | Saves claim priors, effective evidence histories, observer-specific beliefs, and original replay inputs |
 | `simreality/adapter_replay_state.py` | Adapter replay persistence | Saves processed event/witness memory keys and requires matching restored NPC memories |
 | `simreality/social_replay_save_state.py` | Social adapter replay persistence | Saves conversation signatures/results and witnessed-consequence inputs/results so identical replays return recorded outcomes |
 | `simreality/tick_replay_save_state.py` | Simulation tick replay persistence | Saves completed tick request history and cached-result references; restore requires the world, NPCs, memory adapter, and conversation adapter to be restored first |
-| `simreality/world_checkpoint.py` | Composite world checkpoint | Combines event, NPC, trust, belief, memory, conversation and tick replay snapshots, plus optional witnessed-consequence replay, campaign lifecycle, and misconduct history in one canonical JSON checkpoint |\n| `simreality/misconduct_save_state.py` | Accountability persistence | Saves reports and append-only review decisions canonically; validates incident references against the authoritative world-event ledger on restore |
+| `simreality/world_checkpoint.py` | Composite world checkpoint | Combines event, NPC, trust, belief, memory, conversation and tick replay snapshots, plus optional witnessed-consequence replay, campaign lifecycle, and misconduct history in one canonical JSON checkpoint |
+| `simreality/misconduct_save_state.py` | Accountability persistence | Saves reports and append-only review decisions canonically; validates incident references against the authoritative world-event ledger on restore |
 
 | `simreality/institutional_dynamics.py` | Institutional decision dynamics | Ranks feasible institutional options using leadership and department priorities, resource pressure, accountability, evidence, employee traits, favouritism, and explicit signed bias cues; does not execute decisions |
 
@@ -240,7 +246,10 @@ The [memory-to-rumour adapter](docs/MEMORY-TO-RUMOUR-ADAPTER.md) calculates deca
 
 
 The [social conversation adapter](docs/NPC-SOCIAL-CONVERSATIONS.md) connects real gossip transfer to observer-specific belief updates. Conversation IDs make replay idempotent, and appearance-only rumours remain unattributed. Tests are in `tests/test_social_conversations.py`.
-\n\nThe [simulation tick coordinator](docs/SIMULATION-TICK-COORDINATOR.md) now provides a small, deterministic scheduling boundary: explicitly selected event memories are materialized before explicitly selected conversations at the same tick. It does not invent visibility, proximity, or NPC schedules. See `tests/test_simulation_tick.py`.\n
+
+
+The [simulation tick coordinator](docs/SIMULATION-TICK-COORDINATOR.md) now provides a small, deterministic scheduling boundary: explicitly selected event memories are materialized before explicitly selected conversations at the same tick. It does not invent visibility, proximity, or NPC schedules. See `tests/test_simulation_tick.py`.
+
 
 The [versioned simulation save envelope](docs/SIMULATION-SAVE-STATE.md) persists the authoritative event timeline and current tick as canonical JSON. It is the first save boundary, not yet a full restore of all NPC and adapter internals; see `tests/test_save_state.py`.
 
