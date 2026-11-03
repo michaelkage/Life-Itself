@@ -48,3 +48,15 @@ ledger's existing ID semantics; reusing that ID for different record content is
 rejected. Unanswered inquiries and refusals remain in the inquiry history and
 produce no testimony record. The adapter does not choose inquiries, answer
 questions, or infer witness facts.
+
+
+## End-to-end inquiry pipeline
+
+`InquiryInvestigationPipeline.process` materializes an answered inquiry, analyzes
+all testimony for that event, and applies the resulting corroboration or
+contradiction evidence to the caller-selected observer's `SocialBeliefSystem`.
+The caller supplies inquiry/testimony IDs, recording hour, observer ID, and
+observed tick. Existing replay-safe ledgers and evidence IDs make repeated
+processing safe; refusals create neither testimony nor belief claims. The
+pipeline never chooses a witness answer or resolves conflicting accounts into
+one objective truth.
