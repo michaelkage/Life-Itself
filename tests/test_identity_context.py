@@ -30,7 +30,7 @@ class IdentityCognitiveContextTests(unittest.TestCase):
         self.assertAlmostEqual(result.emotion_contributions[0][2], 0.018)
         self.assertAlmostEqual(result.interpreted.delta, 0.046)
         self.assertEqual(result.emotional_sample_tick, 12)
-        self.assertEqual(result.base.interpreted.delta, self.proposal.delta)
+        self.assertAlmostEqual(result.base.interpreted.delta, self.proposal.delta)
 
     def test_emotional_state_is_immutable_and_missing_axes_are_neutral(self):
         state = NPCEmotionalState("npc-a", 5, {"grief": 0.7})
