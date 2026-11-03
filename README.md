@@ -321,3 +321,6 @@ The [NPC goal persistence layer](docs/GOAL-PERSISTENCE.md) adds canonical, versi
 
 
 The new [goal-aware daily routine bridge](docs/GOAL-AWARE-ROUTINES.md) connects explicit NPC goal categories to matching routine activities. Goal priority, confidence, discretionary time/resources, stress, obligations, social support, and recent setbacks shape transparent routine-priority proposals. The adapter is read-only: it does not execute plans, spend resources, mutate routines, or auto-complete goals. Tests: `tests/test_goal_life.py`.
+
+
+The [NPC identity interpretation layer](docs/NPC-IDENTITY-INTERPRETATION.md) now combines explicit belief, personal-memory, and observer-to-target trust inputs when interpreting identity-change proposals. Each input is attributable and bounded; unknown beliefs, memories, or trust pairs are neutral, and an interpreted proposal still requires an explicit decision. Tests: `tests/test_identity_interpretation.py`.
