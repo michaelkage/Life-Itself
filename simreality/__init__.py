@@ -493,3 +493,8 @@ __all__ += ["TestimonyDetail", "TestimonyLedger", "TestimonyRecord"]
 # Deterministic comparison of independently recorded witness testimony.
 from .testimony_analysis import InvestigationReport, TestimonyAnalyzer, TestimonyMatch
 __all__ += ["InvestigationReport", "TestimonyAnalyzer", "TestimonyMatch"]
+
+
+# Explicit conversion of investigation findings into observer-specific belief evidence.
+from .testimony_beliefs import TestimonyBeliefAdapter, TestimonyBeliefPolicy, TestimonyEvidenceBatch
+__all__ += ["TestimonyBeliefAdapter", "TestimonyBeliefPolicy", "TestimonyEvidenceBatch"]
