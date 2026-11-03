@@ -86,6 +86,10 @@ class IdentityBeliefInterpretationTests(unittest.TestCase):
         npc_b = NPC("npc-b", memories=[NPCMemory(
             "npc-b", "person-x", 0.2, 0.2, 2.0, ActionTag.CRIME_ASSAULT, Description(),
         )])
+        proposal_a = IdentityChangeProposal(
+            "event-memory", "npc-a", "betrayal-policy", "trust",
+            0.2, 0.22, 0.02, 1.0, "participant", 0.05,
+        )
         proposal_b = IdentityChangeProposal(
             "event-memory", "npc-b", "betrayal-policy", "trust",
             0.2, 0.22, 0.02, 1.0, "participant", 0.05,
@@ -95,7 +99,7 @@ class IdentityBeliefInterpretationTests(unittest.TestCase):
             IdentityMemoryAssociation("event-memory", "npc-b", "betrayal-policy", 0, 0.04),
         )
         results = self.interpreter.interpret_with_memories(
-            (self.proposal, proposal_b), {"npc-a": npc_a, "npc-b": npc_b}, associations,
+            (proposal_a, proposal_b), {"npc-a": npc_a, "npc-b": npc_b}, associations,
         )
         by_id = {item.interpreted.npc_id: item for item in results}
         self.assertGreater(by_id["npc-a"].interpreted.delta, by_id["npc-b"].interpreted.delta)
