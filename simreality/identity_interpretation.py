@@ -11,6 +11,7 @@ from typing import Iterable, Mapping
 
 from .beliefs import BeliefLedger
 from .identity_evolution import IdentityChangeProposal
+from .social_beliefs import SocialBeliefSystem
 
 
 @dataclass(frozen=True)
@@ -56,6 +57,26 @@ class IdentityBeliefInterpreter:
         if len(keys) != len(set(keys)):
             raise ValueError("duplicate policy/claim interpretation rule")
         self.rules = tuple(sorted(rules, key=lambda r: (r.policy_id, r.claim_id)))
+
+    def interpret_from_social_beliefs(
+        self,
+        proposals: Iterable[IdentityChangeProposal],
+        social_beliefs: SocialBeliefSystem,
+    ) -> tuple[InterpretedIdentityChange, ...]:
+        """Interpret proposals directly from observer-specific social beliefs.
+
+        The adapter consumes public belief-state snapshots. It does not reach
+        into or mutate SocialBeliefSystem internals. Trust has already been
+        sampled when each NPC observed its evidence.
+        """
+        if not isinstance(social_beliefs, SocialBeliefSystem):
+            raise TypeError("social_beliefs must be a SocialBeliefSystem")
+        proposals = tuple(proposals)
+        ledgers = {}
+        for npc_id in sorted({p.npc_id for p in proposals}):
+            states = social_beliefs.beliefs_for(npc_id)
+            ledgers[npc_id] = BeliefLedger({state.claim_id: state.confidence for state in states})
+        return self.interpret(proposals, ledgers)
 
     def interpret(
         self,
