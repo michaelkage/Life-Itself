@@ -44,6 +44,7 @@ class InterpretedIdentityChange:
     memory_contributions: tuple[tuple[int, float, float], ...] = ()
     relationship_contributions: tuple[tuple[str, float, float], ...] = ()
     personality_contributions: tuple[tuple[str, float, float], ...] = ()
+    value_contributions: tuple[tuple[str, float, float], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -88,6 +89,43 @@ class IdentityPersonalityRule:
                 or not math.isfinite(self.coefficient) or not -1.0 <= self.coefficient <= 1.0):
             raise ValueError("coefficient must be finite and in [-1, 1]")
 
+
+@dataclass(frozen=True)
+class NPCIdentityValues:
+    """Individual value priorities; no axis has a universal moral meaning."""
+    npc_id: str
+    axes: Mapping[str, float]
+
+    def __post_init__(self):
+        if not isinstance(self.npc_id, str) or not self.npc_id.strip():
+            raise ValueError("npc_id must be non-empty")
+        if not isinstance(self.axes, Mapping):
+            raise ValueError("axes must be a mapping")
+        copied = dict(self.axes)
+        for axis, value in copied.items():
+            if not isinstance(axis, str) or not axis.strip():
+                raise ValueError("axis names must be non-empty")
+            if (isinstance(value, bool) or not isinstance(value, (int, float))
+                    or not math.isfinite(value) or not -1.0 <= value <= 1.0):
+                raise ValueError("value axes must be finite and in [-1, 1]")
+        object.__setattr__(self, "axes", MappingProxyType(copied))
+
+
+@dataclass(frozen=True)
+class IdentityValueRule:
+    """Map one NPC value axis to a policy-specific appraisal effect."""
+    policy_id: str
+    value_axis: str
+    coefficient: float
+
+    def __post_init__(self):
+        if not isinstance(self.policy_id, str) or not self.policy_id.strip():
+            raise ValueError("policy_id must be non-empty")
+        if not isinstance(self.value_axis, str) or not self.value_axis.strip():
+            raise ValueError("value_axis must be non-empty")
+        if (isinstance(self.coefficient, bool) or not isinstance(self.coefficient, (int, float))
+                or not math.isfinite(self.coefficient) or not -1.0 <= self.coefficient <= 1.0):
+            raise ValueError("coefficient must be finite and in [-1, 1]")
 
 @dataclass(frozen=True)
 class IdentityRelationshipAssociation:
@@ -342,6 +380,8 @@ class IdentityBeliefInterpreter:
         relationship_associations: Iterable[IdentityRelationshipAssociation] = (),
         personalities_by_npc: Mapping[str, NPCIdentityPersonality] | None = None,
         personality_rules: Iterable[IdentityPersonalityRule] = (),
+        values_by_npc: Mapping[str, NPCIdentityValues] | None = None,
+        value_rules: Iterable[IdentityValueRule] = (),
     ) -> tuple[InterpretedIdentityChange, ...]:
         """Run all configured identity-appraisal inputs in one transparent pass.
 
@@ -405,6 +445,24 @@ class IdentityBeliefInterpreter:
         for rule in sorted(personality_items, key=lambda item: (item.policy_id, item.personality_axis)):
             personality_by_policy.setdefault(rule.policy_id, []).append(rule)
 
+        value_map = {} if values_by_npc is None else values_by_npc
+        if not isinstance(value_map, Mapping):
+            raise TypeError("values_by_npc must be a mapping")
+        for npc_id, profile in value_map.items():
+            if not isinstance(npc_id, str) or not npc_id.strip() or not isinstance(profile, NPCIdentityValues):
+                raise TypeError("values_by_npc must map non-empty IDs to NPCIdentityValues")
+            if profile.npc_id != npc_id:
+                raise ValueError("value mapping key must match profile npc_id")
+        value_items = tuple(value_rules)
+        if any(not isinstance(rule, IdentityValueRule) for rule in value_items):
+            raise TypeError("value_rules must contain IdentityValueRule values")
+        value_keys = [(rule.policy_id, rule.value_axis) for rule in value_items]
+        if len(value_keys) != len(set(value_keys)):
+            raise ValueError("duplicate policy/value-axis rule")
+        values_by_policy: dict[str, list[IdentityValueRule]] = {}
+        for rule in sorted(value_items, key=lambda item: (item.policy_id, item.value_axis)):
+            values_by_policy.setdefault(rule.policy_id, []).append(rule)
+
         results = []
         for result in base:
             proposal = result.interpreted
@@ -412,6 +470,7 @@ class IdentityBeliefInterpreter:
             memory_contributions = []
             relationship_contributions = []
             personality_contributions = []
+            value_contributions = []
 
             for item in sorted(
                 memories_by_key.get((proposal.event_id, proposal.npc_id, proposal.policy_id), ()),
@@ -446,6 +505,13 @@ class IdentityBeliefInterpreter:
                 adjustment += contribution
                 personality_contributions.append((rule.personality_axis, value, contribution))
 
+            value_profile = value_map.get(proposal.npc_id)
+            for rule in values_by_policy.get(proposal.policy_id, ()):
+                value = value_profile.axes.get(rule.value_axis, 0.0) if value_profile else 0.0
+                contribution = rule.coefficient * value
+                adjustment += contribution
+                value_contributions.append((rule.value_axis, value, contribution))
+
             maximum = proposal.maximum_delta
             delta = max(-maximum, min(maximum, proposal.delta + adjustment))
             after = max(-1.0, min(1.0, proposal.before + delta))
@@ -457,7 +523,7 @@ class IdentityBeliefInterpreter:
             results.append(InterpretedIdentityChange(
                 result.original, interpreted, result.belief_contributions,
                 tuple(memory_contributions), tuple(relationship_contributions),
-                tuple(personality_contributions),
+                tuple(personality_contributions), tuple(value_contributions),
             ))
         return tuple(results)
 
