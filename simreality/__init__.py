@@ -485,3 +485,6 @@ __all__ += [
     "RecallDetail", "RecalledDetail", "WitnessRecall", "WitnessRecallAdapter",
     "WitnessRecallProfile",
 ]
+
+from .testimony import TestimonyDetail, TestimonyLedger, TestimonyRecord
+__all__ += ["TestimonyDetail", "TestimonyLedger", "TestimonyRecord"]
