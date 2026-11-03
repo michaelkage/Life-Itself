@@ -91,6 +91,41 @@ class IdentityDecisionTests(unittest.TestCase):
         self.assertEqual(ledger.traits_for("npc-a")["trust"], 0.3)
         self.assertEqual([d.decision_id for d in ledger.entries()], ["d1", "d2"])
 
+    def test_out_of_order_same_axis_decision_is_rejected_before_mutation(self):
+        ledger = IdentityDecisionLedger((self.profile,))
+        first = IdentityChangeDecision.from_proposal(
+            "d-later", self.proposal, accepted=True, decision_tick=8, rationale="later"
+        )
+        ledger.record(first)
+        earlier_proposal = IdentityChangeProposal(
+            "event-earlier", "npc-a", "policy-earlier", "trust",
+            0.25, 0.3, 0.05, 0.8, "participant",
+        )
+        earlier = IdentityChangeDecision.from_proposal(
+            "d-earlier", earlier_proposal, accepted=True, decision_tick=7, rationale="earlier"
+        )
+        with self.assertRaisesRegex(ValueError, "decision order"):
+            ledger.record(earlier)
+        self.assertEqual(ledger.entries(), (first,))
+        self.assertEqual(ledger.traits_for("npc-a")["trust"], 0.25)
+
+    def test_same_tick_decisions_use_snapshot_canonical_order(self):
+        ledger = IdentityDecisionLedger((self.profile,))
+        first = IdentityChangeDecision(
+            "a-decision", "event-1", "npc-a", "p1", "trust",
+            True, 4, "first", 0.2, 0.25, 0.05, 1.0, "participant",
+        )
+        second = IdentityChangeDecision(
+            "z-decision", "event-2", "npc-a", "p2", "trust",
+            True, 4, "second", 0.25, 0.3, 0.05, 1.0, "participant",
+        )
+        ledger.record(first)
+        ledger.record(second)
+        self.assertEqual(
+            IdentityDecisionSnapshot.capture(ledger).restore().traits_for("npc-a")["trust"],
+            0.3,
+        )
+
     def test_invalid_decision_tick_rejected(self):
         with self.assertRaises(ValueError):
             IdentityChangeDecision.from_proposal(
