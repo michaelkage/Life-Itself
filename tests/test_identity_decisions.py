@@ -126,6 +126,24 @@ class IdentityDecisionTests(unittest.TestCase):
             0.3,
         )
 
+    def test_record_many_keeps_chain_order_index_for_future_appends(self):
+        ledger = IdentityDecisionLedger((self.profile,))
+        first = IdentityChangeDecision(
+            "d1", "event-1", "npc-a", "p1", "trust",
+            True, 4, "first", 0.2, 0.25, 0.05, 1.0, "participant",
+        )
+        second = IdentityChangeDecision(
+            "d2", "event-2", "npc-a", "p2", "trust",
+            True, 5, "second", 0.25, 0.3, 0.05, 1.0, "participant",
+        )
+        ledger.record_many((second, first))
+        third = IdentityChangeDecision(
+            "d3", "event-3", "npc-a", "p3", "trust",
+            True, 6, "third", 0.3, 0.35, 0.05, 1.0, "participant",
+        )
+        ledger.record(third)
+        self.assertEqual(ledger.traits_for("npc-a")["trust"], 0.35)
+
     def test_invalid_decision_tick_rejected(self):
         with self.assertRaises(ValueError):
             IdentityChangeDecision.from_proposal(
