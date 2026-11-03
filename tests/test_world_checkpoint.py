@@ -12,6 +12,7 @@ from simreality import (
     GoalBook, NPCGoal, GoalEventAdapter, GoalProgressPolicy,
     GoalReviewAction, GoalReviewEvaluator, GoalReviewPolicy,
     GoalReviewDecision, GoalReviewDecisionLedger,
+    NPCIdentityProfile, IdentityChangeProposal, IdentityDecisionLedger,
 )
 
 
@@ -80,6 +81,47 @@ class SimulationWorldCheckpointTests(unittest.TestCase):
             ).to_json(),
             payload,
         )
+
+
+    def test_identity_decisions_round_trip_and_event_replay_remains_idempotent(self):
+        coordinator, npcs, _ = self.make_simulation()
+        profile = NPCIdentityProfile("speaker", {"trust": 0.2}, {"trust": 1.0})
+        proposal = IdentityChangeProposal(
+            "event-1", "speaker", "incident-policy", "trust",
+            0.2, 0.25, 0.05, 1.0, "participant", 0.05,
+        )
+        identity = IdentityDecisionLedger((profile,))
+        identity.decide(
+            "identity-decision-1", proposal, accepted=True,
+            decision_tick=4, rationale="The NPC accepts the experience",
+        )
+        payload = SimulationWorldCheckpoint.capture(
+            4, coordinator, npcs, identity_decisions=identity,
+        ).to_json()
+        restored = SimulationWorldCheckpoint.from_json(payload).restore()
+        self.assertEqual(restored.identity_decisions.traits_for("speaker")["trust"], 0.25)
+        self.assertEqual(len(restored.identity_decisions.entries()), 1)
+        restored.identity_decisions.record(restored.identity_decisions.entries()[0])
+        self.assertEqual(restored.identity_decisions.traits_for("speaker")["trust"], 0.25)
+        self.assertEqual(
+            SimulationWorldCheckpoint.capture(
+                4, restored.coordinator, restored.npcs,
+                identity_decisions=restored.identity_decisions,
+            ).to_json(),
+            payload,
+        )
+
+    def test_identity_decision_checkpoint_rejects_missing_source_event(self):
+        coordinator, npcs, _ = self.make_simulation()
+        profile = NPCIdentityProfile("speaker", {"trust": 0.2})
+        proposal = IdentityChangeProposal(
+            "missing-event", "speaker", "policy", "trust",
+            0.2, 0.25, 0.05, 1.0, "participant", 0.05,
+        )
+        identity = IdentityDecisionLedger((profile,))
+        identity.decide("decision", proposal, accepted=True, decision_tick=4, rationale="test")
+        with self.assertRaises(ValueError):
+            SimulationWorldCheckpoint.capture(4, coordinator, npcs, identity_decisions=identity)
 
     def test_consequence_section_is_optional(self):
         coordinator, npcs, _ = self.make_simulation()
