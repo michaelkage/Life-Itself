@@ -49,6 +49,20 @@ class IdentityBeliefInterpretationTests(unittest.TestCase):
         self.assertEqual(result.interpreted.delta, self.proposal.delta)
         self.assertLessEqual(abs(result.interpreted.delta), 0.05)
 
+    def test_custom_policy_cap_survives_interpretation(self):
+        proposal = IdentityChangeProposal(
+            "event-cap", "npc-a", "wide-policy", "trust",
+            0.2, 0.22, 0.02, 1.0, "participant", 0.08,
+        )
+        interpreter = IdentityBeliefInterpreter((
+            IdentityInterpretationRule("wide-policy", "claim-betrayal", 0.08),
+        ))
+        result = interpreter.interpret(
+            (proposal,), {"npc-a": self.belief(1.0)}
+        )[0]
+        self.assertEqual(result.interpreted.maximum_delta, 0.08)
+        self.assertAlmostEqual(result.interpreted.delta, 0.08)
+
     def test_interpretation_does_not_decide_or_mutate_original_proposal(self):
         original = self.proposal
         result = self.interpreter.interpret(
