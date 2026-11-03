@@ -503,3 +503,12 @@ __all__ += ["TestimonyBeliefAdapter", "TestimonyEvidencePolicy", "TestimonyEvide
 # Read-only dialogue and investigation queries over observer-specific testimony beliefs.
 from .testimony_belief_queries import TestimonyBeliefQuery, TestimonyBeliefQueryAdapter
 __all__ += ["TestimonyBeliefQuery", "TestimonyBeliefQueryAdapter"]
+
+
+# Read-only dialogue and investigation queries over observer-specific testimony beliefs.
+from .testimony_belief_queries import TestimonyBeliefQuery, TestimonyBeliefQueryAdapter
+__all__ += ["TestimonyBeliefQuery", "TestimonyBeliefQueryAdapter"]
+
+# Deterministic follow-up proposals for uncertain or conflicting testimony.
+from .testimony_followups import TestimonyFollowUp, TestimonyFollowUpPlan, TestimonyFollowUpPlanner
+__all__ += ["TestimonyFollowUp", "TestimonyFollowUpPlan", "TestimonyFollowUpPlanner"]
