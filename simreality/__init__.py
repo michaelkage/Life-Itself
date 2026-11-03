@@ -440,3 +440,13 @@ __all__ += ["IdentityChangePolicy", "IdentityChangeProposal", "IdentityEvolution
 from .identity_decisions import IdentityChangeDecision, IdentityDecisionLedger
 from .identity_decisions_save_state import IdentityDecisionSnapshot
 __all__ += ["IdentityChangeDecision", "IdentityDecisionLedger", "IdentityDecisionSnapshot"]
+
+
+# Belief-conditioned interpretation remains separate from explicit acceptance.
+from .identity_interpretation import (
+    IdentityBeliefInterpreter, IdentityInterpretationRule, InterpretedIdentityChange,
+)
+__all__ += [
+    "IdentityBeliefInterpreter", "IdentityInterpretationRule",
+    "InterpretedIdentityChange",
+]
