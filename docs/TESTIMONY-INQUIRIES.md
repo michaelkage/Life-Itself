@@ -15,3 +15,11 @@ Answered inquiries can be materialized as ordinary `TestimonyRecord` instances
 and appended to the existing testimony ledger, so analysis and belief adapters
 continue to use one testimony pipeline. Refusals are retained in inquiry history
 but do not fabricate a factual testimony detail.
+
+
+## Save-state snapshot
+
+`TestimonyInquirySnapshot` wraps the ledger in its own versioned canonical
+JSON envelope. Capture, serialize, parse, and restore preserve unanswered
+questions, answers, refusals, and stable IDs. The snapshot validates canonical
+encoding and delegates ledger invariants to the existing inquiry codec.
