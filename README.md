@@ -330,3 +330,6 @@ The NPC identity interpretation layer also supports explicit personality-axis ef
 
 
 A unified `interpret_comprehensively` pass now combines belief, explicitly linked memory, relationship-trust, and personality inputs against one original identity proposal. It reports each contribution separately and applies the policy cap to the combined result; interpretation still does not auto-accept an identity change. Regression tests: `tests/test_identity_interpretation.py`.
+
+
+The unified NPC identity appraisal now also accepts individual value priorities through `NPCIdentityValues` and `IdentityValueRule`, keeping value influence explicit, inspectable, and policy-specific.
