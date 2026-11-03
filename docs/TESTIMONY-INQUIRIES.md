@@ -23,3 +23,17 @@ but do not fabricate a factual testimony detail.
 JSON envelope. Capture, serialize, parse, and restore preserve unanswered
 questions, answers, refusals, and stable IDs. The snapshot validates canonical
 encoding and delegates ledger invariants to the existing inquiry codec.
+
+
+## World checkpoint integration
+
+The optional `testimony_inquiries` argument to
+`SimulationWorldCheckpoint.capture` embeds inquiry and response history in the
+composite world save. Restoring a checkpoint returns the ledger as
+`RestoredSimulation.testimony_inquiries`; omitting the argument preserves
+backward-compatible checkpoints with no inquiry section.
+
+Checkpoint validation rejects inquiries or responses dated after the world
+clock, missing source events, inquiries asked before their source event, and
+witness IDs that are not recorded witnesses for the source event. This keeps
+investigation history tied to the authoritative event journal.
