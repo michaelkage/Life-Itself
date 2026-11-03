@@ -4,7 +4,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 import math
 
-from .beliefs import Evidence
+from .beliefs import Evidence, BeliefState
+from .social_beliefs import SocialBeliefSystem
 from .testimony_analysis import InvestigationReport, TestimonyMatch
 
 
@@ -40,6 +41,23 @@ class TestimonyBeliefAdapter:
 
     def __init__(self, policy: TestimonyEvidencePolicy | None = None) -> None:
         self.policy = policy or TestimonyEvidencePolicy()
+
+    def apply(
+        self,
+        beliefs: SocialBeliefSystem,
+        observer_id: str,
+        report: InvestigationReport,
+        *,
+        observed_tick: int,
+    ) -> tuple[BeliefState, ...]:
+        """Prepare and observe the report through observer-specific trust."""
+        if not isinstance(beliefs, SocialBeliefSystem):
+            raise TypeError("beliefs must be a SocialBeliefSystem")
+        batch = self.prepare(observer_id, report, observed_tick=observed_tick)
+        states = []
+        for evidence in batch.evidence:
+            states.append(beliefs.observe(observer_id, evidence))
+        return tuple(states)
 
     @staticmethod
     def _claim_id(match: TestimonyMatch, value: object) -> str:
