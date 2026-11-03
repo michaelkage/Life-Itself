@@ -15,6 +15,7 @@ from simreality import (
     NPCIdentityProfile, IdentityChangeProposal, IdentityDecisionLedger,
     TestimonyInquiry, TestimonyInquiryLedger, TestimonyResponse,
     TestimonyLedger, TestimonyRecord, TestimonyDetail,
+    InquiryInvestigationPipeline,
 )
 
 
@@ -23,7 +24,7 @@ class SimulationWorldCheckpointTests(unittest.TestCase):
         events = WorldEventLedger((
             WorldEventLedger.make_event(
                 "event-1", 3, "incident",
-                participants=("speaker", "subject"), witnesses=("speaker",),
+                participants=("speaker", "subject"), witnesses=("speaker", "listener"),
                 attributes={
                     "action_tag": ActionTag.CRIME_THEFT.value,
                     "target_entity_id": "subject",
@@ -174,6 +175,50 @@ class SimulationWorldCheckpointTests(unittest.TestCase):
                 4, coordinator, npcs, testimony_inquiries=inquiries,
             )
 
+
+    def test_inquiry_testimony_and_beliefs_survive_checkpoint_replay(self):
+        coordinator, npcs, _ = self.make_simulation()
+        inquiries = TestimonyInquiryLedger((
+            TestimonyInquiry("checkpoint-q", "event-1", "speaker", "coat", 3),
+        ))
+        inquiries.append_response(TestimonyResponse(
+            "checkpoint-q", 4, True, "green", 0.9,
+        ))
+        testimony = TestimonyLedger((
+            TestimonyRecord(
+                "listener-account", "event-1", "listener", 3, 1.0, 0.0,
+                (TestimonyDetail("listener-coat", "coat", "black", 0.8),), (),
+            ),
+        ))
+        pipeline = InquiryInvestigationPipeline()
+        pipeline.process(
+            inquiries, testimony, coordinator.conversation_adapter.beliefs,
+            "checkpoint-q", "speaker-account", 2.0, "listener", 4,
+        )
+
+        payload = SimulationWorldCheckpoint.capture(
+            4, coordinator, npcs,
+            testimony_inquiries=inquiries, testimony=testimony,
+        ).to_json()
+        restored = SimulationWorldCheckpoint.from_json(payload).restore()
+        self.assertEqual(restored.testimony_inquiries.to_json(), inquiries.to_json())
+        self.assertEqual(restored.testimony.to_json(), testimony.to_json())
+
+        before_beliefs = restored.beliefs.snapshot()
+        replay = pipeline.process(
+            restored.testimony_inquiries, restored.testimony, restored.beliefs,
+            "checkpoint-q", "speaker-account", 2.0, "listener", 4,
+        )
+        self.assertEqual(replay.materialized.testimony_id, "speaker-account")
+        self.assertEqual(restored.beliefs.snapshot(), before_beliefs)
+        self.assertEqual(
+            SimulationWorldCheckpoint.capture(
+                4, restored.coordinator, restored.npcs,
+                testimony_inquiries=restored.testimony_inquiries,
+                testimony=restored.testimony,
+            ).to_json(),
+            payload,
+        )
 
     def test_testimony_ledger_round_trips_and_rejects_non_witness(self):
         coordinator, npcs, _ = self.make_simulation()
