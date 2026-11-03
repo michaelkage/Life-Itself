@@ -114,6 +114,16 @@ class SimulationWorldCheckpointTests(unittest.TestCase):
             payload,
         )
 
+    def test_identity_checkpoint_rejects_profiles_outside_npc_roster(self):
+        coordinator, npcs, _ = self.make_simulation()
+        identity = IdentityDecisionLedger((
+            NPCIdentityProfile("unregistered-npc", {"trust": 0.2}),
+        ))
+        with self.assertRaisesRegex(ValueError, "missing from checkpoint"):
+            SimulationWorldCheckpoint.capture(
+                4, coordinator, npcs, identity_decisions=identity,
+            )
+
     def test_identity_decision_checkpoint_rejects_missing_source_event(self):
         coordinator, npcs, _ = self.make_simulation()
         profile = NPCIdentityProfile("speaker", {"trust": 0.2})
