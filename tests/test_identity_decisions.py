@@ -144,6 +144,16 @@ class IdentityDecisionTests(unittest.TestCase):
         ledger.record(third)
         self.assertEqual(ledger.traits_for("npc-a")["trust"], 0.35)
 
+    def test_snapshot_rejects_duplicate_or_unsorted_profile_entries(self):
+        valid = IdentityDecisionSnapshot.capture(IdentityDecisionLedger((self.profile,)))
+        profile = valid.profiles[0]
+        duplicate_traits = (profile[0], (("trust", 0.2), ("trust", 0.2)), profile[2], profile[3])
+        with self.assertRaises(ValueError):
+            IdentityDecisionSnapshot((duplicate_traits,), ())
+        unsorted_traits = (profile[0], (("z", 0.0), ("a", 0.0)), profile[2], profile[3])
+        with self.assertRaises(ValueError):
+            IdentityDecisionSnapshot((unsorted_traits,), ())
+
     def test_invalid_decision_tick_rejected(self):
         with self.assertRaises(ValueError):
             IdentityChangeDecision.from_proposal(
