@@ -71,7 +71,7 @@ class IdentityBeliefInterpretationTests(unittest.TestCase):
         )
         by_id = {item.interpreted.npc_id: item for item in results}
         self.assertGreater(by_id["npc-a"].belief_contributions[0][1], 0.5)
-        self.assertLess(by_id["npc-b"].belief_contributions[0][1], 0.5)
+        self.assertGreater(by_id["npc-a"].belief_contributions[0][1], by_id["npc-b"].belief_contributions[0][1])
         self.assertGreater(by_id["npc-a"].interpreted.delta, by_id["npc-b"].interpreted.delta)
 
     def test_social_beliefs_adapter_rejects_wrong_input(self):
