@@ -193,6 +193,15 @@ class SimulationWorldCheckpoint:
             raise TypeError("identity_decisions must be an IdentityDecisionLedger or None")
         identity_snapshot = IdentityDecisionSnapshot.capture(identity_decisions) if identity_decisions is not None else None
         if identity_snapshot is not None:
+            unknown_profiles = sorted(
+                profile[0] for profile in identity_snapshot.profiles
+                if profile[0] not in npcs
+            )
+            if unknown_profiles:
+                raise ValueError(
+                    "identity profiles reference NPCs missing from checkpoint: "
+                    + ", ".join(unknown_profiles)
+                )
             for record in identity_snapshot.decisions:
                 if record[6] > current_tick:
                     raise ValueError("identity decisions cannot occur after the checkpoint tick")
