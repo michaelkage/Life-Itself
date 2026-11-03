@@ -517,3 +517,8 @@ __all__ += ["TestimonyFollowUp", "TestimonyFollowUpPlan", "TestimonyFollowUpPlan
 # Replay-safe investigator inquiries and explicit witness responses.
 from .testimony_inquiries import TestimonyInquiry, TestimonyInquiryLedger, TestimonyResponse
 __all__ += ["TestimonyInquiry", "TestimonyInquiryLedger", "TestimonyResponse"]
+
+
+# Caller-selected investigation proposals become durable questions.
+from .testimony_inquiry_adapter import TestimonyInquiryAdapter
+__all__ += ["TestimonyInquiryAdapter"]
