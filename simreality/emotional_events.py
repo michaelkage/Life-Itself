@@ -131,6 +131,8 @@ class NPCEmotionalEventLedger:
                     if prior is not None and prior != signature:
                         raise ValueError("event/rule application ID reused with conflicting content")
 
+        # Exact event retries are no-ops; they must not rewind the decay cursor.
+        ordered_events = tuple(event for event in ordered_events if event.event_id not in self._events)
         cursor = self.current_tick
         ordered_rules = sorted(rules, key=lambda r: (r.event_type, r.role, r.emotion_axis, r.rule_id))
         for event in ordered_events:
