@@ -29,6 +29,13 @@ accept/reject decision through `IdentityDecisionLedger`. This keeps belief,
 identity, and agency separate: what an NPC believes can change how an event feels,
 but does not silently rewrite who that NPC becomes.
 
-Belief ledgers can be supplied from the existing observer-specific
-`SocialBeliefSystem` / `BeliefLedger` pipeline. Rule coefficients and claim
-meanings remain authored simulation data, not universal moral judgments.
+Belief ledgers can be supplied directly, or callers can use
+`interpret_from_social_beliefs(proposals, social_beliefs)` to consume the public
+observer-specific snapshots from `SocialBeliefSystem`. That path preserves the
+trust reliability sampled when each NPC originally heard the evidence; later
+relationship changes do not rewrite that observation. The adapter is read-only
+and does not reach into the belief system private state.
+
+Rule coefficients and claim meanings remain authored simulation data, not
+universal moral judgments. Regression coverage includes two NPCs who hear the
+same report from a source they trust differently.
