@@ -44,7 +44,7 @@ class InquiryInvestigationPipelineTests(unittest.TestCase):
             "observer", 4,
         )
         testimony_after_first = testimony.to_json()
-        beliefs_after_first = beliefs.to_json()
+        beliefs_after_first = beliefs.snapshot()
 
         replay = pipeline.process(
             inquiries, testimony, beliefs, "q-replay", "t-alice", 3.0,
