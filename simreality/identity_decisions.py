@@ -203,11 +203,15 @@ class IdentityDecisionSnapshot:
         if decision_ids != sorted(decision_ids) or len(decision_ids) != len(set(decision_ids)):
             raise ValueError("decision IDs must be unique and sorted")
 
-        # Rebuild to validate decisions and ensure accepted history produces saved traits.
+        # Validate decision fields before ordering them; otherwise malformed ticks
+        # of incomparable types can leak a sorting TypeError.
+        validated_decisions = tuple(IdentityChangeDecision(*d) for d in self.decisions)
+        # Rebuild to ensure accepted history produces the saved current traits.
         ledger = IdentityDecisionLedger(tuple(NPCIdentityProfile(p[0], dict(p[1]), dict(p[2]))
                                               for p in self.profiles))
-        for d in sorted(self.decisions, key=lambda item: (item[6], item[0])):
-            ledger.record(IdentityChangeDecision(*d))
+        for decision in sorted(validated_decisions,
+                              key=lambda item: (item.decision_tick, item.decision_id)):
+            ledger.record(decision)
         expected_current = tuple((p[0], tuple(sorted(ledger.traits_for(p[0]).items()))) for p in self.profiles)
         stored_current = tuple((p[0], p[3]) for p in self.profiles)
         if expected_current != stored_current:
