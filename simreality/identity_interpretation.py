@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import math
+from types import MappingProxyType
 from typing import Iterable, Mapping
 
 from .model import NPC
@@ -42,6 +43,50 @@ class InterpretedIdentityChange:
     belief_contributions: tuple[tuple[str, float, float], ...]
     memory_contributions: tuple[tuple[int, float, float], ...] = ()
     relationship_contributions: tuple[tuple[str, float, float], ...] = ()
+    personality_contributions: tuple[tuple[str, float, float], ...] = ()
+
+
+@dataclass(frozen=True)
+class NPCIdentityPersonality:
+    """Bounded, individual personality axes used only when explicitly mapped.
+
+    Axis values are normalized to [-1, 1]. The model does not prescribe a
+    universal personality taxonomy; projects define axes such as fearfulness,
+    confidence, stubbornness, openness, or sociability.
+    """
+    npc_id: str
+    axes: Mapping[str, float]
+
+    def __post_init__(self):
+        if not isinstance(self.npc_id, str) or not self.npc_id.strip():
+            raise ValueError("npc_id must be a non-empty string")
+        if not isinstance(self.axes, Mapping):
+            raise ValueError("axes must be a mapping")
+        copied = dict(self.axes)
+        for axis, value in copied.items():
+            if not isinstance(axis, str) or not axis.strip():
+                raise ValueError("personality axis names must be non-empty strings")
+            if (isinstance(value, bool) or not isinstance(value, (int, float))
+                    or not math.isfinite(value) or not -1.0 <= value <= 1.0):
+                raise ValueError(f"personality axis {axis!r} must be finite and in [-1, 1]")
+        object.__setattr__(self, "axes", MappingProxyType(copied))
+
+
+@dataclass(frozen=True)
+class IdentityPersonalityRule:
+    """Map one normalized personality axis to one identity policy."""
+    policy_id: str
+    personality_axis: str
+    coefficient: float
+
+    def __post_init__(self):
+        if not isinstance(self.policy_id, str) or not self.policy_id.strip():
+            raise ValueError("policy_id must be a non-empty string")
+        if not isinstance(self.personality_axis, str) or not self.personality_axis.strip():
+            raise ValueError("personality_axis must be a non-empty string")
+        if (isinstance(self.coefficient, bool) or not isinstance(self.coefficient, (int, float))
+                or not math.isfinite(self.coefficient) or not -1.0 <= self.coefficient <= 1.0):
+            raise ValueError("coefficient must be finite and in [-1, 1]")
 
 
 @dataclass(frozen=True)
@@ -176,6 +221,63 @@ class IdentityBeliefInterpreter:
             )
             results.append(InterpretedIdentityChange(
                 result.original, interpreted, result.belief_contributions, tuple(contributions)))
+        return tuple(results)
+
+    def interpret_with_personality(
+        self,
+        proposals: Iterable[IdentityChangeProposal],
+        personalities_by_npc: Mapping[str, NPCIdentityPersonality],
+        rules: Iterable[IdentityPersonalityRule],
+        beliefs_by_npc: Mapping[str, BeliefLedger] | None = None,
+    ) -> tuple[InterpretedIdentityChange, ...]:
+        """Apply explicit personality-axis effects after belief appraisal.
+
+        Each matching axis contributes coefficient * normalized_axis_value.
+        Missing profiles or axes are neutral. Contributions are transparent,
+        deterministic, and bounded by the proposal's original delta cap.
+        """
+        if not isinstance(personalities_by_npc, Mapping):
+            raise TypeError("personalities_by_npc must be a mapping")
+        for npc_id, profile in personalities_by_npc.items():
+            if not isinstance(npc_id, str) or not npc_id.strip():
+                raise ValueError("personality map NPC IDs must be non-empty strings")
+            if not isinstance(profile, NPCIdentityPersonality):
+                raise TypeError("personality map values must be NPCIdentityPersonality instances")
+            if profile.npc_id != npc_id:
+                raise ValueError("personality mapping key must match profile npc_id")
+        rule_items = tuple(rules)
+        if any(not isinstance(rule, IdentityPersonalityRule) for rule in rule_items):
+            raise TypeError("rules must contain IdentityPersonalityRule values")
+        rule_keys = [(rule.policy_id, rule.personality_axis) for rule in rule_items]
+        if len(rule_keys) != len(set(rule_keys)):
+            raise ValueError("duplicate policy/personality-axis rule")
+        grouped: dict[str, list[IdentityPersonalityRule]] = {}
+        for rule in sorted(rule_items, key=lambda item: (item.policy_id, item.personality_axis)):
+            grouped.setdefault(rule.policy_id, []).append(rule)
+        base = self.interpret(tuple(proposals), beliefs_by_npc or {})
+        results = []
+        for result in base:
+            proposal = result.interpreted
+            profile = personalities_by_npc.get(proposal.npc_id)
+            contributions = []
+            adjustment = 0.0
+            for rule in grouped.get(proposal.policy_id, ()):
+                value = profile.axes.get(rule.personality_axis, 0.0) if profile else 0.0
+                contribution = rule.coefficient * value
+                adjustment += contribution
+                contributions.append((rule.personality_axis, value, contribution))
+            maximum = proposal.maximum_delta
+            delta = max(-maximum, min(maximum, proposal.delta + adjustment))
+            after = max(-1.0, min(1.0, proposal.before + delta))
+            interpreted = IdentityChangeProposal(
+                proposal.event_id, proposal.npc_id, proposal.policy_id, proposal.axis,
+                proposal.before, after, after - proposal.before,
+                proposal.evidence_strength, proposal.role, maximum,
+            )
+            results.append(InterpretedIdentityChange(
+                result.original, interpreted, result.belief_contributions,
+                result.memory_contributions, result.relationship_contributions,
+                tuple(contributions)))
         return tuple(results)
 
     def interpret_with_relationships(
