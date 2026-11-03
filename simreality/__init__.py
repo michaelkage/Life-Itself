@@ -527,3 +527,8 @@ __all__ += ["TestimonyInquiryAdapter"]
 # Canonical persistence for investigator inquiry and response history.
 from .testimony_inquiry_save_state import TestimonyInquirySnapshot
 __all__ += ["TestimonyInquirySnapshot"]
+
+
+# Replay-safe bridge from answered inquiries into the shared testimony ledger.
+from .testimony_materialization import TestimonyMaterializationAdapter
+__all__ += ["TestimonyMaterializationAdapter"]
