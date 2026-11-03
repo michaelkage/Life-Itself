@@ -12,6 +12,7 @@ from typing import Iterable, Mapping
 
 from .identity_context import NPCEmotionalState
 from .world_events import WorldEvent
+from .social_trust import SocialTrustLedger
 
 
 @dataclass(frozen=True)
@@ -32,6 +33,34 @@ class EmotionalEventRule:
         if (isinstance(self.delta, bool) or not isinstance(self.delta, (int, float))
                 or not math.isfinite(self.delta) or not -1.0 <= self.delta <= 1.0):
             raise ValueError("delta must be finite and in [-1, 1]")
+
+
+@dataclass(frozen=True)
+class EmotionalRelationshipRule:
+    """Relationship-sensitive emotion impulse using an event's explicit target ID.
+
+    The event attribute named by target_attribute identifies who the event is
+    about. Trust is sampled at the event tick, not at the later processing tick.
+    """
+
+    rule_id: str
+    event_type: str
+    role: str
+    emotion_axis: str
+    target_attribute: str
+    coefficient: float
+
+    def __post_init__(self):
+        for name in ("rule_id", "event_type", "emotion_axis", "target_attribute"):
+            value = getattr(self, name)
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError(f"{name} must be a non-empty string")
+        if self.role not in ("participant", "witness"):
+            raise ValueError("role must be 'participant' or 'witness'")
+        value = self.coefficient
+        if (isinstance(value, bool) or not isinstance(value, (int, float))
+                or not math.isfinite(value) or not -1.0 <= value <= 1.0):
+            raise ValueError("coefficient must be finite and in [-1, 1]")
 
 
 @dataclass(frozen=True)
@@ -90,6 +119,8 @@ class NPCEmotionalEventLedger:
         *,
         event_rules: Iterable[EmotionalEventRule],
         decay_rules: Iterable[EmotionalDecayRule] = (),
+        relationship_rules: Iterable[EmotionalRelationshipRule] = (),
+        trust_ledger: SocialTrustLedger | None = None,
     ) -> tuple[NPCEmotionalState, ...]:
         if isinstance(tick, bool) or not isinstance(tick, int) or tick < self.current_tick:
             raise ValueError("tick must be an integer not earlier than current_tick")
@@ -102,12 +133,18 @@ class NPCEmotionalEventLedger:
             raise ValueError("cannot apply an event from after the requested tick")
         rules = tuple(event_rules)
         decay = tuple(decay_rules)
+        relationship = tuple(relationship_rules)
         if any(not isinstance(rule, EmotionalEventRule) for rule in rules):
             raise TypeError("event_rules must contain EmotionalEventRule values")
         if any(not isinstance(rule, EmotionalDecayRule) for rule in decay):
             raise TypeError("decay_rules must contain EmotionalDecayRule values")
-        if len({r.rule_id for r in rules}) != len(rules):
-            raise ValueError("event rule IDs must be unique")
+        if any(not isinstance(rule, EmotionalRelationshipRule) for rule in relationship):
+            raise TypeError("relationship_rules must contain EmotionalRelationshipRule values")
+        if relationship and not isinstance(trust_ledger, SocialTrustLedger):
+            raise TypeError("relationship rules require a SocialTrustLedger")
+        all_rule_ids = [r.rule_id for r in rules] + [r.rule_id for r in relationship]
+        if len(set(all_rule_ids)) != len(all_rule_ids):
+            raise ValueError("event and relationship rule IDs must be unique")
         if len({r.emotion_axis for r in decay}) != len(decay):
             raise ValueError("decay axes must be unique")
 
@@ -130,11 +167,28 @@ class NPCEmotionalEventLedger:
                     signature = (event.tick, float(rule.delta))
                     if prior is not None and prior != signature:
                         raise ValueError("event/rule application ID reused with conflicting content")
+            attributes = dict(event.attributes)
+            for rule in relationship:
+                if rule.event_type != event.event_type or rule.target_attribute not in attributes:
+                    continue
+                target_id = attributes[rule.target_attribute]
+                if not isinstance(target_id, str) or not target_id.strip():
+                    raise ValueError("relationship target event attribute must be a non-empty NPC ID")
+                people = event.participants if rule.role == "participant" else event.witnesses
+                for npc_id in people:
+                    sampled_trust = trust_ledger.trust_at(npc_id, target_id, event.tick)
+                    delta = float(rule.coefficient) * (2.0 * sampled_trust - 1.0)
+                    key = (event.event_id, npc_id, rule.rule_id)
+                    prior = self._applied.get(key)
+                    signature = (event.tick, delta)
+                    if prior is not None and prior != signature:
+                        raise ValueError("event/rule application ID reused with conflicting content")
 
         # Exact event retries are no-ops; they must not rewind the decay cursor.
         ordered_events = tuple(event for event in ordered_events if event.event_id not in self._events)
         cursor = self.current_tick
         ordered_rules = sorted(rules, key=lambda r: (r.event_type, r.role, r.emotion_axis, r.rule_id))
+        ordered_relationship_rules = sorted(relationship, key=lambda r: (r.event_type, r.role, r.emotion_axis, r.target_attribute, r.rule_id))
         for event in ordered_events:
             step = event.tick - cursor
             if step:
@@ -152,6 +206,24 @@ class NPCEmotionalEventLedger:
                     values = self._states.setdefault(npc_id, {})
                     values[rule.emotion_axis] = max(
                         0.0, min(1.0, values.get(rule.emotion_axis, 0.0) + rule.delta)
+                    )
+                    self._applied[key] = signature
+            attributes = dict(event.attributes)
+            for rule in ordered_relationship_rules:
+                if rule.event_type != event.event_type or rule.target_attribute not in attributes:
+                    continue
+                target_id = attributes[rule.target_attribute]
+                people = event.participants if rule.role == "participant" else event.witnesses
+                for npc_id in people:
+                    sampled_trust = trust_ledger.trust_at(npc_id, target_id, event.tick)
+                    delta = float(rule.coefficient) * (2.0 * sampled_trust - 1.0)
+                    key = (event.event_id, npc_id, rule.rule_id)
+                    signature = (event.tick, delta)
+                    if key in self._applied:
+                        continue
+                    values = self._states.setdefault(npc_id, {})
+                    values[rule.emotion_axis] = max(
+                        0.0, min(1.0, values.get(rule.emotion_axis, 0.0) + delta)
                     )
                     self._applied[key] = signature
             self._events.setdefault(event.event_id, event)
