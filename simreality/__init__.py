@@ -522,3 +522,8 @@ __all__ += ["TestimonyInquiry", "TestimonyInquiryLedger", "TestimonyResponse"]
 # Caller-selected investigation proposals become durable questions.
 from .testimony_inquiry_adapter import TestimonyInquiryAdapter
 __all__ += ["TestimonyInquiryAdapter"]
+
+
+# Canonical persistence for investigator inquiry and response history.
+from .testimony_inquiry_save_state import TestimonyInquirySnapshot
+__all__ += ["TestimonyInquirySnapshot"]
