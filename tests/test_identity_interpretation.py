@@ -5,6 +5,8 @@ from simreality.identity_evolution import IdentityChangeProposal
 from simreality.identity_interpretation import (
     IdentityBeliefInterpreter, IdentityInterpretationRule,
 )
+from simreality.social_beliefs import SocialBeliefSystem
+from simreality.social_trust import SocialTrustLedger
 
 
 class IdentityBeliefInterpretationTests(unittest.TestCase):
@@ -52,6 +54,29 @@ class IdentityBeliefInterpretationTests(unittest.TestCase):
         result = self.interpreter.interpret((self.proposal,), {})[0]
         self.assertAlmostEqual(result.interpreted.delta, self.proposal.delta)
         self.assertLessEqual(abs(result.interpreted.delta), 0.05)
+
+    def test_social_beliefs_adapter_uses_each_observers_trust_sample(self):
+        trust = SocialTrustLedger({("npc-a", "source"): 0.9, ("npc-b", "source"): 0.1})
+        social = SocialBeliefSystem(trust)
+        for npc_id in ("npc-a", "npc-b"):
+            social.observe(npc_id, Evidence(
+                "report-1", "claim-betrayal", "source", 1, 0.8, 0.5, 1,
+            ))
+        other_proposal = IdentityChangeProposal(
+            "event-1", "npc-b", "betrayal-policy", "trust",
+            0.2, 0.22, 0.02, 1.0, "participant", 0.05,
+        )
+        results = self.interpreter.interpret_from_social_beliefs(
+            (self.proposal, other_proposal), social
+        )
+        by_id = {item.interpreted.npc_id: item for item in results}
+        self.assertGreater(by_id["npc-a"].belief_contributions[0][1], 0.5)
+        self.assertLess(by_id["npc-b"].belief_contributions[0][1], 0.5)
+        self.assertGreater(by_id["npc-a"].interpreted.delta, by_id["npc-b"].interpreted.delta)
+
+    def test_social_beliefs_adapter_rejects_wrong_input(self):
+        with self.assertRaises(TypeError):
+            self.interpreter.interpret_from_social_beliefs((self.proposal,), {})
 
     def test_custom_policy_cap_survives_interpretation(self):
         proposal = IdentityChangeProposal(
