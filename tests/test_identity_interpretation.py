@@ -5,6 +5,7 @@ from simreality.identity_evolution import IdentityChangeProposal
 from simreality.identity_interpretation import (
     IdentityBeliefInterpreter, IdentityInterpretationRule, IdentityMemoryAssociation,
     IdentityRelationshipAssociation, IdentityPersonalityRule, NPCIdentityPersonality,
+    NPCIdentityValues, IdentityValueRule,
 )
 from simreality.social_beliefs import SocialBeliefSystem
 from simreality.social_trust import SocialInteraction, SocialTrustLedger
