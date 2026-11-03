@@ -87,3 +87,17 @@ duplicate rules and mismatched NPC IDs are rejected. Contributions are returned
 for inspection, and the original proposal's delta cap and trait bounds remain in
 force. Personality influences interpretation, not automatic acceptance or a
 universal moral judgment.
+
+
+
+## Unified interpretation pass
+
+`interpret_comprehensively` evaluates belief claims, explicitly associated personal
+memories, observer-to-target trust, and personality axes in one pass against the
+same original proposal. It records each source's contribution separately and
+applies the combined adjustment under the original policy delta cap and trait
+bounds. This avoids accidentally recalculating from the original proposal when
+several independent context layers are enabled together. Omitted inputs are
+neutral; relationship associations require a trust ledger, and memory links
+require an available NPC/memory entry. The method is read-only and still leaves
+acceptance or rejection to `IdentityDecisionLedger`.
