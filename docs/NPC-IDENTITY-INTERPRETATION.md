@@ -106,3 +106,34 @@ acceptance or rejection to `IdentityDecisionLedger`.
 ## Individual values
 
 The comprehensive appraisal accepts `NPCIdentityValues`, a normalized, immutable profile of signed priorities such as loyalty, fairness, freedom, or duty. `IdentityValueRule` explicitly maps a value axis to a policy and supplies the signed coefficient. No value is inherently good or bad in the engine: its influence depends on the authored policy mapping. Contributions are reported separately, missing axes are neutral, and the combined result remains bounded by the original proposal cap.
+
+
+## Cognitive biases and temporary emotional states
+
+`NPCCognitiveBiasProfile` stores explicit, normalized [0, 1] bias strengths
+for an individual NPC. The project defines the axes it needs (for example,
+confirmation bias, negativity bias, or authority bias); the engine does not
+assume that every NPC has every bias. `IdentityCognitiveBiasRule` maps a
+specific bias axis to a policy and signed coefficient.
+
+`NPCEmotionalState` is deliberately a separate, immutable snapshot with a
+simulation tick and [0, 1] intensities such as fear, anger, grief, or stress.
+It is not written into the personality profile. The caller's emotion system
+must update or replace snapshots as time and circumstances change. Callers
+can supply `current_tick` and `max_emotion_age_ticks` to reject stale data;
+future snapshots are always rejected when a current tick is supplied.
+
+`IdentityCognitiveContextInterpreter` wraps the existing comprehensive
+identity appraisal and adds bias and emotion contributions as separately
+reported values. Missing profiles and axes are neutral. Duplicate rules,
+invalid normalized values, mismatched NPC IDs, and stale emotional snapshots
+are rejected. The combined delta remains bounded by the original proposal's
+maximum delta and trait range. This layer is read-only: it does not mutate
+personality, emotion, identity traits, or decision history, and it does not
+automatically accept an identity change.
+
+Bias strength is a tendency, not a conclusion: the policy coefficient decides
+whether that tendency pushes a particular interpretation in either direction.
+Likewise, the same fear or grief intensity can have different effects under
+different authored policy rules. This keeps emotional reactions contextual
+rather than treating an emotion as a permanent personality change.
