@@ -64,15 +64,18 @@ class TestimonyAnalyzer:
                 by_attribute[attribute_key],
                 key=lambda pair: (pair[0].witness_id, pair[0].testimony_id, pair[1].detail_id),
             )
-            for i, (left_record, left_detail) in enumerate(entries):
-                for right_record, right_detail in entries[i + 1:]:
-                    if left_record.witness_id == right_record.witness_id:
+            for i, (first_record, first_detail) in enumerate(entries):
+                for second_record, second_detail in entries[i + 1:]:
+                    if first_record.witness_id == second_record.witness_id:
                         continue
                     # Canonical witness ordering makes output stable regardless
                     # of insertion order.
-                    if left_record.witness_id > right_record.witness_id:
-                        left_record, right_record = right_record, left_record
-                        left_detail, right_detail = right_detail, left_detail
+                    if first_record.witness_id < second_record.witness_id:
+                        left_record, left_detail = first_record, first_detail
+                        right_record, right_detail = second_record, second_detail
+                    else:
+                        left_record, left_detail = second_record, second_detail
+                        right_record, right_detail = first_record, first_detail
                     left_value, right_value = left_detail.value, right_detail.value
                     match = TestimonyMatch(
                         event_id=event_id,
