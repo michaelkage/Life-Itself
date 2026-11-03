@@ -14,6 +14,7 @@ from simreality import (
     GoalReviewDecision, GoalReviewDecisionLedger,
     NPCIdentityProfile, IdentityChangeProposal, IdentityDecisionLedger,
     TestimonyInquiry, TestimonyInquiryLedger, TestimonyResponse,
+    TestimonyLedger, TestimonyRecord, TestimonyDetail,
 )
 
 
@@ -172,6 +173,37 @@ class SimulationWorldCheckpointTests(unittest.TestCase):
             SimulationWorldCheckpoint.capture(
                 4, coordinator, npcs, testimony_inquiries=inquiries,
             )
+
+
+    def test_testimony_ledger_round_trips_and_rejects_non_witness(self):
+        coordinator, npcs, _ = self.make_simulation()
+        testimony = TestimonyLedger((
+            TestimonyRecord(
+                "testimony-1", "event-1", "speaker", 3, 1.5, 0.01,
+                (TestimonyDetail("detail-1", "observed_action", "saw it", 0.9),),
+                (),
+            ),
+        ))
+        payload = SimulationWorldCheckpoint.capture(
+            4, coordinator, npcs, testimony=testimony,
+        ).to_json()
+        restored = SimulationWorldCheckpoint.from_json(payload).restore()
+        self.assertEqual(restored.testimony.snapshot(), testimony.snapshot())
+        self.assertEqual(
+            SimulationWorldCheckpoint.capture(
+                4, restored.coordinator, restored.npcs,
+                testimony=restored.testimony,
+            ).to_json(),
+            payload,
+        )
+
+        invalid = TestimonyLedger((
+            TestimonyRecord(
+                "testimony-invalid", "event-1", "listener", 3, 1.5, 0.01, (), (),
+            ),
+        ))
+        with self.assertRaises(ValueError):
+            SimulationWorldCheckpoint.capture(4, coordinator, npcs, testimony=invalid)
 
     def test_consequence_section_is_optional(self):
         coordinator, npcs, _ = self.make_simulation()
