@@ -14,6 +14,7 @@ from .model import NPC
 from .beliefs import BeliefLedger
 from .identity_evolution import IdentityChangeProposal
 from .social_beliefs import SocialBeliefSystem
+from .social_trust import SocialTrustLedger
 
 
 @dataclass(frozen=True)
@@ -40,6 +41,32 @@ class InterpretedIdentityChange:
     interpreted: IdentityChangeProposal
     belief_contributions: tuple[tuple[str, float, float], ...]
     memory_contributions: tuple[tuple[int, float, float], ...] = ()
+    relationship_contributions: tuple[tuple[str, float, float], ...] = ()
+
+
+@dataclass(frozen=True)
+class IdentityRelationshipAssociation:
+    """Explicitly connect an NPC's trust in another person to an event appraisal."""
+    event_id: str
+    npc_id: str
+    policy_id: str
+    target_id: str
+    coefficient: float
+    relevance_scale: float = 1.0
+
+    def __post_init__(self):
+        for name in ("event_id", "npc_id", "policy_id", "target_id"):
+            value = getattr(self, name)
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError(f"{name} must be a non-empty string")
+        if self.npc_id == self.target_id:
+            raise ValueError("an NPC cannot have a relationship with itself")
+        if (isinstance(self.coefficient, bool) or not isinstance(self.coefficient, (int, float))
+                or not math.isfinite(self.coefficient) or not -1.0 <= self.coefficient <= 1.0):
+            raise ValueError("coefficient must be finite and in [-1, 1]")
+        if (isinstance(self.relevance_scale, bool) or not isinstance(self.relevance_scale, (int, float))
+                or not math.isfinite(self.relevance_scale) or not 0.0 <= self.relevance_scale <= 1.0):
+            raise ValueError("relevance_scale must be finite and in [0, 1]")
 
 
 @dataclass(frozen=True)
@@ -149,6 +176,57 @@ class IdentityBeliefInterpreter:
             )
             results.append(InterpretedIdentityChange(
                 result.original, interpreted, result.belief_contributions, tuple(contributions)))
+        return tuple(results)
+
+    def interpret_with_relationships(
+        self,
+        proposals: Iterable[IdentityChangeProposal],
+        trust: SocialTrustLedger,
+        associations: Iterable[IdentityRelationshipAssociation],
+        beliefs_by_npc: Mapping[str, BeliefLedger] | None = None,
+    ) -> tuple[InterpretedIdentityChange, ...]:
+        """Apply explicit observer-to-target trust effects to identity appraisals.
+
+        Trust 0.5 is neutral. Unknown pairs are neutral rather than assigned an
+        invented value. The method is read-only and retains the proposal delta cap.
+        """
+        if not isinstance(trust, SocialTrustLedger):
+            raise TypeError("trust must be a SocialTrustLedger")
+        items = tuple(associations)
+        if any(not isinstance(item, IdentityRelationshipAssociation) for item in items):
+            raise TypeError("associations must contain IdentityRelationshipAssociation values")
+        keys = [(x.event_id, x.npc_id, x.policy_id, x.target_id) for x in items]
+        if len(keys) != len(set(keys)):
+            raise ValueError("duplicate identity relationship association")
+        proposals = tuple(proposals)
+        base = self.interpret(proposals, beliefs_by_npc or {})
+        grouped: dict[tuple[str, str, str], list[IdentityRelationshipAssociation]] = {}
+        for item in items:
+            grouped.setdefault((item.event_id, item.npc_id, item.policy_id), []).append(item)
+        results = []
+        for result in base:
+            proposal = result.interpreted
+            contributions = []
+            adjustment = 0.0
+            for item in sorted(grouped.get((proposal.event_id, proposal.npc_id, proposal.policy_id), ()), key=lambda x: x.target_id):
+                try:
+                    confidence = trust.get(item.npc_id, item.target_id).trust
+                except KeyError:
+                    confidence = 0.5
+                contribution = item.coefficient * (2.0 * confidence - 1.0) * item.relevance_scale
+                adjustment += contribution
+                contributions.append((item.target_id, confidence, contribution))
+            maximum = proposal.maximum_delta
+            delta = max(-maximum, min(maximum, proposal.delta + adjustment))
+            after = max(-1.0, min(1.0, proposal.before + delta))
+            interpreted = IdentityChangeProposal(
+                proposal.event_id, proposal.npc_id, proposal.policy_id, proposal.axis,
+                proposal.before, after, after - proposal.before,
+                proposal.evidence_strength, proposal.role, maximum,
+            )
+            results.append(InterpretedIdentityChange(
+                result.original, interpreted, result.belief_contributions,
+                result.memory_contributions, tuple(contributions)))
         return tuple(results)
 
     def interpret_from_social_beliefs(
