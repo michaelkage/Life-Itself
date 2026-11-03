@@ -488,3 +488,8 @@ __all__ += [
 
 from .testimony import TestimonyDetail, TestimonyLedger, TestimonyRecord
 __all__ += ["TestimonyDetail", "TestimonyLedger", "TestimonyRecord"]
+
+
+# Deterministic comparison of independently recorded witness testimony.
+from .testimony_analysis import InvestigationReport, TestimonyAnalyzer, TestimonyMatch
+__all__ += ["InvestigationReport", "TestimonyAnalyzer", "TestimonyMatch"]
