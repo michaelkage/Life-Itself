@@ -445,9 +445,11 @@ __all__ += ["IdentityChangeDecision", "IdentityDecisionLedger", "IdentityDecisio
 # Belief-conditioned interpretation remains separate from explicit acceptance.
 from .identity_interpretation import (
     IdentityBeliefInterpreter, IdentityInterpretationRule, IdentityMemoryAssociation,
-    IdentityRelationshipAssociation, InterpretedIdentityChange,
+    IdentityRelationshipAssociation, IdentityPersonalityRule, NPCIdentityPersonality,
+    InterpretedIdentityChange,
 )
 __all__ += [
     "IdentityBeliefInterpreter", "IdentityInterpretationRule", "IdentityMemoryAssociation",
-    "IdentityRelationshipAssociation", "InterpretedIdentityChange",
+    "IdentityRelationshipAssociation", "IdentityPersonalityRule", "NPCIdentityPersonality",
+    "InterpretedIdentityChange",
 ]
