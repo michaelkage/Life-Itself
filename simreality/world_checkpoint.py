@@ -37,6 +37,7 @@ from .identity_decisions import IdentityDecisionLedger
 from .identity_decisions_save_state import IdentityDecisionSnapshot
 from .testimony_inquiries import TestimonyInquiryLedger
 from .testimony_inquiry_save_state import TestimonyInquirySnapshot
+from .testimony import TestimonyLedger
 
 
 @dataclass(frozen=True)
@@ -62,6 +63,7 @@ class RestoredSimulation:
     goal_review_decisions: GoalReviewDecisionLedger | None = None
     identity_decisions: IdentityDecisionLedger | None = None
     testimony_inquiries: TestimonyInquiryLedger | None = None
+    testimony: TestimonyLedger | None = None
 
 
 @dataclass(frozen=True)
@@ -94,6 +96,7 @@ class SimulationWorldCheckpoint:
     goal_review_decisions_json: str | None = None
     identity_decisions_json: str | None = None
     testimony_inquiries_json: str | None = None
+    testimony_json: str | None = None
 
     SCHEMA_VERSION = 1
 
@@ -125,7 +128,7 @@ class SimulationWorldCheckpoint:
                 consequence_recorder=None, campaign=None, misconduct=None, routines=None,
                 routine_executions=None, routine_institutions=None, institutional_politics=None,
                 goal_book=None, goal_event_adapter=None, goal_review_decisions=None, identity_decisions=None,
-                testimony_inquiries=None):
+                testimony_inquiries=None, testimony=None):
         if not isinstance(coordinator, SimulationTickCoordinator):
             raise TypeError("coordinator must be a SimulationTickCoordinator")
         if not isinstance(npcs, dict):
@@ -217,6 +220,18 @@ class SimulationWorldCheckpoint:
                     raise ValueError("testimony inquiry does not match its source event")
             if any(response.answered_tick > current_tick for response in inquiry_snapshot.restore().responses()):
                 raise ValueError("testimony responses cannot occur after the checkpoint tick")
+        if testimony is not None and not isinstance(testimony, TestimonyLedger):
+            raise TypeError("testimony must be a TestimonyLedger or None")
+        if testimony is not None:
+            for record in testimony.snapshot():
+                if record.event_tick > current_tick:
+                    raise ValueError("testimony cannot refer to events after the checkpoint tick")
+                try:
+                    source_event = coordinator.events.get(record.event_id)
+                except KeyError:
+                    raise ValueError(f"testimony references missing world event: {record.event_id}") from None
+                if source_event.tick != record.event_tick or record.witness_id not in source_event.witnesses:
+                    raise ValueError("testimony does not match its source event")
         political_snapshot_json = json.dumps(institutional_politics.snapshot(), sort_keys=True, separators=(",", ":"), allow_nan=False) if institutional_politics is not None else None
         if execution_snapshot is not None:
             known_routines = {block.routine_id for block in routines.snapshot()}
@@ -255,6 +270,7 @@ class SimulationWorldCheckpoint:
             goal_decisions_snapshot.to_json() if goal_decisions_snapshot is not None else None,
             identity_snapshot.to_json() if identity_snapshot is not None else None,
             inquiry_snapshot.to_json() if inquiry_snapshot is not None else None,
+            testimony.to_json() if testimony is not None else None,
         )
 
     def _components(self):
@@ -281,10 +297,12 @@ class SimulationWorldCheckpoint:
             GoalReviewDecisionSnapshot.from_json(self.goal_review_decisions_json) if self.goal_review_decisions_json is not None else None,
             IdentityDecisionSnapshot.from_json(self.identity_decisions_json) if self.identity_decisions_json is not None else None,
             TestimonyInquirySnapshot.from_json(self.testimony_inquiries_json) if self.testimony_inquiries_json is not None else None,
+            TestimonyLedger.from_json(self.testimony_json) if self.testimony_json is not None else None,
         )
         goals_snapshot, goal_replay, goal_review_decisions = components[14], components[15], components[16]
         identity_decisions = components[17]
         testimony_inquiries = components[18]
+        testimony = components[19]
         if testimony_inquiries is not None:
             journal = envelope.restore_event_ledger()
             inquiry_ledger = testimony_inquiries.restore()
@@ -299,6 +317,17 @@ class SimulationWorldCheckpoint:
                     raise ValueError("testimony inquiry does not match its source event")
             if any(response.answered_tick > self.current_tick for response in inquiry_ledger.responses()):
                 raise ValueError("testimony responses cannot occur after the checkpoint tick")
+        if testimony is not None:
+            journal = envelope.restore_event_ledger()
+            for record in testimony.snapshot():
+                if record.event_tick > self.current_tick:
+                    raise ValueError("testimony cannot refer to events after the checkpoint tick")
+                try:
+                    event = journal.get(record.event_id)
+                except KeyError:
+                    raise ValueError(f"testimony references missing world event: {record.event_id}") from None
+                if event.tick != record.event_tick or record.witness_id not in event.witnesses:
+                    raise ValueError("testimony does not match its source event")
         if identity_decisions is not None:
             journal = envelope.restore_event_ledger()
             for record in identity_decisions.decisions:
@@ -406,14 +435,15 @@ class SimulationWorldCheckpoint:
                        json.dumps(raw["goal_event_replay"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("goal_event_replay") is not None else None,
                        json.dumps(raw["goal_review_decisions"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("goal_review_decisions") is not None else None,
                        json.dumps(raw["identity_decisions"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("identity_decisions") is not None else None,
-                       json.dumps(raw["testimony_inquiries"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("testimony_inquiries") is not None else None)
+                       json.dumps(raw["testimony_inquiries"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("testimony_inquiries") is not None else None,
+                       json.dumps(raw["testimony"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("testimony") is not None else None)
         except ValueError:
             raise
         except (TypeError, KeyError, IndexError, json.JSONDecodeError) as exc:
             raise ValueError("invalid simulation world checkpoint") from exc
 
     def restore(self):
-        envelope, npc_snapshot, trust_snapshot, belief_snapshot, memory_snapshot, conversation_snapshot, tick_snapshot, consequence_snapshot, campaign, misconduct_snapshot, routine_snapshot, execution_snapshot, institution_snapshot, institutional_politics, goals_snapshot, goal_event_replay, goal_review_decisions_snapshot, identity_decisions_snapshot, testimony_inquiries_snapshot = self._components()
+        envelope, npc_snapshot, trust_snapshot, belief_snapshot, memory_snapshot, conversation_snapshot, tick_snapshot, consequence_snapshot, campaign, misconduct_snapshot, routine_snapshot, execution_snapshot, institution_snapshot, institutional_politics, goals_snapshot, goal_event_replay, goal_review_decisions_snapshot, identity_decisions_snapshot, testimony_inquiries_snapshot, testimony_snapshot = self._components()
         events = envelope.restore_event_ledger()
         npcs = npc_snapshot.restore()
         trust = trust_snapshot.restore()
@@ -446,6 +476,7 @@ class SimulationWorldCheckpoint:
         goal_review_decisions = goal_review_decisions_snapshot.restore() if goal_review_decisions_snapshot is not None else None
         identity_decisions = identity_decisions_snapshot.restore() if identity_decisions_snapshot is not None else None
         testimony_inquiries = testimony_inquiries_snapshot.restore() if testimony_inquiries_snapshot is not None else None
+        testimony = testimony_snapshot if testimony_snapshot is not None else None
         return RestoredSimulation(self.current_tick, events, npcs, trust, beliefs,
                                   memory, conversations, coordinator, self.metadata,
                                   consequence_recorder, campaign, misconduct, routines, routine_executions,
