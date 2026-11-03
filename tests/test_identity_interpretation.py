@@ -240,10 +240,10 @@ class IdentityBeliefInterpretationTests(unittest.TestCase):
 
     def test_comprehensive_pipeline_combines_every_input_once_and_is_bounded(self):
         npc = NPC("npc-a", memories=[NPCMemory(
-            "memory-1", "event-memory", 0.8, 1.0, 1,
+            "npc-a", "person-x", 0.8, 1.0, 1.0, ActionTag.CRIME_ASSAULT, Description(),
         )])
         trust = SocialTrustLedger()
-        trust.add(SocialInteraction("trust-1", "npc-a", "ally", 1, 0.8, 1))
+        trust.add_many((SocialInteraction("trust-1", "npc-a", "ally", 1, 0.8, 1),))
         result = self.interpreter.interpret_comprehensively(
             (self.proposal,),
             beliefs_by_npc={"npc-a": self.belief(0.9)},
