@@ -2,6 +2,7 @@
 from dataclasses import dataclass
 from typing import Iterable, Mapping
 import math
+from types import MappingProxyType
 from .world_events import WorldEvent
 
 
@@ -23,6 +24,9 @@ class NPCIdentityProfile:
                     or isinstance(value, bool) or not isinstance(value, (int, float))
                     or not math.isfinite(value) or not low <= value <= high):
                     raise ValueError("invalid identity axis")
+        object.__setattr__(self, "traits", MappingProxyType(dict(self.traits)))
+        if self.sensitivities is not None:
+            object.__setattr__(self, "sensitivities", MappingProxyType(dict(self.sensitivities)))
 
 
 @dataclass(frozen=True)
