@@ -324,3 +324,6 @@ The new [goal-aware daily routine bridge](docs/GOAL-AWARE-ROUTINES.md) connects 
 
 
 The [NPC identity interpretation layer](docs/NPC-IDENTITY-INTERPRETATION.md) now combines explicit belief, personal-memory, and observer-to-target trust inputs when interpreting identity-change proposals. Each input is attributable and bounded; unknown beliefs, memories, or trust pairs are neutral, and an interpreted proposal still requires an explicit decision. Tests: `tests/test_identity_interpretation.py`.
+
+
+The NPC identity interpretation layer also supports explicit personality-axis effects: caller-defined traits such as fearfulness, confidence, stubbornness, and openness can influence matching event interpretations through bounded, inspectable policy rules. Missing profiles and axes are neutral, and proposals still require a separate decision. See `docs/NPC-IDENTITY-INTERPRETATION.md` and `tests/test_identity_interpretation.py`.
