@@ -68,6 +68,7 @@ class IdentityDecisionLedger:
         self._sensitivities = {p.npc_id: dict(p.sensitivities or {}) for p in profiles}
         self._decisions = {}
         self._proposal_index = {}
+        self._last_chain_key = {}
         for decision in sorted(tuple(decisions), key=lambda item: (item.decision_tick, item.decision_id)):
             self.record(decision)
 
@@ -95,18 +96,15 @@ class IdentityDecisionLedger:
         # Reject out-of-order appends now rather than allowing a ledger that cannot
         # be faithfully serialized and restored later.
         chain_key = (decision.npc_id, decision.axis)
-        previous = max(
-            ((item.decision_tick, item.decision_id)
-             for item in self._decisions.values()
-             if (item.npc_id, item.axis) == chain_key),
-            default=None,
-        )
-        if previous is not None and (decision.decision_tick, decision.decision_id) < previous:
+        order_key = (decision.decision_tick, decision.decision_id)
+        previous = self._last_chain_key.get(chain_key)
+        if previous is not None and order_key < previous:
             raise ValueError("identity decisions must follow the existing NPC/axis decision order")
         if decision.accepted:
             self._traits[decision.npc_id][decision.axis] = decision.proposed_after
         self._decisions[decision.decision_id] = decision
         self._proposal_index[key] = decision.decision_id
+        self._last_chain_key[chain_key] = order_key
         return decision
 
     def record_many(self, decisions):
