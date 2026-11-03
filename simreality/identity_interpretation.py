@@ -9,6 +9,8 @@ from dataclasses import dataclass
 import math
 from typing import Iterable, Mapping
 
+from .model import NPC
+
 from .beliefs import BeliefLedger
 from .identity_evolution import IdentityChangeProposal
 from .social_beliefs import SocialBeliefSystem
@@ -37,6 +39,37 @@ class InterpretedIdentityChange:
     original: IdentityChangeProposal
     interpreted: IdentityChangeProposal
     belief_contributions: tuple[tuple[str, float, float], ...]
+    memory_contributions: tuple[tuple[int, float, float], ...] = ()
+
+
+@dataclass(frozen=True)
+class IdentityMemoryAssociation:
+    """Explicitly link one NPC memory to one event/policy interpretation.
+
+    The association is authored by the simulation because NPCMemory does not
+    claim to know which later event it should influence. Retention scales the
+    effect; coefficient supplies its signed meaning.
+    """
+    event_id: str
+    npc_id: str
+    policy_id: str
+    memory_index: int
+    coefficient: float
+    relevance_scale: float = 1.0
+
+    def __post_init__(self):
+        for name in ("event_id", "npc_id", "policy_id"):
+            value = getattr(self, name)
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError(f"{name} must be a non-empty string")
+        if isinstance(self.memory_index, bool) or not isinstance(self.memory_index, int) or self.memory_index < 0:
+            raise ValueError("memory_index must be a non-negative integer")
+        if (isinstance(self.coefficient, bool) or not isinstance(self.coefficient, (int, float))
+                or not math.isfinite(self.coefficient) or not -1.0 <= self.coefficient <= 1.0):
+            raise ValueError("coefficient must be finite and in [-1, 1]")
+        if (isinstance(self.relevance_scale, bool) or not isinstance(self.relevance_scale, (int, float))
+                or not math.isfinite(self.relevance_scale) or not 0.0 <= self.relevance_scale <= 1.0):
+            raise ValueError("relevance_scale must be finite and in [0, 1]")
 
 
 class IdentityBeliefInterpreter:
@@ -57,6 +90,66 @@ class IdentityBeliefInterpreter:
         if len(keys) != len(set(keys)):
             raise ValueError("duplicate policy/claim interpretation rule")
         self.rules = tuple(sorted(rules, key=lambda r: (r.policy_id, r.claim_id)))
+
+    def interpret_with_memories(
+        self,
+        proposals: Iterable[IdentityChangeProposal],
+        npcs_by_id: Mapping[str, NPC],
+        associations: Iterable[IdentityMemoryAssociation],
+        beliefs_by_npc: Mapping[str, BeliefLedger] | None = None,
+    ) -> tuple[InterpretedIdentityChange, ...]:
+        """Combine belief appraisal with explicitly linked personal memories.
+
+        Each memory contributes coefficient * retained_strength * relevance.
+        No event-to-memory relationship is inferred: callers must provide an
+        association with matching event, NPC and policy IDs. Missing links are
+        neutral. All effects remain bounded by the original proposal cap.
+        """
+        if not isinstance(npcs_by_id, Mapping):
+            raise TypeError("npcs_by_id must be a mapping")
+        for npc_id, npc in npcs_by_id.items():
+            if not isinstance(npc_id, str) or not npc_id.strip() or not isinstance(npc, NPC):
+                raise TypeError("npcs_by_id must map non-empty IDs to NPC instances")
+            if npc.entity_id != npc_id:
+                raise ValueError("NPC mapping key must match NPC entity_id")
+        items = tuple(associations)
+        if any(not isinstance(item, IdentityMemoryAssociation) for item in items):
+            raise TypeError("associations must contain IdentityMemoryAssociation values")
+        keys = [(x.event_id, x.npc_id, x.policy_id, x.memory_index) for x in items]
+        if len(keys) != len(set(keys)):
+            raise ValueError("duplicate identity memory association")
+        proposals = tuple(proposals)
+        base = self.interpret(proposals, beliefs_by_npc or {})
+        grouped: dict[tuple[str, str, str], list[IdentityMemoryAssociation]] = {}
+        for item in items:
+            grouped.setdefault((item.event_id, item.npc_id, item.policy_id), []).append(item)
+        results = []
+        for result in base:
+            proposal = result.interpreted
+            contributions = []
+            adjustment = 0.0
+            for item in sorted(grouped.get((proposal.event_id, proposal.npc_id, proposal.policy_id), ()),
+                               key=lambda x: x.memory_index):
+                npc = npcs_by_id.get(item.npc_id)
+                if npc is None:
+                    continue
+                if item.memory_index >= len(npc.memories):
+                    raise ValueError(f"memory index out of range for {item.npc_id}: {item.memory_index}")
+                retention = npc.memories[item.memory_index].retention
+                contribution = item.coefficient * retention * item.relevance_scale
+                adjustment += contribution
+                contributions.append((item.memory_index, retention, contribution))
+            maximum = proposal.maximum_delta
+            delta = max(-maximum, min(maximum, proposal.delta + adjustment))
+            after = max(-1.0, min(1.0, proposal.before + delta))
+            interpreted = IdentityChangeProposal(
+                proposal.event_id, proposal.npc_id, proposal.policy_id, proposal.axis,
+                proposal.before, after, after - proposal.before,
+                proposal.evidence_strength, proposal.role, maximum,
+            )
+            results.append(InterpretedIdentityChange(
+                result.original, interpreted, result.belief_contributions, tuple(contributions)))
+        return tuple(results)
 
     def interpret_from_social_beliefs(
         self,
