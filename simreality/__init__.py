@@ -512,3 +512,8 @@ __all__ += ["TestimonyBeliefQuery", "TestimonyBeliefQueryAdapter"]
 # Deterministic follow-up proposals for uncertain or conflicting testimony.
 from .testimony_followups import TestimonyFollowUp, TestimonyFollowUpPlan, TestimonyFollowUpPlanner
 __all__ += ["TestimonyFollowUp", "TestimonyFollowUpPlan", "TestimonyFollowUpPlanner"]
+
+
+# Replay-safe investigator inquiries and explicit witness responses.
+from .testimony_inquiries import TestimonyInquiry, TestimonyInquiryLedger, TestimonyResponse
+__all__ += ["TestimonyInquiry", "TestimonyInquiryLedger", "TestimonyResponse"]
