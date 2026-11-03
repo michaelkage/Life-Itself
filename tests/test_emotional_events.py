@@ -1,11 +1,13 @@
 import unittest
 
 from simreality.emotional_events import (
-    EmotionalDecayRule, EmotionalEventRule, EmotionalRelationshipRule, NPCEmotionalEventLedger,
+    EmotionalDecayRule, EmotionalEventRule, EmotionalRelationshipRule,
+    EmotionalMemoryRule, NPCEmotionalEventLedger,
 )
 from simreality.world_events import WorldEventLedger
 from simreality.social_trust import SocialInteraction, SocialTrustLedger
 from simreality.identity_context import NPCEmotionalState
+from simreality.model import ActionTag, Description, NPC, NPCMemory
 
 
 class NPCEmotionalEventLedgerTests(unittest.TestCase):
@@ -108,6 +110,54 @@ class NPCEmotionalEventLedgerTests(unittest.TestCase):
             trust_ledger=SocialTrustLedger(),
         )
         self.assertEqual(self.ledger.state_for("npc-a").intensities, {})
+
+    def test_personal_memories_condition_the_same_event_differently(self):
+        event = WorldEventLedger.make_event(
+            "betrayal-now", 4, "betrayal", participants=("npc-a", "npc-b"),
+            attributes={"target_entity_id": "person-x", "action_tag": ActionTag.CRIME_ASSAULT.value},
+        )
+        def memory(owner, target, tag, retention):
+            return NPCMemory(owner, target, retention, retention, 1.0, tag, Description())
+        npcs = {
+            "npc-a": NPC("npc-a", memories=[memory("npc-a", "person-x", ActionTag.CRIME_ASSAULT, 0.8),
+                                                    memory("npc-a", "other", ActionTag.CRIME_ASSAULT, 1.0)]),
+            "npc-b": NPC("npc-b", memories=[memory("npc-b", "person-x", ActionTag.CRIME_ASSAULT, 0.1),
+                                                    memory("npc-b", "person-x", ActionTag.INTERACTION_POLITE, 1.0)]),
+        }
+        rule = EmotionalMemoryRule(
+            "past-assault-anger", "betrayal", "participant", "anger", coefficient=0.5,
+            minimum_retention=0.05,
+        )
+        states = self.ledger.advance(4, (event,), event_rules=(),
+                                     memory_rules=(rule,), npcs_by_id=npcs)
+        by_id = {state.npc_id: state.intensities["anger"] for state in states}
+        self.assertAlmostEqual(by_id["npc-a"], 0.4)
+        self.assertAlmostEqual(by_id["npc-b"], 0.05)
+
+    def test_memory_effect_is_not_recomputed_when_memory_later_decays(self):
+        event = WorldEventLedger.make_event(
+            "betrayal-memory", 4, "betrayal", participants=("npc-a",),
+            attributes={"target_entity_id": "person-x", "action_tag": ActionTag.CRIME_ASSAULT.value},
+        )
+        memory = NPCMemory("npc-a", "person-x", 0.8, 0.8, 1.0, ActionTag.CRIME_ASSAULT, Description())
+        npc = NPC("npc-a", memories=[memory])
+        rule = EmotionalMemoryRule("memory-grief", "betrayal", "participant", "grief", coefficient=0.5)
+        self.ledger.advance(4, (event,), event_rules=(), memory_rules=(rule,), npcs_by_id={"npc-a": npc})
+        npc.memories[0] = npc.memories[0].decayed_to(0.1)
+        self.ledger.advance(5, (event,), event_rules=(), memory_rules=(rule,), npcs_by_id={"npc-a": npc})
+        self.assertAlmostEqual(self.ledger.state_for("npc-a").intensities["grief"], 0.4)
+
+    def test_memory_rules_require_npc_context_and_valid_event_tag(self):
+        rule = EmotionalMemoryRule("memory-rule", "betrayal", "participant", "grief")
+        event = WorldEventLedger.make_event(
+            "bad-tag", 1, "betrayal", participants=("npc-a",),
+            attributes={"target_entity_id": "person-x", "action_tag": "not-a-tag"},
+        )
+        with self.assertRaisesRegex(TypeError, "NPC mapping"):
+            self.ledger.advance(1, (event,), event_rules=(), memory_rules=(rule,))
+        with self.assertRaisesRegex(ValueError, "unknown"):
+            self.ledger.advance(1, (event,), event_rules=(), memory_rules=(rule,),
+                                npcs_by_id={"npc-a": NPC("npc-a")})
 
     def test_decay_without_events_and_validation(self):
         self.ledger.advance(2, (self.event(),), event_rules=(self.grief,))
