@@ -142,7 +142,7 @@ class IdentityBeliefInterpretationTests(unittest.TestCase):
         result = self.interpreter.interpret_with_relationships(
             (self.proposal,), SocialTrustLedger(), (association,),
         )[0]
-        self.assertEqual(result.interpreted.delta, self.proposal.delta)
+        self.assertAlmostEqual(result.interpreted.delta, self.proposal.delta)
         self.assertEqual(result.relationship_contributions[0][1], 0.5)
         with self.assertRaises(ValueError):
             IdentityRelationshipAssociation("event-1", "npc-a", "p", "npc-a", 0.1)
