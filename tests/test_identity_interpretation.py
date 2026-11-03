@@ -3,10 +3,11 @@ import unittest
 from simreality.beliefs import BeliefLedger, Evidence
 from simreality.identity_evolution import IdentityChangeProposal
 from simreality.identity_interpretation import (
-    IdentityBeliefInterpreter, IdentityInterpretationRule,
+    IdentityBeliefInterpreter, IdentityInterpretationRule, IdentityMemoryAssociation,
 )
 from simreality.social_beliefs import SocialBeliefSystem
 from simreality.social_trust import SocialTrustLedger
+from simreality.model import NPC, NPCMemory, ActionTag, Description
 
 
 class IdentityBeliefInterpretationTests(unittest.TestCase):
@@ -77,6 +78,41 @@ class IdentityBeliefInterpretationTests(unittest.TestCase):
     def test_social_beliefs_adapter_rejects_wrong_input(self):
         with self.assertRaises(TypeError):
             self.interpreter.interpret_from_social_beliefs((self.proposal,), {})
+
+    def test_explicit_personal_memory_changes_interpretation_by_retention(self):
+        npc_a = NPC("npc-a", memories=[NPCMemory(
+            "npc-a", "person-x", 0.9, 0.9, 2.0, ActionTag.CRIME_ASSAULT, Description(),
+        )])
+        npc_b = NPC("npc-b", memories=[NPCMemory(
+            "npc-b", "person-x", 0.2, 0.2, 2.0, ActionTag.CRIME_ASSAULT, Description(),
+        )])
+        proposal_b = IdentityChangeProposal(
+            "event-memory", "npc-b", "betrayal-policy", "trust",
+            0.2, 0.22, 0.02, 1.0, "participant", 0.05,
+        )
+        associations = (
+            IdentityMemoryAssociation("event-memory", "npc-a", "betrayal-policy", 0, 0.04),
+            IdentityMemoryAssociation("event-memory", "npc-b", "betrayal-policy", 0, 0.04),
+        )
+        results = self.interpreter.interpret_with_memories(
+            (self.proposal, proposal_b), {"npc-a": npc_a, "npc-b": npc_b}, associations,
+        )
+        by_id = {item.interpreted.npc_id: item for item in results}
+        self.assertGreater(by_id["npc-a"].interpreted.delta, by_id["npc-b"].interpreted.delta)
+        self.assertAlmostEqual(by_id["npc-a"].memory_contributions[0][2], 0.036)
+        self.assertAlmostEqual(by_id["npc-b"].memory_contributions[0][2], 0.008)
+
+    def test_memory_associations_must_be_explicit_and_valid(self):
+        npc = NPC("npc-a", memories=[])
+        neutral = self.interpreter.interpret_with_memories((self.proposal,), {"npc-a": npc}, ())
+        self.assertEqual(neutral[0].memory_contributions, ())
+        with self.assertRaises(ValueError):
+            self.interpreter.interpret_with_memories(
+                (self.proposal,), {"npc-a": npc},
+                (IdentityMemoryAssociation("event-1", "npc-a", "betrayal-policy", 0, 0.1),),
+            )
+        with self.assertRaises(ValueError):
+            IdentityMemoryAssociation("event-1", "npc-a", "betrayal-policy", 0, 1.1)
 
     def test_custom_policy_cap_survives_interpretation(self):
         proposal = IdentityChangeProposal(
