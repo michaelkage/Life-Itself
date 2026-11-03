@@ -474,3 +474,14 @@ from .emotional_events import (
     EmotionalMemoryRule, NPCEmotionalEventLedger,
 )
 __all__ += ["EmotionalDecayRule", "EmotionalEventRule", "EmotionalRelationshipRule", "EmotionalMemoryRule", "NPCEmotionalEventLedger"]
+
+
+# Deterministic observer-specific recall projections from immutable world events.
+from .witness_recall import (
+    RecallDetail, RecalledDetail, WitnessRecall, WitnessRecallAdapter,
+    WitnessRecallProfile,
+)
+__all__ += [
+    "RecallDetail", "RecalledDetail", "WitnessRecall", "WitnessRecallAdapter",
+    "WitnessRecallProfile",
+]
