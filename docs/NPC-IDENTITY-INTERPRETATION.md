@@ -39,3 +39,17 @@ and does not reach into the belief system private state.
 Rule coefficients and claim meanings remain authored simulation data, not
 universal moral judgments. Regression coverage includes two NPCs who hear the
 same report from a source they trust differently.
+
+
+## Memory-conditioned interpretation
+
+`interpret_with_memories` combines the existing belief-conditioned result with
+explicitly authored `IdentityMemoryAssociation` links. Each link names the
+specific event, NPC, identity policy and memory index; the system never guesses
+which past experience is relevant. A memory contributes its current retention
+multiplied by a signed coefficient and a bounded relevance scale. Multiple
+linked memories are summed, then the original policy delta cap and trait bounds
+are applied. The returned result records memory index, retention and contribution
+for inspection. Missing associations are neutral; invalid memory indices fail
+rather than silently selecting another memory. This is an appraisal input only,
+not an automatic identity decision.
