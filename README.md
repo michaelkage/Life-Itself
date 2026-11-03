@@ -327,3 +327,6 @@ The [NPC identity interpretation layer](docs/NPC-IDENTITY-INTERPRETATION.md) now
 
 
 The NPC identity interpretation layer also supports explicit personality-axis effects: caller-defined traits such as fearfulness, confidence, stubbornness, and openness can influence matching event interpretations through bounded, inspectable policy rules. Missing profiles and axes are neutral, and proposals still require a separate decision. See `docs/NPC-IDENTITY-INTERPRETATION.md` and `tests/test_identity_interpretation.py`.
+
+
+A unified `interpret_comprehensively` pass now combines belief, explicitly linked memory, relationship-trust, and personality inputs against one original identity proposal. It reports each contribution separately and applies the policy cap to the combined result; interpretation still does not auto-accept an identity change. Regression tests: `tests/test_identity_interpretation.py`.
