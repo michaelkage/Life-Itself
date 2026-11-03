@@ -271,6 +271,32 @@ class IdentityBeliefInterpretationTests(unittest.TestCase):
         self.assertAlmostEqual(result.interpreted.delta, 0.05)
         self.assertIs(result.original, self.proposal)
 
+    def test_value_priorities_contribute_to_comprehensive_appraisal(self):
+        result = self.interpreter.interpret_comprehensively(
+            (self.proposal,),
+            values_by_npc={"npc-a": NPCIdentityValues("npc-a", {"loyalty": 0.8, "fairness": -0.4})},
+            value_rules=(
+                IdentityValueRule("betrayal-policy", "loyalty", 0.02),
+                IdentityValueRule("betrayal-policy", "fairness", 0.01),
+            ),
+        )[0]
+        self.assertAlmostEqual(result.value_contributions[0][2], 0.016)
+        self.assertAlmostEqual(result.value_contributions[1][2], -0.004)
+        self.assertAlmostEqual(result.interpreted.delta, 0.032)
+
+    def test_missing_value_axis_is_neutral_and_profile_is_immutable(self):
+        profile = NPCIdentityValues("npc-a", {"fairness": 0.5})
+        result = self.interpreter.interpret_comprehensively(
+            (self.proposal,), values_by_npc={"npc-a": profile},
+            value_rules=(IdentityValueRule("betrayal-policy", "loyalty", 0.02),),
+        )[0]
+        self.assertAlmostEqual(result.interpreted.delta, self.proposal.delta)
+        self.assertEqual(result.value_contributions[0][1], 0.0)
+        with self.assertRaises(TypeError):
+            profile.axes["fairness"] = -0.5
+        with self.assertRaises(ValueError):
+            NPCIdentityValues("npc-a", {"loyalty": 1.1})
+
     def test_comprehensive_pipeline_missing_inputs_are_neutral(self):
         result = self.interpreter.interpret_comprehensively((self.proposal,))[0]
         self.assertAlmostEqual(result.interpreted.delta, self.proposal.delta)
