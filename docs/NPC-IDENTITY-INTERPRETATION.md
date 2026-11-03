@@ -195,3 +195,12 @@ recovery remains governed by explicit decay rules, while trust changes remain
 in the separate social relationship ledger. An NPC can calm down without
 forgiving someone, and trust can change without erasing the emotional history
 of an earlier event.
+
+
+## Memory-conditioned emotional events
+
+EmotionalMemoryRule lets a new event draw on an NPC's own retained memories. The rule explicitly names the event type, participant or witness role, emotion axis, target-ID attribute, action-tag attribute, signed coefficient, and minimum memory retention. A memory contributes only when both its target_entity_id and ActionTag exactly match the event attributes. This is intentionally explicit: the system does not infer thematic similarity or decide that two unrelated events must feel alike.
+
+Each matching memory contributes coefficient multiplied by its current retained strength. Contributions are summed and bounded to [-1, 1] before they are added to the emotional axis. This lets two NPCs respond differently to the same event because they have different personal memory histories. Missing required event attributes cause the rule not to apply; invalid target IDs, unknown action tags, or missing NPC context are rejected.
+
+Memory-derived effects are sampled when the event is first applied. Replaying the same event does not recalculate its effect from memories that may since have decayed or changed. The emotional ledger stores the applied delta in its replay index. Memory decay, emotional recovery, and relationship repair remain separate systems: forgetting does not automatically forgive, and calming down does not erase the underlying memory.
