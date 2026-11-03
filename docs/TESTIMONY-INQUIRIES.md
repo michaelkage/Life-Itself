@@ -60,3 +60,10 @@ observed tick. Existing replay-safe ledgers and evidence IDs make repeated
 processing safe; refusals create neither testimony nor belief claims. The
 pipeline never chooses a witness answer or resolves conflicting accounts into
 one objective truth.
+
+
+Observer trust is sampled when each belief evidence item is first observed. A
+later trust change does not retroactively alter that stored reliability, and
+replaying the same evidence ID returns the existing belief state rather than
+resampling trust. A changed interpretation must be represented as a new explicit
+evidence event.
