@@ -118,6 +118,7 @@ class IdentityDecisionLedger:
         self._traits = candidate._traits
         self._decisions = candidate._decisions
         self._proposal_index = candidate._proposal_index
+        self._last_chain_key = candidate._last_chain_key
         return tuple(candidate._decisions[item.decision_id] for item in items)
 
     def decide(self, decision_id, proposal, *, accepted, decision_tick, rationale=""):
