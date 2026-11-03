@@ -4,9 +4,10 @@ from simreality.beliefs import BeliefLedger, Evidence
 from simreality.identity_evolution import IdentityChangeProposal
 from simreality.identity_interpretation import (
     IdentityBeliefInterpreter, IdentityInterpretationRule, IdentityMemoryAssociation,
+    IdentityRelationshipAssociation,
 )
 from simreality.social_beliefs import SocialBeliefSystem
-from simreality.social_trust import SocialTrustLedger
+from simreality.social_trust import SocialInteraction, SocialTrustLedger
 from simreality.model import NPC, NPCMemory, ActionTag, Description
 
 
@@ -105,6 +106,48 @@ class IdentityBeliefInterpretationTests(unittest.TestCase):
         self.assertGreater(by_id["npc-a"].interpreted.delta, by_id["npc-b"].interpreted.delta)
         self.assertAlmostEqual(by_id["npc-a"].memory_contributions[0][2], 0.036)
         self.assertAlmostEqual(by_id["npc-b"].memory_contributions[0][2], 0.008)
+
+    def test_relationship_trust_changes_identity_interpretation_per_observer(self):
+        trust = SocialTrustLedger()
+        trust.add_many((
+            SocialInteraction("trust-a", "npc-a", "witness", 1, 0.8, 1),
+            SocialInteraction("trust-b", "npc-b", "witness", -1, 0.8, 1),
+        ))
+        proposal_a = IdentityChangeProposal(
+            "event-social", "npc-a", "betrayal-policy", "trust",
+            0.2, 0.22, 0.02, 1.0, "participant", 0.05,
+        )
+        proposal_b = IdentityChangeProposal(
+            "event-social", "npc-b", "betrayal-policy", "trust",
+            0.2, 0.22, 0.02, 1.0, "participant", 0.05,
+        )
+        associations = (
+            IdentityRelationshipAssociation("event-social", "npc-a", "betrayal-policy", "witness", 0.02),
+            IdentityRelationshipAssociation("event-social", "npc-b", "betrayal-policy", "witness", 0.02),
+        )
+        results = self.interpreter.interpret_with_relationships(
+            (proposal_a, proposal_b), trust, associations,
+        )
+        by_id = {item.interpreted.npc_id: item for item in results}
+        self.assertAlmostEqual(by_id["npc-a"].relationship_contributions[0][1], 0.9)
+        self.assertAlmostEqual(by_id["npc-b"].relationship_contributions[0][1], 0.1)
+        self.assertGreater(by_id["npc-a"].interpreted.delta, by_id["npc-b"].interpreted.delta)
+        self.assertAlmostEqual(by_id["npc-a"].relationship_contributions[0][2], 0.016)
+        self.assertAlmostEqual(by_id["npc-b"].relationship_contributions[0][2], -0.016)
+
+    def test_unknown_relationship_is_neutral_and_associations_are_validated(self):
+        association = IdentityRelationshipAssociation(
+            "event-1", "npc-a", "betrayal-policy", "unknown", 0.04,
+        )
+        result = self.interpreter.interpret_with_relationships(
+            (self.proposal,), SocialTrustLedger(), (association,),
+        )[0]
+        self.assertEqual(result.interpreted.delta, self.proposal.delta)
+        self.assertEqual(result.relationship_contributions[0][1], 0.5)
+        with self.assertRaises(ValueError):
+            IdentityRelationshipAssociation("event-1", "npc-a", "p", "npc-a", 0.1)
+        with self.assertRaises(ValueError):
+            IdentityRelationshipAssociation("event-1", "npc-a", "p", "other", 1.1)
 
     def test_memory_associations_must_be_explicit_and_valid(self):
         npc = NPC("npc-a", memories=[])
