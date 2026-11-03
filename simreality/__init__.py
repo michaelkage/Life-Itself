@@ -470,6 +470,6 @@ __all__ += [
 
 # Event-driven transient emotion changes with deterministic decay and replay safety.
 from .emotional_events import (
-    EmotionalDecayRule, EmotionalEventRule, NPCEmotionalEventLedger,
+    EmotionalDecayRule, EmotionalEventRule, EmotionalRelationshipRule, NPCEmotionalEventLedger,
 )
-__all__ += ["EmotionalDecayRule", "EmotionalEventRule", "NPCEmotionalEventLedger"]
+__all__ += ["EmotionalDecayRule", "EmotionalEventRule", "EmotionalRelationshipRule", "NPCEmotionalEventLedger"]
