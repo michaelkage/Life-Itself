@@ -107,7 +107,7 @@ class NPCEmotionalEventLedgerTests(unittest.TestCase):
             1, (event,), event_rules=(), relationship_rules=(rule,),
             trust_ledger=SocialTrustLedger(),
         )
-        self.assertEqual(states[0].intensities, {})
+        self.assertEqual(self.ledger.state_for("npc-a").intensities, {})
 
     def test_decay_without_events_and_validation(self):
         self.ledger.advance(2, (self.event(),), event_rules=(self.grief,))
