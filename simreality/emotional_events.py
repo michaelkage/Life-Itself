@@ -13,6 +13,7 @@ from typing import Iterable, Mapping
 from .identity_context import NPCEmotionalState
 from .world_events import WorldEvent
 from .social_trust import SocialTrustLedger
+from .model import ActionTag
 
 
 @dataclass(frozen=True)
@@ -198,6 +199,8 @@ class NPCEmotionalEventLedger:
                 raise ValueError("world event ID reused with conflicting content")
             if existing_event is None and event.tick < self.current_tick:
                 raise ValueError("new emotional events cannot be inserted before current_tick")
+            if existing_event is not None:
+                continue  # Do not resample mutable memories or relationship context on replay.
             for rule in rules:
                 if rule.event_type != event.event_type:
                     continue
@@ -225,11 +228,46 @@ class NPCEmotionalEventLedger:
                     if prior is not None and prior != signature:
                         raise ValueError("event/rule application ID reused with conflicting content")
 
+            for rule in memories:
+                if rule.event_type != event.event_type:
+                    continue
+                if rule.target_attribute not in attributes or rule.action_tag_attribute not in attributes:
+                    continue
+                target_id = attributes[rule.target_attribute]
+                raw_tag = attributes[rule.action_tag_attribute]
+                if not isinstance(target_id, str) or not target_id.strip():
+                    raise ValueError("memory target event attribute must be a non-empty NPC ID")
+                if not isinstance(raw_tag, str):
+                    raise ValueError("memory action-tag event attribute must be a string")
+                try:
+                    ActionTag(raw_tag)
+                except ValueError as exc:
+                    raise ValueError("memory action-tag event attribute is unknown") from exc
+                people = event.participants if rule.role == "participant" else event.witnesses
+                for npc_id in people:
+                    if npc_id not in npcs_by_id:
+                        raise KeyError("NPC missing from memory context: " + npc_id)
+                    npc = npcs_by_id[npc_id]
+                    delta = sum(
+                        float(rule.coefficient) * memory.retention
+                        for memory in npc.memories
+                        if memory.target_entity_id == target_id
+                        and memory.action_tag.value == raw_tag
+                        and memory.retention >= rule.minimum_retention
+                    )
+                    delta = max(-1.0, min(1.0, delta))
+                    key = (event.event_id, npc_id, rule.rule_id)
+                    prior = self._applied.get(key)
+                    signature = (event.tick, delta)
+                    if prior is not None and prior != signature:
+                        raise ValueError("event/rule application ID reused with conflicting content")
+
         # Exact event retries are no-ops; they must not rewind the decay cursor.
         ordered_events = tuple(event for event in ordered_events if event.event_id not in self._events)
         cursor = self.current_tick
         ordered_rules = sorted(rules, key=lambda r: (r.event_type, r.role, r.emotion_axis, r.rule_id))
         ordered_relationship_rules = sorted(relationship, key=lambda r: (r.event_type, r.role, r.emotion_axis, r.target_attribute, r.rule_id))
+        ordered_memory_rules = sorted(memories, key=lambda r: (r.event_type, r.role, r.emotion_axis, r.target_attribute, r.action_tag_attribute, r.rule_id))
         for event in ordered_events:
             step = event.tick - cursor
             if step:
@@ -258,6 +296,33 @@ class NPCEmotionalEventLedger:
                 for npc_id in people:
                     sampled_trust = trust_ledger.trust_at(npc_id, target_id, event.tick)
                     delta = float(rule.coefficient) * (2.0 * sampled_trust - 1.0)
+                    key = (event.event_id, npc_id, rule.rule_id)
+                    signature = (event.tick, delta)
+                    if key in self._applied:
+                        continue
+                    values = self._states.setdefault(npc_id, {})
+                    values[rule.emotion_axis] = max(
+                        0.0, min(1.0, values.get(rule.emotion_axis, 0.0) + delta)
+                    )
+                    self._applied[key] = signature
+            for rule in ordered_memory_rules:
+                if rule.event_type != event.event_type:
+                    continue
+                if rule.target_attribute not in attributes or rule.action_tag_attribute not in attributes:
+                    continue
+                target_id = attributes[rule.target_attribute]
+                raw_tag = attributes[rule.action_tag_attribute]
+                people = event.participants if rule.role == "participant" else event.witnesses
+                for npc_id in people:
+                    npc = npcs_by_id[npc_id]
+                    delta = sum(
+                        float(rule.coefficient) * memory.retention
+                        for memory in npc.memories
+                        if memory.target_entity_id == target_id
+                        and memory.action_tag.value == raw_tag
+                        and memory.retention >= rule.minimum_retention
+                    )
+                    delta = max(-1.0, min(1.0, delta))
                     key = (event.event_id, npc_id, rule.rule_id)
                     signature = (event.tick, delta)
                     if key in self._applied:
