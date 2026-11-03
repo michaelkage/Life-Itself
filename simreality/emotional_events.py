@@ -11,7 +11,7 @@ import math
 from typing import Iterable, Mapping
 
 from .identity_context import NPCEmotionalState
-from .world_events import WorldEvent, WorldEventLedger
+from .world_events import WorldEvent
 
 
 @dataclass(frozen=True)
@@ -67,19 +67,13 @@ class NPCEmotionalEventLedger:
         self.current_tick = current_tick
         self._states: dict[str, dict[str, float]] = {}
         self._applied: dict[tuple[str, str, str], tuple[int, float]] = {}
+        self._events: dict[str, WorldEvent] = {}
         for npc_id, state in (initial_states or {}).items():
             if not isinstance(state, NPCEmotionalState) or state.npc_id != npc_id:
                 raise ValueError("initial state mapping keys must match NPC IDs")
-            if state.sampled_tick > current_tick:
-                raise ValueError("initial emotional state cannot be from a future tick")
-            values = dict(state.intensities)
-            for axis, value in values.items():
-                values[axis] = value
-            self._states[npc_id] = values
-            if state.sampled_tick < current_tick:
-                # Initial snapshots are brought forward using no implicit decay:
-                # callers must provide decay rules through advance().
-                self._states[npc_id] = values
+            if state.sampled_tick != current_tick:
+                raise ValueError("initial emotional states must match current_tick")
+            self._states[npc_id] = dict(state.intensities)
 
     def state_for(self, npc_id: str) -> NPCEmotionalState:
         if not isinstance(npc_id, str) or not npc_id.strip():
@@ -121,6 +115,11 @@ class NPCEmotionalEventLedger:
         decay_by_axis = {rule.emotion_axis: rule.retained_per_tick for rule in decay}
         ordered_events = tuple(sorted(event_items, key=lambda e: (e.tick, e.event_id)))
         for event in ordered_events:
+            existing_event = self._events.get(event.event_id)
+            if existing_event is not None and existing_event != event:
+                raise ValueError("world event ID reused with conflicting content")
+            if existing_event is None and event.tick < self.current_tick:
+                raise ValueError("new emotional events cannot be inserted before current_tick")
             for rule in rules:
                 if rule.event_type != event.event_type:
                     continue
@@ -132,14 +131,14 @@ class NPCEmotionalEventLedger:
                     if prior is not None and prior != signature:
                         raise ValueError("event/rule application ID reused with conflicting content")
 
-        elapsed = tick - self.current_tick
-        if elapsed:
-            for values in self._states.values():
-                for axis, value in tuple(values.items()):
-                    values[axis] = value * (decay_by_axis.get(axis, 1.0) ** elapsed)
-
+        cursor = self.current_tick
+        ordered_rules = sorted(rules, key=lambda r: (r.event_type, r.role, r.emotion_axis, r.rule_id))
         for event in ordered_events:
-            for rule in sorted(rules, key=lambda r: (r.event_type, r.role, r.emotion_axis, r.rule_id)):
+            step = event.tick - cursor
+            if step:
+                self._decay_states(step, decay_by_axis)
+                cursor = event.tick
+            for rule in ordered_rules:
                 if rule.event_type != event.event_type:
                     continue
                 people = event.participants if rule.role == "participant" else event.witnesses
@@ -153,8 +152,18 @@ class NPCEmotionalEventLedger:
                         0.0, min(1.0, values.get(rule.emotion_axis, 0.0) + rule.delta)
                     )
                     self._applied[key] = signature
+            self._events.setdefault(event.event_id, event)
+        if tick > cursor:
+            self._decay_states(tick - cursor, decay_by_axis)
         self.current_tick = tick
         return self.states()
+
+    def _decay_states(self, elapsed: int, decay_by_axis: Mapping[str, float]) -> None:
+        if elapsed <= 0:
+            return
+        for values in self._states.values():
+            for axis, value in tuple(values.items()):
+                values[axis] = value * (decay_by_axis.get(axis, 1.0) ** elapsed)
 
     def snapshot(self) -> dict:
         """Return a canonical JSON-compatible snapshot."""
@@ -165,6 +174,12 @@ class NPCEmotionalEventLedger:
                 npc_id: dict(sorted(values.items()))
                 for npc_id, values in sorted(self._states.items())
             },
+            "events": [
+                {"event_id": event.event_id, "tick": event.tick,
+                 "event_type": event.event_type, "participants": list(event.participants),
+                 "witnesses": list(event.witnesses), "attributes": [list(pair) for pair in event.attributes]}
+                for event in sorted(self._events.values(), key=lambda e: (e.tick, e.event_id))
+            ],
             "applied": [
                 {"event_id": event_id, "npc_id": npc_id, "rule_id": rule_id,
                  "event_tick": signature[0], "delta": signature[1]}
@@ -181,6 +196,15 @@ class NPCEmotionalEventLedger:
             for npc_id, values in snapshot["states"].items()
         }
         ledger = cls(states, current_tick=snapshot["current_tick"])
+        for item in snapshot.get("events", []):
+            event = WorldEvent(
+                event_id=item["event_id"], tick=item["tick"], event_type=item["event_type"],
+                participants=tuple(item["participants"]), witnesses=tuple(item["witnesses"]),
+                attributes=tuple(tuple(pair) for pair in item["attributes"]),
+            )
+            if event.event_id in ledger._events:
+                raise ValueError("duplicate event ID in emotional snapshot")
+            ledger._events[event.event_id] = event
         for item in snapshot["applied"]:
             key = (item["event_id"], item["npc_id"], item["rule_id"])
             signature = (item["event_tick"], item["delta"])
