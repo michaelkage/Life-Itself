@@ -4,7 +4,7 @@ from simreality.beliefs import BeliefLedger, Evidence
 from simreality.identity_evolution import IdentityChangeProposal
 from simreality.identity_interpretation import (
     IdentityBeliefInterpreter, IdentityInterpretationRule, IdentityMemoryAssociation,
-    IdentityRelationshipAssociation,
+    IdentityRelationshipAssociation, IdentityPersonalityRule, NPCIdentityPersonality,
 )
 from simreality.social_beliefs import SocialBeliefSystem
 from simreality.social_trust import SocialInteraction, SocialTrustLedger
@@ -134,6 +134,60 @@ class IdentityBeliefInterpretationTests(unittest.TestCase):
         self.assertGreater(by_id["npc-a"].interpreted.delta, by_id["npc-b"].interpreted.delta)
         self.assertAlmostEqual(by_id["npc-a"].relationship_contributions[0][2], 0.016)
         self.assertAlmostEqual(by_id["npc-b"].relationship_contributions[0][2], -0.016)
+
+    def test_personality_axes_make_same_event_feel_different(self):
+        proposal_b = IdentityChangeProposal(
+            "event-personality", "npc-b", "betrayal-policy", "trust",
+            0.2, 0.22, 0.02, 1.0, "participant", 0.05,
+        )
+        profiles = {
+            "npc-a": NPCIdentityPersonality("npc-a", {
+                "fearfulness": 0.9, "openness": -0.2,
+            }),
+            "npc-b": NPCIdentityPersonality("npc-b", {
+                "fearfulness": -0.5, "openness": 0.8,
+            }),
+        }
+        rules = (
+            IdentityPersonalityRule("betrayal-policy", "fearfulness", 0.02),
+            IdentityPersonalityRule("betrayal-policy", "openness", 0.01),
+        )
+        results = self.interpreter.interpret_with_personality(
+            (self.proposal, proposal_b), profiles, rules,
+        )
+        by_id = {item.interpreted.npc_id: item for item in results}
+        self.assertGreater(by_id["npc-a"].interpreted.delta, by_id["npc-b"].interpreted.delta)
+        self.assertAlmostEqual(by_id["npc-a"].personality_contributions[0][2], 0.018)
+        self.assertAlmostEqual(by_id["npc-b"].personality_contributions[0][2], -0.01)
+        self.assertLessEqual(abs(by_id["npc-a"].interpreted.delta), 0.05)
+
+    def test_missing_personality_is_neutral_and_profile_is_immutable(self):
+        profile = NPCIdentityPersonality("npc-a", {"stubbornness": 0.7})
+        result = self.interpreter.interpret_with_personality(
+            (self.proposal,), {"npc-a": profile},
+            (IdentityPersonalityRule("betrayal-policy", "openness", 0.04),),
+        )[0]
+        self.assertAlmostEqual(result.interpreted.delta, self.proposal.delta)
+        self.assertAlmostEqual(result.personality_contributions[0][1], 0.0)
+        with self.assertRaises(TypeError):
+            profile.axes["stubbornness"] = -0.5
+        with self.assertRaises(ValueError):
+            NPCIdentityPersonality("npc-a", {"fearfulness": 1.1})
+        with self.assertRaises(ValueError):
+            IdentityPersonalityRule("betrayal-policy", "fearfulness", float("nan"))
+
+    def test_personality_rules_reject_duplicates_and_mismatched_profiles(self):
+        rule = IdentityPersonalityRule("betrayal-policy", "confidence", 0.02)
+        with self.assertRaises(ValueError):
+            self.interpreter.interpret_with_personality(
+                (self.proposal,), {"npc-a": NPCIdentityPersonality("npc-b", {})},
+                (rule,),
+            )
+        with self.assertRaises(ValueError):
+            self.interpreter.interpret_with_personality(
+                (self.proposal,), {},
+                (rule, rule),
+            )
 
     def test_unknown_relationship_is_neutral_and_associations_are_validated(self):
         association = IdentityRelationshipAssociation(
