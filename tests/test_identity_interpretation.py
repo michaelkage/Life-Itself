@@ -281,8 +281,9 @@ class IdentityBeliefInterpretationTests(unittest.TestCase):
                 IdentityValueRule("betrayal-policy", "fairness", 0.01),
             ),
         )[0]
-        self.assertAlmostEqual(result.value_contributions[0][2], 0.016)
-        self.assertAlmostEqual(result.value_contributions[1][2], -0.004)
+        contributions = {item[0]: item[2] for item in result.value_contributions}
+        self.assertAlmostEqual(contributions["loyalty"], 0.016)
+        self.assertAlmostEqual(contributions["fairness"], -0.004)
         self.assertAlmostEqual(result.interpreted.delta, 0.032)
 
     def test_missing_value_axis_is_neutral_and_profile_is_immutable(self):
