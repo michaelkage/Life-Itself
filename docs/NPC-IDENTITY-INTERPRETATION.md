@@ -53,3 +53,20 @@ are applied. The returned result records memory index, retention and contributio
 for inspection. Missing associations are neutral; invalid memory indices fail
 rather than silently selecting another memory. This is an appraisal input only,
 not an automatic identity decision.
+
+
+## Relationship-conditioned interpretation
+
+`interpret_with_relationships` adds an optional observer-to-target relationship input.
+An `IdentityRelationshipAssociation` explicitly links an event, the NPC whose
+identity proposal is being interpreted, the policy, and another person whose
+relationship matters. The trust ledger is queried for that exact observer/target
+pair; trust 0.5 is neutral, while higher or lower trust contributes according to
+the association's signed coefficient and relevance scale.
+
+Unknown trust pairs are neutral. Contributions are recorded with the target ID,
+trust sample and resulting adjustment. They are summed with the belief-conditioned
+proposal, then clamped to the original per-event delta cap and trait bounds. This
+is not a universal judgment about the target and does not automatically accept an
+identity change. It simply lets a person the NPC trusts or distrusts influence
+how that NPC interprets the same event.
