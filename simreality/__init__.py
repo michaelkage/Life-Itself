@@ -532,3 +532,8 @@ __all__ += ["TestimonyInquirySnapshot"]
 # Replay-safe bridge from answered inquiries into the shared testimony ledger.
 from .testimony_materialization import TestimonyMaterializationAdapter
 __all__ += ["TestimonyMaterializationAdapter"]
+
+
+# Explicit inquiry-answer pipeline into testimony analysis and observer beliefs.
+from .testimony_pipeline import InquiryInvestigationPipeline, InquiryInvestigationResult
+__all__ += ["InquiryInvestigationPipeline", "InquiryInvestigationResult"]
