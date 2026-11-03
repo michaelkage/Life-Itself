@@ -70,3 +70,20 @@ proposal, then clamped to the original per-event delta cap and trait bounds. Thi
 is not a universal judgment about the target and does not automatically accept an
 identity change. It simply lets a person the NPC trusts or distrusts influence
 how that NPC interprets the same event.
+
+
+## Personality-conditioned interpretation
+
+`NPCIdentityPersonality` stores caller-defined, normalized personality axes for
+one NPC. Projects can model axes such as fearfulness, confidence, stubbornness,
+openness, or sociability without the engine imposing a fixed personality
+classification. Values are finite and bounded to [-1, 1], and the profile copies
+its input mapping into an immutable view.
+
+`IdentityPersonalityRule` explicitly maps one axis to one identity policy with a
+signed coefficient. `interpret_with_personality` applies the matching effects
+after the interpreter's belief appraisal. Missing profiles or axes are neutral;
+duplicate rules and mismatched NPC IDs are rejected. Contributions are returned
+for inspection, and the original proposal's delta cap and trait bounds remain in
+force. Personality influences interpretation, not automatic acceptance or a
+universal moral judgment.
