@@ -64,6 +64,38 @@ class EmotionalRelationshipRule:
 
 
 @dataclass(frozen=True)
+class EmotionalMemoryRule:
+    """Apply an emotional impulse when retained personal memories match an event.
+
+    The event supplies a target NPC ID and action-tag string. Only memories
+    explicitly matching both facts contribute; no semantic similarity is guessed.
+    """
+
+    rule_id: str
+    event_type: str
+    role: str
+    emotion_axis: str
+    target_attribute: str = "target_entity_id"
+    action_tag_attribute: str = "action_tag"
+    coefficient: float = 0.5
+    minimum_retention: float = 0.0
+
+    def __post_init__(self):
+        for name in ("rule_id", "event_type", "emotion_axis",
+                     "target_attribute", "action_tag_attribute"):
+            value = getattr(self, name)
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError(f"{name} must be a non-empty string")
+        if self.role not in ("participant", "witness"):
+            raise ValueError("role must be 'participant' or 'witness'")
+        for name, low, high in (("coefficient", -1.0, 1.0),
+                                ("minimum_retention", 0.0, 1.0)):
+            value = getattr(self, name)
+            if (isinstance(value, bool) or not isinstance(value, (int, float))
+                    or not math.isfinite(value) or not low <= value <= high):
+                raise ValueError(f"{name} must be finite and in [{low}, {high}]")
+
+@dataclass(frozen=True)
 class EmotionalDecayRule:
     emotion_axis: str
     retained_per_tick: float
@@ -121,6 +153,8 @@ class NPCEmotionalEventLedger:
         decay_rules: Iterable[EmotionalDecayRule] = (),
         relationship_rules: Iterable[EmotionalRelationshipRule] = (),
         trust_ledger: SocialTrustLedger | None = None,
+        memory_rules: Iterable[EmotionalMemoryRule] = (),
+        npcs_by_id: Mapping[str, object] | None = None,
     ) -> tuple[NPCEmotionalState, ...]:
         if isinstance(tick, bool) or not isinstance(tick, int) or tick < self.current_tick:
             raise ValueError("tick must be an integer not earlier than current_tick")
@@ -134,15 +168,22 @@ class NPCEmotionalEventLedger:
         rules = tuple(event_rules)
         decay = tuple(decay_rules)
         relationship = tuple(relationship_rules)
+        memories = tuple(memory_rules)
         if any(not isinstance(rule, EmotionalEventRule) for rule in rules):
             raise TypeError("event_rules must contain EmotionalEventRule values")
         if any(not isinstance(rule, EmotionalDecayRule) for rule in decay):
             raise TypeError("decay_rules must contain EmotionalDecayRule values")
         if any(not isinstance(rule, EmotionalRelationshipRule) for rule in relationship):
             raise TypeError("relationship_rules must contain EmotionalRelationshipRule values")
+        if any(not isinstance(rule, EmotionalMemoryRule) for rule in memories):
+            raise TypeError("memory_rules must contain EmotionalMemoryRule values")
+        if memories and not isinstance(npcs_by_id, Mapping):
+            raise TypeError("memory rules require an NPC mapping keyed by entity ID")
+        if memories and any(getattr(npc, "entity_id", None) != npc_id or not hasattr(npc, "memories") for npc_id, npc in npcs_by_id.items()):
+            raise TypeError("NPC mapping keys must match NPC entity IDs")
         if relationship and not isinstance(trust_ledger, SocialTrustLedger):
             raise TypeError("relationship rules require a SocialTrustLedger")
-        all_rule_ids = [r.rule_id for r in rules] + [r.rule_id for r in relationship]
+        all_rule_ids = [r.rule_id for r in rules] + [r.rule_id for r in relationship] + [r.rule_id for r in memories]
         if len(set(all_rule_ids)) != len(all_rule_ids):
             raise ValueError("event and relationship rule IDs must be unique")
         if len({r.emotion_axis for r in decay}) != len(decay):
