@@ -154,6 +154,24 @@ class IdentityDecisionTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             IdentityDecisionSnapshot((unsorted_traits,), ())
 
+    def test_snapshot_rejects_malformed_profile_records_without_type_errors(self):
+        valid = IdentityDecisionSnapshot.capture(IdentityDecisionLedger((self.profile,)))
+        profile = valid.profiles[0]
+        malformed_records = (
+            ("npc-a", (("trust", 0.2), (None, 0.1)), profile[2], profile[3]),
+            ("npc-a", (("trust", 0.2), (1, 0.1)), profile[2], profile[3]),
+            ("npc-a", (("trust", 0.2),), profile[2]),
+        )
+        for malformed in malformed_records:
+            with self.subTest(record=malformed), self.assertRaises(ValueError):
+                IdentityDecisionSnapshot((malformed,), ())
+
+    def test_snapshot_rejects_malformed_decision_records(self):
+        valid = IdentityDecisionSnapshot.capture(IdentityDecisionLedger((self.profile,)))
+        for malformed in (("decision-id",), (None,) + (None,) * 12):
+            with self.subTest(record=malformed), self.assertRaises(ValueError):
+                IdentityDecisionSnapshot(valid.profiles, (malformed,))
+
     def test_invalid_decision_tick_rejected(self):
         with self.assertRaises(ValueError):
             IdentityChangeDecision.from_proposal(
