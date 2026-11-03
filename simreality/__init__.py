@@ -498,3 +498,8 @@ __all__ += ["InvestigationReport", "TestimonyAnalyzer", "TestimonyMatch"]
 # Explicit conversion of investigation findings into observer-specific belief evidence.
 from .testimony_beliefs import TestimonyBeliefAdapter, TestimonyEvidencePolicy, TestimonyEvidenceBatch
 __all__ += ["TestimonyBeliefAdapter", "TestimonyEvidencePolicy", "TestimonyEvidenceBatch"]
+
+
+# Read-only dialogue and investigation queries over observer-specific testimony beliefs.
+from .testimony_belief_queries import TestimonyBeliefQuery, TestimonyBeliefQueryAdapter
+__all__ += ["TestimonyBeliefQuery", "TestimonyBeliefQueryAdapter"]
