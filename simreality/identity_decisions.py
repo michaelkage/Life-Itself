@@ -91,6 +91,18 @@ class IdentityDecisionLedger:
         current = self._traits[decision.npc_id][decision.axis]
         if not math.isclose(current, decision.before, abs_tol=1e-12):
             raise ValueError("decision does not continue the current identity state")
+        # Snapshot restoration replays each NPC/axis chain by (tick, decision ID).
+        # Reject out-of-order appends now rather than allowing a ledger that cannot
+        # be faithfully serialized and restored later.
+        chain_key = (decision.npc_id, decision.axis)
+        previous = max(
+            ((item.decision_tick, item.decision_id)
+             for item in self._decisions.values()
+             if (item.npc_id, item.axis) == chain_key),
+            default=None,
+        )
+        if previous is not None and (decision.decision_tick, decision.decision_id) < previous:
+            raise ValueError("identity decisions must follow the existing NPC/axis decision order")
         if decision.accepted:
             self._traits[decision.npc_id][decision.axis] = decision.proposed_after
         self._decisions[decision.decision_id] = decision
