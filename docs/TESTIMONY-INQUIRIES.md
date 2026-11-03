@@ -37,3 +37,14 @@ Checkpoint validation rejects inquiries or responses dated after the world
 clock, missing source events, inquiries asked before their source event, and
 witness IDs that are not recorded witnesses for the source event. This keeps
 investigation history tied to the authoritative event journal.
+
+
+## Materialization adapter
+
+`TestimonyMaterializationAdapter.materialize` appends an answered inquiry to a
+caller-provided `TestimonyLedger` using a caller-provided stable testimony ID and
+recording hour. Repeating the same materialization is idempotent through the
+ledger's existing ID semantics; reusing that ID for different record content is
+rejected. Unanswered inquiries and refusals remain in the inquiry history and
+produce no testimony record. The adapter does not choose inquiries, answer
+questions, or infer witness facts.
