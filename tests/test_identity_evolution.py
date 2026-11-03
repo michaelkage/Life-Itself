@@ -78,6 +78,17 @@ class IdentityEvolutionTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             evaluator.assess((first, first))
 
+    def test_profile_mappings_are_defensively_immutable(self):
+        traits = {"trust": 0.2}
+        sensitivities = {"trust": 1.0}
+        profile = NPCIdentityProfile("npc", traits, sensitivities)
+        traits["trust"] = 0.9
+        sensitivities["trust"] = 0.1
+        self.assertEqual(profile.traits["trust"], 0.2)
+        self.assertEqual(profile.sensitivities["trust"], 1.0)
+        with self.assertRaises(TypeError):
+            profile.traits["trust"] = 0.7
+
     def test_invalid_traits_are_rejected(self):
         with self.assertRaises(ValueError):
             NPCIdentityProfile("npc", {"trust": 1.1})
