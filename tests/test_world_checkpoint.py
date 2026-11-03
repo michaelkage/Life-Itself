@@ -13,6 +13,7 @@ from simreality import (
     GoalReviewAction, GoalReviewEvaluator, GoalReviewPolicy,
     GoalReviewDecision, GoalReviewDecisionLedger,
     NPCIdentityProfile, IdentityChangeProposal, IdentityDecisionLedger,
+    TestimonyInquiry, TestimonyInquiryLedger, TestimonyResponse,
 )
 
 
@@ -122,6 +123,55 @@ class SimulationWorldCheckpointTests(unittest.TestCase):
         identity.decide("decision", proposal, accepted=True, decision_tick=4, rationale="test")
         with self.assertRaises(ValueError):
             SimulationWorldCheckpoint.capture(4, coordinator, npcs, identity_decisions=identity)
+
+    def test_testimony_inquiries_round_trip_in_world_checkpoint(self):
+        coordinator, npcs, _ = self.make_simulation()
+        inquiries = TestimonyInquiryLedger()
+        inquiries.append_inquiry(TestimonyInquiry(
+            "inquiry-1", "event-1", "speaker", "observed_action", 3,
+        ))
+        inquiries.append_response(TestimonyResponse(
+            "inquiry-1", 4, True, "saw the incident", 0.85,
+        ))
+        payload = SimulationWorldCheckpoint.capture(
+            4, coordinator, npcs, testimony_inquiries=inquiries,
+        ).to_json()
+
+        restored = SimulationWorldCheckpoint.from_json(payload).restore()
+        self.assertIsNotNone(restored.testimony_inquiries)
+        self.assertEqual(restored.testimony_inquiries.inquiries(), inquiries.inquiries())
+        self.assertEqual(restored.testimony_inquiries.responses(), inquiries.responses())
+        self.assertEqual(
+            SimulationWorldCheckpoint.capture(
+                4, restored.coordinator, restored.npcs,
+                testimony_inquiries=restored.testimony_inquiries,
+            ).to_json(),
+            payload,
+        )
+
+    def test_testimony_inquiries_are_optional_and_future_records_rejected(self):
+        coordinator, npcs, _ = self.make_simulation()
+        payload = SimulationWorldCheckpoint.capture(4, coordinator, npcs).to_json()
+        self.assertNotIn('"testimony_inquiries"', payload)
+        self.assertIsNone(SimulationWorldCheckpoint.from_json(payload).restore().testimony_inquiries)
+
+        inquiries = TestimonyInquiryLedger((
+            TestimonyInquiry("future", "event-1", "speaker", "observed_action", 5),
+        ))
+        with self.assertRaises(ValueError):
+            SimulationWorldCheckpoint.capture(
+                4, coordinator, npcs, testimony_inquiries=inquiries,
+            )
+
+    def test_testimony_inquiry_checkpoint_rejects_non_witness(self):
+        coordinator, npcs, _ = self.make_simulation()
+        inquiries = TestimonyInquiryLedger((
+            TestimonyInquiry("not-witness", "event-1", "listener", "observed_action", 3),
+        ))
+        with self.assertRaises(ValueError):
+            SimulationWorldCheckpoint.capture(
+                4, coordinator, npcs, testimony_inquiries=inquiries,
+            )
 
     def test_consequence_section_is_optional(self):
         coordinator, npcs, _ = self.make_simulation()
