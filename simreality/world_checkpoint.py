@@ -380,6 +380,8 @@ class SimulationWorldCheckpoint:
             payload["identity_decisions"] = json.loads(identity_decisions.to_json())
         if testimony_inquiries is not None:
             payload["testimony_inquiries"] = json.loads(testimony_inquiries.to_json())
+        if testimony is not None:
+            payload["testimony"] = json.loads(testimony.to_json())
         return json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False)
 
     @classmethod
@@ -448,4 +450,4 @@ class SimulationWorldCheckpoint:
                                   memory, conversations, coordinator, self.metadata,
                                   consequence_recorder, campaign, misconduct, routines, routine_executions,
                                   routine_institutions, institutional_politics, goals, goal_event_replay,
-                                  goal_review_decisions, identity_decisions, testimony_inquiries)
+                                  goal_review_decisions, identity_decisions, testimony_inquiries, testimony)
