@@ -63,6 +63,7 @@ class IdentityChangeProposal:
     delta: float
     evidence_strength: float
     role: str
+    maximum_delta: float = 0.05
 
 
 class IdentityEvolutionEvaluator:
@@ -112,6 +113,7 @@ class IdentityEvolutionEvaluator:
                     if after != before:
                         result.append(IdentityChangeProposal(
                             event.event_id, npc_id, policy.policy_id, policy.axis,
-                            before, after, after - before, float(strength), role))
+                            before, after, after - before, float(strength), role,
+                            policy.maximum_delta))
         return tuple(sorted(result, key=lambda p: (
             p.event_id, p.npc_id, p.axis, p.policy_id)))
