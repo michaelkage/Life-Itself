@@ -238,6 +238,55 @@ class IdentityBeliefInterpretationTests(unittest.TestCase):
         self.assertEqual(original.delta, 0.02)
         self.assertNotEqual(result.interpreted.delta, original.delta)
 
+    def test_comprehensive_pipeline_combines_every_input_once_and_is_bounded(self):
+        npc = NPC("npc-a", memories=[NPCMemory(
+            "memory-1", "event-memory", 0.8, 1.0, 1,
+        )])
+        trust = SocialTrustLedger()
+        trust.add(SocialInteraction("trust-1", "npc-a", "ally", 1, 0.8, 1))
+        result = self.interpreter.interpret_comprehensively(
+            (self.proposal,),
+            beliefs_by_npc={"npc-a": self.belief(0.9)},
+            npcs_by_id={"npc-a": npc},
+            memory_associations=(
+                IdentityMemoryAssociation("event-1", "npc-a", "betrayal-policy", 0, 0.01),
+            ),
+            trust=trust,
+            relationship_associations=(
+                IdentityRelationshipAssociation(
+                    "event-1", "npc-a", "betrayal-policy", "ally", 0.01,
+                ),
+            ),
+            personalities_by_npc={
+                "npc-a": NPCIdentityPersonality("npc-a", {"caution": 0.5}),
+            },
+            personality_rules=(
+                IdentityPersonalityRule("betrayal-policy", "caution", 0.01),
+            ),
+        )[0]
+        self.assertAlmostEqual(result.belief_contributions[0][2], 0.032)
+        self.assertAlmostEqual(result.memory_contributions[0][2], 0.008)
+        self.assertAlmostEqual(result.relationship_contributions[0][2], 0.008)
+        self.assertAlmostEqual(result.personality_contributions[0][2], 0.005)
+        self.assertAlmostEqual(result.interpreted.delta, 0.05)
+        self.assertIs(result.original, self.proposal)
+
+    def test_comprehensive_pipeline_missing_inputs_are_neutral(self):
+        result = self.interpreter.interpret_comprehensively((self.proposal,))[0]
+        self.assertAlmostEqual(result.interpreted.delta, self.proposal.delta)
+        self.assertEqual(result.memory_contributions, ())
+        self.assertEqual(result.relationship_contributions, ())
+        self.assertEqual(result.personality_contributions, ())
+
+    def test_comprehensive_pipeline_requires_trust_for_relationship_links(self):
+        association = IdentityRelationshipAssociation(
+            "event-1", "npc-a", "betrayal-policy", "ally", 0.01,
+        )
+        with self.assertRaises(ValueError):
+            self.interpreter.interpret_comprehensively(
+                (self.proposal,), relationship_associations=(association,),
+            )
+
     def test_duplicate_rules_and_proposals_are_rejected(self):
         with self.assertRaises(ValueError):
             IdentityBeliefInterpreter((
