@@ -32,6 +32,21 @@ class SocialTrustTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             ledger.add(self.event("same", -1))
 
+    def test_trust_at_uses_only_interactions_known_by_requested_tick(self):
+        ledger = SocialTrustLedger({("alice", "bob"): 0.2})
+        ledger.add(self.event("early-help", 1, tick=2, strength=0.5))
+        ledger.add(self.event("later-betrayal", -1, tick=8, strength=1.0))
+        self.assertAlmostEqual(ledger.trust_at("alice", "bob", 2), 0.6)
+        self.assertEqual(ledger.trust_at("alice", "bob", 8), 0.0)
+        self.assertEqual(ledger.get("alice", "bob").trust, 0.0)
+
+    def test_unknown_historical_relationship_is_neutral(self):
+        ledger = SocialTrustLedger()
+        self.assertEqual(ledger.trust_at("alice", "bob", 10), 0.5)
+        self.assertEqual(ledger.trust_at("alice", "alice", 10), 0.5)
+        with self.assertRaises(ValueError):
+            ledger.trust_at("alice", "bob", -1)
+
     def test_trust_can_be_used_as_source_reliability(self):
         ledger = SocialTrustLedger({("alice", "witness"): 0.8})
         self.assertEqual(ledger.get("alice", "witness").source_reliability, 0.8)
