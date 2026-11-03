@@ -166,3 +166,32 @@ caused a betrayal, or whether a witness felt threatened. Those facts must be
 represented explicitly by the event's participants/witnesses and authored
 rules. The result is deterministic and inspectable, while allowing different
 NPCs to react differently to the same event.
+
+
+## Relationship-conditioned emotional events
+
+EmotionalRelationshipRule adds an explicitly relationship-sensitive impulse
+to the transient emotional ledger. The rule names an event type, participant or
+witness role, emotion axis, signed coefficient, and event attribute containing
+the relevant target NPC ID. For example, a betrayal event can identify its
+subject with target_id; each affected NPC's trust in that person then shapes
+the emotional adjustment.
+
+Trust is sampled through SocialTrustLedger.trust_at(observer, target, event_tick).
+The neutral value 0.5 contributes zero; higher trust contributes in the
+coefficient's direction and lower trust contributes in the opposite direction.
+Unknown pairs are neutral. Later relationship changes do not rewrite the
+historical sample, even if an event is processed after those later interactions
+have entered the trust ledger.
+
+The rule is additive and bounded by the emotional axis range [0, 1]. A missing
+target attribute means that relationship rule does not apply; a present but
+invalid target ID is rejected. Relationship rule IDs must be unique alongside
+ordinary emotional event rule IDs. Supplying relationship rules requires a
+SocialTrustLedger.
+
+This is not an automatic forgiveness or relationship-repair system. Emotional
+recovery remains governed by explicit decay rules, while trust changes remain
+in the separate social relationship ledger. An NPC can calm down without
+forgiving someone, and trust can change without erasing the emotional history
+of an earlier event.
