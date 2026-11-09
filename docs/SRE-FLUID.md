@@ -85,10 +85,13 @@ named hardware.
 
 ## Next stages
 
-1. WebGPU host runner with capability checks, persistent buffers, async readback,
-   CPU/GPU differential tests and device-loss fallback.
-2. Compact social-edge buffers and a gather-oriented rumour pass with deterministic
-   conflict resolution.
-3. Trauma accumulation and memory-decay kernels driven by explicit simulation time.
-4. C++20 snapshot packing and CPU reference are now in the core; next add a backend interface for Unreal immutable snapshots.
-5. Benchmarks with realistic density, edge counts, buffer reuse and full tick budgets.
+1. Implement a production WebGPU host adapter with capability checks, persistent
+   buffers, asynchronous readback, shader compilation and device-loss recovery.
+2. Run the registered CPU/GPU differential suite on real adapters, then tune the
+   score tolerance from measured cross-device error rather than assumption.
+3. Add compact social-edge buffers and a gather-oriented rumour pass with
+   deterministic conflict resolution.
+4. Add trauma accumulation and memory-decay kernels driven by explicit
+   simulation-time inputs.
+5. Benchmark realistic density, edge counts, buffer reuse and full tick budgets
+   on named hardware before treating 500,000 agents at 60 FPS as achieved.
