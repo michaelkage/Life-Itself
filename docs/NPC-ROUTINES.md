@@ -149,3 +149,12 @@ not use institution-facing records.
 `MemoryLocationAssociationSnapshot` provides canonical versioned JSON persistence for these links. Capture the association book alongside the NPC memory snapshot, restore both, then call `MemoryRoutineAdapter.derive_avoidance` with `book.for_owner(npc.entity_id)`. This preserves the explicit association across save/load; it does not infer locations, create memories, or automatically schedule disruptions. The existing routine execution ledger continues to preserve the exact derived disruption used for each execution.
 
 Regression coverage: `tests/test_memory_routine_save_state.py`.
+
+
+## Personal memory-aware route selection
+
+`PersonalRoutePlanner` evaluates an explicit `RouteEdge` graph with deterministic lowest-cost path selection. Callers pass the requesting NPC's `RoutineAvoidanceProfile` values, normally produced by `MemoryRoutineAdapter.derive_avoidance_profiles` or the corresponding profile-building path. Matching owner/location profiles add a configurable cost penalty to routes entering those locations. Profiles belonging to other NPCs are ignored, so a remembered incident does not globally close a street or force every citizen to detour.
+
+`RoutePlan` returns the selected location sequence, base travel cost, adjusted cost, and the avoided locations that influenced the selected path. Equal-cost paths are resolved lexicographically and do not depend on edge insertion order. An unreachable destination returns an empty path; the planner does not invent roads, travel times, or location links. This is a graph-level path-choice layer only: traffic simulation, dynamic road closures, vehicle movement, and route execution remain world-driver responsibilities.
+
+Regression coverage: `tests/test_route_planning.py`.
