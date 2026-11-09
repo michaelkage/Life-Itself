@@ -41,6 +41,7 @@ class RoutineTravelAdapter:
         current_locations: Mapping[str, str],
         planner: PersonalRoutePlanner,
         *,
+        departure_lead_minutes: int = 0,
         closed_edge_ids: Iterable[str] = (),
         avoidance_profiles_by_owner: Mapping[str, Iterable[RoutineAvoidanceProfile]] | None = None,
     ) -> tuple[RoutineTravelRequest, ...]:
@@ -55,6 +56,8 @@ class RoutineTravelAdapter:
         for owner, location in current_locations.items():
             if not isinstance(owner, str) or not owner.strip() or not isinstance(location, str) or not location.strip():
                 raise ValueError("current location entries require non-empty NPC and location IDs")
+        if isinstance(departure_lead_minutes, bool) or not isinstance(departure_lead_minutes, int) or not 0 <= departure_lead_minutes <= 1440:
+            raise ValueError("departure_lead_minutes must be an integer from 0 to 1440")
         if not isinstance(planner, PersonalRoutePlanner):
             raise TypeError("planner must be a PersonalRoutePlanner")
         supplied_profiles = avoidance_profiles_by_owner or {}
@@ -73,7 +76,8 @@ class RoutineTravelAdapter:
 
         requests = []
         for block in book.snapshot():
-            if not block.start_minute <= minute_of_day < block.end_minute:
+            departure_start = max(0, block.start_minute - departure_lead_minutes)
+            if not departure_start <= minute_of_day < block.end_minute:
                 continue
             if block.owner_id not in current_locations:
                 raise ValueError(f"missing current location for routine owner: {block.owner_id}")
