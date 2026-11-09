@@ -1,3 +1,4 @@
+import json
 import unittest
 
 from simreality.route_planning import PersonalRoutePlanner, RouteEdge
@@ -166,6 +167,19 @@ class TravelTickTests(unittest.TestCase):
         )
         self.assertEqual(rerouted.journeys[0].path,
                          ("home", "junction", "park", "office"))
+
+    def test_legacy_travel_snapshot_schema_one_remains_readable(self):
+        self.adapter.advance(1, {"npc-1": 1})
+        raw = json.loads(TravelSnapshot.capture(self.adapter.ledger).to_json())
+        raw["schema_version"] = 1
+        for journey in raw["journeys"]:
+            journey.pop("routine_id", None)
+        for tick in raw["ticks"]:
+            for journey in tick["result"]["journeys"]:
+                journey.pop("routine_id", None)
+        legacy = json.dumps(raw, sort_keys=True, separators=(",", ":"), allow_nan=False)
+        restored = TravelSnapshot.from_json(legacy).restore()
+        self.assertIsNone(restored.get("trip-1").routine_id)
 
 
 if __name__ == "__main__":
