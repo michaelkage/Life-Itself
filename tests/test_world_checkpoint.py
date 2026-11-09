@@ -15,7 +15,8 @@ from simreality import (
     NPCIdentityProfile, IdentityChangeProposal, IdentityDecisionLedger,
     TestimonyInquiry, TestimonyInquiryLedger, TestimonyResponse,
     TestimonyLedger, TestimonyRecord, TestimonyDetail,
-    InquiryInvestigationPipeline,
+    InquiryInvestigationPipeline, RouteEdge, PersonalRoutePlanner,
+    TravelTickAdapter,
 )
 
 
@@ -690,6 +691,43 @@ class SimulationWorldCheckpointTests(unittest.TestCase):
                 4, coordinator, npcs, goal_book=goals, goal_event_adapter=adapter,
             )
 
+
+    def test_in_progress_travel_round_trips_in_composite_checkpoint(self):
+        coordinator, npcs, _ = self.make_simulation()
+        edges = (RouteEdge("street-a", "home", "crossroads", 3),
+                 RouteEdge("street-b", "crossroads", "office", 4))
+        planner = PersonalRoutePlanner(edges)
+        travel_adapter = TravelTickAdapter(edges)
+        travel_adapter.start("commute-speaker", "speaker",
+                             planner.plan("speaker", "home", "office"), 4)
+        travel_adapter.advance(5, {"speaker": 1})
+        payload = SimulationWorldCheckpoint.capture(
+            5, coordinator, npcs, travel=travel_adapter.ledger,
+        ).to_json()
+        restored = SimulationWorldCheckpoint.from_json(payload).restore()
+        self.assertIsNotNone(restored.travel)
+        self.assertEqual(restored.travel.get("commute-speaker").edge_progress, 1)
+        self.assertEqual(
+            SimulationWorldCheckpoint.capture(5, restored.coordinator, restored.npcs,
+                                              travel=restored.travel).to_json(),
+            payload,
+        )
+        resumed = TravelTickAdapter(edges, restored.travel)
+        result = resumed.advance(6, {"speaker": 2})
+        self.assertEqual(result.journeys[0].current_location, "crossroads")
+        self.assertEqual(result.journeys[0].edge_progress, 0)
+
+    def test_travel_checkpoint_rejects_unknown_npc_and_future_tick(self):
+        coordinator, npcs, _ = self.make_simulation()
+        edges = (RouteEdge("road", "home", "office", 3),)
+        adapter = TravelTickAdapter(edges)
+        adapter.start("unknown-owner-trip", "ghost", PersonalRoutePlanner(edges).plan("ghost", "home", "office"), 4)
+        with self.assertRaisesRegex(ValueError, "missing from checkpoint"):
+            SimulationWorldCheckpoint.capture(4, coordinator, npcs, travel=adapter.ledger)
+        adapter2 = TravelTickAdapter(edges)
+        adapter2.start("future-trip", "speaker", PersonalRoutePlanner(edges).plan("speaker", "home", "office"), 5)
+        with self.assertRaisesRegex(ValueError, "after the checkpoint tick"):
+            SimulationWorldCheckpoint.capture(4, coordinator, npcs, travel=adapter2.ledger)
 
 
 if __name__ == "__main__":
