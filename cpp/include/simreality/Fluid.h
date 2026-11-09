@@ -10,6 +10,26 @@ namespace simreality::fluid {
 
 inline constexpr std::size_t kAgentInputStride = 48;
 inline constexpr std::size_t kAgentOutputStride = 16;
+inline constexpr std::size_t kWorkgroupSize = 256;
+
+struct DispatchLimits {
+    // Maximum number of agents addressable by one dispatch's storage buffers.
+    std::size_t maximum_agents{0U};
+    // Device limit for workgroups dispatched along the x dimension.
+    std::size_t maximum_workgroups_per_dimension{0U};
+    std::size_t workgroup_size{kWorkgroupSize};
+};
+
+struct DispatchRange {
+    std::size_t agent_offset{0U};
+    std::size_t agent_count{0U};
+    std::size_t workgroup_count{0U};
+};
+
+// Build bounded, contiguous dispatches. All non-final chunks are workgroup
+// aligned; the final chunk may be partial and is protected by shader bounds checks.
+[[nodiscard]] std::vector<DispatchRange> plan_dispatches(
+    std::size_t agent_count, DispatchLimits limits);
 inline constexpr float kRumourAttributionThreshold = 0.6F;
 inline constexpr float kRumourFloorAttributed = 0.05F;
 inline constexpr float kRumourFloorUnattributed = 0.01F;
