@@ -23,7 +23,7 @@ void require_unit(float value, const char* name) {
     }
 }
 
-void validate(const std::vector<AgentInput>& agents) {
+void validate_impl(const std::vector<AgentInput>& agents) {
     std::unordered_set<std::string> ids;
     ids.reserve(agents.size());
     for (const AgentInput& agent : agents) {
@@ -58,7 +58,7 @@ void append_f32_le(std::vector<std::uint8_t>& bytes, float value) {
 } // namespace
 
 std::vector<std::uint8_t> pack_agents(const std::vector<AgentInput>& agents) {
-    validate(agents);
+    validate_agents(agents);
     if (agents.size() > std::numeric_limits<std::size_t>::max() / kAgentInputStride) {
         throw std::length_error("agent batch is too large to pack");
     }
@@ -103,6 +103,64 @@ std::vector<AgentOutput> evaluate_cpu(const std::vector<AgentInput>& agents) {
             transmittable, transmittable && attributed_input});
     }
     return outputs;
+}
+
+
+void validate_agents(const std::vector<AgentInput>& agents) {
+    validate_impl(agents);
+}
+
+EvaluationReport evaluate_with_fallback(
+    const std::vector<AgentInput>& agents, ComputeBackend* backend,
+    EvaluationOptions options) {
+    validate_agents(agents);
+    EvaluationReport report;
+    const auto use_cpu = [&]() {
+        report.agents = evaluate_cpu(agents);
+        report.backend = BackendKind::Cpu;
+        report.backend_name = "CPU reference";
+    };
+
+    if (backend == nullptr || agents.size() < options.minimum_gpu_batch) {
+        use_cpu();
+        return report;
+    }
+    try {
+        const ComputeBackendInfo capabilities = backend->info();
+        if (!capabilities.available || agents.size() > capabilities.maximum_agents) {
+            use_cpu();
+            return report;
+        }
+        std::vector<AgentOutput> candidate = backend->evaluate(agents);
+        bool valid = candidate.size() == agents.size();
+        if (valid) {
+            for (std::size_t i = 0; i < candidate.size(); ++i) {
+                const AgentOutput& output = candidate[i];
+                if (output.agent_id != agents[i].agent_id
+                    || !std::isfinite(output.desperation_index)
+                    || output.desperation_index < 0.0F
+                    || output.desperation_index > 1.0F
+                    || output.trauma_tier > 3U
+                    || (output.attribution_survives && !output.rumour_transmittable)) {
+                    valid = false;
+                    break;
+                }
+            }
+        }
+        if (!valid) {
+            report.gpu_fallback = true;
+            use_cpu();
+            return report;
+        }
+        report.agents = std::move(candidate);
+        report.backend = BackendKind::Gpu;
+        report.backend_name = capabilities.name.empty() ? "GPU backend" : capabilities.name;
+        return report;
+    } catch (...) {
+        report.gpu_fallback = true;
+        use_cpu();
+        return report;
+    }
 }
 
 } // namespace simreality::fluid
