@@ -12,7 +12,7 @@ import math
 from typing import Iterable, Mapping
 
 from .route_planning import RouteEdge, RoutePlan
-from .world_events import WorldEvent, WorldEventLedger
+from .world_events import WorldEventLedger
 
 
 @dataclass(frozen=True)
@@ -203,13 +203,13 @@ class TravelTickAdapter:
                     blocked.append(journey.journey_id)
                     break
                 edge = self._edges[edge_id]
-                duration = float(edge.travel_cost) * multipliers.get(edge_id, 1.0)
-                remaining = duration - progress
-                used = min(budget, remaining)
-                progress += used
+                multiplier = multipliers.get(edge_id, 1.0)
+                remaining_time = (float(edge.travel_cost) - progress) * multiplier
+                used = min(budget, remaining_time)
+                progress += used / multiplier
                 elapsed += used
                 budget -= used
-                if progress + 1e-12 >= duration:
+                if progress + 1e-12 >= float(edge.travel_cost):
                     index += 1
                     progress = 0.0
                 else:
