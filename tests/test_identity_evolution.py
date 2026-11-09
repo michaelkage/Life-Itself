@@ -2,7 +2,7 @@
 import unittest
 
 from simreality.identity_evolution import (
-    IdentityChangePolicy, IdentityEvolutionEvaluator, NPCIdentityProfile,
+    IdentityChangePolicy, IdentityChangeProposal, IdentityEvolutionEvaluator, NPCIdentityProfile,
 )
 from simreality.world_events import WorldEventLedger
 
@@ -88,6 +88,22 @@ class IdentityEvolutionTests(unittest.TestCase):
         self.assertEqual(profile.sensitivities["trust"], 1.0)
         with self.assertRaises(TypeError):
             profile.traits["trust"] = 0.7
+
+    def test_identity_change_proposal_validates_its_bounds(self):
+        valid = IdentityChangeProposal(
+            "event", "npc", "policy", "trust", 0.2, 0.24, 0.04, 0.8, "participant"
+        )
+        self.assertEqual(valid.delta, 0.04)
+        invalid_values = (
+            ("", "npc", "policy", "trust", 0.2, 0.24, 0.04, 0.8, "participant", 0.05),
+            ("event", "npc", "policy", "trust", 0.2, 0.24, 0.04, 0.8, "unknown", 0.05),
+            ("event", "npc", "policy", "trust", 0.2, 0.24, 0.04, 0.8, "participant", 0.0),
+            ("event", "npc", "policy", "trust", 0.2, 0.24, 0.2, 0.8, "participant", 0.05),
+            ("event", "npc", "policy", "trust", 0.2, 0.24, 0.04, True, "participant", 0.05),
+        )
+        for values in invalid_values:
+            with self.subTest(values=values), self.assertRaises(ValueError):
+                IdentityChangeProposal(*values)
 
     def test_policy_rejects_boolean_numeric_values_and_invalid_flags(self):
         with self.assertRaises(ValueError):
