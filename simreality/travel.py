@@ -11,6 +11,7 @@ import json
 import math
 from typing import Iterable, Mapping
 
+from .memory_routines import RoutineAvoidanceProfile
 from .route_planning import PersonalRoutePlanner, RouteEdge, RoutePlan
 from .world_events import WorldEventLedger
 
@@ -211,8 +212,8 @@ class TravelTickAdapter:
             if not isinstance(owner, str) or not owner.strip():
                 raise ValueError("avoidance profile owners must be non-empty strings")
             profiles = tuple(values)
-            if any(getattr(profile, "owner_id", None) != owner for profile in profiles):
-                raise ValueError("avoidance profiles must be scoped to their mapping owner")
+            if any(not isinstance(profile, RoutineAvoidanceProfile) or profile.owner_id != owner for profile in profiles):
+                raise ValueError("avoidance profiles must be RoutineAvoidanceProfile values scoped to their mapping owner")
             profile_map[owner] = profiles
         profile_signature = tuple((owner, profile_map[owner]) for owner in sorted(profile_map))
         signature = _tick_signature(tick, clean_budgets, closed, tuple(sorted(multipliers.items())), replan_blocked, profile_signature)
@@ -273,7 +274,7 @@ class TravelTickAdapter:
                     progress = 0.0
                 else:
                     break
-            if index >= len(journey.edge_ids):
+            if index >= len(edge_ids):
                 status, arrived_tick = "arrived", tick
                 arrivals.append(journey.journey_id)
             elif status != "blocked":
