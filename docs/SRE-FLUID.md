@@ -49,13 +49,15 @@ non-integral trauma tiers, and non-boolean flags.
 The C++ core now exposes a device-independent `ComputeBackend` interface and
 `evaluate_with_fallback` dispatcher. A future WebGPU/Vulkan adapter owns its
 device buffers and reports availability and maximum batch capacity. The
-dispatcher keeps small batches on the CPU, validates the immutable inputs,
-checks output count/order/ranges and compares every score to the CPU reference
-within a configurable absolute tolerance. Trauma tiers and rumour decisions must
-match exactly. It falls back to the CPU reference if the
-device is unavailable, the adapter throws (including device loss), or its
-results violate the contract. A fake backend in the C++ tests exercises these
-paths; it is not a real GPU implementation.
+dispatcher keeps small batches on the CPU and splits larger snapshots into
+contiguous chunks no larger than the adapter's reported maximum batch capacity.
+Chunk boundaries do not change stable agent order. Every chunk is checked for
+output count/order/ranges and compared to the CPU reference within a configurable
+absolute tolerance. Trauma tiers and rumour decisions must match exactly. If any
+chunk fails, including device loss after earlier chunks completed, all partial
+GPU output is discarded and the complete snapshot is recomputed on the CPU. A
+fake backend in the C++ tests exercises these paths; it is not a real GPU
+implementation.
 
 This boundary deliberately does not add a graphics API dependency to the
 portable core. A production adapter still needs persistent device buffers,
