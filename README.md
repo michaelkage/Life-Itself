@@ -60,7 +60,8 @@ Engine-independent Python reference systems:
 | `simreality/routines.py` | Persistent NPC routines | Time-windowed routines resolved against explicit disruptions; intended plans can be delayed, redirected, or missed with deterministic replay inputs |
 | `simreality/route_planning.py` | NPC navigation | Deterministic personal route selection over explicit road edges, including closed-road exclusion and memory-derived location avoidance |
 | `simreality/travel.py` | NPC travel execution | Advances journeys across simulation ticks with explicit time budgets, road closures, travel-time multipliers, junction-aware rerouting, and arrival world events |
-| `simreality/travel_save_state.py` | NPC travel persistence | Canonical journey and tick-replay snapshot, including partial edge progress and routine intent for save/load continuation |\n| `simreality/routine_travel.py` | Routine-to-travel bridge | Starts journeys toward active scheduled routine destinations and carries routine IDs through arrival events |
+| `simreality/travel_save_state.py` | NPC travel persistence | Canonical journey and tick-replay snapshot, including partial edge progress and routine intent for save/load continuation |
+| `simreality/routine_travel.py` | Routine-to-travel bridge | Starts journeys toward active scheduled routine destinations and carries routine IDs through arrival events |
 | `simreality/routine_tick.py` | Routine tick adapter | Selects active routines for an explicit tick, scopes supplied disruptions per NPC, and records replay-safe executions using explicit samples; called by the coordinator's named routine phase |
 | `simreality/npc_autonomy.py` | NPC autonomy | Read-only decision cycle that connects selected goals to explicit desired facts and bounded plans |
 | `simreality/appraisal.py` | NPC values and bias | Transparent value-weighted choice appraisal; different NPCs can rank the same hard choice differently |
