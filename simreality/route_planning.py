@@ -79,12 +79,19 @@ class PersonalRoutePlanner:
         *,
         avoidance_profiles: Iterable[RoutineAvoidanceProfile] = (),
         avoidance_penalty_scale: float = 4.0,
+        closed_edge_ids: Iterable[str] = (),
     ) -> RoutePlan:
         for name, value in (("owner_id", owner_id), ("origin", origin), ("destination", destination)):
             if not isinstance(value, str) or not value.strip():
                 raise ValueError(f"{name} must be a non-empty string")
         if isinstance(avoidance_penalty_scale, bool) or not isinstance(avoidance_penalty_scale, (int, float)) or not math.isfinite(avoidance_penalty_scale) or avoidance_penalty_scale < 0:
             raise ValueError("avoidance_penalty_scale must be finite and non-negative")
+        closed = frozenset(closed_edge_ids)
+        known_edges = {item[2] for neighbours in self._adjacency.values() for item in neighbours}
+        if any(not isinstance(edge_id, str) or not edge_id.strip() for edge_id in closed):
+            raise ValueError("closed_edge_ids must contain non-empty edge IDs")
+        if not closed.issubset(known_edges):
+            raise ValueError("closed_edge_ids contains an unknown route edge")
         profiles = tuple(avoidance_profiles)
         if any(not isinstance(item, RoutineAvoidanceProfile) for item in profiles):
             raise TypeError("avoidance_profiles must contain RoutineAvoidanceProfile values")
@@ -109,8 +116,8 @@ class PersonalRoutePlanner:
                 continue
             if node == destination:
                 return RoutePlan(owner_id, origin, destination, path, base, adjusted, avoided)
-            for neighbour, edge_cost, _edge_id in self._adjacency.get(node, ()):
-                if neighbour in path:
+            for neighbour, edge_cost, edge_id in self._adjacency.get(node, ()):
+                if edge_id in closed or neighbour in path:
                     continue
                 strength = strengths.get(neighbour, 0.0)
                 penalty = edge_cost * float(avoidance_penalty_scale) * strength
