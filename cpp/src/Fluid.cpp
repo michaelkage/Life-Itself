@@ -48,6 +48,14 @@ void validate_impl(const std::vector<AgentInput>& agents) {
     }
 }
 
+float read_f32_le(const std::uint8_t* bytes) {
+    const std::uint32_t bits = static_cast<std::uint32_t>(bytes[0])
+        | (static_cast<std::uint32_t>(bytes[1]) << 8U)
+        | (static_cast<std::uint32_t>(bytes[2]) << 16U)
+        | (static_cast<std::uint32_t>(bytes[3]) << 24U);
+    return std::bit_cast<float>(bits);
+}
+
 void append_f32_le(std::vector<std::uint8_t>& bytes, float value) {
     const std::uint32_t bits = std::bit_cast<std::uint32_t>(value);
     bytes.push_back(static_cast<std::uint8_t>(bits & 0xffU));
@@ -109,6 +117,37 @@ std::vector<AgentOutput> evaluate_cpu(const std::vector<AgentInput>& agents) {
 
 void validate_agents(const std::vector<AgentInput>& agents) {
     validate_impl(agents);
+}
+
+
+std::vector<AgentOutput> unpack_outputs(
+    const std::vector<AgentInput>& agents, const std::vector<std::uint8_t>& bytes) {
+    validate_agents(agents);
+    if (agents.size() > std::numeric_limits<std::size_t>::max() / kAgentOutputStride
+        || bytes.size() != agents.size() * kAgentOutputStride) {
+        throw std::invalid_argument("GPU output buffer has an invalid byte length");
+    }
+    std::vector<AgentOutput> outputs;
+    outputs.reserve(agents.size());
+    for (std::size_t i = 0; i < agents.size(); ++i) {
+        const std::uint8_t* record = bytes.data() + i * kAgentOutputStride;
+        const float desperation = read_f32_le(record);
+        const float trauma = read_f32_le(record + 4);
+        const float transmittable = read_f32_le(record + 8);
+        const float attribution = read_f32_le(record + 12);
+        if (!std::isfinite(desperation) || desperation < 0.0F || desperation > 1.0F
+            || !std::isfinite(trauma) || trauma < 0.0F || trauma > 3.0F
+            || std::floor(trauma) != trauma
+            || (transmittable != 0.0F && transmittable != 1.0F)
+            || (attribution != 0.0F && attribution != 1.0F)
+            || (attribution == 1.0F && transmittable != 1.0F)) {
+            throw std::invalid_argument("GPU output buffer contains an invalid agent result");
+        }
+        outputs.push_back({agents[i].agent_id, desperation,
+            static_cast<std::uint8_t>(trauma), transmittable == 1.0F,
+            attribution == 1.0F});
+    }
+    return outputs;
 }
 
 EvaluationReport evaluate_with_fallback(
