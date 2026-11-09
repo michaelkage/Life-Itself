@@ -150,22 +150,26 @@ class TravelTickAdapter:
             raise ValueError("a found route plan for the same owner is required")
         if isinstance(tick, bool) or not isinstance(tick, int) or tick < 0:
             raise ValueError("tick must be a non-negative integer")
-        selected: list[str] = []
-        for start, end in zip(plan.path, plan.path[1:]):
-            candidates = [edge for edge in self._edges.values()
-                          if (edge.start_location_id == start and edge.end_location_id == end)
-                          or (edge.bidirectional and edge.start_location_id == end and edge.end_location_id == start)]
-            if not candidates:
-                raise ValueError(f"route plan segment has no matching edge: {start} -> {end}")
-            selected.append(min(candidates, key=lambda edge: (edge.travel_cost, edge.edge_id)).edge_id)
+        selected = self._edge_ids_for_plan(plan)
         status = "arrived" if not selected else "travelling"
         journey = TravelJourney(journey_id, owner_id, plan.origin, plan.destination, plan.path,
-                                tuple(selected), edge_index=len(selected) if not selected else 0,
+                                selected, edge_index=len(selected) if not selected else 0,
                                 status=status, started_tick=tick, arrived_tick=tick if not selected else None,
                                 routine_id=routine_id)
         return self.ledger.add(journey)
 
     def _edge_ids_for_plan(self, plan: RoutePlan) -> tuple[str, ...]:
+        if plan.edge_ids:
+            if len(plan.edge_ids) != len(plan.path) - 1:
+                raise ValueError("route plan edge IDs do not match its path")
+            for edge_id, start, end in zip(plan.edge_ids, plan.path, plan.path[1:]):
+                edge = self._edges.get(edge_id)
+                if edge is None or not (
+                    (edge.start_location_id == start and edge.end_location_id == end)
+                    or (edge.bidirectional and edge.start_location_id == end and edge.end_location_id == start)
+                ):
+                    raise ValueError(f"route plan edge does not match its path segment: {edge_id}")
+            return plan.edge_ids
         selected = []
         for start, end in zip(plan.path, plan.path[1:]):
             candidates = [edge for edge in self._edges.values()
