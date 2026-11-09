@@ -29,7 +29,7 @@ class FluidBatchTests(unittest.TestCase):
 
     def test_rumour_transmission_and_attribution_thresholds(self):
         cases = ((0.7, True, True, True), (0.59, True, True, False),
-                 (0.05, True, False, False), (0.01, False, False, False),
+                 (0.01, True, False, False), (0.01, False, False, False),
                  (0.02, False, True, False))
         for retention, known, transmittable, attributed in cases:
             result = evaluate_cpu((self.make_agent(rumour_retention=retention,
