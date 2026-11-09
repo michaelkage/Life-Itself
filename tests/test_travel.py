@@ -180,9 +180,15 @@ class TravelTickTests(unittest.TestCase):
         for tick in raw["ticks"]:
             for journey in tick["result"]["journeys"]:
                 journey.pop("routine_id", None)
+            signature = json.loads(tick["signature"])
+            signature.pop("replan_blocked", None)
+            signature.pop("avoidance_profiles", None)
+            tick["signature"] = json.dumps(signature, sort_keys=True, separators=(",", ":"), allow_nan=False)
         legacy = json.dumps(raw, sort_keys=True, separators=(",", ":"), allow_nan=False)
         restored = TravelSnapshot.from_json(legacy).restore()
         self.assertIsNone(restored.get("trip-1").routine_id)
+        replay = TravelTickAdapter(self.edges, restored).advance(1, {"npc-1": 1})
+        self.assertEqual(replay.journeys[0].edge_progress, 1)
 
     def test_start_uses_open_parallel_edge_selected_by_planner(self):
         edges = (
