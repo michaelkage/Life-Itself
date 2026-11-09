@@ -54,6 +54,26 @@ public:
         std::span<const AgentInput> agents) = 0;
 };
 
+struct BufferViews {
+    std::span<std::uint8_t> input{};
+    std::span<std::uint8_t> output{};
+};
+
+// Retains CPU staging/readback allocations between ticks. prepare() exposes
+// only the active byte ranges while keeping the larger allocation for reuse.
+class BufferWorkspace {
+public:
+    [[nodiscard]] BufferViews prepare(std::size_t agent_count);
+    [[nodiscard]] std::size_t capacity_agents() const noexcept {
+        return capacity_agents_;
+    }
+
+private:
+    std::vector<std::uint8_t> input_{};
+    std::vector<std::uint8_t> output_{};
+    std::size_t capacity_agents_{0U};
+};
+
 struct EvaluationOptions {
     std::size_t minimum_gpu_batch{2048};
     // GPU pressure may differ slightly from the f32 CPU reference across devices.
