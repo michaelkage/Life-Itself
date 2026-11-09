@@ -182,6 +182,11 @@ class IdentityDecisionTests(unittest.TestCase):
             with self.subTest(record=malformed), self.assertRaises(ValueError):
                 IdentityDecisionSnapshot(valid.profiles, (malformed,))
 
+    def test_decision_rejects_unrepresentably_large_numeric_values(self):
+        with self.assertRaises(ValueError):
+            IdentityChangeDecision("d", "e", "npc-a", "p", "trust", True, 1, "r",
+                                   10**10000, 0.2, 0.0, 0.5, "participant")
+
     def test_invalid_decision_tick_rejected(self):
         with self.assertRaises(ValueError):
             IdentityChangeDecision.from_proposal(
