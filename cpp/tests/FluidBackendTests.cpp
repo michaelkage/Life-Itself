@@ -81,11 +81,15 @@ int main() {
     pack_agents_into(batch, first_buffers.input);
     const auto* retained_input_address = first_buffers.input.data();
     const auto* retained_output_address = first_buffers.output.data();
+    first_buffers.input[0] = 0xA5U;
+    first_buffers.output[0] = 0x5AU;
     auto smaller_buffers = workspace.prepare(0U);
     assert(smaller_buffers.input.empty() && smaller_buffers.output.empty());
     auto reused_buffers = workspace.prepare(batch.size());
     assert(reused_buffers.input.data() == retained_input_address);
     assert(reused_buffers.output.data() == retained_output_address);
+    assert(reused_buffers.input[0] == 0xA5U);
+    assert(reused_buffers.output[0] == 0x5AU);
     assert(workspace.capacity_agents() >= batch.size());
     pack_agents_into(batch, reused_buffers.input);
     const auto workspace_decoded = unpack_outputs(batch, reused_buffers.output);
