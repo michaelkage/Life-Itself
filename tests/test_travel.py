@@ -2,6 +2,7 @@ import unittest
 
 from simreality.route_planning import PersonalRoutePlanner, RouteEdge
 from simreality.travel import TravelLedger, TravelTickAdapter
+from simreality.travel_save_state import TravelSnapshot
 from simreality.world_events import WorldEventLedger
 
 
@@ -40,7 +41,7 @@ class TravelTickTests(unittest.TestCase):
     def test_dynamic_time_multiplier_and_arrival_event(self):
         events = WorldEventLedger()
         result = self.adapter.advance(1, {"npc-1": 3}, time_multipliers={"home-road": 2})
-        self.assertEqual(result.journeys[0].edge_progress, 3)
+        self.assertEqual(result.journeys[0].edge_progress, 1.5)
         self.adapter.advance(2, {"npc-1": 3}, events=events)
         arrived = self.adapter.advance(3, {"npc-1": 1}, events=events)
         self.assertEqual(arrived.arrivals, ("trip-1",))
@@ -64,6 +65,22 @@ class TravelTickTests(unittest.TestCase):
         plan = self.planner.plan("npc-2", "home", "home")
         journey = self.adapter.start("trip-2", "npc-2", plan, 0)
         self.assertEqual(journey.status, "arrived")
+
+    def test_snapshot_restores_partial_progress_and_tick_replay(self):
+        original = self.adapter.advance(1, {"npc-1": 1})
+        encoded = TravelSnapshot.capture(self.adapter.ledger).to_json()
+        restored_ledger = TravelSnapshot.from_json(encoded).restore()
+        restored = TravelTickAdapter(self.edges, restored_ledger)
+        self.assertEqual(restored.ledger.get("trip-1").edge_progress, 1)
+        self.assertEqual(restored.advance(1, {"npc-1": 1}), original)
+        result = restored.advance(2, {"npc-1": 2})
+        self.assertEqual(result.journeys[0].edge_progress, 0)
+        self.assertEqual(result.journeys[0].current_location, "crossroads")
+
+    def test_snapshot_rejects_noncanonical_json(self):
+        encoded = TravelSnapshot.capture(self.adapter.ledger).to_json()
+        with self.assertRaises(ValueError):
+            TravelSnapshot.from_json(encoded + " ")
 
 
 if __name__ == "__main__":
