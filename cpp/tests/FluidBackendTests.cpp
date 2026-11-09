@@ -213,7 +213,6 @@ int main() {
     backend.throw_on_call = 0U;
     backend.maximum_agents = 1000U;
     backend.maximum_workgroups_per_dimension = 1U;
-    backend.maximum_agents = 1000U;
     std::vector<AgentInput> dispatch_limited_batch;
     for (int i = 0; i < 600; ++i) {
         AgentInput item = sample();
