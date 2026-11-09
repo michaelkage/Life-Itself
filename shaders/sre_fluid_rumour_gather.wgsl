@@ -22,7 +22,11 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     let slot = claims[i];
     let start = slot.edge_range.x;
     let count = slot.edge_range.y;
-    if (start > arrayLength(&edges) || count > arrayLength(&edges) - start) { return; }
+    if (start > arrayLength(&edges) || count > arrayLength(&edges) - start) {
+        // A malformed range must not leave stale bytes looking like a valid result.
+        results[i].values = vec4<f32>(-1.0, -1.0, 0.0, 0.0);
+        return;
+    }
     var confidence = clamp(slot.prior.x, 0.0, 1.0);
     for (var offset = 0u; offset < count; offset = offset + 1u) {
         let edge = edges[start + offset].values;
