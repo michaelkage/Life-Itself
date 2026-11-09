@@ -184,6 +184,22 @@ class TravelTickTests(unittest.TestCase):
         restored = TravelSnapshot.from_json(legacy).restore()
         self.assertIsNone(restored.get("trip-1").routine_id)
 
+    def test_start_uses_open_parallel_edge_selected_by_planner(self):
+        edges = (
+            RouteEdge("closed-shortcut", "home", "junction", 1),
+            RouteEdge("open-road", "home", "junction", 2),
+            RouteEdge("junction-office", "junction", "office", 1),
+        )
+        planner = PersonalRoutePlanner(edges)
+        plan = planner.plan("npc-parallel", "home", "office",
+                            closed_edge_ids=("closed-shortcut",))
+        adapter = TravelTickAdapter(edges)
+        journey = adapter.start("parallel-trip", "npc-parallel", plan, 0)
+        self.assertEqual(journey.edge_ids, ("open-road", "junction-office"))
+        result = adapter.advance(1, {"npc-parallel": 2},
+                                 closed_edge_ids=("closed-shortcut",))
+        self.assertEqual(result.journeys[0].current_location, "junction")
+
 
 if __name__ == "__main__":
     unittest.main()
