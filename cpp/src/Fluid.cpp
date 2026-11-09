@@ -86,9 +86,15 @@ BufferViews BufferWorkspace::prepare(std::size_t agent_count) {
         capacity_agents_ = next_capacity;
     }
 
-    input_.resize(agent_count * kAgentInputStride);
-    output_.resize(agent_count * kAgentOutputStride);
-    return {std::span<std::uint8_t>(input_), std::span<std::uint8_t>(output_)};
+    // Keep vector sizes at the retained capacity. Resizing down and back up
+    // every tick would value-initialize the same bytes repeatedly, adding
+    // avoidable CPU memory bandwidth cost before each GPU upload.
+    const std::size_t active_input_bytes = agent_count * kAgentInputStride;
+    const std::size_t active_output_bytes = agent_count * kAgentOutputStride;
+    return {
+        std::span<std::uint8_t>(input_.data(), active_input_bytes),
+        std::span<std::uint8_t>(output_.data(), active_output_bytes)
+    };
 }
 
 void pack_agents_into(std::span<const AgentInput> agents,
