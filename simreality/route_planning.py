@@ -43,6 +43,7 @@ class RoutePlan:
     base_cost: float
     adjusted_cost: float
     avoided_locations: tuple[str, ...]
+    edge_ids: tuple[str, ...] = ()
 
     @property
     def found(self) -> bool:
@@ -102,20 +103,20 @@ class PersonalRoutePlanner:
             strengths[profile.location_id] = max(strengths.get(profile.location_id, 0.0), profile.strength)
 
         if origin == destination:
-            return RoutePlan(owner_id, origin, destination, (origin,), 0.0, 0.0, ())
+            return RoutePlan(owner_id, origin, destination, (origin,), 0.0, 0.0, (), ())
         # Heap ordering by (adjusted cost, complete path) makes equal-cost
         # choices stable and independent of edge insertion order.
-        queue: list[tuple[float, tuple[str, ...], float, tuple[str, ...]]] = [
-            (0.0, (origin,), 0.0, ())
+        queue: list[tuple[float, tuple[str, ...], float, tuple[str, ...], tuple[str, ...]]] = [
+            (0.0, (origin,), 0.0, (), ())
         ]
         best: dict[str, tuple[float, tuple[str, ...]]] = {origin: (0.0, (origin,))}
         while queue:
-            adjusted, path, base, avoided = heapq.heappop(queue)
+            adjusted, path, base, avoided, edge_path = heapq.heappop(queue)
             node = path[-1]
             if best.get(node) != (adjusted, path):
                 continue
             if node == destination:
-                return RoutePlan(owner_id, origin, destination, path, base, adjusted, avoided)
+                return RoutePlan(owner_id, origin, destination, path, base, adjusted, avoided, edge_path)
             for neighbour, edge_cost, edge_id in self._adjacency.get(node, ()):
                 if edge_id in closed or neighbour in path:
                     continue
@@ -127,5 +128,6 @@ class PersonalRoutePlanner:
                 if neighbour not in best or candidate < best[neighbour]:
                     best[neighbour] = candidate
                     next_avoided = avoided + ((neighbour,) if strength > 0 else ())
-                    heapq.heappush(queue, (next_adjusted, next_path, base + edge_cost, next_avoided))
-        return RoutePlan(owner_id, origin, destination, (), math.inf, math.inf, ())
+                    next_edge_path = edge_path + (edge_id,)
+                    heapq.heappush(queue, (next_adjusted, next_path, base + edge_cost, next_avoided, next_edge_path))
+        return RoutePlan(owner_id, origin, destination, (), math.inf, math.inf, (), ())
