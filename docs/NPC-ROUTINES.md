@@ -140,3 +140,12 @@ returns the ledger as `RestoredSimulation.routine_institutions`; its processed
 event signatures are preserved, so reapplying an already recorded consequence
 does not increment counts again. The section is optional for worlds that do
 not use institution-facing records.
+
+
+## Persistent memory/location associations
+
+`MemoryLocationAssociationBook` stores explicit links from one NPC's memory index to a location, optional alternative location, and avoidance scale. Links are owner-scoped: two NPCs may use the same association ID without sharing memories or responses. Duplicate IDs for the same owner are rejected, and removal is owner-scoped and idempotent.
+
+`MemoryLocationAssociationSnapshot` provides canonical versioned JSON persistence for these links. Capture the association book alongside the NPC memory snapshot, restore both, then call `MemoryRoutineAdapter.derive_avoidance` with `book.for_owner(npc.entity_id)`. This preserves the explicit association across save/load; it does not infer locations, create memories, or automatically schedule disruptions. The existing routine execution ledger continues to preserve the exact derived disruption used for each execution.
+
+Regression coverage: `tests/test_memory_routine_save_state.py`.
