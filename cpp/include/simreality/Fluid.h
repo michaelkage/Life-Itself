@@ -68,6 +68,11 @@ struct EvaluationReport {
 };
 
 void validate_agents(const std::vector<AgentInput>& agents);
+
+// Fill caller-owned staging memory. Adapters can retain these allocations across
+// ticks instead of allocating a fresh byte vector for every GPU upload.
+void pack_agents_into(std::span<const AgentInput> agents,
+    std::span<std::uint8_t> destination);
 [[nodiscard]] EvaluationReport evaluate_with_fallback(
     const std::vector<AgentInput>& agents, ComputeBackend* backend = nullptr,
     EvaluationOptions options = {});
@@ -75,6 +80,6 @@ void validate_agents(const std::vector<AgentInput>& agents);
 [[nodiscard]] std::vector<std::uint8_t> pack_agents(const std::vector<AgentInput>& agents);
 [[nodiscard]] std::vector<AgentOutput> evaluate_cpu(std::span<const AgentInput> agents);
 [[nodiscard]] std::vector<AgentOutput> unpack_outputs(
-    const std::vector<AgentInput>& agents, const std::vector<std::uint8_t>& bytes);
+    std::span<const AgentInput> agents, std::span<const std::uint8_t> bytes);
 
 } // namespace simreality::fluid
