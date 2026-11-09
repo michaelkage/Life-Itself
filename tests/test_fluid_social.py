@@ -86,6 +86,11 @@ class FluidSocialGatherTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             pack_evidence_gather((ClaimEvidenceBatch("same", 0.5),
                                   ClaimEvidenceBatch("same", 0.4)))
+        with self.assertRaises(ValueError):
+            pack_evidence_gather((
+                ClaimEvidenceBatch("claim-a", 0.5, (self.edge("duplicate", 1),)),
+                ClaimEvidenceBatch("claim-b", 0.5, (self.edge("duplicate", 2),)),
+            ))
 
 
 if __name__ == "__main__":
