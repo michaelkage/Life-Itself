@@ -1,6 +1,6 @@
 import struct
 import unittest
-from simreality.fluid import AGENT_INPUT_STRIDE, FluidAgentInput, evaluate_cpu, pack_agents
+from simreality.fluid import (AGENT_INPUT_STRIDE, DispatchLimits, FluidAgentInput,\n                              evaluate_cpu, pack_agents, plan_dispatches)
 
 class FluidBatchTests(unittest.TestCase):
     def make_agent(self, **overrides):
@@ -44,6 +44,33 @@ class FluidBatchTests(unittest.TestCase):
             self.make_agent(personal_stress=1.1)
         with self.assertRaises(TypeError):
             self.make_agent(target_known=1)
+
+    def test_dispatch_planner_respects_device_limits_and_stable_order(self):
+        ranges = plan_dispatches(500_000, DispatchLimits(10_000, 64))
+        self.assertTrue(ranges)
+        self.assertEqual(ranges[0].agent_offset, 0)
+        self.assertEqual(ranges[-1].agent_offset + ranges[-1].agent_count, 500_000)
+        self.assertEqual(sum(item.agent_count for item in ranges), 500_000)
+        for index, item in enumerate(ranges):
+            self.assertLessEqual(item.agent_count, 10_000)
+            self.assertLessEqual(item.workgroup_count, 64)
+            if index + 1 < len(ranges):
+                self.assertEqual(item.agent_count % 256, 0)
+            self.assertEqual(item.workgroup_count, (item.agent_count + 255) // 256)
+
+    def test_dispatch_planner_handles_small_devices_and_empty_batches(self):
+        ranges = plan_dispatches(250, DispatchLimits(100, 1))
+        self.assertEqual([item.agent_count for item in ranges], [100, 100, 50])
+        self.assertEqual([item.workgroup_count for item in ranges], [1, 1, 1])
+        self.assertEqual(plan_dispatches(0, DispatchLimits(100, 1)), ())
+
+    def test_dispatch_planner_rejects_invalid_limits(self):
+        with self.assertRaises(ValueError):
+            plan_dispatches(1, DispatchLimits(100, 0))
+        with self.assertRaises(ValueError):
+            plan_dispatches(1, DispatchLimits(100, 1, 0))
+        with self.assertRaises(TypeError):
+            plan_dispatches(True, DispatchLimits(100, 1))
 
     def test_f32_overflow_is_rejected_by_packer(self):
         with self.assertRaises((OverflowError, struct.error)):
