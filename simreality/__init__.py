@@ -305,6 +305,10 @@ from .memory_location_book import MemoryLocationAssociationBook
 from .memory_routine_save_state import MemoryLocationAssociationSnapshot
 __all__ += ["MemoryLocationAssociationBook", "MemoryLocationAssociationSnapshot"]
 
+# Deterministic route selection with NPC-specific memory avoidance costs.
+from .route_planning import PersonalRoutePlanner, RouteEdge, RoutePlan
+__all__ += ["PersonalRoutePlanner", "RouteEdge", "RoutePlan"]
+
 
 # Deterministic bridge from schedule definitions to tick-level executions.
 from .routine_tick import RoutineTickAdapter
