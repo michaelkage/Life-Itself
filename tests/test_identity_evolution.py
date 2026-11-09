@@ -89,6 +89,24 @@ class IdentityEvolutionTests(unittest.TestCase):
         with self.assertRaises(TypeError):
             profile.traits["trust"] = 0.7
 
+    def test_policy_rejects_boolean_numeric_values_and_invalid_flags(self):
+        with self.assertRaises(ValueError):
+            IdentityChangePolicy("p", "event", "trust", True)
+        with self.assertRaises(ValueError):
+            IdentityChangePolicy("p", "event", "trust", 0.1, minimum_strength=True)
+        with self.assertRaises(ValueError):
+            IdentityChangePolicy("p", "event", "trust", 0.1, maximum_delta=False)
+        with self.assertRaises(ValueError):
+            IdentityChangePolicy("p", "event", "trust", 0.1, strength_attribute="")
+        with self.assertRaises(TypeError):
+            IdentityChangePolicy("p", "event", "trust", 0.1, include_witnesses=1)
+
+    def test_evaluator_rejects_invalid_profile_and_policy_types(self):
+        with self.assertRaises(TypeError):
+            IdentityEvolutionEvaluator((object(),), ())
+        with self.assertRaises(TypeError):
+            IdentityEvolutionEvaluator((), (object(),))
+
     def test_invalid_traits_are_rejected(self):
         with self.assertRaises(ValueError):
             NPCIdentityProfile("npc", {"trust": 1.1})
