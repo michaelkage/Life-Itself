@@ -57,15 +57,19 @@ class RoutineTravelAdapter:
                 raise ValueError("current location entries require non-empty NPC and location IDs")
         if not isinstance(planner, PersonalRoutePlanner):
             raise TypeError("planner must be a PersonalRoutePlanner")
-        profiles = avoidance_profiles_by_owner or {}
-        if not isinstance(profiles, Mapping):
+        supplied_profiles = avoidance_profiles_by_owner or {}
+        if not isinstance(supplied_profiles, Mapping):
             raise TypeError("avoidance_profiles_by_owner must be a mapping")
-        for owner, values in profiles.items():
+        profiles = {}
+        for owner, values in supplied_profiles.items():
             if not isinstance(owner, str) or not owner.strip():
                 raise ValueError("avoidance profile owners must be non-empty strings")
+            profile_values = tuple(values)
             if any(not isinstance(profile, RoutineAvoidanceProfile) or profile.owner_id != owner
-                   for profile in tuple(values)):
+                   for profile in profile_values):
                 raise ValueError("avoidance profiles must be typed and scoped to their owner")
+            profiles[owner] = profile_values
+        closed = tuple(closed_edge_ids)
 
         requests = []
         for block in book.snapshot():
@@ -99,7 +103,7 @@ class RoutineTravelAdapter:
             plan = planner.plan(
                 block.owner_id, origin, block.location_id,
                 avoidance_profiles=profiles.get(block.owner_id, ()),
-                closed_edge_ids=closed_edge_ids,
+                closed_edge_ids=closed,
             )
             if not plan.found:
                 requests.append(RoutineTravelRequest(
