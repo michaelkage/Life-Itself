@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <span>
 #include <string>
 #include <vector>
@@ -18,6 +19,9 @@ struct DispatchLimits {
     // Device limit for workgroups dispatched along the x dimension.
     std::size_t maximum_workgroups_per_dimension{0U};
     std::size_t workgroup_size{kWorkgroupSize};
+    // Maximum byte sizes of the input and output storage-buffer bindings.
+    std::size_t maximum_input_buffer_bytes{std::numeric_limits<std::size_t>::max()};
+    std::size_t maximum_output_buffer_bytes{std::numeric_limits<std::size_t>::max()};
 };
 
 struct DispatchRange {
@@ -66,6 +70,8 @@ struct ComputeBackendInfo {
     std::size_t maximum_agents{0};
     std::size_t maximum_workgroups_per_dimension{65535U};
     std::size_t workgroup_size{kWorkgroupSize};
+    std::size_t maximum_input_buffer_bytes{std::numeric_limits<std::size_t>::max()};
+    std::size_t maximum_output_buffer_bytes{std::numeric_limits<std::size_t>::max()};
 };
 
 class ComputeBackend {
