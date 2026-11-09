@@ -11,7 +11,7 @@ import json
 import math
 from typing import Iterable, Mapping
 
-from .route_planning import RouteEdge, RoutePlan
+from .route_planning import PersonalRoutePlanner, RouteEdge, RoutePlan
 from .world_events import WorldEventLedger
 
 
@@ -71,9 +71,11 @@ class TravelTickResult:
     blocked: tuple[str, ...]
 
 
-def _tick_signature(tick: int, budgets: Mapping[str, float], closed: tuple[str, ...], multipliers: tuple[tuple[str, float], ...]) -> str:
+def _tick_signature(tick: int, budgets: Mapping[str, float], closed: tuple[str, ...], multipliers: tuple[tuple[str, float], ...], replan_blocked: bool, avoidance_profiles: tuple[tuple[str, tuple[object, ...]], ...]) -> str:
+    profiles = [(owner, [(p.location_id, p.strength, p.source_memory_indices, p.alternative_location_id) for p in values]) for owner, values in avoidance_profiles]
     return json.dumps({"tick": tick, "budgets": sorted(budgets.items()), "closed": closed,
-                       "multipliers": multipliers}, sort_keys=True, separators=(",", ":"), allow_nan=False)
+                       "multipliers": multipliers, "replan_blocked": replan_blocked,
+                       "avoidance_profiles": profiles}, sort_keys=True, separators=(",", ":"), allow_nan=False)
 
 
 class TravelLedger:
@@ -157,9 +159,23 @@ class TravelTickAdapter:
                                 status=status, started_tick=tick, arrived_tick=tick if not selected else None)
         return self.ledger.add(journey)
 
+    def _edge_ids_for_plan(self, plan: RoutePlan) -> tuple[str, ...]:
+        selected = []
+        for start, end in zip(plan.path, plan.path[1:]):
+            candidates = [edge for edge in self._edges.values()
+                          if (edge.start_location_id == start and edge.end_location_id == end)
+                          or (edge.bidirectional and edge.start_location_id == end and edge.end_location_id == start)]
+            if not candidates:
+                raise ValueError(f"route plan segment has no matching edge: {start} -> {end}")
+            selected.append(min(candidates, key=lambda edge: (edge.travel_cost, edge.edge_id)).edge_id)
+        return tuple(selected)
+
     def advance(self, tick: int, budgets: Mapping[str, float], *,
                 closed_edge_ids: Iterable[str] = (),
                 time_multipliers: Mapping[str, float] | None = None,
+                route_planner: PersonalRoutePlanner | None = None,
+                replan_blocked: bool = False,
+                avoidance_profiles_by_owner: Mapping[str, Iterable[object]] | None = None,
                 events: WorldEventLedger | None = None) -> TravelTickResult:
         if isinstance(tick, bool) or not isinstance(tick, int) or tick < 0:
             raise ValueError("tick must be a non-negative integer")
@@ -181,7 +197,25 @@ class TravelTickAdapter:
             multipliers[edge_id] = float(multiplier)
         if events is not None and not isinstance(events, WorldEventLedger):
             raise TypeError("events must be a WorldEventLedger")
-        signature = _tick_signature(tick, clean_budgets, closed, tuple(sorted(multipliers.items())))
+        if not isinstance(replan_blocked, bool):
+            raise ValueError("replan_blocked must be a boolean")
+        if route_planner is not None and not isinstance(route_planner, PersonalRoutePlanner):
+            raise TypeError("route_planner must be a PersonalRoutePlanner or None")
+        if replan_blocked and route_planner is None:
+            raise ValueError("route_planner is required when replan_blocked is enabled")
+        supplied_profiles = avoidance_profiles_by_owner or {}
+        if not isinstance(supplied_profiles, Mapping):
+            raise TypeError("avoidance_profiles_by_owner must map owner IDs to profile iterables")
+        profile_map = {}
+        for owner, values in supplied_profiles.items():
+            if not isinstance(owner, str) or not owner.strip():
+                raise ValueError("avoidance profile owners must be non-empty strings")
+            profiles = tuple(values)
+            if any(getattr(profile, "owner_id", None) != owner for profile in profiles):
+                raise ValueError("avoidance profiles must be scoped to their mapping owner")
+            profile_map[owner] = profiles
+        profile_signature = tuple((owner, profile_map[owner]) for owner in sorted(profile_map))
+        signature = _tick_signature(tick, clean_budgets, closed, tuple(sorted(multipliers.items())), replan_blocked, profile_signature)
         prior = self.ledger._ticks.get(tick)
         if prior:
             if prior[0] != signature:
@@ -196,13 +230,33 @@ class TravelTickAdapter:
         arrivals: list[str] = []
         blocked: list[str] = []
         for journey in self.ledger.snapshot():
-            if journey.status != "travelling":
+            if journey.status not in ("travelling", "blocked", "unreachable"):
                 continue
-            budget = clean_budgets.get(journey.owner_id, 0.0)
             index, progress, elapsed = journey.edge_index, journey.edge_progress, journey.elapsed_cost
             status, arrived_tick = journey.status, journey.arrived_tick
-            while budget > 1e-12 and index < len(journey.edge_ids):
-                edge_id = journey.edge_ids[index]
+            path, edge_ids = journey.path, journey.edge_ids
+            if status in ("blocked", "unreachable") and replan_blocked and progress <= 1e-12:
+                plan = route_planner.plan(
+                    journey.owner_id, journey.current_location, journey.destination,
+                    avoidance_profiles=profile_map.get(journey.owner_id, ()),
+                    closed_edge_ids=closed,
+                )
+                if plan.found:
+                    replacement_edges = self._edge_ids_for_plan(plan)
+                    path = path[:index + 1] + plan.path[1:]
+                    edge_ids = edge_ids[:index] + replacement_edges
+                    status = "travelling"
+                else:
+                    status = "unreachable"
+                    blocked.append(journey.journey_id)
+                    updated.append(replace(journey, status=status))
+                    continue
+            elif status in ("blocked", "unreachable"):
+                blocked.append(journey.journey_id)
+                continue
+            budget = clean_budgets.get(journey.owner_id, 0.0)
+            while budget > 1e-12 and index < len(edge_ids):
+                edge_id = edge_ids[index]
                 if edge_id in closed:
                     status = "blocked"
                     blocked.append(journey.journey_id)
@@ -224,8 +278,9 @@ class TravelTickAdapter:
                 arrivals.append(journey.journey_id)
             elif status != "blocked":
                 status = "travelling"
-            updated.append(replace(journey, edge_index=index, edge_progress=progress,
-                                   elapsed_cost=elapsed, status=status, arrived_tick=arrived_tick))
+            updated.append(replace(journey, path=path, edge_ids=edge_ids, edge_index=index,
+                                   edge_progress=progress, elapsed_cost=elapsed,
+                                   status=status, arrived_tick=arrived_tick))
         result = TravelTickResult(tick, tuple(updated), tuple(sorted(arrivals)), tuple(sorted(blocked)))
         result = self.ledger._apply_tick(tick, signature, result)
         if events is not None:
