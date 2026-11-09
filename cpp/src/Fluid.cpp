@@ -264,16 +264,22 @@ EvaluationReport evaluate_with_fallback(
             return report;
         }
 
-        // Device storage limits are per dispatch, not per world snapshot. Split a
-        // large immutable batch into bounded contiguous chunks while preserving ID
-        // order. If any chunk fails parity or the adapter throws, discard every
-        // partial result and recompute the complete snapshot on the CPU.
+        // Device storage and dispatch dimensions are per-dispatch limits, not
+        // world-snapshot limits. The shared planner creates bounded, stable-order
+        // ranges from the adapter's actual capabilities.
+        const std::vector<DispatchRange> dispatches = plan_dispatches(
+            agents.size(), DispatchLimits{capabilities.maximum_agents,
+                capabilities.maximum_workgroups_per_dimension,
+                capabilities.workgroup_size});
+
+        // If any chunk fails parity or the adapter throws, discard every partial
+        // result and recompute the complete snapshot on the CPU.
         std::vector<AgentOutput> candidate;
         candidate.reserve(agents.size());
         bool valid = true;
-        for (std::size_t offset = 0; offset < agents.size();) {
-            const std::size_t count = std::min(
-                capabilities.maximum_agents, agents.size() - offset);
+        for (const DispatchRange& dispatch : dispatches) {
+            const std::size_t offset = dispatch.agent_offset;
+            const std::size_t count = dispatch.agent_count;
             const std::span<const AgentInput> chunk(agents.data() + offset, count);
             const std::vector<AgentOutput> chunk_output = backend->evaluate(chunk);
             const std::vector<AgentOutput> reference = evaluate_cpu(chunk);
@@ -300,7 +306,6 @@ EvaluationReport evaluate_with_fallback(
             }
             if (!valid) break;
             candidate.insert(candidate.end(), chunk_output.begin(), chunk_output.end());
-            offset += count;
         }
         if (!valid || candidate.size() != agents.size()) {
             report.gpu_fallback = true;
