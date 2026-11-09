@@ -72,6 +72,8 @@ class FluidBatchTests(unittest.TestCase):
             plan_dispatches(1, DispatchLimits(100, 1, 0))
         with self.assertRaises(TypeError):
             plan_dispatches(True, DispatchLimits(100, 1))
+        with self.assertRaises(ValueError):
+            plan_dispatches(1, DispatchLimits(100, 1, 128))
 
     def test_f32_overflow_is_rejected_by_packer(self):
         with self.assertRaises((OverflowError, struct.error)):
