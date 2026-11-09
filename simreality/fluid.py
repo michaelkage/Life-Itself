@@ -64,6 +64,8 @@ def plan_dispatches(agent_count: int, limits: DispatchLimits) -> tuple[DispatchR
         limits.maximum_output_buffer_bytes // AGENT_OUTPUT_STRIDE,
         storage_capacity,
     )
+    if safe_capacity == 0:
+        raise ValueError("device storage limits cannot address a complete agent record")
     chunk_capacity = (
         (safe_capacity // limits.workgroup_size) * limits.workgroup_size
         if safe_capacity >= limits.workgroup_size else safe_capacity
