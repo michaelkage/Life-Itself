@@ -273,10 +273,18 @@ int main() {
     backend.maximum_input_buffer_bytes = 47U;
     backend.maximum_output_buffer_bytes = 16U * 1000U;
     backend.evaluate_calls = 0U;
-    const auto undersized_binding = evaluate_with_fallback(
+    const auto undersized_input_binding = evaluate_with_fallback(
         dispatch_limited_batch, &backend, options);
-    assert(undersized_binding.backend == BackendKind::Cpu);
-    assert(undersized_binding.gpu_fallback);
+    assert(undersized_input_binding.backend == BackendKind::Cpu);
+    assert(undersized_input_binding.gpu_fallback);
+    assert(backend.evaluate_calls == 0U);
+
+    backend.maximum_input_buffer_bytes = 48U * 1000U;
+    backend.maximum_output_buffer_bytes = 15U;
+    const auto undersized_output_binding = evaluate_with_fallback(
+        dispatch_limited_batch, &backend, options);
+    assert(undersized_output_binding.backend == BackendKind::Cpu);
+    assert(undersized_output_binding.gpu_fallback);
     assert(backend.evaluate_calls == 0U);
 
     backend.maximum_input_buffer_bytes = std::numeric_limits<std::size_t>::max();
