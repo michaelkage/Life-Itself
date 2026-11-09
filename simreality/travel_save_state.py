@@ -75,10 +75,20 @@ class TravelSnapshot:
             if not isinstance(raw, dict) or raw.get("schema_version") not in (1, cls.SCHEMA_VERSION):
                 raise ValueError("unsupported travel snapshot schema version")
             journeys = tuple(_read_journey(j) for j in raw["journeys"])
-            ticks = tuple((item["tick"], item["signature"], _read_result(item["result"]))
-                          for item in raw["ticks"])
-            snapshot = cls(journeys, ticks)
             canonical = json.dumps(raw, sort_keys=True, separators=(",", ":"), allow_nan=False)
+            ticks_list = []
+            for item in raw["ticks"]:
+                signature = item["signature"]
+                try:
+                    signature_data = json.loads(signature)
+                except (TypeError, json.JSONDecodeError):
+                    signature_data = None
+                if isinstance(signature_data, dict) and set(signature_data) == {"tick", "budgets", "closed", "multipliers"}:
+                    signature_data["replan_blocked"] = False
+                    signature_data["avoidance_profiles"] = []
+                    signature = json.dumps(signature_data, sort_keys=True, separators=(",", ":"), allow_nan=False)
+                ticks_list.append((item["tick"], signature, _read_result(item["result"])))
+            snapshot = cls(journeys, tuple(ticks_list))
             if canonical != payload:
                 raise ValueError("travel snapshot must use canonical JSON")
             return snapshot
