@@ -153,7 +153,7 @@ Regression coverage: `tests/test_memory_routine_save_state.py`.
 
 ## Personal memory-aware route selection
 
-`PersonalRoutePlanner` evaluates an explicit `RouteEdge` graph with deterministic lowest-cost path selection. Callers pass the requesting NPC's `RoutineAvoidanceProfile` values, normally produced by `MemoryRoutineAdapter.derive_avoidance_profiles` or the corresponding profile-building path. Matching owner/location profiles add a configurable cost penalty to routes entering those locations. Profiles belonging to other NPCs are ignored, so a remembered incident does not globally close a street or force every citizen to detour.
+`PersonalRoutePlanner` evaluates an explicit `RouteEdge` graph with deterministic lowest-cost path selection. Callers pass the requesting NPC's `RoutineAvoidanceProfile` values, produced by `MemoryRoutineAdapter.derive_profiles` using that NPC's restored `MemoryLocationAssociationBook.for_owner(owner_id)` entries. Matching owner/location profiles add a configurable cost penalty to routes entering those locations. Profiles belonging to other NPCs are ignored, so a remembered incident does not globally close a street or force every citizen to detour.
 
 `RoutePlan` returns the selected location sequence, base travel cost, adjusted cost, and the avoided locations that influenced the selected path. Equal-cost paths are resolved lexicographically and do not depend on edge insertion order. An unreachable destination returns an empty path; the planner does not invent roads, travel times, or location links. This is a graph-level path-choice layer only: traffic simulation, dynamic road closures, vehicle movement, and route execution remain world-driver responsibilities.
 
