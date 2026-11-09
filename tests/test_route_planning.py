@@ -60,6 +60,17 @@ class PersonalRoutePlannerTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             planner.plan("npc", "home", "office", closed_edge_ids=("unknown",))
 
+    def test_route_plan_preserves_selected_parallel_edge(self):
+        planner = PersonalRoutePlanner((
+            RouteEdge("closed-shortcut", "home", "junction", 1),
+            RouteEdge("open-road", "home", "junction", 2),
+            RouteEdge("junction-office", "junction", "office", 1),
+        ))
+        plan = planner.plan("npc", "home", "office",
+                            closed_edge_ids=("closed-shortcut",))
+        self.assertEqual(plan.path, ("home", "junction", "office"))
+        self.assertEqual(plan.edge_ids, ("open-road", "junction-office"))
+
 
 if __name__ == "__main__":
     unittest.main()
