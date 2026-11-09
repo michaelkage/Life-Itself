@@ -73,7 +73,7 @@ void validate_agents(const std::vector<AgentInput>& agents);
     EvaluationOptions options = {});
 
 [[nodiscard]] std::vector<std::uint8_t> pack_agents(const std::vector<AgentInput>& agents);
-[[nodiscard]] std::vector<AgentOutput> evaluate_cpu(const std::vector<AgentInput>& agents);
+[[nodiscard]] std::vector<AgentOutput> evaluate_cpu(std::span<const AgentInput> agents);
 [[nodiscard]] std::vector<AgentOutput> unpack_outputs(
     const std::vector<AgentInput>& agents, const std::vector<std::uint8_t>& bytes);
 
