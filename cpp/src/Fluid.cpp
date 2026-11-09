@@ -170,20 +170,33 @@ EvaluationReport evaluate_with_fallback(
     }
     try {
         const ComputeBackendInfo capabilities = backend->info();
-        if (!capabilities.available || agents.size() > capabilities.maximum_agents) {
+        if (!capabilities.available || capabilities.maximum_agents == 0U) {
             use_cpu();
             return report;
         }
-        std::vector<AgentOutput> candidate = backend->evaluate(agents);
-        // The CPU reference remains authoritative. GPU arithmetic is accepted only
-        // within an explicit score tolerance; discrete decisions must match exactly.
-        const std::vector<AgentOutput> reference = evaluate_cpu(agents);
-        bool valid = candidate.size() == agents.size();
-        if (valid) {
-            for (std::size_t i = 0; i < candidate.size(); ++i) {
-                const AgentOutput& output = candidate[i];
+
+        // Device storage limits are per dispatch, not per world snapshot. Split a
+        // large immutable batch into bounded contiguous chunks while preserving ID
+        // order. If any chunk fails parity or the adapter throws, discard every
+        // partial result and recompute the complete snapshot on the CPU.
+        std::vector<AgentOutput> candidate;
+        candidate.reserve(agents.size());
+        bool valid = true;
+        for (std::size_t offset = 0; offset < agents.size();) {
+            const std::size_t count = std::min(
+                capabilities.maximum_agents, agents.size() - offset);
+            const auto first = agents.begin() + static_cast<std::ptrdiff_t>(offset);
+            std::vector<AgentInput> chunk(first, first + static_cast<std::ptrdiff_t>(count));
+            const std::vector<AgentOutput> chunk_output = backend->evaluate(chunk);
+            const std::vector<AgentOutput> reference = evaluate_cpu(chunk);
+            if (chunk_output.size() != count) {
+                valid = false;
+                break;
+            }
+            for (std::size_t i = 0; i < count; ++i) {
+                const AgentOutput& output = chunk_output[i];
                 const AgentOutput& expected = reference[i];
-                if (output.agent_id != agents[i].agent_id
+                if (output.agent_id != chunk[i].agent_id
                     || !std::isfinite(output.desperation_index)
                     || output.desperation_index < 0.0F
                     || output.desperation_index > 1.0F
@@ -197,8 +210,11 @@ EvaluationReport evaluate_with_fallback(
                     break;
                 }
             }
+            if (!valid) break;
+            candidate.insert(candidate.end(), chunk_output.begin(), chunk_output.end());
+            offset += count;
         }
-        if (!valid) {
+        if (!valid || candidate.size() != agents.size()) {
             report.gpu_fallback = true;
             use_cpu();
             return report;
