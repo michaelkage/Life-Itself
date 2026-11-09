@@ -56,14 +56,6 @@ float read_f32_le(const std::uint8_t* bytes) {
     return std::bit_cast<float>(bits);
 }
 
-void append_f32_le(std::vector<std::uint8_t>& bytes, float value) {
-    const std::uint32_t bits = std::bit_cast<std::uint32_t>(value);
-    bytes.push_back(static_cast<std::uint8_t>(bits & 0xffU));
-    bytes.push_back(static_cast<std::uint8_t>((bits >> 8U) & 0xffU));
-    bytes.push_back(static_cast<std::uint8_t>((bits >> 16U) & 0xffU));
-    bytes.push_back(static_cast<std::uint8_t>((bits >> 24U) & 0xffU));
-}
-
 } // namespace
 
 void pack_agents_into(std::span<const AgentInput> agents,
