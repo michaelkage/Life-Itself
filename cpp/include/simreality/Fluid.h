@@ -13,7 +13,6 @@ inline constexpr float kRumourAttributionThreshold = 0.6F;
 inline constexpr float kRumourFloorAttributed = 0.05F;
 inline constexpr float kRumourFloorUnattributed = 0.01F;
 
-// Immutable numerical snapshot. All channels except world coordinates are normalized.
 struct AgentInput {
     std::string agent_id{};
     float x{0.0F};
@@ -38,7 +37,6 @@ struct AgentOutput {
     bool attribution_survives{false};
 };
 
-
 enum class BackendKind : std::uint8_t { Cpu, Gpu };
 
 struct ComputeBackendInfo {
@@ -47,8 +45,6 @@ struct ComputeBackendInfo {
     std::size_t maximum_agents{0};
 };
 
-// A backend owns its device resources and returns results in input order.
-// Backend failures are contained by evaluate_with_fallback.
 class ComputeBackend {
 public:
     virtual ~ComputeBackend() = default;
@@ -59,6 +55,8 @@ public:
 
 struct EvaluationOptions {
     std::size_t minimum_gpu_batch{2048};
+    // GPU pressure may differ slightly from the f32 CPU reference across devices.
+    float maximum_score_error{1.0e-5F};
 };
 
 struct EvaluationReport {
@@ -73,11 +71,8 @@ void validate_agents(const std::vector<AgentInput>& agents);
     const std::vector<AgentInput>& agents, ComputeBackend* backend = nullptr,
     EvaluationOptions options = {});
 
-// Explicit little-endian f32 layout matching shaders/sre_fluid_agent.wgsl.
 [[nodiscard]] std::vector<std::uint8_t> pack_agents(const std::vector<AgentInput>& agents);
 [[nodiscard]] std::vector<AgentOutput> evaluate_cpu(const std::vector<AgentInput>& agents);
-// Decodes the shader's 16-byte-per-agent vec4<f32> readback and restores IDs
-// from the matching input snapshot. Rejects malformed sizes, flags and tiers.
 [[nodiscard]] std::vector<AgentOutput> unpack_outputs(
     const std::vector<AgentInput>& agents, const std::vector<std::uint8_t>& bytes);
 
