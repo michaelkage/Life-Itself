@@ -9,6 +9,15 @@ from typing import Iterable
 from .identity_evolution import IdentityChangeProposal, NPCIdentityProfile
 
 
+def _finite_number(value):
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return False
+    try:
+        return math.isfinite(value)
+    except OverflowError:
+        return False
+
+
 @dataclass(frozen=True)
 class IdentityChangeDecision:
     decision_id: str
@@ -33,11 +42,11 @@ class IdentityChangeDecision:
             raise TypeError("accepted must be bool")
         if isinstance(self.decision_tick, bool) or not isinstance(self.decision_tick, int) or self.decision_tick < 0:
             raise ValueError("decision_tick must be a non-negative integer")
-        if self.role not in ("participant", "witness"):
+        if not isinstance(self.role, str) or self.role not in ("participant", "witness"):
             raise ValueError("role must be participant or witness")
         for name in ("before", "proposed_after", "delta", "evidence_strength"):
             value = getattr(self, name)
-            if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+            if not _finite_number(value):
                 raise ValueError(f"{name} must be finite numeric")
         if not -1 <= self.before <= 1 or not -1 <= self.proposed_after <= 1:
             raise ValueError("trait values must be in [-1, 1]")
