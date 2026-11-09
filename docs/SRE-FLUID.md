@@ -93,8 +93,10 @@ named hardware.
 
 ## Next stages
 
-1. Implement a production WebGPU host adapter with capability checks, persistent
-   buffers, asynchronous readback, shader compilation and device-loss recovery.
+1. Build a reusable staging/readback allocation pool around the caller-owned
+   pack/unpack APIs, then implement the production WebGPU host adapter with
+   capability checks, persistent device buffers, asynchronous readback, shader
+   compilation and device-loss recovery.
 2. Run the registered CPU/GPU differential suite on real adapters, then tune the
    score tolerance from measured cross-device error rather than assumption.
 3. Add compact social-edge buffers and a gather-oriented rumour pass with
