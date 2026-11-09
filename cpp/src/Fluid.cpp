@@ -66,27 +66,35 @@ void append_f32_le(std::vector<std::uint8_t>& bytes, float value) {
 
 } // namespace
 
+void pack_agents_into(std::span<const AgentInput> agents,
+    std::span<std::uint8_t> destination) {
+    validate_impl(agents);
+    if (agents.size() > std::numeric_limits<std::size_t>::max() / kAgentInputStride
+        || destination.size() != agents.size() * kAgentInputStride) {
+        throw std::invalid_argument("agent staging buffer has an invalid byte length");
+    }
+    std::size_t offset = 0U;
+    const auto write = [&destination, &offset](float value) {
+        const std::uint32_t bits = std::bit_cast<std::uint32_t>(value);
+        destination[offset++] = static_cast<std::uint8_t>(bits & 0xffU);
+        destination[offset++] = static_cast<std::uint8_t>((bits >> 8U) & 0xffU);
+        destination[offset++] = static_cast<std::uint8_t>((bits >> 16U) & 0xffU);
+        destination[offset++] = static_cast<std::uint8_t>((bits >> 24U) & 0xffU);
+    };
+    for (const AgentInput& a : agents) {
+        write(a.x); write(a.y); write(a.moral_shackle); write(a.personal_stress);
+        write(a.overpopulation); write(a.supply_shortage); write(a.weather_severity);
+        write(a.local_corruption); write(a.rumour_retention); write(a.speaker_fidelity);
+        write(a.description_uncertainty); write(a.target_known ? 1.0F : 0.0F);
+    }
+}
+
 std::vector<std::uint8_t> pack_agents(const std::vector<AgentInput>& agents) {
-    validate_agents(agents);
     if (agents.size() > std::numeric_limits<std::size_t>::max() / kAgentInputStride) {
         throw std::length_error("agent batch is too large to pack");
     }
-    std::vector<std::uint8_t> bytes;
-    bytes.reserve(agents.size() * kAgentInputStride);
-    for (const AgentInput& a : agents) {
-        append_f32_le(bytes, a.x);
-        append_f32_le(bytes, a.y);
-        append_f32_le(bytes, a.moral_shackle);
-        append_f32_le(bytes, a.personal_stress);
-        append_f32_le(bytes, a.overpopulation);
-        append_f32_le(bytes, a.supply_shortage);
-        append_f32_le(bytes, a.weather_severity);
-        append_f32_le(bytes, a.local_corruption);
-        append_f32_le(bytes, a.rumour_retention);
-        append_f32_le(bytes, a.speaker_fidelity);
-        append_f32_le(bytes, a.description_uncertainty);
-        append_f32_le(bytes, a.target_known ? 1.0F : 0.0F);
-    }
+    std::vector<std::uint8_t> bytes(agents.size() * kAgentInputStride);
+    pack_agents_into(agents, bytes);
     return bytes;
 }
 
@@ -121,8 +129,8 @@ void validate_agents(const std::vector<AgentInput>& agents) {
 
 
 std::vector<AgentOutput> unpack_outputs(
-    const std::vector<AgentInput>& agents, const std::vector<std::uint8_t>& bytes) {
-    validate_agents(agents);
+    std::span<const AgentInput> agents, std::span<const std::uint8_t> bytes) {
+    validate_impl(agents);
     if (agents.size() > std::numeric_limits<std::size_t>::max() / kAgentOutputStride
         || bytes.size() != agents.size() * kAgentOutputStride) {
         throw std::invalid_argument("GPU output buffer has an invalid byte length");
