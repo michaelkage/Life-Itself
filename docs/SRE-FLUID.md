@@ -59,9 +59,15 @@ upload/readback allocations and reuse them across ticks. The allocating
 `pack_agents` helper remains available for simple callers and tests. The C++
 `BufferWorkspace` owns reusable input and output byte arrays, grows them
 geometrically when a larger population arrives, and exposes only the active
-ranges for each tick. Shrinking a population does not discard the retained
-allocation; adapters can pack directly into its input span and decode from its
-output span.
+ranges for each tick. The vectors remain at their high-water size, so
+shrinking and regrowing a population within the retained capacity does not
+reinitialize the staging bytes on every tick. Shrinking a population does not
+discard the retained allocation; adapters can pack directly into its input
+span and decode from its output span. Workspace spans must not be used after a
+later `prepare` call that grows the allocation, and a workspace instance must
+not be accessed concurrently without external synchronization. The workspace
+does not clear bytes: adapters must fully write the active input/output ranges
+before consuming them.
 Chunk boundaries do not change stable agent order. Every chunk is checked for
 output count/order/ranges and compared to the CPU reference within a configurable
 absolute tolerance. Trauma tiers and rumour decisions must match exactly. If any
