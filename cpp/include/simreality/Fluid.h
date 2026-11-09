@@ -64,6 +64,8 @@ struct ComputeBackendInfo {
     std::string name{};
     bool available{false};
     std::size_t maximum_agents{0};
+    std::size_t maximum_workgroups_per_dimension{65535U};
+    std::size_t workgroup_size{kWorkgroupSize};
 };
 
 class ComputeBackend {
