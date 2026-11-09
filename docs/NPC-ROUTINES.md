@@ -189,8 +189,9 @@ the adapter returns an explicit status rather than silently creating a
 conflicting journey. Repeating the same tick/routine request reuses the
 existing journey ID.
 
-Routine associations are part of `TravelSnapshot`, including the
-routine-aware schema version and backward reading of schema version 1. Because
-the snapshot is included in `SimulationWorldCheckpoint`, a commute in progress
-retains its routine purpose after save/load. Regression coverage is in
+Routine associations are part of schema version 2 of `TravelSnapshot`; schema
+version 1 snapshots remain readable. Because the snapshot is included in
+`SimulationWorldCheckpoint`, a routine-linked journey must be checkpointed with
+the matching `RoutineBook` (routine ID, owner, and destination are validated).
+A commute in progress therefore retains its routine purpose after save/load. Regression coverage is in
 `tests/test_routine_travel.py`.
