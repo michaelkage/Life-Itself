@@ -88,6 +88,55 @@ class TravelTickTests(unittest.TestCase):
         self.assertEqual(replay.arrivals, ("trip-1",))
         self.assertEqual(events.get("travel-arrival:trip-1").event_type, "npc_arrived")
 
+    def test_blocked_journey_replans_at_next_junction(self):
+        edges = (
+            RouteEdge("home-junction", "home", "junction", 1),
+            RouteEdge("junction-destination", "junction", "destination", 1),
+            RouteEdge("junction-detour", "junction", "detour", 2),
+            RouteEdge("detour-destination", "detour", "destination", 2),
+        )
+        planner = PersonalRoutePlanner(edges)
+        adapter = TravelTickAdapter(edges)
+        adapter.start("detour-trip", "npc-detour",
+                      planner.plan("npc-detour", "home", "destination"), 0)
+        first = adapter.advance(1, {"npc-detour": 2},
+                                closed_edge_ids=("junction-destination",))
+        self.assertEqual(first.blocked, ("detour-trip",))
+        self.assertEqual(first.journeys[0].current_location, "junction")
+        second = adapter.advance(2, {"npc-detour": 2},
+                                 closed_edge_ids=("junction-destination",),
+                                 route_planner=planner, replan_blocked=True)
+        self.assertEqual(second.journeys[0].path,
+                         ("home", "junction", "detour", "destination"))
+        self.assertEqual(second.journeys[0].current_location, "detour")
+        self.assertEqual(second.journeys[0].status, "travelling")
+
+    def test_unreachable_journey_can_recover_when_road_reopens(self):
+        edges = (RouteEdge("only-road", "home", "destination", 2),)
+        planner = PersonalRoutePlanner(edges)
+        adapter = TravelTickAdapter(edges)
+        adapter.start("recovery-trip", "npc-recovery",
+                      planner.plan("npc-recovery", "home", "destination"), 0)
+        blocked = adapter.advance(1, {"npc-recovery": 1},
+                                  closed_edge_ids=("only-road",),
+                                  route_planner=planner, replan_blocked=True)
+        self.assertEqual(blocked.journeys[0].status, "unreachable")
+        recovered = adapter.advance(2, {"npc-recovery": 2},
+                                    route_planner=planner, replan_blocked=True)
+        self.assertEqual(recovered.arrivals, ("recovery-trip",))
+
+    def test_replanning_inputs_participate_in_tick_replay_signature(self):
+        edges = (RouteEdge("only-road", "home", "destination", 2),)
+        planner = PersonalRoutePlanner(edges)
+        adapter = TravelTickAdapter(edges)
+        adapter.start("signature-trip", "npc-signature",
+                      planner.plan("npc-signature", "home", "destination"), 0)
+        adapter.advance(1, {"npc-signature": 0}, route_planner=planner,
+                        replan_blocked=True)
+        with self.assertRaises(ValueError):
+            adapter.advance(1, {"npc-signature": 0}, route_planner=planner,
+                            replan_blocked=False)
+
 
 if __name__ == "__main__":
     unittest.main()
