@@ -53,7 +53,10 @@ dispatcher keeps small batches on the CPU and splits larger snapshots into
 contiguous chunks no larger than the adapter's reported maximum batch capacity. Backend batches are passed as read-only C++20 spans into the original
 immutable snapshot, so chunking does not allocate or copy a second set of NPC
 records. Adapters can pack each span directly into their staging or persistent
-GPU buffer.
+GPU buffer. The C++ `pack_agents_into` API fills caller-owned byte storage and
+`unpack_outputs` accepts read-only byte spans, allowing an adapter to retain
+upload/readback allocations and reuse them across ticks. The allocating
+`pack_agents` helper remains available for simple callers and tests.
 Chunk boundaries do not change stable agent order. Every chunk is checked for
 output count/order/ranges and compared to the CPU reference within a configurable
 absolute tolerance. Trauma tiers and rumour decisions must match exactly. If any
