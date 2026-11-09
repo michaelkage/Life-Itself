@@ -123,6 +123,15 @@ class IdentityEvolutionTests(unittest.TestCase):
         with self.assertRaises(TypeError):
             IdentityEvolutionEvaluator((), (object(),))
 
+    def test_unrepresentably_large_numeric_inputs_are_rejected_cleanly(self):
+        with self.assertRaises(ValueError):
+            NPCIdentityProfile("npc", {"trust": 10**10000})
+        with self.assertRaises(ValueError):
+            IdentityChangePolicy("p", "event", "trust", 10**10000)
+        with self.assertRaises(ValueError):
+            IdentityChangeProposal("event", "npc", "p", "trust", 0.0, 0.0, 0.0,
+                                   10**10000, "participant")
+
     def test_invalid_traits_are_rejected(self):
         with self.assertRaises(ValueError):
             NPCIdentityProfile("npc", {"trust": 1.1})
