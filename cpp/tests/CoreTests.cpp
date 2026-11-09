@@ -20,6 +20,7 @@
 #include "simreality/WorldPersistence.h"
 
 #include <cassert>
+#include <bit>
 #include <cmath>
 #include <limits>
 #include <sstream>
@@ -1956,6 +1957,47 @@ int main() {
     auto small_batch_report = fluid::evaluate_with_fallback(
         {fluid_agent}, &test_backend, fluid::EvaluationOptions{2U});
     assert(small_batch_report.backend == fluid::BackendKind::Cpu);
+
+
+    // GPU readback uses four little-endian f32 values per input agent.
+    const auto append_test_f32 = [](std::vector<std::uint8_t>& out, float value) {
+        const auto bits = std::bit_cast<std::uint32_t>(value);
+        out.push_back(static_cast<std::uint8_t>(bits & 0xffU));
+        out.push_back(static_cast<std::uint8_t>((bits >> 8U) & 0xffU));
+        out.push_back(static_cast<std::uint8_t>((bits >> 16U) & 0xffU));
+        out.push_back(static_cast<std::uint8_t>((bits >> 24U) & 0xffU));
+    };
+    std::vector<std::uint8_t> fluid_readback;
+    append_test_f32(fluid_readback, 0.75F);
+    append_test_f32(fluid_readback, 2.0F);
+    append_test_f32(fluid_readback, 1.0F);
+    append_test_f32(fluid_readback, 1.0F);
+    const auto decoded_fluid = fluid::unpack_outputs({fluid_agent}, fluid_readback);
+    assert(decoded_fluid.size() == 1U);
+    assert(decoded_fluid[0].agent_id == fluid_agent.agent_id);
+    assert(decoded_fluid[0].desperation_index == 0.75F);
+    assert(decoded_fluid[0].trauma_tier == 2U);
+    assert(decoded_fluid[0].rumour_transmittable);
+    assert(decoded_fluid[0].attribution_survives);
+    bool rejected_short_fluid_readback = false;
+    try {
+        (void)fluid::unpack_outputs({fluid_agent}, std::vector<std::uint8_t>{0U});
+    } catch (const std::invalid_argument&) {
+        rejected_short_fluid_readback = true;
+    }
+    assert(rejected_short_fluid_readback);
+    bool rejected_invalid_fluid_flag = false;
+    try {
+        auto invalid_readback = fluid_readback;
+        invalid_readback[8] = 0x00U;
+        invalid_readback[9] = 0x00U;
+        invalid_readback[10] = 0x00U;
+        invalid_readback[11] = 0x40U;
+        (void)fluid::unpack_outputs({fluid_agent}, invalid_readback);
+    } catch (const std::invalid_argument&) {
+        rejected_invalid_fluid_flag = true;
+    }
+    assert(rejected_invalid_fluid_flag);
 
     return 0;
 }
