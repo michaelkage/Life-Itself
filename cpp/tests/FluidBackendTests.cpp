@@ -17,6 +17,8 @@ public:
     std::size_t maximum_agents{10000U};
     std::size_t maximum_workgroups_per_dimension{65535U};
     std::size_t workgroup_size{kWorkgroupSize};
+    std::size_t maximum_input_buffer_bytes{std::numeric_limits<std::size_t>::max()};
+    std::size_t maximum_output_buffer_bytes{std::numeric_limits<std::size_t>::max()};
     std::size_t evaluate_calls{0U};
     std::size_t throw_on_call{0U};
     float score_offset{0.0F};
@@ -24,7 +26,8 @@ public:
 
     [[nodiscard]] ComputeBackendInfo info() const override {
         return {"reference test backend", available, maximum_agents,
-            maximum_workgroups_per_dimension, workgroup_size};
+            maximum_workgroups_per_dimension, workgroup_size,
+            maximum_input_buffer_bytes, maximum_output_buffer_bytes};
     }
 
     [[nodiscard]] std::vector<AgentOutput> evaluate(
@@ -247,8 +250,38 @@ int main() {
     assert(dispatch_limited.agents.size() == dispatch_limited_batch.size());
     assert(backend.evaluate_calls == 3U);
     backend.maximum_workgroups_per_dimension = 65535U;
-    backend.maximum_agents = 2U;
+    backend.maximum_agents = 1000U;
 
+    // Per-binding byte limits supplied by the adapter constrain the actual
+    // backend call sizes, independently of its nominal agent capacity.
+    backend.maximum_input_buffer_bytes = 48U * 256U;
+    backend.maximum_output_buffer_bytes = 16U * 1000U;
+    backend.evaluate_calls = 0U;
+    const auto input_binding_limited = evaluate_with_fallback(
+        dispatch_limited_batch, &backend, options);
+    assert(input_binding_limited.backend == BackendKind::Gpu);
+    assert(backend.evaluate_calls == 3U);
+
+    backend.maximum_input_buffer_bytes = 48U * 1000U;
+    backend.maximum_output_buffer_bytes = 16U * 256U;
+    backend.evaluate_calls = 0U;
+    const auto output_binding_limited = evaluate_with_fallback(
+        dispatch_limited_batch, &backend, options);
+    assert(output_binding_limited.backend == BackendKind::Gpu);
+    assert(backend.evaluate_calls == 3U);
+
+    backend.maximum_input_buffer_bytes = 47U;
+    backend.maximum_output_buffer_bytes = 16U * 1000U;
+    backend.evaluate_calls = 0U;
+    const auto undersized_binding = evaluate_with_fallback(
+        dispatch_limited_batch, &backend, options);
+    assert(undersized_binding.backend == BackendKind::Cpu);
+    assert(undersized_binding.gpu_fallback);
+    assert(backend.evaluate_calls == 0U);
+
+    backend.maximum_input_buffer_bytes = std::numeric_limits<std::size_t>::max();
+    backend.maximum_output_buffer_bytes = std::numeric_limits<std::size_t>::max();
+    backend.maximum_agents = 2U;
     backend.evaluate_calls = 0U;
     backend.throw_on_call = 2U;
     const auto partial_failure = evaluate_with_fallback(large_batch, &backend, options);
