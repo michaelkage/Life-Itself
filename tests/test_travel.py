@@ -1,6 +1,7 @@
 import unittest
 
 from simreality.route_planning import PersonalRoutePlanner, RouteEdge
+from simreality.memory_routines import RoutineAvoidanceProfile
 from simreality.travel import TravelLedger, TravelTickAdapter
 from simreality.travel_save_state import TravelSnapshot
 from simreality.world_events import WorldEventLedger
@@ -140,6 +141,31 @@ class TravelTickTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             adapter.advance(1, {"npc-signature": 0}, route_planner=planner,
                             replan_blocked=False)
+
+    def test_replanning_uses_only_the_npcs_own_memory_avoidance(self):
+        edges = (
+            RouteEdge("home-junction", "home", "junction", 1),
+            RouteEdge("junction-avenue", "junction", "avenue", 1),
+            RouteEdge("avenue-office", "avenue", "office", 1),
+            RouteEdge("junction-market", "junction", "market", 1),
+            RouteEdge("market-office", "market", "office", 1),
+            RouteEdge("junction-park", "junction", "park", 1),
+            RouteEdge("park-office", "park", "office", 1),
+        )
+        planner = PersonalRoutePlanner(edges)
+        adapter = TravelTickAdapter(edges)
+        adapter.start("memory-trip", "npc-memory",
+                      planner.plan("npc-memory", "home", "office"), 0)
+        adapter.advance(1, {"npc-memory": 1},
+                        closed_edge_ids=("junction-avenue",))
+        profile = RoutineAvoidanceProfile("npc-memory", "market", 1.0, (0,), None)
+        rerouted = adapter.advance(
+            2, {"npc-memory": 1}, closed_edge_ids=("junction-avenue",),
+            route_planner=planner, replan_blocked=True,
+            avoidance_profiles_by_owner={"npc-memory": (profile,)},
+        )
+        self.assertEqual(rerouted.journeys[0].path,
+                         ("home", "junction", "park", "office"))
 
 
 if __name__ == "__main__":
