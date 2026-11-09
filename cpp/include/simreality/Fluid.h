@@ -38,6 +38,41 @@ struct AgentOutput {
     bool attribution_survives{false};
 };
 
+
+enum class BackendKind : std::uint8_t { Cpu, Gpu };
+
+struct ComputeBackendInfo {
+    std::string name{};
+    bool available{false};
+    std::size_t maximum_agents{0};
+};
+
+// A backend owns its device resources and returns results in input order.
+// Backend failures are contained by evaluate_with_fallback.
+class ComputeBackend {
+public:
+    virtual ~ComputeBackend() = default;
+    [[nodiscard]] virtual ComputeBackendInfo info() const = 0;
+    [[nodiscard]] virtual std::vector<AgentOutput> evaluate(
+        const std::vector<AgentInput>& agents) = 0;
+};
+
+struct EvaluationOptions {
+    std::size_t minimum_gpu_batch{2048};
+};
+
+struct EvaluationReport {
+    std::vector<AgentOutput> agents{};
+    BackendKind backend{BackendKind::Cpu};
+    std::string backend_name{"CPU reference"};
+    bool gpu_fallback{false};
+};
+
+void validate_agents(const std::vector<AgentInput>& agents);
+[[nodiscard]] EvaluationReport evaluate_with_fallback(
+    const std::vector<AgentInput>& agents, ComputeBackend* backend = nullptr,
+    EvaluationOptions options = {});
+
 // Explicit little-endian f32 layout matching shaders/sre_fluid_agent.wgsl.
 [[nodiscard]] std::vector<std::uint8_t> pack_agents(const std::vector<AgentInput>& agents);
 [[nodiscard]] std::vector<AgentOutput> evaluate_cpu(const std::vector<AgentInput>& agents);
