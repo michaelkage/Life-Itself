@@ -76,7 +76,11 @@ aligns intermediate chunks to full workgroups where possible, and leaves only
 the final chunk partial for the shader's bounds checks. This planner does not
 query a GPU; the future adapter must populate its limits from the actual device. The
 Python planner mirrors the C++ range contract and is covered by the Python
-regression suite.
+regression suite. The C++ backend capability record supplies maximum agent
+capacity and maximum workgroups per dimension; the fallback dispatcher now uses
+those values to plan its actual backend calls. The workgroup size is fixed at
+256 to match the compiled WGSL entry point, so adapters must not report a
+different value.
 
 Chunk boundaries do not change stable agent order. Every chunk is checked for
 output count/order/ranges and compared to the CPU reference within a configurable
