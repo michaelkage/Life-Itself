@@ -58,8 +58,8 @@ Engine-independent Python reference systems:
 | `simreality/goal_review_decisions.py` | NPC goal decision history | Records explicit accepted/rejected goal-review proposals as an append-only, idempotent ledger; `goal_review_decisions_save_state.py` provides canonical persistence |
 | `simreality/planning.py` | NPC autonomy | Bounded symbolic action planning with preconditions, effects, costs, and deterministic tie-breaking |
 | `simreality/routines.py` | Persistent NPC routines | Time-windowed routines resolved against explicit disruptions; intended plans can be delayed, redirected, or missed with deterministic replay inputs |
-| `simreality/route_planning.py` | NPC navigation | Deterministic personal route selection over explicit road edges, including memory-derived location avoidance |
-| `simreality/travel.py` | NPC travel execution | Advances journeys across simulation ticks with explicit time budgets, road closures, travel-time multipliers, and arrival world events |
+| `simreality/route_planning.py` | NPC navigation | Deterministic personal route selection over explicit road edges, including closed-road exclusion and memory-derived location avoidance |
+| `simreality/travel.py` | NPC travel execution | Advances journeys across simulation ticks with explicit time budgets, road closures, travel-time multipliers, junction-aware rerouting, and arrival world events |
 | `simreality/travel_save_state.py` | NPC travel persistence | Canonical journey and tick-replay snapshot, including partial edge progress for save/load continuation |
 | `simreality/routine_tick.py` | Routine tick adapter | Selects active routines for an explicit tick, scopes supplied disruptions per NPC, and records replay-safe executions using explicit samples; called by the coordinator's named routine phase |
 | `simreality/npc_autonomy.py` | NPC autonomy | Read-only decision cycle that connects selected goals to explicit desired facts and bounded plans |
