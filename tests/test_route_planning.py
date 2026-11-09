@@ -48,6 +48,18 @@ class PersonalRoutePlannerTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.planner.plan("npc", "home", "market", avoidance_penalty_scale=-1)
 
+    def test_closed_edges_are_excluded_from_personal_route(self):
+        planner = PersonalRoutePlanner((
+            RouteEdge("fast-a", "home", "junction", 1),
+            RouteEdge("fast-b", "junction", "office", 1),
+            RouteEdge("slow-a", "home", "detour", 3),
+            RouteEdge("slow-b", "detour", "office", 3),
+        ))
+        plan = planner.plan("npc", "home", "office", closed_edge_ids=("fast-b",))
+        self.assertEqual(plan.path, ("home", "detour", "office"))
+        with self.assertRaises(ValueError):
+            planner.plan("npc", "home", "office", closed_edge_ids=("unknown",))
+
 
 if __name__ == "__main__":
     unittest.main()
