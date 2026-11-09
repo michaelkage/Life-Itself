@@ -74,9 +74,11 @@ std::vector<DispatchRange> plan_dispatches(
         throw std::invalid_argument("fluid dispatch workgroup limit overflows size_t");
     }
 
-    const std::size_t storage_capacity = std::min(
+    const std::size_t storage_capacity = std::min({
         std::numeric_limits<std::size_t>::max() / kAgentInputStride,
-        std::numeric_limits<std::size_t>::max() / kAgentOutputStride);
+        std::numeric_limits<std::size_t>::max() / kAgentOutputStride,
+        limits.maximum_input_buffer_bytes / kAgentInputStride,
+        limits.maximum_output_buffer_bytes / kAgentOutputStride});
     const std::size_t device_dispatch_capacity = std::min(
         limits.maximum_agents,
         limits.maximum_workgroups_per_dimension * limits.workgroup_size);
@@ -273,7 +275,9 @@ EvaluationReport evaluate_with_fallback(
         const std::vector<DispatchRange> dispatches = plan_dispatches(
             agents.size(), DispatchLimits{capabilities.maximum_agents,
                 capabilities.maximum_workgroups_per_dimension,
-                capabilities.workgroup_size});
+                capabilities.workgroup_size,
+                capabilities.maximum_input_buffer_bytes,
+                capabilities.maximum_output_buffer_bytes});
 
         // If any chunk fails parity or the adapter throws, discard every partial
         // result and recompute the complete snapshot on the CPU.
