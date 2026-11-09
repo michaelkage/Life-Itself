@@ -14,6 +14,59 @@ DI_WEIGHT_TOTAL = sum(DI_WEIGHTS)
 RUMOUR_ATTRIBUTION_THRESHOLD = 0.6
 RUMOUR_FLOOR_ATTRIBUTED = 0.05
 RUMOUR_FLOOR_UNATTRIBUTED = 0.01
+WORKGROUP_SIZE = 256
+
+@dataclass(frozen=True)
+class DispatchLimits:
+    """Limits reported by a compute device for one dispatch."""
+    maximum_agents: int
+    maximum_workgroups_per_dimension: int
+    workgroup_size: int = WORKGROUP_SIZE
+
+@dataclass(frozen=True)
+class DispatchRange:
+    """Contiguous agent range and its one-dimensional workgroup count."""
+    agent_offset: int
+    agent_count: int
+    workgroup_count: int
+
+def plan_dispatches(agent_count: int, limits: DispatchLimits) -> tuple[DispatchRange, ...]:
+    """Plan bounded, stable-order dispatches without querying a GPU.
+
+    Intermediate chunks are aligned to full workgroups where possible. The
+    final chunk may be partial and must use the shader's invocation bounds guard.
+    """
+    for name, value in (
+        ("agent_count", agent_count),
+        ("maximum_agents", limits.maximum_agents),
+        ("maximum_workgroups_per_dimension", limits.maximum_workgroups_per_dimension),
+        ("workgroup_size", limits.workgroup_size),
+    ):
+        if isinstance(value, bool) or not isinstance(value, int):
+            raise TypeError(f"{name} must be an integer")
+        if value < 0 or (name != "agent_count" and value == 0):
+            raise ValueError(f"{name} is outside its valid range")
+    if limits.maximum_workgroups_per_dimension > ((1 << 63) - 1) // limits.workgroup_size:
+        raise ValueError("dispatch workgroup limit overflows the supported size")
+    storage_capacity = min(((1 << 63) - 1) // AGENT_INPUT_STRIDE,
+                           ((1 << 63) - 1) // AGENT_OUTPUT_STRIDE)
+    safe_capacity = min(
+        limits.maximum_agents,
+        limits.maximum_workgroups_per_dimension * limits.workgroup_size,
+        storage_capacity,
+    )
+    chunk_capacity = (
+        (safe_capacity // limits.workgroup_size) * limits.workgroup_size
+        if safe_capacity >= limits.workgroup_size else safe_capacity
+    )
+    ranges = []
+    offset = 0
+    while offset < agent_count:
+        count = min(chunk_capacity, agent_count - offset)
+        workgroups = (count + limits.workgroup_size - 1) // limits.workgroup_size
+        ranges.append(DispatchRange(offset, count, workgroups))
+        offset += count
+    return tuple(ranges)
 
 def _finite(value, name):
     if isinstance(value, bool) or not isinstance(value, (int, float)):
