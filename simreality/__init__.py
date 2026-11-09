@@ -300,6 +300,11 @@ from .memory_routines import (
 )
 __all__ += ["MemoryLocationAssociation", "MemoryRoutineAdapter", "RoutineAvoidanceProfile"]
 
+# Owner-scoped persistence for explicit memory/location associations.
+from .memory_location_book import MemoryLocationAssociationBook
+from .memory_routine_save_state import MemoryLocationAssociationSnapshot
+__all__ += ["MemoryLocationAssociationBook", "MemoryLocationAssociationSnapshot"]
+
 
 # Deterministic bridge from schedule definitions to tick-level executions.
 from .routine_tick import RoutineTickAdapter
