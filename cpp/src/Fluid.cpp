@@ -90,8 +90,7 @@ std::vector<std::uint8_t> pack_agents(const std::vector<AgentInput>& agents) {
     return bytes;
 }
 
-std::vector<AgentOutput> evaluate_cpu(const std::vector<AgentInput>& agents) {
-    validate_agents(agents);
+std::vector<AgentOutput> evaluate_cpu(std::span<const AgentInput> agents) {
     std::vector<AgentOutput> outputs;
     outputs.reserve(agents.size());
     for (const AgentInput& a : agents) {
@@ -185,8 +184,7 @@ EvaluationReport evaluate_with_fallback(
         for (std::size_t offset = 0; offset < agents.size();) {
             const std::size_t count = std::min(
                 capabilities.maximum_agents, agents.size() - offset);
-            const auto first = agents.begin() + static_cast<std::ptrdiff_t>(offset);
-            std::vector<AgentInput> chunk(first, first + static_cast<std::ptrdiff_t>(count));
+            const std::span<const AgentInput> chunk(agents.data() + offset, count);
             const std::vector<AgentOutput> chunk_output = backend->evaluate(chunk);
             const std::vector<AgentOutput> reference = evaluate_cpu(chunk);
             if (chunk_output.size() != count) {
