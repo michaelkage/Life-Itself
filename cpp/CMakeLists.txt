@@ -37,4 +37,8 @@ if(SIMREALITY_BUILD_TESTS)
     add_executable(simreality_core_tests tests/CoreTests.cpp)
     target_link_libraries(simreality_core_tests PRIVATE simreality_core)
     add_test(NAME simreality_core_tests COMMAND simreality_core_tests)
+
+    add_executable(simreality_fluid_backend_tests tests/FluidBackendTests.cpp)
+    target_link_libraries(simreality_fluid_backend_tests PRIVATE simreality_core)
+    add_test(NAME simreality_fluid_backend_tests COMMAND simreality_fluid_backend_tests)
 endif()
