@@ -91,6 +91,7 @@ int main() {
     assert(reused_buffers.input[0] == 0xA5U);
     assert(reused_buffers.output[0] == 0x5AU);
     assert(workspace.capacity_agents() >= batch.size());
+    reused_buffers.output[0] = 0U;
     pack_agents_into(batch, reused_buffers.input);
     const auto workspace_decoded = unpack_outputs(batch, reused_buffers.output);
     assert(workspace_decoded.size() == batch.size());
