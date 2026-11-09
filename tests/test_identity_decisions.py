@@ -12,6 +12,10 @@ class IdentityDecisionTests(unittest.TestCase):
             "event-1", "npc-a", "policy-1", "trust", 0.2, 0.25, 0.05, 1.0, "participant"
         )
 
+    def test_ledger_rejects_invalid_decision_types_before_sorting(self):
+        with self.assertRaisesRegex(TypeError, "IdentityChangeDecision"):
+            IdentityDecisionLedger((self.profile,), decisions=(object(),))
+
     def test_accept_changes_trait_and_replay_is_idempotent(self):
         ledger = IdentityDecisionLedger((self.profile,))
         decision = IdentityChangeDecision.from_proposal(
