@@ -81,6 +81,28 @@ int main() {
     assert(dispatches.back().agent_offset + dispatches.back().agent_count == 500000U);
     assert(plan_dispatches(0U, DispatchLimits{100U, 1U, kWorkgroupSize}).empty());
 
+    // Storage binding byte limits can be tighter than the device's nominal
+    // agent and workgroup limits; both input and output bindings are enforced.
+    const auto input_limited = plan_dispatches(900U, DispatchLimits{
+        1000U, 64U, kWorkgroupSize, 48U * 300U, 16U * 1000U});
+    assert(input_limited.size() == 4U);
+    assert(input_limited[0].agent_count == 256U);
+    assert(input_limited[1].agent_count == 256U);
+    assert(input_limited[2].agent_count == 256U);
+    assert(input_limited[3].agent_count == 132U);
+    const auto output_limited = plan_dispatches(900U, DispatchLimits{
+        1000U, 64U, kWorkgroupSize, 48U * 1000U, 16U * 300U});
+    assert(output_limited.size() == 4U);
+    assert(output_limited.front().agent_count == 256U);
+    bool rejected_zero_storage_limit = false;
+    try {
+        (void)plan_dispatches(1U, DispatchLimits{
+            100U, 1U, kWorkgroupSize, 0U, 16U});
+    } catch (const std::invalid_argument&) {
+        rejected_zero_storage_limit = true;
+    }
+    assert(rejected_zero_storage_limit);
+
     const auto tiny_device = plan_dispatches(250U,
         DispatchLimits{100U, 1U, kWorkgroupSize});
     assert(tiny_device.size() == 3U);
