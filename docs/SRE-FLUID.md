@@ -33,7 +33,11 @@ transmittable flag, and attribution-survives flag. Dispatch ceil(agent_count / 2
 workgroups. The shader bounds-checks against the storage buffer length.
 
 The Python CPU reference and packer are in simreality/fluid.py. The corresponding
-WebGPU WGSL kernel is shaders/sre_fluid_agent.wgsl.
+WebGPU WGSL kernel is shaders/sre_fluid_agent.wgsl. The portable C++20 contract
+is exposed by cpp/include/simreality/Fluid.h and implemented in cpp/src/Fluid.cpp;
+it provides the same immutable input snapshot, explicit little-endian f32 packing,
+and CPU reference evaluation. The C++ source is part of simreality_core, so the
+Unreal-facing layer can build and test the data contract without a GPU SDK.
 
 ## Determinism and integration boundary
 
@@ -63,5 +67,5 @@ named hardware.
 2. Compact social-edge buffers and a gather-oriented rumour pass with deterministic
    conflict resolution.
 3. Trauma accumulation and memory-decay kernels driven by explicit simulation time.
-4. C++20 snapshot packing and a backend interface for Unreal immutable snapshots.
+4. C++20 snapshot packing and CPU reference are now in the core; next add a backend interface for Unreal immutable snapshots.
 5. Benchmarks with realistic density, edge counts, buffer reuse and full tick budgets.
