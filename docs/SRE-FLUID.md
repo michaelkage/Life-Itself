@@ -68,13 +68,15 @@ later `prepare` call that grows the allocation, and a workspace instance must
 not be accessed concurrently without external synchronization. The workspace
 does not clear bytes: adapters must fully write the active input/output ranges
 before consuming them.
-The portable C++ layer also exposes `plan_dispatches`, which converts an
+Both the Python reference and portable C++ layer expose `plan_dispatches`, which converts an
 agent count and device limits (maximum storage-buffer agent capacity,
 maximum workgroups per dimension, and workgroup size) into contiguous dispatch
 ranges. It bounds both storage-buffer byte sizes and dispatch dimensions,
 aligns intermediate chunks to full workgroups where possible, and leaves only
 the final chunk partial for the shader's bounds checks. This planner does not
-query a GPU; the future adapter must populate its limits from the actual device.
+query a GPU; the future adapter must populate its limits from the actual device. The
+Python planner mirrors the C++ range contract and is covered by the Python
+regression suite.
 
 Chunk boundaries do not change stable agent order. Every chunk is checked for
 output count/order/ranges and compared to the CPU reference within a configurable
