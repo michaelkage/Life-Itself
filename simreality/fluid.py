@@ -47,6 +47,8 @@ def plan_dispatches(agent_count: int, limits: DispatchLimits) -> tuple[DispatchR
             raise TypeError(f"{name} must be an integer")
         if value < 0 or (name != "agent_count" and value == 0):
             raise ValueError(f"{name} is outside its valid range")
+    if limits.workgroup_size != WORKGROUP_SIZE:
+        raise ValueError("workgroup_size must match the compiled WGSL shader")
     if limits.maximum_workgroups_per_dimension > sys.maxsize // limits.workgroup_size:
         raise ValueError("dispatch workgroup limit overflows the supported size")
     storage_capacity = min(sys.maxsize // AGENT_INPUT_STRIDE,
