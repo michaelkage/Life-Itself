@@ -154,6 +154,9 @@ EvaluationReport evaluate_with_fallback(
     const std::vector<AgentInput>& agents, ComputeBackend* backend,
     EvaluationOptions options) {
     validate_agents(agents);
+    if (!std::isfinite(options.maximum_score_error) || options.maximum_score_error < 0.0F) {
+        throw std::invalid_argument("maximum_score_error must be finite and non-negative");
+    }
     EvaluationReport report;
     const auto use_cpu = [&]() {
         report.agents = evaluate_cpu(agents);
@@ -172,16 +175,24 @@ EvaluationReport evaluate_with_fallback(
             return report;
         }
         std::vector<AgentOutput> candidate = backend->evaluate(agents);
+        // The CPU reference remains authoritative. GPU arithmetic is accepted only
+        // within an explicit score tolerance; discrete decisions must match exactly.
+        const std::vector<AgentOutput> reference = evaluate_cpu(agents);
         bool valid = candidate.size() == agents.size();
         if (valid) {
             for (std::size_t i = 0; i < candidate.size(); ++i) {
                 const AgentOutput& output = candidate[i];
+                const AgentOutput& expected = reference[i];
                 if (output.agent_id != agents[i].agent_id
                     || !std::isfinite(output.desperation_index)
                     || output.desperation_index < 0.0F
                     || output.desperation_index > 1.0F
+                    || std::abs(output.desperation_index - expected.desperation_index)
+                        > options.maximum_score_error
                     || output.trauma_tier > 3U
-                    || (output.attribution_survives && !output.rumour_transmittable)) {
+                    || output.trauma_tier != expected.trauma_tier
+                    || output.rumour_transmittable != expected.rumour_transmittable
+                    || output.attribution_survives != expected.attribution_survives) {
                     valid = false;
                     break;
                 }
