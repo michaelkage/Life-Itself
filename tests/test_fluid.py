@@ -65,6 +65,21 @@ class FluidBatchTests(unittest.TestCase):
         self.assertEqual([item.workgroup_count for item in ranges], [1, 1, 1])
         self.assertEqual(plan_dispatches(0, DispatchLimits(100, 1)), ())
 
+    def test_dispatch_planner_respects_storage_binding_byte_limits(self):
+        input_limited = plan_dispatches(900, DispatchLimits(
+            1000, 64, maximum_input_buffer_bytes=48 * 300,
+            maximum_output_buffer_bytes=16 * 1000))
+        self.assertEqual([item.agent_count for item in input_limited],
+                         [256, 256, 256, 132])
+        output_limited = plan_dispatches(900, DispatchLimits(
+            1000, 64, maximum_input_buffer_bytes=48 * 1000,
+            maximum_output_buffer_bytes=16 * 300))
+        self.assertEqual([item.agent_count for item in output_limited],
+                         [256, 256, 256, 132])
+        with self.assertRaises(ValueError):
+            plan_dispatches(1, DispatchLimits(
+                100, 1, maximum_input_buffer_bytes=0))
+
     def test_dispatch_planner_rejects_invalid_limits(self):
         with self.assertRaises(ValueError):
             plan_dispatches(1, DispatchLimits(100, 0))
