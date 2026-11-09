@@ -1,6 +1,7 @@
 import struct
 import unittest
-from simreality.fluid import (AGENT_INPUT_STRIDE, DispatchLimits, FluidAgentInput,\n                              evaluate_cpu, pack_agents, plan_dispatches)
+from simreality.fluid import (AGENT_INPUT_STRIDE, DispatchLimits, FluidAgentInput,
+                              evaluate_cpu, pack_agents, plan_dispatches)
 
 class FluidBatchTests(unittest.TestCase):
     def make_agent(self, **overrides):
