@@ -4,6 +4,7 @@
 #include <bit>
 #include <cmath>
 #include <limits>
+#include <initializer_list>
 #include <stdexcept>
 #include <utility>
 #include <unordered_set>
