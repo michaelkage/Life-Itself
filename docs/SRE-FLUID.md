@@ -39,6 +39,22 @@ it provides the same immutable input snapshot, explicit little-endian f32 packin
 and CPU reference evaluation. The C++ source is part of simreality_core, so the
 Unreal-facing layer can build and test the data contract without a GPU SDK.
 
+## C++ backend boundary
+
+The C++ core now exposes a device-independent `ComputeBackend` interface and
+`evaluate_with_fallback` dispatcher. A future WebGPU/Vulkan adapter owns its
+device buffers and reports availability and maximum batch capacity. The
+dispatcher keeps small batches on the CPU, validates the immutable inputs,
+checks output count/order/ranges, and falls back to the CPU reference if the
+device is unavailable, the adapter throws (including device loss), or its
+results violate the contract. A fake backend in the C++ tests exercises these
+paths; it is not a real GPU implementation.
+
+This boundary deliberately does not add a graphics API dependency to the
+portable core. A production adapter still needs persistent device buffers,
+asynchronous readback, capability negotiation, shader compilation, and
+CPU/GPU differential tests on actual hardware.
+
 ## Determinism and integration boundary
 
 - Stable NPC IDs stay in a CPU-side index table; GPU indices are transient.
