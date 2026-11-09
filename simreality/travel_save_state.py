@@ -36,7 +36,7 @@ def _read_result(item):
 class TravelSnapshot:
     journeys: tuple[TravelJourney, ...]
     ticks: tuple[tuple[int, str, TravelTickResult], ...]
-    SCHEMA_VERSION = 1
+    SCHEMA_VERSION = 2
 
     def __post_init__(self):
         if not isinstance(self.journeys, tuple) or any(not isinstance(j, TravelJourney) for j in self.journeys):
@@ -72,13 +72,14 @@ class TravelSnapshot:
     def from_json(cls, payload):
         try:
             raw = json.loads(payload)
-            if not isinstance(raw, dict) or raw.get("schema_version") != cls.SCHEMA_VERSION:
+            if not isinstance(raw, dict) or raw.get("schema_version") not in (1, cls.SCHEMA_VERSION):
                 raise ValueError("unsupported travel snapshot schema version")
             journeys = tuple(_read_journey(j) for j in raw["journeys"])
             ticks = tuple((item["tick"], item["signature"], _read_result(item["result"]))
                           for item in raw["ticks"])
             snapshot = cls(journeys, ticks)
-            if snapshot.to_json() != payload:
+            canonical = json.dumps(raw, sort_keys=True, separators=(",", ":"), allow_nan=False)
+            if canonical != payload:
                 raise ValueError("travel snapshot must use canonical JSON")
             return snapshot
         except ValueError:
