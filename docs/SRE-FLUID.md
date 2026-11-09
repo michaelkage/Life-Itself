@@ -13,10 +13,50 @@ environmental trauma tiers using the existing thresholds; rumour transmission
 eligibility using existing attributed/unattributed retention floors; and
 whether target attribution survives the existing 0.6 threshold.
 
-This is not yet full rumour mutation or social-network propagation. Description
-merging, corroboration, participant-specific belief updates, event provenance
-and graph-edge traversal remain authoritative CPU work until a deterministic
-GPU design for those dependencies is implemented and differentially tested.
+This is not full rumour mutation or social-network propagation. Description
+merging, corroboration, participant-specific belief history, event provenance
+and graph-edge traversal remain authoritative CPU work.
+
+## Ordered social-evidence gather (v0.2)
+
+The second kernel accelerates one safe numerical subproblem from the social
+belief pipeline: recomputing a claim's confidence from an already selected set
+of evidence. It does not decide which NPCs meet, choose claims, infer truth, or
+change an NPC's belief ledger.
+
+The CPU builds one claim slot per claim and groups its evidence into a compact
+contiguous edge range. Before packing, claim slots are sorted by claim ID and
+each claim's evidence is sorted by the same canonical key as `BeliefLedger`:
+`(observed_tick, evidence_id)`. This order matters because confidence updates
+are a recurrence, not a commutative sum:
+
+`influence = strength * source_reliability`
+
+`confidence = confidence + (target - confidence) * influence`
+
+where target is 1 for support and 0 for contradiction. Each GPU invocation
+processes one claim and walks its edge range sequentially, preserving that
+non-associative order. Different claims execute independently and in parallel.
+
+| Buffer | Stride | Contents |
+| --- | ---: | --- |
+| Claim slot | 32 bytes | u32 edge start/count, reserved words, f32 prior confidence |
+| Evidence edge | 16 bytes | f32 strength, source reliability, signed direction, reserved |
+| Gather output | 16 bytes | f32 resulting confidence, evidence count, reserved values |
+
+The Python reference and packer live in `simreality/fluid_social.py`; the WGSL
+kernel is `shaders/sre_fluid_rumour_gather.wgsl`. The result is a proposal for
+the existing CPU belief ledger to compare or consume at a defined boundary.
+Evidence IDs, source identity, timestamps, idempotency checks, provenance,
+belief history, and persistence remain CPU-owned. The gather kernel does not
+replace `SocialBeliefSystem` or `BeliefLedger`.
+
+The ordered loop avoids nondeterministic parallel reductions within a claim,
+but f32 arithmetic can still differ slightly from the Python/C++ reference.
+Real-device differential tests and an explicit tolerance are required before
+using this kernel in production. Very high-degree claims also serialize within
+one invocation; profile realistic evidence fan-in before choosing this layout
+over a multi-stage deterministic scan.
 
 ## Buffer contract
 
