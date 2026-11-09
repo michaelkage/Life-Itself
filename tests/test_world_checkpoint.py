@@ -729,6 +729,32 @@ class SimulationWorldCheckpointTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "after the checkpoint tick"):
             SimulationWorldCheckpoint.capture(4, coordinator, npcs, travel=adapter2.ledger)
 
+    def test_routine_linked_travel_requires_and_validates_saved_routine_book(self):
+        coordinator, npcs, _ = self.make_simulation()
+        edges = (RouteEdge("commute", "home", "office", 2),)
+        planner = PersonalRoutePlanner(edges)
+        adapter = TravelTickAdapter(edges)
+        adapter.start("routine:4:work-shift", "speaker",
+                      planner.plan("speaker", "home", "office"), 4,
+                      routine_id="work-shift")
+        routines = RoutineBook((
+            RoutineBlock("work-shift", "speaker", "work", "office", 540, 600),
+        ))
+        with self.assertRaisesRegex(ValueError, "requires the corresponding RoutineBook"):
+            SimulationWorldCheckpoint.capture(4, coordinator, npcs, travel=adapter.ledger)
+        payload = SimulationWorldCheckpoint.capture(
+            4, coordinator, npcs, routines=routines, travel=adapter.ledger,
+        ).to_json()
+        restored = SimulationWorldCheckpoint.from_json(payload).restore()
+        self.assertEqual(restored.travel.get("routine:4:work-shift").routine_id, "work-shift")
+        wrong_routine = RoutineBook((
+            RoutineBlock("work-shift", "listener", "work", "office", 540, 600),
+        ))
+        with self.assertRaisesRegex(ValueError, "does not match its saved routine"):
+            SimulationWorldCheckpoint.capture(
+                4, coordinator, npcs, routines=wrong_routine, travel=adapter.ledger,
+            )
+
 
 if __name__ == "__main__":
     unittest.main()
