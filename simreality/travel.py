@@ -179,12 +179,17 @@ class TravelTickAdapter:
             if edge_id not in self._edges or isinstance(multiplier, bool) or not isinstance(multiplier, (int, float)) or not math.isfinite(multiplier) or multiplier <= 0:
                 raise ValueError("time multipliers must reference known edges and be finite and positive")
             multipliers[edge_id] = float(multiplier)
+        if events is not None and not isinstance(events, WorldEventLedger):
+            raise TypeError("events must be a WorldEventLedger")
         signature = _tick_signature(tick, clean_budgets, closed, tuple(sorted(multipliers.items())))
         prior = self.ledger._ticks.get(tick)
         if prior:
             if prior[0] != signature:
                 raise ValueError(f"conflicting travel tick replay: {tick}")
-            return prior[1]
+            result = prior[1]
+            if events is not None:
+                self._materialize_arrivals(result, events)
+            return result
         if self.ledger._ticks and tick <= max(self.ledger._ticks):
             raise ValueError("new travel ticks must advance monotonically")
         updated: list[TravelJourney] = []
@@ -224,17 +229,18 @@ class TravelTickAdapter:
         result = TravelTickResult(tick, tuple(updated), tuple(sorted(arrivals)), tuple(sorted(blocked)))
         result = self.ledger._apply_tick(tick, signature, result)
         if events is not None:
-            if not isinstance(events, WorldEventLedger):
-                raise TypeError("events must be a WorldEventLedger")
-            for journey_id in result.arrivals:
-                journey = self.ledger.get(journey_id)
-                events.append(WorldEventLedger.make_event(
-                    f"travel-arrival:{journey_id}", tick, "npc_arrived",
-                    participants=(journey.owner_id,),
-                    attributes={"journey_id": journey_id, "origin": journey.origin,
-                                "destination": journey.destination, "elapsed_cost": journey.elapsed_cost},
-                ))
+            self._materialize_arrivals(result, events)
         return result
+
+    def _materialize_arrivals(self, result: TravelTickResult, events: WorldEventLedger) -> None:
+        for journey_id in result.arrivals:
+            journey = self.ledger.get(journey_id)
+            events.append(WorldEventLedger.make_event(
+                f"travel-arrival:{journey_id}", result.tick, "npc_arrived",
+                participants=(journey.owner_id,),
+                attributes={"journey_id": journey_id, "origin": journey.origin,
+                            "destination": journey.destination, "elapsed_cost": journey.elapsed_cost},
+            ))
 
     def reopen(self, journey_id: str) -> TravelJourney:
         journey = self.ledger.get(journey_id)
