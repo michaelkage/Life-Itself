@@ -256,6 +256,15 @@ class SimulationWorldCheckpoint:
                 raise ValueError("travel tick history cannot occur after the checkpoint tick")
             if any(journey.owner_id not in npcs for journey in travel_snapshot.journeys):
                 raise ValueError("travel journeys reference NPCs missing from checkpoint")
+            routine_journeys = [journey for journey in travel_snapshot.journeys if journey.routine_id is not None]
+            if routine_journeys and routines_snapshot is None:
+                raise ValueError("routine-linked travel requires the corresponding RoutineBook")
+            if routine_journeys:
+                known_routines = {block.routine_id: block for block in routines_snapshot.blocks}
+                for journey in routine_journeys:
+                    block = known_routines.get(journey.routine_id)
+                    if block is None or block.owner_id != journey.owner_id or block.location_id != journey.destination:
+                        raise ValueError("routine-linked travel does not match its saved routine block")
         if execution_snapshot is not None:
             known_routines = {block.routine_id for block in routines.snapshot()}
             if any(record.routine_id not in known_routines for record in execution_snapshot.records):
@@ -337,6 +346,15 @@ class SimulationWorldCheckpoint:
             npc_ids = {npc.entity_id for npc in NPCCollectionSnapshot.from_json(self.npcs_json).restore().values()}
             if any(journey.owner_id not in npc_ids for journey in travel_snapshot.journeys):
                 raise ValueError("travel journeys reference NPCs missing from checkpoint")
+            routine_journeys = [journey for journey in travel_snapshot.journeys if journey.routine_id is not None]
+            if routine_journeys and components[10] is None:
+                raise ValueError("routine-linked travel requires the corresponding RoutineBook")
+            if routine_journeys:
+                known_routines = {block.routine_id: block for block in components[10].blocks}
+                for journey in routine_journeys:
+                    block = known_routines.get(journey.routine_id)
+                    if block is None or block.owner_id != journey.owner_id or block.location_id != journey.destination:
+                        raise ValueError("routine-linked travel does not match its saved routine block")
         if testimony_inquiries is not None:
             journal = envelope.restore_event_ledger()
             inquiry_ledger = testimony_inquiries.restore()
