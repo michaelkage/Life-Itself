@@ -76,6 +76,29 @@ class IdentityChangeProposal:
     role: str
     maximum_delta: float = 0.05
 
+    def __post_init__(self):
+        for name in ("event_id", "npc_id", "policy_id", "axis"):
+            value = getattr(self, name)
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError(f"{name} must be a non-empty string")
+        if self.role not in ("participant", "witness"):
+            raise ValueError("role must be participant or witness")
+        for name in ("before", "after", "delta", "evidence_strength", "maximum_delta"):
+            value = getattr(self, name)
+            if (isinstance(value, bool) or not isinstance(value, (int, float))
+                    or not math.isfinite(value)):
+                raise ValueError(f"{name} must be finite numeric")
+        if not -1.0 <= self.before <= 1.0 or not -1.0 <= self.after <= 1.0:
+            raise ValueError("trait values must be in [-1, 1]")
+        if not 0.0 < self.maximum_delta <= 0.1:
+            raise ValueError("maximum_delta must be in (0, 0.1]")
+        if not -self.maximum_delta <= self.delta <= self.maximum_delta:
+            raise ValueError("delta exceeds maximum_delta")
+        if not 0.0 <= self.evidence_strength <= 1.0:
+            raise ValueError("evidence_strength must be in [0, 1]")
+        if not math.isclose(self.after - self.before, self.delta, abs_tol=1e-12):
+            raise ValueError("delta must match proposed trait change")
+
 
 class IdentityEvolutionEvaluator:
     """Evaluate explicit event policies without mutating identity profiles."""
