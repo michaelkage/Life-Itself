@@ -81,6 +81,9 @@ class RoutineTravelAdapter:
             journey_id = f"routine:{tick}:{block.routine_id}"
             existing = self.travel.ledger.get(journey_id)
             if existing is not None:
+                if (existing.owner_id != block.owner_id or existing.origin != origin
+                        or existing.destination != block.location_id or existing.routine_id != block.routine_id):
+                    raise ValueError(f"conflicting routine travel request: {journey_id}")
                 requests.append(RoutineTravelRequest(
                     block.routine_id, block.owner_id, journey_id, origin,
                     block.location_id, existing.status,
