@@ -13,16 +13,22 @@ class ReferenceBackend final : public ComputeBackend {
 public:
     bool available{true};
     bool throw_on_evaluate{false};
+    std::size_t maximum_agents{10000U};
+    std::size_t evaluate_calls{0U};
+    std::size_t throw_on_call{0U};
     float score_offset{0.0F};
     std::uint8_t trauma_override{255U};
 
     [[nodiscard]] ComputeBackendInfo info() const override {
-        return {"reference test backend", available, 10000U};
+        return {"reference test backend", available, maximum_agents};
     }
 
     [[nodiscard]] std::vector<AgentOutput> evaluate(
         const std::vector<AgentInput>& agents) override {
-        if (throw_on_evaluate) throw std::runtime_error("simulated adapter failure");
+        ++evaluate_calls;
+        if (throw_on_evaluate || (throw_on_call != 0U && evaluate_calls == throw_on_call)) {
+            throw std::runtime_error("simulated adapter failure");
+        }
         auto outputs = evaluate_cpu(agents);
         for (auto& output : outputs) {
             output.desperation_index += score_offset;
@@ -72,6 +78,35 @@ int main() {
     const auto adapter_failure = evaluate_with_fallback(batch, &backend, options);
     assert(adapter_failure.backend == BackendKind::Cpu);
     assert(adapter_failure.gpu_fallback);
+
+    // Large world snapshots are split into device-capacity chunks without
+    // changing stable result order. A later chunk failure discards partial GPU
+    // output and recomputes the complete snapshot on the CPU.
+    backend.throw_on_evaluate = false;
+    backend.evaluate_calls = 0U;
+    backend.throw_on_call = 0U;
+    backend.maximum_agents = 2U;
+    std::vector<AgentInput> large_batch;
+    for (int i = 0; i < 5; ++i) {
+        AgentInput item = sample();
+        item.agent_id = "npc-" + std::to_string(i);
+        large_batch.push_back(item);
+    }
+    const auto chunked = evaluate_with_fallback(large_batch, &backend, options);
+    assert(chunked.backend == BackendKind::Gpu);
+    assert(chunked.agents.size() == large_batch.size());
+    assert(backend.evaluate_calls == 3U);
+    for (std::size_t i = 0; i < large_batch.size(); ++i) {
+        assert(chunked.agents[i].agent_id == large_batch[i].agent_id);
+    }
+
+    backend.evaluate_calls = 0U;
+    backend.throw_on_call = 2U;
+    const auto partial_failure = evaluate_with_fallback(large_batch, &backend, options);
+    assert(partial_failure.backend == BackendKind::Cpu);
+    assert(partial_failure.gpu_fallback);
+    assert(partial_failure.agents.size() == large_batch.size());
+    assert(backend.evaluate_calls == 2U);
 
     bool rejected_negative_tolerance = false;
     try {
