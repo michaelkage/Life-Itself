@@ -34,7 +34,7 @@ class RoutineTravelAdapterTests(unittest.TestCase):
         result = self.travel.advance(11, {"npc-1": 2}, events=events)
         self.assertEqual(result.arrivals, (first[0].journey_id,))
         event = events.get(f"travel-arrival:{first[0].journey_id}")
-        self.assertEqual(event.attributes["routine_id"], "work-shift")
+        self.assertEqual(dict(event.attributes)["routine_id"], "work-shift")
 
     def test_routine_travel_survives_snapshot_round_trip(self):
         request = self.adapter.start_due(10, self.book, 550, {"npc-1": "home"}, self.planner)[0]
