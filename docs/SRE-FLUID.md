@@ -50,7 +50,10 @@ The C++ core now exposes a device-independent `ComputeBackend` interface and
 `evaluate_with_fallback` dispatcher. A future WebGPU/Vulkan adapter owns its
 device buffers and reports availability and maximum batch capacity. The
 dispatcher keeps small batches on the CPU and splits larger snapshots into
-contiguous chunks no larger than the adapter's reported maximum batch capacity.
+contiguous chunks no larger than the adapter's reported maximum batch capacity. Backend batches are passed as read-only C++20 spans into the original
+immutable snapshot, so chunking does not allocate or copy a second set of NPC
+records. Adapters can pack each span directly into their staging or persistent
+GPU buffer.
 Chunk boundaries do not change stable agent order. Every chunk is checked for
 output count/order/ranges and compared to the CPU reference within a configurable
 absolute tolerance. Trauma tiers and rumour decisions must match exactly. If any
