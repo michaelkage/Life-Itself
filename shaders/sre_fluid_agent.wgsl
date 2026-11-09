@@ -17,7 +17,8 @@ const UNATTRIBUTED_FLOOR: f32 = 0.01;
 @compute @workgroup_size(256)
 fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     let i = gid.x;
-    if (i >= arrayLength(&agents)) { return; }
+    // Guard both bindings: a mismatched output allocation must never write OOB.
+    if (i >= arrayLength(&agents) || i >= arrayLength(&results)) { return; }
     let a = agents[i];
     let pressure = clamp((a.district.x * 1.2 + a.district.y * 1.5
         + a.district.z * 0.8 + a.district.w * 1.1) / DI_WEIGHT_TOTAL, 0.0, 1.0);
