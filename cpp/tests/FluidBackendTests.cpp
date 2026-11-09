@@ -54,6 +54,55 @@ AgentInput sample() {
 } // namespace
 
 int main() {
+    const auto dispatches = plan_dispatches(500000U,
+        DispatchLimits{10000U, 64U, kWorkgroupSize});
+    assert(!dispatches.empty());
+    std::size_t planned_agents = 0U;
+    std::size_t expected_offset = 0U;
+    for (std::size_t i = 0U; i < dispatches.size(); ++i) {
+        const auto& range = dispatches[i];
+        assert(range.agent_offset == expected_offset);
+        assert(range.agent_count > 0U && range.agent_count <= 10000U);
+        assert(range.workgroup_count > 0U && range.workgroup_count <= 64U);
+        if (i + 1U < dispatches.size()) {
+            assert(range.agent_count % kWorkgroupSize == 0U);
+        }
+        assert(range.workgroup_count
+            == range.agent_count / kWorkgroupSize
+                + (range.agent_count % kWorkgroupSize == 0U ? 0U : 1U));
+        planned_agents += range.agent_count;
+        expected_offset += range.agent_count;
+    }
+    assert(planned_agents == 500000U);
+    assert(dispatches.front().agent_offset == 0U);
+    assert(dispatches.back().agent_offset + dispatches.back().agent_count == 500000U);
+    assert(plan_dispatches(0U, DispatchLimits{100U, 1U, kWorkgroupSize}).empty());
+
+    const auto tiny_device = plan_dispatches(250U,
+        DispatchLimits{100U, 1U, kWorkgroupSize});
+    assert(tiny_device.size() == 3U);
+    assert(tiny_device[0].agent_count == 100U);
+    assert(tiny_device[1].agent_count == 100U);
+    assert(tiny_device[2].agent_count == 50U);
+    assert(tiny_device[0].workgroup_count == 1U);
+
+    bool rejected_zero_dispatch_limit = false;
+    try {
+        (void)plan_dispatches(1U, DispatchLimits{100U, 0U, kWorkgroupSize});
+    } catch (const std::invalid_argument&) {
+        rejected_zero_dispatch_limit = true;
+    }
+    assert(rejected_zero_dispatch_limit);
+
+    bool rejected_dispatch_overflow = false;
+    try {
+        (void)plan_dispatches(1U, DispatchLimits{
+            100U, std::numeric_limits<std::size_t>::max(), 2U});
+    } catch (const std::invalid_argument&) {
+        rejected_dispatch_overflow = true;
+    }
+    assert(rejected_dispatch_overflow);
+
     const std::vector<AgentInput> batch{sample()};
     // Caller-owned upload memory can be reused over many simulation ticks.
     std::vector<std::uint8_t> retained_upload(batch.size() * kAgentInputStride, 0U);
