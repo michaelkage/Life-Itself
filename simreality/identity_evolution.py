@@ -44,12 +44,23 @@ class IdentityChangePolicy:
         if not all(isinstance(v, str) and v.strip()
                    for v in (self.policy_id, self.event_type, self.axis)):
             raise ValueError("policy identifiers must be non-empty")
-        if not math.isfinite(self.delta) or not -1 <= self.delta <= 1:
-            raise ValueError("delta must be in [-1, 1]")
-        if not 0 <= self.minimum_strength <= 1:
-            raise ValueError("minimum_strength must be in [0, 1]")
-        if not 0 < self.maximum_delta <= 0.1:
-            raise ValueError("maximum_delta must be in (0, 0.1]")
+        if self.strength_attribute is not None and (
+                not isinstance(self.strength_attribute, str) or not self.strength_attribute.strip()):
+            raise ValueError("strength_attribute must be None or a non-empty string")
+        if not isinstance(self.include_witnesses, bool):
+            raise TypeError("include_witnesses must be bool")
+        for name, value, low, high, inclusive_low in (
+            ("delta", self.delta, -1.0, 1.0, True),
+            ("minimum_strength", self.minimum_strength, 0.0, 1.0, True),
+            ("maximum_delta", self.maximum_delta, 0.0, 0.1, False),
+        ):
+            if (isinstance(value, bool) or not isinstance(value, (int, float))
+                    or not math.isfinite(value)
+                    or (value < low if inclusive_low else value <= low)
+                    or value > high):
+                interval = "[-1, 1]" if name == "delta" else (
+                    "[0, 1]" if name == "minimum_strength" else "(0, 0.1]")
+                raise ValueError(f"{name} must be in {interval}")
 
 
 @dataclass(frozen=True)
@@ -72,6 +83,10 @@ class IdentityEvolutionEvaluator:
     def __init__(self, profiles: Iterable[NPCIdentityProfile],
                  policies: Iterable[IdentityChangePolicy]):
         profiles, policies = tuple(profiles), tuple(policies)
+        if any(not isinstance(profile, NPCIdentityProfile) for profile in profiles):
+            raise TypeError("profiles must contain NPCIdentityProfile values")
+        if any(not isinstance(policy, IdentityChangePolicy) for policy in policies):
+            raise TypeError("policies must contain IdentityChangePolicy values")
         if len({p.npc_id for p in profiles}) != len(profiles):
             raise ValueError("duplicate NPC profile")
         if len({p.policy_id for p in policies}) != len(policies):
