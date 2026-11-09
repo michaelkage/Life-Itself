@@ -63,6 +63,14 @@ class RoutineTravelAdapterTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "missing current location"):
             self.adapter.start_due(10, self.book, 550, {}, self.planner)
 
+    def test_explicit_departure_lead_starts_before_routine_window(self):
+        requests = self.adapter.start_due(
+            9, self.book, 530, {"npc-1": "home"}, self.planner,
+            departure_lead_minutes=15,
+        )
+        self.assertEqual(len(requests), 1)
+        self.assertEqual(requests[0].routine_id if hasattr(requests[0], "routine_id") else requests[0].routine_id, "work-shift")
+
 
 if __name__ == "__main__":
     unittest.main()
