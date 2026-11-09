@@ -24,7 +24,7 @@ public:
     }
 
     [[nodiscard]] std::vector<AgentOutput> evaluate(
-        const std::vector<AgentInput>& agents) override {
+        std::span<const AgentInput> agents) override {
         ++evaluate_calls;
         if (throw_on_evaluate || (throw_on_call != 0U && evaluate_calls == throw_on_call)) {
             throw std::runtime_error("simulated adapter failure");
