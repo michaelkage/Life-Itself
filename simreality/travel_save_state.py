@@ -11,14 +11,15 @@ def _journey_payload(j):
             "destination": j.destination, "path": list(j.path), "edge_ids": list(j.edge_ids),
             "edge_index": j.edge_index, "edge_progress": j.edge_progress,
             "elapsed_cost": j.elapsed_cost, "status": j.status,
-            "started_tick": j.started_tick, "arrived_tick": j.arrived_tick}
+            "started_tick": j.started_tick, "arrived_tick": j.arrived_tick,
+            "routine_id": j.routine_id}
 
 
 def _read_journey(item):
     return TravelJourney(item["journey_id"], item["owner_id"], item["origin"], item["destination"],
                          tuple(item["path"]), tuple(item["edge_ids"]), item["edge_index"],
                          item["edge_progress"], item["elapsed_cost"], item["status"],
-                         item["started_tick"], item.get("arrived_tick"))
+                         item["started_tick"], item.get("arrived_tick"), item.get("routine_id"))
 
 
 def _result_payload(result):
