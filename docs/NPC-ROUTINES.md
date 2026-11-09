@@ -176,8 +176,11 @@ TravelSnapshot stores each journey's current edge, partial progress, elapsed cos
 `RoutineTravelAdapter.start_due` connects the active `RoutineBook` schedule to
 the route and travel systems. At an explicitly supplied simulation tick and
 minute-of-day, the world driver supplies each active NPC's current location,
-the route planner, road closures, and optional owner-scoped memory avoidance
-profiles. The adapter starts a persistent journey toward the routine's
+the route planner, road closures, optional owner-scoped memory avoidance
+profiles, and (when desired) an explicit `departure_lead_minutes` window so
+commutes can begin before the routine's scheduled start. Travel time is not
+guessed from wall-clock minutes; the world driver controls the lead window and
+per-tick travel budget. The adapter starts a persistent journey toward the routine's
 `location_id` and records the originating `routine_id` on the journey.
 
 The adapter does not teleport NPCs or execute the scheduled activity before
