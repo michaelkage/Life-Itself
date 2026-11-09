@@ -60,7 +60,10 @@ struct BufferViews {
 };
 
 // Retains CPU staging/readback allocations between ticks. prepare() exposes
-// only the active byte ranges while keeping the larger allocation for reuse.
+// only the active byte ranges while keeping the full allocation size unchanged.
+// Returned spans are valid until a later prepare() grows the workspace; callers
+// must finish using them before the next prepare() call. This class is not
+// thread-safe and does not clear retained bytes between ticks.
 class BufferWorkspace {
 public:
     [[nodiscard]] BufferViews prepare(std::size_t agent_count);
