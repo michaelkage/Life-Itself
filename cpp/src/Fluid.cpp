@@ -24,7 +24,7 @@ void require_unit(float value, const char* name) {
     }
 }
 
-void validate_impl(const std::vector<AgentInput>& agents) {
+void validate_impl(std::span<const AgentInput> agents) {
     std::unordered_set<std::string> ids;
     ids.reserve(agents.size());
     for (const AgentInput& agent : agents) {
@@ -91,6 +91,7 @@ std::vector<std::uint8_t> pack_agents(const std::vector<AgentInput>& agents) {
 }
 
 std::vector<AgentOutput> evaluate_cpu(std::span<const AgentInput> agents) {
+    validate_impl(agents);
     std::vector<AgentOutput> outputs;
     outputs.reserve(agents.size());
     for (const AgentInput& a : agents) {
