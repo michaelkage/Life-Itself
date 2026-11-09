@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -50,7 +51,7 @@ public:
     virtual ~ComputeBackend() = default;
     [[nodiscard]] virtual ComputeBackendInfo info() const = 0;
     [[nodiscard]] virtual std::vector<AgentOutput> evaluate(
-        const std::vector<AgentInput>& agents) = 0;
+        std::span<const AgentInput> agents) = 0;
 };
 
 struct EvaluationOptions {
