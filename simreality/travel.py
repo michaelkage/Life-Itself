@@ -98,7 +98,8 @@ class TravelLedger:
             if self._journeys[journey.journey_id] == journey:
                 return journey
             raise ValueError(f"conflicting journey ID: {journey.journey_id}")
-        if any(item.owner_id == journey.owner_id and item.status == "travelling" for item in self._journeys.values()):
+        if any(item.owner_id == journey.owner_id and item.status in ("travelling", "blocked", "unreachable")
+               for item in self._journeys.values()):
             raise ValueError(f"owner already has an active journey: {journey.owner_id}")
         self._journeys[journey.journey_id] = journey
         return journey
