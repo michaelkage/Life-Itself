@@ -53,6 +53,45 @@ class RoutineAvoidanceProfile:
 class MemoryRoutineAdapter:
     """Translate linked personal memories into stable location-avoidance disruptions."""
 
+    def derive_profiles(
+        self,
+        npc: NPC,
+        associations: Iterable[MemoryLocationAssociation],
+        *,
+        minimum_strength: float = 0.25,
+    ) -> tuple[RoutineAvoidanceProfile, ...]:
+        """Aggregate linked retained memories into owner-scoped route preferences."""
+        if not isinstance(npc, NPC):
+            raise TypeError("npc must be an NPC")
+        if isinstance(minimum_strength, bool) or not isinstance(minimum_strength, (int, float)) or not math.isfinite(minimum_strength) or not 0.0 <= minimum_strength <= 1.0:
+            raise ValueError("minimum_strength must be finite and in [0, 1]")
+        items = tuple(sorted(associations, key=lambda item: item.association_id))
+        if any(not isinstance(item, MemoryLocationAssociation) for item in items):
+            raise TypeError("associations must contain MemoryLocationAssociation values")
+        if len({item.association_id for item in items}) != len(items):
+            raise ValueError("association IDs must be unique")
+        grouped: dict[str, list[tuple[int, float, str | None]]] = {}
+        for association in items:
+            if association.memory_index >= len(npc.memories):
+                raise ValueError(f"memory index out of range: {association.memory_index}")
+            strength = npc.memories[association.memory_index].retention * association.avoidance_scale
+            if strength >= minimum_strength:
+                grouped.setdefault(association.location_id, []).append(
+                    (association.memory_index, strength, association.alternative_location_id)
+                )
+        profiles = []
+        for location_id, entries in sorted(grouped.items()):
+            remaining = 1.0
+            for _, strength, _ in entries:
+                remaining *= 1.0 - strength
+            alternatives = sorted({alternative for _, _, alternative in entries if alternative is not None})
+            profiles.append(RoutineAvoidanceProfile(
+                npc.entity_id, location_id, 1.0 - remaining,
+                tuple(sorted({index for index, _, _ in entries})),
+                alternatives[0] if alternatives else None,
+            ))
+        return tuple(profile for profile in profiles if profile.strength >= minimum_strength)
+
     def derive_avoidance(
         self,
         npc: NPC,
