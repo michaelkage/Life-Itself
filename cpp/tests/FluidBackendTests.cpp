@@ -87,6 +87,10 @@ int main() {
     assert(reused_buffers.input.data() == retained_input_address);
     assert(reused_buffers.output.data() == retained_output_address);
     assert(workspace.capacity_agents() >= batch.size());
+    pack_agents_into(batch, reused_buffers.input);
+    const auto workspace_decoded = unpack_outputs(batch, reused_buffers.output);
+    assert(workspace_decoded.size() == batch.size());
+    assert(workspace_decoded[0].agent_id == batch[0].agent_id);
     auto grown_buffers = workspace.prepare(100U);
     assert(grown_buffers.input.size() == 100U * kAgentInputStride);
     assert(grown_buffers.output.size() == 100U * kAgentOutputStride);
