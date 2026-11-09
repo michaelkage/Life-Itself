@@ -36,6 +36,9 @@ class TravelTickTests(unittest.TestCase):
         result = self.adapter.advance(1, {"npc-1": 5}, closed_edge_ids=("home-road",))
         self.assertEqual(result.blocked, ("trip-1",))
         self.assertEqual(self.adapter.ledger.get("trip-1").edge_progress, 0)
+        with self.assertRaisesRegex(ValueError, "already has an active journey"):
+            self.adapter.start("duplicate-trip", "npc-1",
+                               self.planner.plan("npc-1", "home", "market"), 2)
         self.adapter.reopen("trip-1")
         result = self.adapter.advance(2, {"npc-1": 3})
         self.assertEqual(result.journeys[0].current_location, "crossroads")
