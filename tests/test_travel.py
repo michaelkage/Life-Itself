@@ -1,0 +1,70 @@
+import unittest
+
+from simreality.route_planning import PersonalRoutePlanner, RouteEdge
+from simreality.travel import TravelLedger, TravelTickAdapter
+from simreality.world_events import WorldEventLedger
+
+
+class TravelTickTests(unittest.TestCase):
+    def setUp(self):
+        self.edges = (
+            RouteEdge("home-road", "home", "crossroads", 3),
+            RouteEdge("market-road", "crossroads", "market", 4),
+        )
+        self.planner = PersonalRoutePlanner(self.edges)
+        self.adapter = TravelTickAdapter(self.edges)
+        self.plan = self.planner.plan("npc-1", "home", "market")
+        self.adapter.start("trip-1", "npc-1", self.plan, 0)
+
+    def test_travel_consumes_explicit_budget_over_multiple_ticks(self):
+        first = self.adapter.advance(1, {"npc-1": 2})
+        self.assertEqual(first.journeys[0].current_location, "home")
+        self.assertEqual(first.journeys[0].edge_progress, 2)
+        second = self.adapter.advance(2, {"npc-1": 3})
+        self.assertEqual(second.journeys[0].current_location, "crossroads")
+        self.assertEqual(second.journeys[0].edge_progress, 2)
+        third = self.adapter.advance(3, {"npc-1": 2})
+        self.assertEqual(third.arrivals, ())
+        fourth = self.adapter.advance(4, {"npc-1": 1})
+        self.assertEqual(fourth.arrivals, ("trip-1",))
+        self.assertEqual(self.adapter.ledger.get("trip-1").status, "arrived")
+
+    def test_closure_pauses_and_can_be_reopened(self):
+        result = self.adapter.advance(1, {"npc-1": 5}, closed_edge_ids=("home-road",))
+        self.assertEqual(result.blocked, ("trip-1",))
+        self.assertEqual(self.adapter.ledger.get("trip-1").edge_progress, 0)
+        self.adapter.reopen("trip-1")
+        result = self.adapter.advance(2, {"npc-1": 3})
+        self.assertEqual(result.journeys[0].current_location, "crossroads")
+
+    def test_dynamic_time_multiplier_and_arrival_event(self):
+        events = WorldEventLedger()
+        result = self.adapter.advance(1, {"npc-1": 3}, time_multipliers={"home-road": 2})
+        self.assertEqual(result.journeys[0].edge_progress, 3)
+        self.adapter.advance(2, {"npc-1": 3}, events=events)
+        arrived = self.adapter.advance(3, {"npc-1": 1}, events=events)
+        self.assertEqual(arrived.arrivals, ("trip-1",))
+        event = events.get("travel-arrival:trip-1")
+        self.assertEqual(event.event_type, "npc_arrived")
+        self.assertEqual(event.participants, ("npc-1",))
+
+    def test_replay_is_idempotent_and_conflicts_rejected(self):
+        first = self.adapter.advance(1, {"npc-1": 1})
+        self.assertEqual(self.adapter.advance(1, {"npc-1": 1}), first)
+        with self.assertRaises(ValueError):
+            self.adapter.advance(1, {"npc-1": 2})
+
+    def test_no_budget_does_not_move_and_unknown_edges_rejected(self):
+        result = self.adapter.advance(1, {"npc-1": 0})
+        self.assertEqual(result.journeys[0].elapsed_cost, 0)
+        with self.assertRaises(ValueError):
+            self.adapter.advance(2, {"npc-1": 1}, closed_edge_ids=("missing",))
+
+    def test_same_location_journey_arrives_immediately(self):
+        plan = self.planner.plan("npc-2", "home", "home")
+        journey = self.adapter.start("trip-2", "npc-2", plan, 0)
+        self.assertEqual(journey.status, "arrived")
+
+
+if __name__ == "__main__":
+    unittest.main()
