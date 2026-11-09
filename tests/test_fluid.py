@@ -79,6 +79,14 @@ class FluidBatchTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             plan_dispatches(1, DispatchLimits(
                 100, 1, maximum_input_buffer_bytes=0))
+        with self.assertRaises(ValueError):
+            plan_dispatches(1, DispatchLimits(
+                100, 1, maximum_input_buffer_bytes=47,
+                maximum_output_buffer_bytes=16))
+        with self.assertRaises(ValueError):
+            plan_dispatches(1, DispatchLimits(
+                100, 1, maximum_input_buffer_bytes=48,
+                maximum_output_buffer_bytes=15))
 
     def test_dispatch_planner_rejects_invalid_limits(self):
         with self.assertRaises(ValueError):
