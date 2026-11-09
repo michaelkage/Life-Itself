@@ -66,10 +66,13 @@ class IdentityDecisionLedger:
         self._traits = {p.npc_id: dict(p.traits) for p in profiles}
         self._initial_traits = {p.npc_id: dict(p.traits) for p in profiles}
         self._sensitivities = {p.npc_id: dict(p.sensitivities or {}) for p in profiles}
+        decision_items = tuple(decisions)
+        if any(not isinstance(item, IdentityChangeDecision) for item in decision_items):
+            raise TypeError("decisions must contain IdentityChangeDecision values")
         self._decisions = {}
         self._proposal_index = {}
         self._last_chain_key = {}
-        for decision in sorted(tuple(decisions), key=lambda item: (item.decision_tick, item.decision_id)):
+        for decision in sorted(decision_items, key=lambda item: (item.decision_tick, item.decision_id)):
             self.record(decision)
 
     @staticmethod
