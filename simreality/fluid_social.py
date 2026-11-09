@@ -75,6 +75,9 @@ def _canonical_batches(batches: Iterable[ClaimEvidenceBatch]) -> tuple[ClaimEvid
     ids = [item.claim_id for item in items]
     if len(ids) != len(set(ids)):
         raise ValueError("claim IDs must be unique within a gather batch")
+    evidence_ids = [edge.evidence_id for item in items for edge in item.evidence]
+    if len(evidence_ids) != len(set(evidence_ids)):
+        raise ValueError("evidence IDs must be unique across a gather batch")
     return tuple(sorted(items, key=lambda item: item.claim_id))
 
 
