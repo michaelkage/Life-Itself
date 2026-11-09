@@ -120,8 +120,12 @@ class TravelTickTests(unittest.TestCase):
         blocked = adapter.advance(1, {"npc-recovery": 1},
                                   closed_edge_ids=("only-road",),
                                   route_planner=planner, replan_blocked=True)
-        self.assertEqual(blocked.journeys[0].status, "unreachable")
-        recovered = adapter.advance(2, {"npc-recovery": 2},
+        self.assertEqual(blocked.journeys[0].status, "blocked")
+        unreachable = adapter.advance(2, {"npc-recovery": 0},
+                                       closed_edge_ids=("only-road",),
+                                       route_planner=planner, replan_blocked=True)
+        self.assertEqual(unreachable.journeys[0].status, "unreachable")
+        recovered = adapter.advance(3, {"npc-recovery": 2},
                                     route_planner=planner, replan_blocked=True)
         self.assertEqual(recovered.arrivals, ("recovery-trip",))
 
