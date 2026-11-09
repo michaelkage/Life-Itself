@@ -6,6 +6,15 @@ from types import MappingProxyType
 from .world_events import WorldEvent
 
 
+def _finite_number(value):
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return False
+    try:
+        return math.isfinite(value)
+    except OverflowError:
+        return False
+
+
 @dataclass(frozen=True)
 class NPCIdentityProfile:
     npc_id: str
@@ -21,8 +30,7 @@ class NPCIdentityProfile:
                 raise ValueError("identity axes must be mappings")
             for key, value in values.items():
                 if (not isinstance(key, str) or not key.strip()
-                    or isinstance(value, bool) or not isinstance(value, (int, float))
-                    or not math.isfinite(value) or not low <= value <= high):
+                    or not _finite_number(value) or not low <= value <= high):
                     raise ValueError("invalid identity axis")
         object.__setattr__(self, "traits", MappingProxyType(dict(self.traits)))
         if self.sensitivities is not None:
@@ -54,8 +62,7 @@ class IdentityChangePolicy:
             ("minimum_strength", self.minimum_strength, 0.0, 1.0, True),
             ("maximum_delta", self.maximum_delta, 0.0, 0.1, False),
         ):
-            if (isinstance(value, bool) or not isinstance(value, (int, float))
-                    or not math.isfinite(value)
+            if (not _finite_number(value)
                     or (value < low if inclusive_low else value <= low)
                     or value > high):
                 interval = "[-1, 1]" if name == "delta" else (
@@ -81,12 +88,11 @@ class IdentityChangeProposal:
             value = getattr(self, name)
             if not isinstance(value, str) or not value.strip():
                 raise ValueError(f"{name} must be a non-empty string")
-        if self.role not in ("participant", "witness"):
+        if not isinstance(self.role, str) or self.role not in ("participant", "witness"):
             raise ValueError("role must be participant or witness")
         for name in ("before", "after", "delta", "evidence_strength", "maximum_delta"):
             value = getattr(self, name)
-            if (isinstance(value, bool) or not isinstance(value, (int, float))
-                    or not math.isfinite(value)):
+            if not _finite_number(value):
                 raise ValueError(f"{name} must be finite numeric")
         if not -1.0 <= self.before <= 1.0 or not -1.0 <= self.after <= 1.0:
             raise ValueError("trait values must be in [-1, 1]")
@@ -130,8 +136,7 @@ class IdentityEvolutionEvaluator:
                 if event.event_type != policy.event_type:
                     continue
                 strength = 1.0 if policy.strength_attribute is None else attrs.get(policy.strength_attribute)
-                if (isinstance(strength, bool) or not isinstance(strength, (int, float))
-                    or not math.isfinite(strength) or not 0 <= strength <= 1
+                if (not _finite_number(strength) or not 0 <= strength <= 1
                     or strength < policy.minimum_strength):
                     continue
                 for npc_id, profile in sorted(self.profiles.items()):
