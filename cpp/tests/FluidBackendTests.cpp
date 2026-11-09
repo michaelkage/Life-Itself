@@ -15,13 +15,16 @@ public:
     bool available{true};
     bool throw_on_evaluate{false};
     std::size_t maximum_agents{10000U};
+    std::size_t maximum_workgroups_per_dimension{65535U};
+    std::size_t workgroup_size{kWorkgroupSize};
     std::size_t evaluate_calls{0U};
     std::size_t throw_on_call{0U};
     float score_offset{0.0F};
     std::uint8_t trauma_override{255U};
 
     [[nodiscard]] ComputeBackendInfo info() const override {
-        return {"reference test backend", available, maximum_agents};
+        return {"reference test backend", available, maximum_agents,
+            maximum_workgroups_per_dimension, workgroup_size};
     }
 
     [[nodiscard]] std::vector<AgentOutput> evaluate(
