@@ -56,7 +56,12 @@ records. Adapters can pack each span directly into their staging or persistent
 GPU buffer. The C++ `pack_agents_into` API fills caller-owned byte storage and
 `unpack_outputs` accepts read-only byte spans, allowing an adapter to retain
 upload/readback allocations and reuse them across ticks. The allocating
-`pack_agents` helper remains available for simple callers and tests.
+`pack_agents` helper remains available for simple callers and tests. The C++
+`BufferWorkspace` owns reusable input and output byte arrays, grows them
+geometrically when a larger population arrives, and exposes only the active
+ranges for each tick. Shrinking a population does not discard the retained
+allocation; adapters can pack directly into its input span and decode from its
+output span.
 Chunk boundaries do not change stable agent order. Every chunk is checked for
 output count/order/ranges and compared to the CPU reference within a configurable
 absolute tolerance. Trauma tiers and rumour decisions must match exactly. If any
