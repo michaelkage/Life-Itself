@@ -23,6 +23,8 @@ class DispatchLimits:
     maximum_agents: int
     maximum_workgroups_per_dimension: int
     workgroup_size: int = WORKGROUP_SIZE
+    maximum_input_buffer_bytes: int = sys.maxsize
+    maximum_output_buffer_bytes: int = sys.maxsize
 
 @dataclass(frozen=True)
 class DispatchRange:
@@ -42,6 +44,8 @@ def plan_dispatches(agent_count: int, limits: DispatchLimits) -> tuple[DispatchR
         ("maximum_agents", limits.maximum_agents),
         ("maximum_workgroups_per_dimension", limits.maximum_workgroups_per_dimension),
         ("workgroup_size", limits.workgroup_size),
+        ("maximum_input_buffer_bytes", limits.maximum_input_buffer_bytes),
+        ("maximum_output_buffer_bytes", limits.maximum_output_buffer_bytes),
     ):
         if isinstance(value, bool) or not isinstance(value, int):
             raise TypeError(f"{name} must be an integer")
@@ -56,6 +60,8 @@ def plan_dispatches(agent_count: int, limits: DispatchLimits) -> tuple[DispatchR
     safe_capacity = min(
         limits.maximum_agents,
         limits.maximum_workgroups_per_dimension * limits.workgroup_size,
+        limits.maximum_input_buffer_bytes // AGENT_INPUT_STRIDE,
+        limits.maximum_output_buffer_bytes // AGENT_OUTPUT_STRIDE,
         storage_capacity,
     )
     chunk_capacity = (
