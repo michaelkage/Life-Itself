@@ -41,6 +41,19 @@ class MemoryRoutineAdapterTests(unittest.TestCase):
         self.assertEqual(first, second)
         self.assertEqual(first[0].severity, 0.6975)
 
+    def test_route_profiles_are_personal_and_compound_linked_memories(self):
+        associations = (
+            MemoryLocationAssociation("assoc-a", 0, "alley", 0.5, "main-road"),
+            MemoryLocationAssociation("assoc-b", 0, "alley", 0.5),
+        )
+        profiles = self.adapter.derive_profiles(self.npc, associations)
+        self.assertEqual(len(profiles), 1)
+        self.assertEqual(profiles[0].owner_id, "witness-1")
+        self.assertEqual(profiles[0].location_id, "alley")
+        self.assertAlmostEqual(profiles[0].strength, 0.6975)
+        self.assertEqual(profiles[0].source_memory_indices, (0,))
+        self.assertEqual(profiles[0].alternative_location_id, "main-road")
+
     def test_different_npcs_get_personal_results(self):
         associations = (MemoryLocationAssociation("assoc-a", 0, "alley"),)
         fearful = self.adapter.derive_avoidance(self.npc, associations, start_minute=480, end_minute=600)
