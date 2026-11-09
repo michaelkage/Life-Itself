@@ -69,7 +69,7 @@ class RoutineTravelAdapterTests(unittest.TestCase):
             departure_lead_minutes=15,
         )
         self.assertEqual(len(requests), 1)
-        self.assertEqual(requests[0].routine_id if hasattr(requests[0], "routine_id") else requests[0].routine_id, "work-shift")
+        self.assertEqual(requests[0].routine_id, "work-shift")
 
 
 if __name__ == "__main__":
