@@ -58,6 +58,38 @@ float read_f32_le(const std::uint8_t* bytes) {
 
 } // namespace
 
+BufferViews BufferWorkspace::prepare(std::size_t agent_count) {
+    constexpr std::size_t initial_capacity = 64U;
+    const std::size_t maximum_agents = std::min(
+        {std::numeric_limits<std::size_t>::max() / kAgentInputStride,
+         std::numeric_limits<std::size_t>::max() / kAgentOutputStride,
+         input_.max_size() / kAgentInputStride,
+         output_.max_size() / kAgentOutputStride});
+    if (agent_count > maximum_agents) {
+        throw std::length_error("fluid buffer workspace request is too large");
+    }
+
+    if (agent_count > capacity_agents_) {
+        std::size_t next_capacity = capacity_agents_ == 0U
+            ? initial_capacity : capacity_agents_;
+        while (next_capacity < agent_count) {
+            if (next_capacity > maximum_agents / 2U) {
+                next_capacity = agent_count;
+                break;
+            }
+            next_capacity *= 2U;
+        }
+        next_capacity = std::min(next_capacity, maximum_agents);
+        input_.resize(next_capacity * kAgentInputStride);
+        output_.resize(next_capacity * kAgentOutputStride);
+        capacity_agents_ = next_capacity;
+    }
+
+    input_.resize(agent_count * kAgentInputStride);
+    output_.resize(agent_count * kAgentOutputStride);
+    return {std::span<std::uint8_t>(input_), std::span<std::uint8_t>(output_)};
+}
+
 void pack_agents_into(std::span<const AgentInput> agents,
     std::span<std::uint8_t> destination) {
     validate_impl(agents);
