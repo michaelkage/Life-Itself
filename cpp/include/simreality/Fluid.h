@@ -76,5 +76,9 @@ void validate_agents(const std::vector<AgentInput>& agents);
 // Explicit little-endian f32 layout matching shaders/sre_fluid_agent.wgsl.
 [[nodiscard]] std::vector<std::uint8_t> pack_agents(const std::vector<AgentInput>& agents);
 [[nodiscard]] std::vector<AgentOutput> evaluate_cpu(const std::vector<AgentInput>& agents);
+// Decodes the shader's 16-byte-per-agent vec4<f32> readback and restores IDs
+// from the matching input snapshot. Rejects malformed sizes, flags and tiers.
+[[nodiscard]] std::vector<AgentOutput> unpack_outputs(
+    const std::vector<AgentInput>& agents, const std::vector<std::uint8_t>& bytes);
 
 } // namespace simreality::fluid
