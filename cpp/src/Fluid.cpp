@@ -5,6 +5,7 @@
 #include <cmath>
 #include <limits>
 #include <stdexcept>
+#include <utility>
 #include <unordered_set>
 
 namespace simreality::fluid {
@@ -82,7 +83,7 @@ std::vector<std::uint8_t> pack_agents(const std::vector<AgentInput>& agents) {
 }
 
 std::vector<AgentOutput> evaluate_cpu(const std::vector<AgentInput>& agents) {
-    validate(agents);
+    validate_agents(agents);
     std::vector<AgentOutput> outputs;
     outputs.reserve(agents.size());
     for (const AgentInput& a : agents) {
