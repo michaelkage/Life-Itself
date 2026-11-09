@@ -70,14 +70,17 @@ does not clear bytes: adapters must fully write the active input/output ranges
 before consuming them.
 Both the Python reference and portable C++ layer expose `plan_dispatches`, which converts an
 agent count and device limits (maximum storage-buffer agent capacity,
-maximum workgroups per dimension, and workgroup size) into contiguous dispatch
-ranges. It bounds both storage-buffer byte sizes and dispatch dimensions,
+maximum workgroups per dimension, workgroup size, and separate input/output
+storage-buffer byte limits) into contiguous dispatch
+ranges. It bounds both storage-buffer byte sizes (including device-specific maximum
+binding sizes for each input/output buffer) and dispatch dimensions,
 aligns intermediate chunks to full workgroups where possible, and leaves only
 the final chunk partial for the shader's bounds checks. This planner does not
 query a GPU; the future adapter must populate its limits from the actual device. The
 Python planner mirrors the C++ range contract and is covered by the Python
 regression suite. The C++ backend capability record supplies maximum agent
-capacity and maximum workgroups per dimension; the fallback dispatcher now uses
+capacity, maximum workgroups per dimension, and maximum input/output storage
+binding sizes; the fallback dispatcher now uses
 those values to plan its actual backend calls. The workgroup size is fixed at
 256 to match the compiled WGSL entry point, so adapters must not report a
 different value.
