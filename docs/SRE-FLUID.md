@@ -80,7 +80,9 @@ query a GPU; the future adapter must populate its limits from the actual device.
 Python planner mirrors the C++ range contract and is covered by the Python
 regression suite. The C++ backend capability record supplies maximum agent
 capacity, maximum workgroups per dimension, and maximum input/output storage
-binding sizes; the fallback dispatcher now uses
+binding sizes. Integration tests verify that both binding limits split real
+backend calls and that an adapter limit smaller than one record triggers safe
+whole-batch CPU fallback; the fallback dispatcher now uses
 those values to plan its actual backend calls. The workgroup size is fixed at
 256 to match the compiled WGSL entry point, so adapters must not report a
 different value.
