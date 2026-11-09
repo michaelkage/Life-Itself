@@ -66,6 +66,9 @@ std::vector<DispatchRange> plan_dispatches(
         || limits.workgroup_size == 0U) {
         throw std::invalid_argument("fluid dispatch limits must be non-zero");
     }
+    if (limits.workgroup_size != kWorkgroupSize) {
+        throw std::invalid_argument("fluid dispatch workgroup size must match the compiled shader");
+    }
     if (limits.maximum_workgroups_per_dimension
         > std::numeric_limits<std::size_t>::max() / limits.workgroup_size) {
         throw std::invalid_argument("fluid dispatch workgroup limit overflows size_t");
