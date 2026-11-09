@@ -552,3 +552,8 @@ __all__ += ["InquiryInvestigationPipeline", "InquiryInvestigationResult"]
 from .travel import TravelJourney, TravelLedger, TravelTickAdapter, TravelTickResult
 from .travel_save_state import TravelSnapshot
 __all__ += ["TravelJourney", "TravelLedger", "TravelTickAdapter", "TravelTickResult", "TravelSnapshot"]
+
+
+# Schedule-to-travel bridge for NPC routine destinations.
+from .routine_travel import RoutineTravelAdapter, RoutineTravelRequest
+__all__ += ["RoutineTravelAdapter", "RoutineTravelRequest"]
