@@ -6,6 +6,7 @@
 #include "simreality/Districts.h"
 #include "simreality/Ecosystem.h"
 #include "simreality/Fixers.h"
+#include "simreality/Fluid.h"
 #include "simreality/Gossip.h"
 #include "simreality/Justice.h"
 #include "simreality/LifeSystems.h"
@@ -1850,6 +1851,61 @@ int main() {
         rejected_unknown_consequence = true;
     }
     assert(rejected_unknown_consequence);
+
+
+    // SRE-Fluid CPU contract mirrors the WGSL buffer layout and thresholds.
+    fluid::AgentInput fluid_agent;
+    fluid_agent.agent_id = "fluid-1";
+    fluid_agent.x = 12.5F;
+    fluid_agent.y = -4.0F;
+    fluid_agent.personal_stress = 0.45F;
+    fluid_agent.overpopulation = 0.5F;
+    fluid_agent.supply_shortage = 0.6F;
+    fluid_agent.weather_severity = 0.5F;
+    fluid_agent.local_corruption = 0.5F;
+    fluid_agent.rumour_retention = 0.6F;
+    fluid_agent.target_known = true;
+    const auto fluid_bytes = fluid::pack_agents({fluid_agent});
+    assert(fluid_bytes.size() == fluid::kAgentInputStride);
+    assert(fluid_bytes[0] == 0x00U && fluid_bytes[1] == 0x00U
+        && fluid_bytes[2] == 0x48U && fluid_bytes[3] == 0x41U); // 12.5f, little-endian.
+    const auto fluid_result = fluid::evaluate_cpu({fluid_agent});
+    assert(fluid_result.size() == 1);
+    assert(fluid_result[0].agent_id == "fluid-1");
+    assert(fluid_result[0].trauma_tier == 2U);
+    assert(fluid_result[0].rumour_transmittable);
+    assert(fluid_result[0].attribution_survives);
+    fluid_agent.rumour_retention = 0.05F;
+    const auto unattributed_fluid = fluid::evaluate_cpu({fluid_agent});
+    assert(!unattributed_fluid[0].rumour_transmittable);
+    fluid_agent.rumour_retention = 0.0101F;
+    fluid_agent.target_known = false;
+    assert(fluid::evaluate_cpu({fluid_agent})[0].rumour_transmittable);
+    bool rejected_fluid_duplicate_ids = false;
+    try {
+        (void)fluid::pack_agents({fluid_agent, fluid_agent});
+    } catch (const std::invalid_argument&) {
+        rejected_fluid_duplicate_ids = true;
+    }
+    assert(rejected_fluid_duplicate_ids);
+    bool rejected_fluid_nan = false;
+    try {
+        auto invalid = fluid_agent;
+        invalid.x = std::numeric_limits<float>::quiet_NaN();
+        (void)fluid::evaluate_cpu({invalid});
+    } catch (const std::invalid_argument&) {
+        rejected_fluid_nan = true;
+    }
+    assert(rejected_fluid_nan);
+    bool rejected_fluid_channel = false;
+    try {
+        auto invalid = fluid_agent;
+        invalid.personal_stress = 1.1F;
+        (void)fluid::pack_agents({invalid});
+    } catch (const std::invalid_argument&) {
+        rejected_fluid_channel = true;
+    }
+    assert(rejected_fluid_channel);
 
     return 0;
 }
