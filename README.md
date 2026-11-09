@@ -58,6 +58,9 @@ Engine-independent Python reference systems:
 | `simreality/goal_review_decisions.py` | NPC goal decision history | Records explicit accepted/rejected goal-review proposals as an append-only, idempotent ledger; `goal_review_decisions_save_state.py` provides canonical persistence |
 | `simreality/planning.py` | NPC autonomy | Bounded symbolic action planning with preconditions, effects, costs, and deterministic tie-breaking |
 | `simreality/routines.py` | Persistent NPC routines | Time-windowed routines resolved against explicit disruptions; intended plans can be delayed, redirected, or missed with deterministic replay inputs |
+| `simreality/route_planning.py` | NPC navigation | Deterministic personal route selection over explicit road edges, including memory-derived location avoidance |
+| `simreality/travel.py` | NPC travel execution | Advances journeys across simulation ticks with explicit time budgets, road closures, travel-time multipliers, and arrival world events |
+| `simreality/travel_save_state.py` | NPC travel persistence | Canonical journey and tick-replay snapshot, including partial edge progress for save/load continuation |
 | `simreality/routine_tick.py` | Routine tick adapter | Selects active routines for an explicit tick, scopes supplied disruptions per NPC, and records replay-safe executions using explicit samples; called by the coordinator's named routine phase |
 | `simreality/npc_autonomy.py` | NPC autonomy | Read-only decision cycle that connects selected goals to explicit desired facts and bounded plans |
 | `simreality/appraisal.py` | NPC values and bias | Transparent value-weighted choice appraisal; different NPCs can rank the same hard choice differently |
@@ -79,7 +82,7 @@ Engine-independent Python reference systems:
 | `simreality/adapter_replay_state.py` | Adapter replay persistence | Saves processed event/witness memory keys and requires matching restored NPC memories |
 | `simreality/social_replay_save_state.py` | Social adapter replay persistence | Saves conversation signatures/results and witnessed-consequence inputs/results so identical replays return recorded outcomes |
 | `simreality/tick_replay_save_state.py` | Simulation tick replay persistence | Saves completed tick request history and cached-result references; restore requires the world, NPCs, memory adapter, and conversation adapter to be restored first |
-| `simreality/world_checkpoint.py` | Composite world checkpoint | Combines event, NPC, trust, belief, memory, conversation and tick replay snapshots, plus optional witnessed-consequence replay, campaign lifecycle, and misconduct history in one canonical JSON checkpoint |
+| `simreality/world_checkpoint.py` | Composite world checkpoint | Combines event, NPC, trust, belief, memory, conversation and tick replay snapshots, plus optional routines, travel journeys, witnessed-consequence replay, campaign lifecycle, and institutional histories in one canonical JSON checkpoint |
 | `simreality/misconduct_save_state.py` | Accountability persistence | Saves reports and append-only review decisions canonically; validates incident references against the authoritative world-event ledger on restore |
 
 | `simreality/institutional_dynamics.py` | Institutional decision dynamics | Ranks feasible institutional options using leadership and department priorities, resource pressure, accountability, evidence, employee traits, favouritism, and explicit signed bias cues; does not execute decisions |
