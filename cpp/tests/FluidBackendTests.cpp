@@ -2,6 +2,7 @@
 
 #include <cassert>
 #include <cmath>
+#include <limits>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -72,6 +73,32 @@ int main() {
         rejected_short_upload = true;
     }
     assert(rejected_short_upload);
+
+    BufferWorkspace workspace;
+    auto first_buffers = workspace.prepare(batch.size());
+    assert(first_buffers.input.size() == kAgentInputStride);
+    assert(first_buffers.output.size() == kAgentOutputStride);
+    pack_agents_into(batch, first_buffers.input);
+    const auto* retained_input_address = first_buffers.input.data();
+    const auto* retained_output_address = first_buffers.output.data();
+    auto smaller_buffers = workspace.prepare(0U);
+    assert(smaller_buffers.input.empty() && smaller_buffers.output.empty());
+    auto reused_buffers = workspace.prepare(batch.size());
+    assert(reused_buffers.input.data() == retained_input_address);
+    assert(reused_buffers.output.data() == retained_output_address);
+    assert(workspace.capacity_agents() >= batch.size());
+    auto grown_buffers = workspace.prepare(100U);
+    assert(grown_buffers.input.size() == 100U * kAgentInputStride);
+    assert(grown_buffers.output.size() == 100U * kAgentOutputStride);
+    assert(workspace.capacity_agents() >= 100U);
+
+    bool rejected_workspace_overflow = false;
+    try {
+        (void)workspace.prepare(std::numeric_limits<std::size_t>::max());
+    } catch (const std::length_error&) {
+        rejected_workspace_overflow = true;
+    }
+    assert(rejected_workspace_overflow);
 
     ReferenceBackend backend;
     EvaluationOptions options;
