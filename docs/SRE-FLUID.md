@@ -39,6 +39,11 @@ it provides the same immutable input snapshot, explicit little-endian f32 packin
 and CPU reference evaluation. The C++ source is part of simreality_core, so the
 Unreal-facing layer can build and test the data contract without a GPU SDK.
 
+The C++ `unpack_outputs` helper decodes the shader's 16-byte result records
+(four little-endian f32 values), restores stable agent IDs from the matching
+input snapshot, and rejects malformed lengths, non-finite/out-of-range scores,
+non-integral trauma tiers, and non-boolean flags.
+
 ## C++ backend boundary
 
 The C++ core now exposes a device-independent `ComputeBackend` interface and
