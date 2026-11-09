@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import math
 import struct
+import sys
 from typing import Iterable
 
 AGENT_INPUT_FLOATS = 12
@@ -46,10 +47,10 @@ def plan_dispatches(agent_count: int, limits: DispatchLimits) -> tuple[DispatchR
             raise TypeError(f"{name} must be an integer")
         if value < 0 or (name != "agent_count" and value == 0):
             raise ValueError(f"{name} is outside its valid range")
-    if limits.maximum_workgroups_per_dimension > ((1 << 63) - 1) // limits.workgroup_size:
+    if limits.maximum_workgroups_per_dimension > sys.maxsize // limits.workgroup_size:
         raise ValueError("dispatch workgroup limit overflows the supported size")
-    storage_capacity = min(((1 << 63) - 1) // AGENT_INPUT_STRIDE,
-                           ((1 << 63) - 1) // AGENT_OUTPUT_STRIDE)
+    storage_capacity = min(sys.maxsize // AGENT_INPUT_STRIDE,
+                           sys.maxsize // AGENT_OUTPUT_STRIDE)
     safe_capacity = min(
         limits.maximum_agents,
         limits.maximum_workgroups_per_dimension * limits.workgroup_size,
