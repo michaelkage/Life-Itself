@@ -1,6 +1,6 @@
 # Persistent NPC Routines — First Implementation Slice
 
-**Status:** Python reference implementation includes canonical schedule persistence, an idempotent execution ledger, a deterministic tick adapter, and an explicit routine-execution phase on `SimulationTickCoordinator`. Callers run the ordinary world tick first, then call `execute_routines` for that latest tick with a schedule, ledger, minute, disruptions, and outcome samples. Schedules and execution history can be included in `SimulationWorldCheckpoint`. This is an explicit two-phase API, not an automatic routine call inside `step`; callers must pass the same ledger into checkpoint capture. NPC memory associations still need to be translated into explicit disruptions. Route simulation and C++ runtime integration remain pending.
+**Status:** Python reference implementation includes canonical schedule persistence, an idempotent execution ledger, a deterministic tick adapter, and an explicit routine-execution phase on `SimulationTickCoordinator`. Callers run the ordinary world tick first, then call `execute_routines` for that latest tick with a schedule, ledger, minute, disruptions, and outcome samples. Schedules and execution history can be included in `SimulationWorldCheckpoint`. This is an explicit two-phase API, not an automatic routine call inside `step`; callers must pass the same ledger into checkpoint capture. NPC memory associations still need to be translated into explicit disruptions. Route planning and deterministic graph-based travel progression now have a Python reference implementation; composite checkpoint integration and C++ runtime integration remain pending.
 
 ## Design contract
 
@@ -158,3 +158,14 @@ Regression coverage: `tests/test_memory_routine_save_state.py`.
 `RoutePlan` returns the selected location sequence, base travel cost, adjusted cost, and the avoided locations that influenced the selected path. Equal-cost paths are resolved lexicographically and do not depend on edge insertion order. An unreachable destination returns an empty path; the planner does not invent roads, travel times, or location links. This is a graph-level path-choice layer only: traffic simulation, dynamic road closures, vehicle movement, and route execution remain world-driver responsibilities.
 
 Regression coverage: `tests/test_route_planning.py`.
+
+
+## Deterministic travel execution
+
+TravelTickAdapter turns a found RoutePlan into an owner-scoped TravelJourney. Each consecutive location pair is bound to an explicit RouteEdge; missing segments are rejected rather than silently invented. The world driver advances journeys with a per-owner budget expressed in the same abstract time-cost units as edge travel costs. Partial edge progress is retained between ticks, and a budget can carry across multiple edges.
+
+Road conditions are explicit inputs to each tick. closed_edge_ids pauses a journey at the affected edge and marks it blocked; the caller can reopen it after conditions change. time_multipliers scale the time required by an edge, allowing traffic or temporary delays to affect journey duration without changing the underlying route. Progress is stored in base edge-cost units, so changing a multiplier between ticks does not corrupt partial progress.
+
+An arrival is recorded once in the shared event journal as npc_arrived, with the journey ID, owner, origin, destination, and elapsed travel cost. Tick requests are idempotent: repeating the same tick and inputs returns its stored result, while conflicting inputs for an already processed tick are rejected. A caller must supply a budget for each NPC that should move; absent budgets mean no progress.
+
+TravelSnapshot stores each journey's current edge, partial progress, elapsed cost, status, and the per-tick replay history in canonical versioned JSON. It can restore a journey mid-edge and preserve replay behavior across a save/load cycle. This snapshot is currently standalone and is not yet a field inside SimulationWorldCheckpoint. Route changes during an active journey also remain an explicit world-driver decision: this adapter does not silently reroute an NPC or invent detours. Regression coverage is in tests/test_travel.py.
