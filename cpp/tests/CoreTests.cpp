@@ -1912,5 +1912,50 @@ int main() {
     }
     assert(rejected_fluid_channel);
 
+
+    // Backend dispatch keeps the CPU authoritative and falls back on device
+    // loss or malformed GPU output without exposing partial results.
+    class TestFluidBackend final : public fluid::ComputeBackend {
+    public:
+        bool device_available{true};
+        bool should_throw{false};
+        bool malformed{false};
+        [[nodiscard]] fluid::ComputeBackendInfo info() const override {
+            return {"test backend", device_available, 1000U};
+        }
+        [[nodiscard]] std::vector<fluid::AgentOutput> evaluate(
+            const std::vector<fluid::AgentInput>& inputs) override {
+            if (should_throw) throw std::runtime_error("simulated device loss");
+            auto outputs = fluid::evaluate_cpu(inputs);
+            if (malformed && !outputs.empty()) outputs.front().agent_id = "wrong-id";
+            return outputs;
+        }
+    };
+    TestFluidBackend test_backend;
+    fluid::EvaluationOptions fluid_options;
+    fluid_options.minimum_gpu_batch = 1U;
+    auto gpu_report = fluid::evaluate_with_fallback({fluid_agent}, &test_backend, fluid_options);
+    assert(gpu_report.backend == fluid::BackendKind::Gpu);
+    assert(gpu_report.backend_name == "test backend");
+    assert(!gpu_report.gpu_fallback);
+    test_backend.should_throw = true;
+    auto lost_device_report = fluid::evaluate_with_fallback({fluid_agent}, &test_backend, fluid_options);
+    assert(lost_device_report.backend == fluid::BackendKind::Cpu);
+    assert(lost_device_report.gpu_fallback);
+    assert(lost_device_report.agents.size() == 1U);
+    test_backend.should_throw = false;
+    test_backend.malformed = true;
+    auto malformed_report = fluid::evaluate_with_fallback({fluid_agent}, &test_backend, fluid_options);
+    assert(malformed_report.backend == fluid::BackendKind::Cpu);
+    assert(malformed_report.gpu_fallback);
+    test_backend.malformed = false;
+    test_backend.device_available = false;
+    auto unavailable_report = fluid::evaluate_with_fallback({fluid_agent}, &test_backend, fluid_options);
+    assert(unavailable_report.backend == fluid::BackendKind::Cpu);
+    assert(!unavailable_report.gpu_fallback);
+    auto small_batch_report = fluid::evaluate_with_fallback(
+        {fluid_agent}, &test_backend, fluid::EvaluationOptions{2U});
+    assert(small_batch_report.backend == fluid::BackendKind::Cpu);
+
     return 0;
 }
