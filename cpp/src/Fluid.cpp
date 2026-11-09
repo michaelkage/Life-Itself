@@ -59,6 +59,56 @@ float read_f32_le(const std::uint8_t* bytes) {
 
 } // namespace
 
+std::vector<DispatchRange> plan_dispatches(
+    std::size_t agent_count, DispatchLimits limits) {
+    if (limits.maximum_agents == 0U
+        || limits.maximum_workgroups_per_dimension == 0U
+        || limits.workgroup_size == 0U) {
+        throw std::invalid_argument("fluid dispatch limits must be non-zero");
+    }
+    if (limits.maximum_workgroups_per_dimension
+        > std::numeric_limits<std::size_t>::max() / limits.workgroup_size) {
+        throw std::invalid_argument("fluid dispatch workgroup limit overflows size_t");
+    }
+
+    const std::size_t storage_capacity = std::min(
+        std::numeric_limits<std::size_t>::max() / kAgentInputStride,
+        std::numeric_limits<std::size_t>::max() / kAgentOutputStride);
+    const std::size_t device_dispatch_capacity = std::min(
+        limits.maximum_agents,
+        limits.maximum_workgroups_per_dimension * limits.workgroup_size);
+    const std::size_t safe_capacity = std::min(
+        device_dispatch_capacity, storage_capacity);
+    if (safe_capacity == 0U) {
+        throw std::invalid_argument("fluid dispatch cannot address any agents");
+    }
+
+    // Keep intermediate dispatches aligned so only the final dispatch needs
+    // a partial workgroup. Tiny devices may still process smaller chunks.
+    const std::size_t chunk_capacity = safe_capacity >= limits.workgroup_size
+        ? (safe_capacity / limits.workgroup_size) * limits.workgroup_size
+        : safe_capacity;
+
+    std::vector<DispatchRange> ranges;
+    if (agent_count == 0U) return ranges;
+    const std::size_t range_count = agent_count / chunk_capacity
+        + (agent_count % chunk_capacity == 0U ? 0U : 1U);
+    if (range_count > ranges.max_size()) {
+        throw std::length_error("fluid dispatch plan is too large");
+    }
+    ranges.reserve(range_count);
+
+    std::size_t offset = 0U;
+    while (offset < agent_count) {
+        const std::size_t count = std::min(chunk_capacity, agent_count - offset);
+        const std::size_t workgroups = count / limits.workgroup_size
+            + (count % limits.workgroup_size == 0U ? 0U : 1U);
+        ranges.push_back({offset, count, workgroups});
+        offset += count;
+    }
+    return ranges;
+}
+
 BufferViews BufferWorkspace::prepare(std::size_t agent_count) {
     constexpr std::size_t initial_capacity = 64U;
     const std::size_t maximum_agents = std::min(
