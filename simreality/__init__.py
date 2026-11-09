@@ -546,3 +546,9 @@ __all__ += ["TestimonyMaterializationAdapter"]
 # Explicit inquiry-answer pipeline into testimony analysis and observer beliefs.
 from .testimony_pipeline import InquiryInvestigationPipeline, InquiryInvestigationResult
 __all__ += ["InquiryInvestigationPipeline", "InquiryInvestigationResult"]
+
+
+# Deterministic NPC travel progression and canonical journey persistence.
+from .travel import TravelJourney, TravelLedger, TravelTickAdapter, TravelTickResult
+from .travel_save_state import TravelSnapshot
+__all__ += ["TravelJourney", "TravelLedger", "TravelTickAdapter", "TravelTickResult", "TravelSnapshot"]
