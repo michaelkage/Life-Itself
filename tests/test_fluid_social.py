@@ -1,6 +1,7 @@
 import struct
 import unittest
 
+from simreality.beliefs import BeliefLedger, Evidence
 from simreality.fluid_social import (
     ClaimEvidenceBatch, EvidenceEdge, evaluate_gather_cpu,
     pack_evidence_gather, unpack_gather_outputs,
@@ -34,6 +35,27 @@ class FluidSocialGatherTests(unittest.TestCase):
         confidence += (1.0 - confidence) * (0.8 * 0.9)
         self.assertAlmostEqual(result.confidence, confidence)
         self.assertEqual(result.evidence_count, 2)
+
+    def test_gather_matches_belief_ledger_exactly_on_canonical_evidence(self):
+        batch = ClaimEvidenceBatch("claim", 0.37, (
+            self.edge("z-support", 4, 1, 0.9, 0.8),
+            self.edge("a-contradiction", 2, -1, 0.6, 0.7),
+            self.edge("m-support", 4, 1, 0.3, 0.95),
+        ))
+        ledger = BeliefLedger({"claim": 0.37})
+        for item in sorted(batch.evidence, key=lambda value: (value.observed_tick, value.evidence_id)):
+            ledger.add(Evidence(
+                evidence_id=item.evidence_id,
+                claim_id="claim",
+                source_id="source-" + item.evidence_id,
+                direction=item.direction,
+                strength=item.strength,
+                source_reliability=item.source_reliability,
+                observed_tick=item.observed_tick,
+            ))
+        proposal = evaluate_gather_cpu((batch,))[0]
+        self.assertAlmostEqual(proposal.confidence, ledger.get("claim").confidence, places=14)
+        self.assertEqual(proposal.evidence_count, len(ledger.get("claim").evidence_ids))
 
     def test_input_order_does_not_change_canonical_result(self):
         first = ClaimEvidenceBatch("claim", 0.5, (
