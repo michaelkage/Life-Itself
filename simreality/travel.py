@@ -30,6 +30,7 @@ class TravelJourney:
     status: str = "travelling"
     started_tick: int = 0
     arrived_tick: int | None = None
+    routine_id: str | None = None
 
     def __post_init__(self) -> None:
         for name in ("journey_id", "owner_id", "origin", "destination"):
@@ -54,6 +55,8 @@ class TravelJourney:
             raise ValueError("started_tick must be a non-negative integer")
         if self.arrived_tick is not None and (isinstance(self.arrived_tick, bool) or not isinstance(self.arrived_tick, int) or self.arrived_tick < self.started_tick):
             raise ValueError("arrived_tick must be a valid tick")
+        if self.routine_id is not None and (not isinstance(self.routine_id, str) or not self.routine_id.strip()):
+            raise ValueError("routine_id must be None or a non-empty string")
         if self.status == "arrived" and (self.edge_index != len(self.edge_ids) or self.arrived_tick is None):
             raise ValueError("arrived journeys must be complete and have arrived_tick")
 
@@ -141,7 +144,7 @@ class TravelTickAdapter:
         self._edges = {edge.edge_id: edge for edge in items}
         self.ledger = ledger if ledger is not None else TravelLedger()
 
-    def start(self, journey_id: str, owner_id: str, plan: RoutePlan, tick: int) -> TravelJourney:
+    def start(self, journey_id: str, owner_id: str, plan: RoutePlan, tick: int, *, routine_id: str | None = None) -> TravelJourney:
         if not isinstance(plan, RoutePlan) or plan.owner_id != owner_id or not plan.found:
             raise ValueError("a found route plan for the same owner is required")
         if isinstance(tick, bool) or not isinstance(tick, int) or tick < 0:
@@ -157,7 +160,8 @@ class TravelTickAdapter:
         status = "arrived" if not selected else "travelling"
         journey = TravelJourney(journey_id, owner_id, plan.origin, plan.destination, plan.path,
                                 tuple(selected), edge_index=len(selected) if not selected else 0,
-                                status=status, started_tick=tick, arrived_tick=tick if not selected else None)
+                                status=status, started_tick=tick, arrived_tick=tick if not selected else None,
+                                routine_id=routine_id)
         return self.ledger.add(journey)
 
     def _edge_ids_for_plan(self, plan: RoutePlan) -> tuple[str, ...]:
@@ -295,7 +299,8 @@ class TravelTickAdapter:
                 f"travel-arrival:{journey_id}", result.tick, "npc_arrived",
                 participants=(journey.owner_id,),
                 attributes={"journey_id": journey_id, "origin": journey.origin,
-                            "destination": journey.destination, "elapsed_cost": journey.elapsed_cost},
+                            "destination": journey.destination, "elapsed_cost": journey.elapsed_cost,
+                            "routine_id": journey.routine_id},
             ))
 
     def reopen(self, journey_id: str) -> TravelJourney:
