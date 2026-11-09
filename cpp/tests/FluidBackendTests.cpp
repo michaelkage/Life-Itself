@@ -204,6 +204,27 @@ int main() {
         assert(chunked.agents[i].agent_id == large_batch[i].agent_id);
     }
 
+    // The dispatcher also obeys workgroup-count limits reported by the device,
+    // even when its storage buffer could hold a much larger batch.
+    backend.evaluate_calls = 0U;
+    backend.throw_on_call = 0U;
+    backend.maximum_agents = 1000U;
+    backend.maximum_workgroups_per_dimension = 1U;
+    backend.maximum_agents = 1000U;
+    std::vector<AgentInput> dispatch_limited_batch;
+    for (int i = 0; i < 600; ++i) {
+        AgentInput item = sample();
+        item.agent_id = "dispatch-npc-" + std::to_string(i);
+        dispatch_limited_batch.push_back(item);
+    }
+    const auto dispatch_limited = evaluate_with_fallback(
+        dispatch_limited_batch, &backend, options);
+    assert(dispatch_limited.backend == BackendKind::Gpu);
+    assert(dispatch_limited.agents.size() == dispatch_limited_batch.size());
+    assert(backend.evaluate_calls == 3U);
+    backend.maximum_workgroups_per_dimension = 65535U;
+    backend.maximum_agents = 2U;
+
     backend.evaluate_calls = 0U;
     backend.throw_on_call = 2U;
     const auto partial_failure = evaluate_with_fallback(large_batch, &backend, options);
