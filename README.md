@@ -40,7 +40,7 @@ Engine-independent Python reference systems:
 
 | Module | Brief section | What it does |
 | --- | --- | --- |
-| `simreality/model.py` | — | Shared data records and tuning constants. The C++ port contract |
+| `simreality/model.py` | — | Shared data records and tuning constants. The C++ port contract |\n| `simreality/fluid.py` | SRE-Fluid | Packed 48-byte-per-agent GPU input contract and deterministic CPU reference for parallel pressure, trauma-tier, and rumour-gating evaluation |
 | `simreality/decay.py` | 1.A Memory Decay | Exponential decay with situational modifiers |
 | `simreality/gossip.py` | 1.B Gossip Network | Rumour mutation through social contact |
 | `simreality/ecosystem.py` | 1.C Desperation Matrix | Environmental pressure and behavioural status flips |
@@ -83,7 +83,7 @@ Engine-independent Python reference systems:
 
 | `simreality/institutional_dynamics.py` | Institutional decision dynamics | Ranks feasible institutional options using leadership and department priorities, resource pressure, accountability, evidence, employee traits, favouritism, and explicit signed bias cues; does not execute decisions |
 
-The authoritative world event journal is documented in [docs/WORLD-EVENT-LEDGER.md](docs/WORLD-EVENT-LEDGER.md); it is deliberately separate from observer-specific beliefs and consequences. The per-witness social integration is described in [docs/WORLD-EVENT-SOCIAL-INTEGRATION.md](docs/WORLD-EVENT-SOCIAL-INTEGRATION.md), and the event-to-memory bridge in [docs/WORLD-EVENT-MEMORY.md](docs/WORLD-EVENT-MEMORY.md).
+The optional GPU compute foundation is documented in [docs/SRE-FLUID.md](docs/SRE-FLUID.md). Its first WebGPU kernel is [shaders/sre_fluid_agent.wgsl](shaders/sre_fluid_agent.wgsl); it is a parallel numerical pass with a CPU reference, not yet a production GPU runtime.\n\nThe authoritative world event journal is documented in [docs/WORLD-EVENT-LEDGER.md](docs/WORLD-EVENT-LEDGER.md); it is deliberately separate from observer-specific beliefs and consequences. The per-witness social integration is described in [docs/WORLD-EVENT-SOCIAL-INTEGRATION.md](docs/WORLD-EVENT-SOCIAL-INTEGRATION.md), and the event-to-memory bridge in [docs/WORLD-EVENT-MEMORY.md](docs/WORLD-EVENT-MEMORY.md).
 
 `simreality/model.py` is the contract for the existing C++ domain port — it holds records and
 constants only, no behaviour. The new NPC goal and planning modules are currently Python-only; their implementation boundaries and regression coverage are documented in [docs/NPC-GOALS-IMPLEMENTATION.md](docs/NPC-GOALS-IMPLEMENTATION.md) and [docs/NPC-PLANNING-IMPLEMENTATION.md](docs/NPC-PLANNING-IMPLEMENTATION.md).
