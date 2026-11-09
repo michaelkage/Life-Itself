@@ -82,6 +82,13 @@ class TravelTickTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             TravelSnapshot.from_json(encoded + " ")
 
+    def test_arrival_event_can_be_materialized_on_replay(self):
+        self.adapter.advance(1, {"npc-1": 7})
+        events = WorldEventLedger()
+        replay = self.adapter.advance(1, {"npc-1": 7}, events=events)
+        self.assertEqual(replay.arrivals, ("trip-1",))
+        self.assertEqual(events.get("travel-arrival:trip-1").event_type, "npc_arrived")
+
 
 if __name__ == "__main__":
     unittest.main()
