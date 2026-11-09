@@ -54,6 +54,25 @@ AgentInput sample() {
 
 int main() {
     const std::vector<AgentInput> batch{sample()};
+    // Caller-owned upload memory can be reused over many simulation ticks.
+    std::vector<std::uint8_t> retained_upload(batch.size() * kAgentInputStride, 0U);
+    pack_agents_into(batch, retained_upload);
+    const auto allocated_upload = pack_agents(batch);
+    assert(retained_upload == allocated_upload);
+    const auto decoded = unpack_outputs(batch, std::vector<std::uint8_t>{
+        0U, 0U, 0U, 0U, 0U, 0U, 0U, 0U,
+        0U, 0U, 0U, 0U, 0U, 0U, 0U, 0U});
+    assert(decoded.size() == 1U && decoded[0].agent_id == batch[0].agent_id);
+
+    bool rejected_short_upload = false;
+    try {
+        std::vector<std::uint8_t> too_small(kAgentInputStride - 1U);
+        pack_agents_into(batch, too_small);
+    } catch (const std::invalid_argument&) {
+        rejected_short_upload = true;
+    }
+    assert(rejected_short_upload);
+
     ReferenceBackend backend;
     EvaluationOptions options;
     options.minimum_gpu_batch = 1U;
