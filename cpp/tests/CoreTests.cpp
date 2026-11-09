@@ -1875,11 +1875,16 @@ int main() {
     assert(fluid_result[0].trauma_tier == 2U);
     assert(fluid_result[0].rumour_transmittable);
     assert(fluid_result[0].attribution_survives);
+    // Below the attribution threshold, a known target degrades to an
+    // appearance-only rumour and therefore uses the lower 0.01 floor.
     fluid_agent.rumour_retention = 0.05F;
     const auto unattributed_fluid = fluid::evaluate_cpu({fluid_agent});
-    assert(!unattributed_fluid[0].rumour_transmittable);
-    fluid_agent.rumour_retention = 0.0101F;
+    assert(unattributed_fluid[0].rumour_transmittable);
+    assert(!unattributed_fluid[0].attribution_survives);
+    fluid_agent.rumour_retention = 0.01F;
     fluid_agent.target_known = false;
+    assert(!fluid::evaluate_cpu({fluid_agent})[0].rumour_transmittable);
+    fluid_agent.rumour_retention = 0.0101F;
     assert(fluid::evaluate_cpu({fluid_agent})[0].rumour_transmittable);
     bool rejected_fluid_duplicate_ids = false;
     try {
