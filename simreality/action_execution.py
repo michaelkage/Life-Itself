@@ -196,7 +196,9 @@ class ActionExecutionLedger:
         if isinstance(tick, bool) or not isinstance(tick, int) or tick < active.last_tick:
             raise ValueError("advance tick cannot precede the previous execution tick")
         if tick == active.last_tick:
-            return active
+            if active.progress_ticks > 0:
+                return active
+            raise ValueError("first advance tick must be greater than the start tick")
         if not isinstance(world_facts, set) or not isinstance(resources, dict):
             raise TypeError("world_facts and resources must be mutable set/dict values")
         if interruption is not None and (not isinstance(interruption, str) or not interruption.strip()):
