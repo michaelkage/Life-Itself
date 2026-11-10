@@ -3,6 +3,9 @@ import unittest
 from simreality.identity_evolution import IdentityChangeProposal, NPCIdentityProfile
 from simreality.identity_decisions import IdentityChangeDecision, IdentityDecisionLedger
 from simreality.identity_decisions_save_state import IdentityDecisionSnapshot
+from simreality.emotional_scars import EmotionalScar, NPCEmotionalScarLedger
+from simreality.emotional_scar_identity import EmotionalScarIdentityAdapter, ScarIdentityPolicy
+from simreality.world_events import WorldEventLedger
 
 
 class IdentityDecisionTests(unittest.TestCase):
@@ -11,6 +14,69 @@ class IdentityDecisionTests(unittest.TestCase):
         self.proposal = IdentityChangeProposal(
             "event-1", "npc-a", "policy-1", "trust", 0.2, 0.25, 0.05, 1.0, "participant"
         )
+
+    def test_accepted_scar_informs_identity_proposal_without_mutating_traits(self):
+        events = WorldEventLedger((WorldEventLedger.make_event(
+            "event-scar", 2, "incident", participants=("npc-a",),
+        ),))
+        scars = NPCEmotionalScarLedger()
+        scars.add_scar(EmotionalScar(
+            "scar-1", "npc-a", "event-scar", "memory-1", 3,
+            "fear", "crowded-room", 0.8, 0.999,
+        ))
+        identities = IdentityDecisionLedger((self.profile,))
+        policy = ScarIdentityPolicy(
+            "fear-to-trust", "fear", "crowded-room", "trust",
+            -0.05, minimum_severity=0.2, maximum_delta=0.05,
+        )
+        proposals = EmotionalScarIdentityAdapter.propose(
+            scars, identities, events, (policy,), 4,
+        )
+        self.assertEqual(len(proposals), 1)
+        proposal = proposals[0]
+        self.assertEqual(proposal.event_id, "event-scar")
+        self.assertEqual(proposal.npc_id, "npc-a")
+        self.assertEqual(proposal.axis, "trust")
+        self.assertLess(proposal.delta, 0)
+        self.assertEqual(identities.traits_for("npc-a")["trust"], 0.2)
+        identities.decide(
+            "scar-identity-decision", proposal, accepted=False,
+            decision_tick=4, rationale="I do not want this experience to define my trust",
+        )
+        self.assertEqual(identities.traits_for("npc-a")["trust"], 0.2)
+        self.assertFalse(identities.entries()[0].accepted)
+
+    def test_scar_identity_proposals_respect_recovery_threshold_and_role(self):
+        events = WorldEventLedger((WorldEventLedger.make_event(
+            "event-scar", 2, "incident", witnesses=("npc-a",),
+        ),))
+        scars = NPCEmotionalScarLedger()
+        scars.add_scar(EmotionalScar(
+            "scar-1", "npc-a", "event-scar", "memory-1", 3,
+            "fear", "crowded-room", 0.8, 0.999,
+        ))
+        scars.recover(
+            recovery_id="recovery-1", scar_id="scar-1", owner_id="npc-a",
+            tick=3, amount=0.7, method="support",
+        )
+        identities = IdentityDecisionLedger((self.profile,))
+        policy = ScarIdentityPolicy(
+            "fear-to-trust", "fear", "crowded-room", "trust",
+            -0.05, minimum_severity=0.2, include_witnesses=False,
+        )
+        self.assertEqual(
+            EmotionalScarIdentityAdapter.propose(scars, identities, events, (policy,), 4),
+            (),
+        )
+        witness_policy = ScarIdentityPolicy(
+            "fear-to-trust-witness", "fear", "crowded-room", "trust",
+            -0.05, minimum_severity=0.05, include_witnesses=True,
+        )
+        proposal, = EmotionalScarIdentityAdapter.propose(
+            scars, identities, events, (witness_policy,), 4,
+        )
+        self.assertEqual(proposal.role, "witness")
+        self.assertLess(proposal.evidence_strength, 0.2)
 
     def test_ledger_rejects_invalid_decision_types_before_sorting(self):
         with self.assertRaisesRegex(TypeError, "IdentityChangeDecision"):
