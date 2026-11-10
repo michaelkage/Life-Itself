@@ -116,5 +116,54 @@ class GoalLifeAdapterTests(unittest.TestCase):
             GoalLifeContext("npc-1", 0, 10, 0.0, stress=1.1)
 
 
+    def test_accepted_goal_review_reorders_daily_routine_budget_allocation(self):
+        from simreality.identity_decisions import IdentityChangeDecision
+        from simreality.identity_goal_alignment import (
+            IdentityGoalAction, IdentityGoalAlignmentAdapter,
+            IdentityGoalAlignmentPolicy, IdentityGoalReviewDecision,
+            IdentityGoalReviewDecisionLedger,
+        )
+
+        context = GoalLifeContext("npc-1", 10, 30, 2.0)
+        before = self.adapter.assess(context)
+        before_by_routine = {item.routine_id: item for item in before.proposals}
+        self.assertTrue(before_by_routine["market-research"].accepted)
+        self.assertFalse(before_by_routine["family-dinner"].accepted)
+
+        identity = IdentityChangeDecision(
+            "identity-family-1", "event-family-1", "npc-1",
+            "care-policy", "caregiving", True, 10,
+            "My family responsibilities now come first", 0.0, 0.4, 0.4,
+            0.9, "participant",
+        )
+        alignment = IdentityGoalAlignmentAdapter(self.goals, (
+            IdentityGoalAlignmentPolicy(
+                "care-family-goal", "caregiving", "family",
+                IdentityGoalAction.REPRIORITIZE,
+                minimum_abs_delta=0.1, priority_delta=5.0,
+            ),
+        ))
+        proposal, = alignment.assess((identity,), current_tick=10)
+        decisions = IdentityGoalReviewDecisionLedger((
+            IdentityGoalReviewDecision(
+                "family-goal-review", proposal, True, 11,
+                "I choose to prioritize family time",
+            ),
+        ))
+        # The identity change and its goal proposal do not affect daily life
+        # until the NPC separately accepts and applies the goal review.
+        unchanged = self.adapter.assess(context)
+        self.assertEqual(unchanged, before)
+        decisions.apply_accepted("family-goal-review", self.goals)
+
+        after = self.adapter.assess(context)
+        after_by_routine = {item.routine_id: item for item in after.proposals}
+        self.assertTrue(after_by_routine["family-dinner"].accepted)
+        self.assertFalse(after_by_routine["market-research"].accepted)
+        self.assertEqual(after_by_routine["market-research"].reason,
+                         "insufficient discretionary time")
+        self.assertEqual(self.goals.goals["family"].priority, 10.0)
+
+
 if __name__ == "__main__":
     unittest.main()
