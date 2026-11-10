@@ -788,3 +788,14 @@ __all__ += [
     "MemoryChoiceAssociation", "MemoryDecisionInfluence",
     "MemoryDecisionInfluenceAdapter", "MemoryDecisionProfile",
 ]
+
+
+# Personality-conditioned appraisal of cue-triggered emotional memories.
+from .personality_emotion import (
+    PersonalityConditionedEmotion, PersonalityEmotionAdapter,
+    PersonalityEmotionContribution, PersonalityEmotionRule,
+)
+__all__ += [
+    "PersonalityConditionedEmotion", "PersonalityEmotionAdapter",
+    "PersonalityEmotionContribution", "PersonalityEmotionRule",
+]
