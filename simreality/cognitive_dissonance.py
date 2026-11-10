@@ -67,8 +67,10 @@ class DissonanceDecision:
     rationale: str
 
     def __post_init__(self):
-        for name in ("decision_id", "conflict_id", "owner_id", "rationale"):
+        for name in ("decision_id", "conflict_id", "owner_id"):
             _text(name, getattr(self, name))
+        if not isinstance(self.rationale, str):
+            raise ValueError("rationale must be a string")
         if self.response not in ("rationalize", "avoid", "seek_evidence", "acknowledge", "reconsider"):
             raise ValueError("unsupported dissonance response")
         if isinstance(self.tick, bool) or not isinstance(self.tick, int) or self.tick < 0:
