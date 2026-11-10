@@ -376,3 +376,6 @@ NPC stress now participates in composite world checkpoints. Stress ledgers are v
 
 
 Stress-driven behavioral adaptation now projects individual stress and exhaustion sensitivity into explicit decision considerations for social engagement, work performance, sleep priority, risk tolerance, routine flexibility, and conflict sensitivity. It is read-only and does not force behavior. See [docs/NPC-STRESS-BEHAVIOR-ADAPTATION.md](docs/NPC-STRESS-BEHAVIOR-ADAPTATION.md) and `tests/test_stress_behavior_adaptation.py`.
+
+
+NPC psychological conditioning records owner-specific associations between explicit cues and experienced outcomes. Reinforcement, extinction, gradual weakening, replay protection, and canonical persistence are available through `NPCConditioningLedger`; the system returns approach/avoidance signals without forcing actions. See [docs/NPC-PSYCHOLOGICAL-CONDITIONING.md](docs/NPC-PSYCHOLOGICAL-CONDITIONING.md) and `tests/test_npc_conditioning.py`.
