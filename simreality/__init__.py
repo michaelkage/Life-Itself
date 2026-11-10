@@ -867,5 +867,5 @@ __all__ += ["ActionExecution", "ActionExecutionLedger", "ActionExecutionPolicy",
 
 
 # Explicit goal-aware action replanning over the persistent execution ledger.
-from .npc_action_replanning import (NPCActionProgression, NPCActionReplanningCoordinator, NPCReplanningResult)
-__all__ += ["NPCActionProgression", "NPCActionReplanningCoordinator", "NPCReplanningResult"]
+from .npc_action_replanning import (NPCActionProgression, NPCActionReplanningCoordinator, NPCReplanningResult, NPCReplanningSnapshot)
+__all__ += ["NPCActionProgression", "NPCActionReplanningCoordinator", "NPCReplanningResult", "NPCReplanningSnapshot"]
