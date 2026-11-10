@@ -35,6 +35,21 @@ class NPCConditioningTests(unittest.TestCase):
         ledger.advance(2, {"npc": profile})
         self.assertAlmostEqual(ledger.association_for("npc", "crowd"), -0.648)
 
+    def test_decay_clock_is_independent_per_npc(self):
+        ledger = NPCConditioningLedger(associations={
+            ("npc-a", "cue"): 1.0, ("npc-b", "cue"): 1.0,
+        })
+        profile_a = ConditioningProfile("npc-a", spontaneous_recovery_rate=0.1)
+        profile_b = ConditioningProfile("npc-b", spontaneous_recovery_rate=0.1)
+        ledger.advance(1, {"npc-a": profile_a})
+        ledger.advance(2, {"npc-b": profile_b})
+        self.assertAlmostEqual(ledger.association_for("npc-a", "cue"), 0.9)
+        self.assertAlmostEqual(ledger.association_for("npc-b", "cue"), 0.81)
+        restored = NPCConditioningSnapshot.capture(ledger).restore()
+        ledger.advance(3, {"npc-b": profile_b})
+        restored.advance(3, {"npc-b": profile_b})
+        self.assertEqual(restored.snapshot(), ledger.snapshot())
+
     def test_replay_is_idempotent_and_conflicts_rejected(self):
         ledger = NPCConditioningLedger()
         profile = ConditioningProfile("npc")
