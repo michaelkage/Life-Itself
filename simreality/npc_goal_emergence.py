@@ -155,7 +155,7 @@ class NPCGoalEmergence:
                            and (m.turning_point or not rule.require_turning_point)]
                 strategic = [x for x in experience_evidence
                              if rule.experience_tag in x.tags
-                             and (not rule.require_turning_point or x.source_class == "personal")]
+                             and not rule.require_turning_point]
                 evidence.extend(m.memory_id for m in matches)
                 sources.extend("personal_memory" for _ in matches)
                 evidence.extend(x.evidence_id for x in strategic)
