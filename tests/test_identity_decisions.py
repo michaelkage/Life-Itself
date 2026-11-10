@@ -46,6 +46,13 @@ class IdentityDecisionTests(unittest.TestCase):
         self.assertEqual(identities.traits_for("npc-a")["trust"], 0.2)
         self.assertFalse(identities.entries()[0].accepted)
 
+        accepting_identity = IdentityDecisionLedger((self.profile,))
+        accepting_identity.decide(
+            "scar-identity-accepted", proposal, accepted=True,
+            decision_tick=4, rationale="I choose to learn from this experience",
+        )
+        self.assertLess(accepting_identity.traits_for("npc-a")["trust"], 0.2)
+
     def test_scar_identity_proposals_respect_recovery_threshold_and_role(self):
         events = WorldEventLedger((WorldEventLedger.make_event(
             "event-scar", 2, "incident", witnesses=("npc-a",),
