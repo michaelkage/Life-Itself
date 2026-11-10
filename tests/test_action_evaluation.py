@@ -3,6 +3,9 @@ import unittest
 
 from simreality.action_execution import ActionExecutionLedger, ActionExecutionPolicy
 from simreality.action_evaluation import ActionPlanEvaluationLedger
+from simreality.goals import GoalBook, NPCGoal
+from simreality.npc_action_replanning import NPCActionReplanningCoordinator
+from simreality.npc_autonomy import NPCDecisionCycle
 from simreality.planning import DeterministicPlanner, PlanningAction
 from simreality.world_events import WorldEventLedger
 
@@ -53,6 +56,26 @@ class ActionEvaluationTests(unittest.TestCase):
         snapshot = self.evaluations.to_snapshot()
         restored = ActionPlanEvaluationLedger.from_snapshot(self.executions, self.events, snapshot)
         self.assertEqual(restored.to_snapshot(), snapshot)
+
+    def test_replanning_progression_attaches_terminal_evaluation(self):
+        goals = GoalBook()
+        goals.add(NPCGoal("fix-goal", "npc", "maintenance", 5.0))
+        cycle = NPCDecisionCycle(goals, self.planner)
+        coordinator = NPCActionReplanningCoordinator(
+            cycle, self.executions, self.events, self.evaluations,
+        )
+        facts, resources = {"broken"}, {"parts": 5.0}
+        planned = coordinator.replan(
+            "npc", 1, facts, resources, {"fix-goal": {"fixed"}},
+            reason="repair required",
+        )
+        coordinator.advance(planned.execution_id, 2, facts, resources,
+                            {"fix-goal": {"fixed"}})
+        progression = coordinator.advance(
+            planned.execution_id, 3, facts, resources, {"fix-goal": {"fixed"}},
+        )
+        self.assertIsNotNone(progression.evaluation)
+        self.assertEqual(progression.evaluation.execution_id, planned.execution_id)
 
     def test_cancelled_action_is_recorded_as_non_success(self):
         facts, resources = {"broken"}, {"parts": 5.0}
