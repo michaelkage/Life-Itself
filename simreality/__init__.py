@@ -557,7 +557,12 @@ __all__ += ["TravelJourney", "TravelLedger", "TravelTickAdapter", "TravelTickRes
 # Schedule-to-travel bridge for NPC routine destinations.
 from .routine_travel import RoutineTravelAdapter, RoutineTravelRequest
 __all__ += ["RoutineTravelAdapter", "RoutineTravelRequest"]
-\n\n# Execute routine activities only after their routine-linked travel has arrived.\nfrom .routine_arrival import RoutineArrivalAdapter, RoutineArrivalResult\n__all__ += ["RoutineArrivalAdapter", "RoutineArrivalResult"]\n
+
+
+# Execute routine activities only after their routine-linked travel has arrived.
+from .routine_arrival import RoutineArrivalAdapter, RoutineArrivalResult
+__all__ += ["RoutineArrivalAdapter", "RoutineArrivalResult"]
+
 
 # Authoritative location and road-edge presence, synchronized from travel.
 from .presence import NPCPresence, PresenceLedger, PresenceTickAdapter
