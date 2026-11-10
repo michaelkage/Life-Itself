@@ -14,7 +14,8 @@ from .action_execution import ActionExecution, ActionExecutionLedger, ActiveActi
 from .action_evaluation import ActionPlanEvaluationLedger, NPCActionEvaluation, NPCPlanEvaluation
 from .npc_autonomy import NPCDecision, NPCDecisionCycle
 from .npc_life_history import NPCLifeHistory
-from .npc_experience_transfer import NPCExperienceTransferLedger, experience_action_guidance
+from .npc_experience_transfer import (NPCExperienceTransferLedger, experience_action_guidance,
+                                     strategic_experience_evidence)
 from .planning import PlanResult
 from .world_events import WorldEventLedger
 
@@ -118,6 +119,7 @@ class NPCActionReplanningCoordinator:
                 "reason": result.reason, "goal_id": decision.goal_id,
                 "goal_category": decision.goal_category, "decision_reason": decision.reason,
                 "experience_evidence_ids": list(decision.experience_evidence_ids),
+                "experience_evidence_sources": [list(x) for x in decision.experience_evidence_sources],
                 "plan": plan, "status": result.status,
                 "execution_id": result.execution_id, "action_id": result.action_id,
                 "rejected_reason": result.rejected_reason, "event_id": result.event_id,
@@ -147,7 +149,7 @@ class NPCActionReplanningCoordinator:
                     or attributes.get("status") != item["status"]
                     or attributes.get("action_id", "") != (item["action_id"] or "")
                     or attributes.get("reason") != item["reason"]
-                    or attributes.get("experience_evidence_ids", "[]") != json.dumps(item.get("experience_evidence_ids", []), separators=(",", ":"))):
+                    or attributes.get("experience_evidence_ids", "[]") != json.dumps(item.get("experience_evidence_ids", []), separators=(",", ":"))\n                    or attributes.get("experience_evidence_sources", "[]") != json.dumps(item.get("experience_evidence_sources", []), separators=(",", ":"))):
                 raise ValueError("replanning history does not match its world event")
             plan_data = item["plan"]
             plan = None if plan_data is None else PlanResult(
@@ -158,6 +160,7 @@ class NPCActionReplanningCoordinator:
                 item["owner_id"], item["tick"], item["goal_id"],
                 item["goal_category"], plan, item["decision_reason"],
                 tuple(item.get("experience_evidence_ids", ())),
+                tuple(tuple(x) for x in item.get("experience_evidence_sources", ())),
             )
             result = NPCReplanningResult(
                 request_id, item["owner_id"], item["tick"], item["reason"], decision,
@@ -220,18 +223,19 @@ class NPCActionReplanningCoordinator:
         plan_reliability = (self.evaluations.plan_reliabilities()
                             if self.evaluations is not None else {})
         experience_ids: set[str] = set()
+        experience_sources: dict[str, str] = {}
         if self.experience_transfers is not None:
             experience_reliability, evidence_by_action = experience_action_guidance(
                 self.life_history, self.experience_transfers, owner_id, tick,
                 self.decisions.planner.actions)
-            for action_id, value in experience_reliability.items():
+            experience_sources = {item.evidence_id: item.source_class for item in strategic_experience_evidence(\n                self.life_history, self.experience_transfers, owner_id, tick)}\n            for action_id, value in experience_reliability.items():
                 prior = action_reliability.get(action_id)
                 action_reliability[action_id] = value if prior is None else 0.75 * prior + 0.25 * value
                 experience_ids.update(evidence_by_action[action_id])
         request = {
             "owner": owner_id, "tick": tick, "facts": facts, "resources": balances,
             "action_reliability": sorted(action_reliability.items()),
-            "experience_evidence_ids": sorted(experience_ids),
+            "experience_evidence_ids": sorted(experience_ids),\n            "experience_evidence_sources": sorted((key, experience_sources[key]) for key in experience_ids),
             "plan_reliability": [[goal_id, list(actions), value]
                                  for (goal_id, actions), value in sorted(plan_reliability.items())],
             "goal_facts": {key: sorted(value) for key, value in sorted(goal_facts.items())},
@@ -267,7 +271,7 @@ class NPCActionReplanningCoordinator:
         if experience_ids:
             decision = NPCDecision(decision.owner_id, decision.tick, decision.goal_id,
                                    decision.goal_category, decision.plan, decision.reason,
-                                   tuple(sorted(experience_ids)))
+                                   tuple(sorted(experience_ids)),\n                                   tuple(sorted((key, experience_sources[key]) for key in experience_ids)))
         execution_id = None
         action_id = None
         rejected_reason = None
@@ -302,7 +306,7 @@ class NPCActionReplanningCoordinator:
                 "request_id": request_id, "reason": reason, "goal_id": decision.goal_id or "",
                 "status": status, "action_id": action_id or "",
                 "rejected_reason": rejected_reason or "",
-                "experience_evidence_ids": json.dumps(sorted(experience_ids), separators=(",", ":")),
+                "experience_evidence_ids": json.dumps(sorted(experience_ids), separators=(",", ":")),\n                "experience_evidence_sources": json.dumps(sorted((key, experience_sources[key]) for key in experience_ids), separators=(",", ":")),
             },
         ))
         result = NPCReplanningResult(
