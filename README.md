@@ -453,3 +453,6 @@ Autonomous NPC replanning history is now part of the composite world checkpoint.
 
 
 NPC action outcomes can be evaluated against immutable execution records and the authoritative event journal with `ActionPlanEvaluationLedger`. It compares declared effects, resource costs, and duration with observed terminal results, retains evidence event IDs, and exposes a bounded per-action reliability estimate only after a configurable minimum sample count. Learning is a separate projection: it never rewrites prior plans, decisions, or execution history. See [docs/NPC-ACTION-EVALUATION.md](docs/NPC-ACTION-EVALUATION.md) and `tests/test_action_evaluation.py`.
+
+
+Action evaluation history and its bounded reliability projection are also persisted by `SimulationWorldCheckpoint` using `action_evaluations=...`. Restore the execution ledger first, then call `RestoredSimulation.restore_action_evaluation_ledger(executions)`, and pass that ledger to `restore_action_replanning_coordinator(decisions, executions, evaluations)`. The checkpoint validates each evaluation against its terminal execution record, evaluation journal event, and evidence event IDs. Older checkpoints without evaluation state remain compatible. See [docs/NPC-ACTION-EVALUATION.md](docs/NPC-ACTION-EVALUATION.md).
