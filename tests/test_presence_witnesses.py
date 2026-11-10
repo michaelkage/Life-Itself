@@ -54,6 +54,19 @@ class PresenceWitnessTests(unittest.TestCase):
         self.assertEqual(result.eligible_witnesses, ("a", "b"))
         self.assertEqual(event.witnesses, ("already-recorded",))
 
+
+    def test_presence_record_created_after_event_cannot_prove_witnessing(self):
+        presence = PresenceLedger()
+        presence.place("late-record", "street", 5)
+        event = WorldEventLedger.make_event(
+            "incident-6", 4, "incident", attributes={"location_id": "street"}
+        )
+        result = PresenceWitnessAdapter(presence).resolve(
+            event, ("late-record",), {"late-record": True}
+        )
+        self.assertEqual(result.eligible_witnesses, ())
+        self.assertEqual(result.assessments[0].reason, "presence_updated_after_event")
+
     def test_rejects_invalid_opportunity_and_location_inputs(self):
         presence = PresenceLedger()
         event = WorldEventLedger.make_event("incident-4", 1, "incident")
