@@ -413,3 +413,6 @@ The [NPC autobiographical memory recall layer](docs/NPC-MEMORY-RECALL.md) retrie
 
 
 NPC memories can now be reinterpreted over time without rewriting the original account. The [memory reflection ledger](docs/NPC-MEMORY-REFLECTION.md) stores owner-specific, append-only interpretation changes with chronological validation and a canonical component snapshot. The [cue-driven recall layer](docs/NPC-MEMORY-RECALL.md) retrieves matching memories using authored cue associations, salience, and optional emotional weighting. These are component-level systems; reflection snapshots are not yet included in the composite world checkpoint. Tests: `tests/test_npc_memory_reflection.py` and `tests/test_npc_memory_recall.py`.
+
+
+The [memory-driven decision layer](docs/MEMORY-DRIVEN-DECISIONS.md) translates explicitly associated recalled experiences into bounded choice-appraisal signals. It can feed the integrated belief/value/conditioning decision ranker while preserving NPC agency: it influences scores but never executes or forces a choice. Tests: `tests/test_memory_decisions.py` and the memory-influence cases in `tests/test_integrated_decisions.py`.
