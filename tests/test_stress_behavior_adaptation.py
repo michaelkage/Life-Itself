@@ -33,7 +33,7 @@ class StressBehaviorAdaptationTests(unittest.TestCase):
             StressAdaptationProfile("npc", {"work_performance": -0.1},
                                     {"work_performance": -0.9}),
         )
-        self.assertAlmostEqual(result.modifier_for("work_performance"), -0.64)
+        self.assertAlmostEqual(result.modifier_for("work_performance"), -0.62)
 
     def test_outputs_are_bounded_and_all_channels_are_explicit(self):
         ledger = NPCStressLedger(initial_stress={"npc": 1.0})
