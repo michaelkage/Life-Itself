@@ -1427,6 +1427,7 @@ class SimulationWorldCheckpointTests(unittest.TestCase):
             planned.execution_id, 5, facts, resources, goal_facts,
         )
         self.assertIsNotNone(progression.evaluation)
+        self.assertIsNotNone(progression.plan_evaluation)
         payload = SimulationWorldCheckpoint.capture(
             5, coordinator, npcs, goal_book=goals,
             action_executions=executions, action_world_facts=facts,
@@ -1442,6 +1443,7 @@ class SimulationWorldCheckpointTests(unittest.TestCase):
             restored_decisions, restored_executions, restored_evaluations,
         )
         self.assertEqual(restored_evaluations.to_snapshot(), evaluations.to_snapshot())
+        self.assertEqual(restored_evaluations.plan_history, evaluations.plan_history)
         self.assertEqual(restored_evaluations.reliability("get-food"), evaluations.reliability("get-food"))
         self.assertIs(restored_replanning.evaluations, restored_evaluations)
         self.assertEqual(
