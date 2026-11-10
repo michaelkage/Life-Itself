@@ -15,6 +15,32 @@ class PresenceTests(unittest.TestCase):
         self.assertEqual(ledger.occupants("market"), ("a", "b"))
         self.assertEqual(ledger.occupants("home"), ("c",))
 
+    def test_existing_location_cannot_be_changed_without_a_journey(self):
+        ledger = PresenceLedger()
+        ledger.place("npc", "home", 0)
+        with self.assertRaisesRegex(ValueError, "explicit travel journey"):
+            ledger.place("npc", "office", 1)
+
+    def test_old_arrival_does_not_override_a_later_journey(self):
+        ledger = PresenceLedger()
+        ledger.place("npc", "home", 0)
+        first = TravelJourney(
+            "first", "npc", "home", "office", ("home", "office"), ("road-1",),
+            edge_index=1, status="arrived", started_tick=1, arrived_tick=2,
+        )
+        travel = TravelLedger((first,))
+        adapter = PresenceTickAdapter(ledger)
+        adapter.synchronize(2, travel)
+        second = TravelJourney(
+            "second", "npc", "office", "home", ("office", "home"), ("road-2",),
+            edge_progress=0.5, status="travelling", started_tick=3,
+        )
+        travel.add(second)
+        adapter.synchronize(3, travel)
+        self.assertEqual(ledger.get("npc").journey_id, "second")
+        self.assertEqual(ledger.get("npc").location_id, "office")
+        self.assertEqual(ledger.occupants("office"), ())
+
     def test_travel_sync_tracks_exact_edge_and_partial_progress(self):
         ledger = PresenceLedger()
         ledger.place("npc", "home", 0)
