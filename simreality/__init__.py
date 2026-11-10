@@ -558,3 +558,8 @@ __all__ += ["TravelJourney", "TravelLedger", "TravelTickAdapter", "TravelTickRes
 from .routine_travel import RoutineTravelAdapter, RoutineTravelRequest
 __all__ += ["RoutineTravelAdapter", "RoutineTravelRequest"]
 \n\n# Execute routine activities only after their routine-linked travel has arrived.\nfrom .routine_arrival import RoutineArrivalAdapter, RoutineArrivalResult\n__all__ += ["RoutineArrivalAdapter", "RoutineArrivalResult"]\n
+
+# Authoritative location and road-edge presence, synchronized from travel.
+from .presence import NPCPresence, PresenceLedger, PresenceTickAdapter
+from .presence_save_state import PresenceSnapshot
+__all__ += ["NPCPresence", "PresenceLedger", "PresenceTickAdapter", "PresenceSnapshot"]
