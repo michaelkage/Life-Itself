@@ -2,6 +2,7 @@
 import unittest
 
 from simreality.action_execution import ActionExecutionLedger, ActionExecutionPolicy
+from simreality.action_evaluation import ActionPlanEvaluationLedger
 from simreality.goals import GoalBook, NPCGoal
 from simreality.npc_action_replanning import NPCActionReplanningCoordinator
 from simreality.npc_autonomy import NPCDecisionCycle
@@ -29,6 +30,41 @@ class NPCActionReplanningTests(unittest.TestCase):
         )
         self.cycle = NPCDecisionCycle(self.goals, self.planner)
         self.coordinator = NPCActionReplanningCoordinator(self.cycle, self.ledger)
+
+
+    def test_replanning_prefers_actions_with_better_observed_reliability(self):
+        goals = GoalBook()
+        goals.add(NPCGoal("goal", "npc-1", "maintenance", 8.0))
+        planner = DeterministicPlanner((
+            PlanningAction("a-unreliable", frozenset({"start"}), frozenset({"done"})),
+            PlanningAction("z-reliable", frozenset({"start"}), frozenset({"done"})),
+        ))
+        events = WorldEventLedger()
+        executions = ActionExecutionLedger(planner, (), events)
+        evaluations = ActionPlanEvaluationLedger(
+            executions, learning_min_samples=1, learning_rate=1.0,
+        )
+        executions.start(
+            "bad-sample", "npc-1", 1, "a-unreliable", {"start"}, {},
+            plan_actions=("a-unreliable",),
+        )
+        executions.cancel("bad-sample", 2, "failed attempt")
+        evaluations.evaluate("bad-sample")
+        executions.execute(
+            "good-sample", "npc-1", 3, "z-reliable", {"start"}, {},
+            plan_actions=("z-reliable",),
+        )
+        evaluations.evaluate("good-sample")
+        self.assertEqual(evaluations.reliability("a-unreliable"), 0.0)
+        self.assertEqual(evaluations.reliability("z-reliable"), 1.0)
+        coordinator = NPCActionReplanningCoordinator(
+            NPCDecisionCycle(goals, planner), executions, events, evaluations,
+        )
+        result = coordinator.replan(
+            "npc-1", 4, {"start"}, {},
+            {"goal": {"done"}}, reason="choose reliable route",
+        )
+        self.assertEqual(result.action_id, "z-reliable")
 
     def test_changed_preconditions_replan_to_alternate_path(self):
         result = self.coordinator.replan(
