@@ -748,3 +748,12 @@ __all__ += [
     "MemoryRecallProfile", "MemoryRecallResult", "MemoryRecallRule",
     "NPCMemoryRecallAdapter", "RecalledMemory",
 ]
+
+
+# Append-only reinterpretation history over immutable autobiographical memories.
+from .npc_memory_reflection import (
+    MemoryReflectionLedger, MemoryReflectionSnapshot, MemoryReinterpretation,
+)
+__all__ += [
+    "MemoryReflectionLedger", "MemoryReflectionSnapshot", "MemoryReinterpretation",
+]
