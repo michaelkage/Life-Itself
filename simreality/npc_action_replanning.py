@@ -124,7 +124,9 @@ class NPCActionReplanningCoordinator:
             if (event.event_type != "npc_action_replanned" or event.tick != item["tick"]
                     or item["owner_id"] not in event.participants
                     or attributes.get("request_id") != request_id
-                    or attributes.get("status") != item["status"]):
+                    or attributes.get("status") != item["status"]
+                    or attributes.get("action_id", "") != (item["action_id"] or "")
+                    or attributes.get("reason") != item["reason"]):
                 raise ValueError("replanning history does not match its world event")
             plan_data = item["plan"]
             plan = None if plan_data is None else PlanResult(
