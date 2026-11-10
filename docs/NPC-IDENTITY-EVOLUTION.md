@@ -34,3 +34,8 @@ proposals = EmotionalScarIdentityAdapter.propose(
 ```
 
 The adapter lives in `simreality/emotional_scar_identity.py`. Tests: `tests/test_identity_decisions.py`.
+
+
+## Scar-informed proposal provenance
+
+`EmotionalScarIdentityAdapter.propose_evidence(...)` returns exact identity proposals together with their source scar ID, authored policy ID, emotion axis, cue ID, evaluation tick, and effective severity. Record these values in `ScarIdentityProposalLedger`; the ledger is append-only and replay-idempotent. Pass `scar_identity_proposals=...` alongside `emotional_scars=...` and `identity_decisions=...` to `SimulationWorldCheckpoint.capture`. Restored worlds expose `RestoredSimulation.scar_identity_proposals`. Checkpoint loading verifies the scar/event provenance and checks any matching accepted or rejected identity decision against the original proposal. The identity decision ledger remains the authority for NPC consent and trait changes; proposal provenance never applies a change. Tests: `tests/test_scar_identity_proposals.py` and `tests/test_world_checkpoint.py`.
