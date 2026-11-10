@@ -77,12 +77,14 @@ class NPCStressLedger:
             raise ValueError("current_tick must be a non-negative integer")
         self.current_tick = current_tick
         self._stress = {}
+        self._owner_ticks = {}
         self._records = {}
         self._events = {}
         for owner_id, value in (initial_stress or {}).items():
             if not isinstance(owner_id, str) or not owner_id.strip():
                 raise ValueError("stress owner IDs must be non-empty")
             self._stress[owner_id] = _unit(value, "initial stress")
+            self._owner_ticks[owner_id] = current_tick
 
     def stress_for(self, owner_id):
         if not isinstance(owner_id, str) or not owner_id.strip():
@@ -134,17 +136,17 @@ class NPCStressLedger:
         for owner_id, profile in profiles.items():
             if not isinstance(profile, CopingProfile) or profile.owner_id != owner_id:
                 raise ValueError("coping profiles must be keyed by their owner ID")
-        elapsed = tick - self.current_tick
-        if elapsed:
-            for owner_id, value in tuple(self._stress.items()):
-                profile = profiles.get(owner_id)
-                if profile is None:
-                    continue
+        # Recovery clocks belong to each NPC; omitted owners retain elapsed time.
+        for owner_id, profile in sorted(profiles.items()):
+            last_tick = self._owner_ticks.get(owner_id, self.current_tick)
+            elapsed = tick - last_tick
+            if elapsed:
+                value = self._stress.get(owner_id, 0.0)
                 recovery = profile.recovery_per_tick * (1.0 + profile.resilience)
                 self._stress[owner_id] = max(0.0, value - recovery * elapsed)
-            self.current_tick = tick
+            self._owner_ticks[owner_id] = tick
+        self.current_tick = max(self.current_tick, tick)
         return tuple(self.assess(owner_id, profile) for owner_id, profile in sorted(profiles.items()))
-
     def assess(self, owner_id: str, profile: CopingProfile) -> StressAssessment:
         if not isinstance(profile, CopingProfile) or profile.owner_id != owner_id:
             raise ValueError("coping profile owner must match assessment owner")
@@ -163,8 +165,9 @@ class NPCStressLedger:
 
     def snapshot(self):
         return {
-            "version": 1,
+            "version": 2,
             "current_tick": self.current_tick,
+            "owner_ticks": dict(sorted(self._owner_ticks.items())),
             "stress": dict(sorted(self._stress.items())),
             "records": [
                 {"record_id": r.record_id, "event_id": r.event_id,
@@ -177,9 +180,23 @@ class NPCStressLedger:
 
     @classmethod
     def from_snapshot(cls, data):
-        if not isinstance(data, dict) or data.get("version") != 1:
+        if not isinstance(data, dict) or data.get("version") not in (1, 2):
             raise ValueError("unsupported stress snapshot")
+        version = data["version"]
         ledger = cls(current_tick=data["current_tick"], initial_stress=data["stress"])
+        if version == 2:
+            owner_ticks = data.get("owner_ticks")
+            if not isinstance(owner_ticks, dict):
+                raise ValueError("stress owner_ticks must be a mapping")
+            for owner_id, last_tick in owner_ticks.items():
+                if not isinstance(owner_id, str) or not owner_id.strip():
+                    raise ValueError("stress owner tick IDs must be non-empty")
+                if (isinstance(last_tick, bool) or not isinstance(last_tick, int)
+                        or not 0 <= last_tick <= ledger.current_tick):
+                    raise ValueError("stress owner tick is invalid")
+            if any(owner not in owner_ticks for owner in ledger._stress):
+                raise ValueError("stress value is missing its owner tick")
+            ledger._owner_ticks = dict(owner_ticks)
         for item in data["records"]:
             record = StressRecord(**item)
             event_key = (record.event_id, record.owner_id)
@@ -195,7 +212,6 @@ class NPCStressLedger:
             ledger._events[event_key] = record.tick
         return ledger
 
-
 @dataclass(frozen=True)
 class NPCStressSnapshot:
     payload: str
@@ -205,7 +221,9 @@ class NPCStressSnapshot:
             raise TypeError("payload must be a string")
         raw = json.loads(self.payload)
         restored = NPCStressLedger.from_snapshot(raw)
-        canonical = json.dumps(restored.snapshot(), sort_keys=True, separators=(",", ":"), allow_nan=False)
+        canonical = (json.dumps(raw, sort_keys=True, separators=(",", ":"), allow_nan=False)
+                     if raw.get("version") == 1 else
+                     json.dumps(restored.snapshot(), sort_keys=True, separators=(",", ":"), allow_nan=False))
         if canonical != self.payload:
             raise ValueError("stress snapshot must use canonical JSON")
 
