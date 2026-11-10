@@ -14,7 +14,10 @@ familiarity does not imply trust, affection, agreement, or moral approval.
 ID and requires exactly two directional exposure strengths. It cannot create
 familiarity from mere co-location or an unconfirmed encounter.
 
-Recognition is assessed separately. The caller must provide an explicit
+Recognition is assessed separately. Both directional exposure values are validated before either is recorded,
+so an invalid second direction cannot leave a half-applied encounter.
+
+The caller must provide an explicit
 `identity_cue_available` signal (for example, a clear face, known voice, or
 distinctive identifying feature) and a threshold. Without an identity cue,
 even a highly familiar NPC does not automatically identify someone. The
