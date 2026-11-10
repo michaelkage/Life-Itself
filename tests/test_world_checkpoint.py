@@ -715,6 +715,42 @@ class SimulationWorldCheckpointTests(unittest.TestCase):
             )
 
 
+
+    def test_presence_encounters_round_trip_in_world_checkpoint(self):
+        coordinator, npcs, _ = self.make_simulation()
+        presence = PresenceLedger()
+        presence.place("speaker", "cafe", 4)
+        presence.place("listener", "cafe", 4)
+        adapter = PresenceSocialAdapter(presence)
+        adapter.encounter("encounter-checkpoint", "speaker", "listener", 4,
+                          opportunity=True, events=coordinator.events)
+        payload = SimulationWorldCheckpoint.capture(
+            4, coordinator, npcs, presence=presence,
+            presence_encounters=adapter.ledger,
+        ).to_json()
+        restored = SimulationWorldCheckpoint.from_json(payload).restore()
+        self.assertIsNotNone(restored.presence_encounters)
+        self.assertEqual(restored.presence_encounters.snapshot(), adapter.ledger.snapshot())
+        self.assertEqual(restored.presence_encounters.tick_snapshot(), adapter.ledger.tick_snapshot())
+        self.assertEqual(
+            SimulationWorldCheckpoint.capture(
+                4, restored.coordinator, restored.npcs, presence=restored.presence,
+                presence_encounters=restored.presence_encounters,
+            ).to_json(),
+            payload,
+        )
+
+    def test_presence_encounter_checkpoint_rejects_missing_presence(self):
+        coordinator, npcs, _ = self.make_simulation()
+        ledger = PresenceEncounterLedger()
+        ledger._record(4, "signature", PresenceEncounter(
+            "missing-presence", 4, "cafe", ("listener", "speaker")
+        ))
+        with self.assertRaisesRegex(ValueError, "corresponding presence ledger"):
+            SimulationWorldCheckpoint.capture(
+                4, coordinator, npcs, presence_encounters=ledger,
+            )
+
     def test_in_progress_travel_round_trips_in_composite_checkpoint(self):
         coordinator, npcs, _ = self.make_simulation()
         edges = (RouteEdge("street-a", "home", "crossroads", 3),
