@@ -1,6 +1,8 @@
 import unittest
 
-from simreality.beliefs import BeliefLedger, Evidence
+from simreality.beliefs import Evidence
+from simreality.social_beliefs import SocialBeliefSystem
+from simreality.social_trust import SocialTrustLedger
 from simreality.social_relationships import SocialRelationshipLedger
 from simreality.world_events import WorldEventLedger
 from simreality.relationship_interpretation import (
@@ -44,7 +46,7 @@ class NPCRelationshipInterpreterTests(unittest.TestCase):
         self.assertNotEqual(first.changes, second.changes)
 
     def test_bias_cues_and_personal_beliefs_are_separate_inputs(self):
-        beliefs = BeliefLedger()
+        beliefs = SocialBeliefSystem(SocialTrustLedger())
         beliefs.observe("observer-a", Evidence(
             "evidence-1", "defendant-is-dangerous", "source", 1, 0.9, 0.8, 7,
         ))
@@ -95,7 +97,7 @@ class NPCRelationshipInterpreterTests(unittest.TestCase):
         profile = RelationshipInterpretationProfile(
             "observer-a", {}, claim_responses={"some-claim": {"fear": 0.5}},
         )
-        with self.assertRaisesRegex(ValueError, "require a BeliefLedger"):
+        with self.assertRaisesRegex(ValueError, "require a SocialBeliefSystem"):
             self.interpreter.interpret(
                 "court-event", "observer-a", "defendant", profile, value_impacts={},
             )
