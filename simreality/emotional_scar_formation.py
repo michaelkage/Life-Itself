@@ -135,6 +135,7 @@ class EmotionalScarDecisionLedger:
         self._proposals = {}
         self._decisions = {}
         self._proposal_decisions = {}
+        self.current_tick = self.scars.current_tick
         for proposal in sorted(tuple(proposals), key=lambda p: (p.proposed_tick, p.proposal_id)):
             self.add_proposal(proposal)
         for decision in sorted(tuple(decisions), key=lambda d: (d.decision_tick, d.decision_id)):
@@ -163,6 +164,7 @@ class EmotionalScarDecisionLedger:
         if proposal.proposed_tick < self.scars.current_tick:
             raise ValueError("proposal tick cannot precede scar ledger current_tick")
         self._proposals[proposal.proposal_id] = proposal
+        self.current_tick = max(self.current_tick, proposal.proposed_tick)
         return proposal
 
     def decide(self, decision):
@@ -178,7 +180,7 @@ class EmotionalScarDecisionLedger:
             raise KeyError(decision.proposal_id)
         if decision.owner_id != proposal.owner_id:
             raise ValueError("only the proposal's NPC owner may decide")
-        if decision.decision_tick < proposal.proposed_tick or decision.decision_tick < self.scars.current_tick:
+        if decision.decision_tick < proposal.proposed_tick or decision.decision_tick < self.current_tick:
             raise ValueError("decision tick precedes proposal or ledger time")
         if proposal.proposal_id in self._proposal_decisions:
             raise ValueError("proposal already has an explicit decision")
@@ -191,6 +193,7 @@ class EmotionalScarDecisionLedger:
             ))
         self._decisions[decision.decision_id] = decision
         self._proposal_decisions[proposal.proposal_id] = decision.decision_id
+        self.current_tick = max(self.current_tick, decision.decision_tick)
         return decision
 
     def snapshot(self):
@@ -202,7 +205,7 @@ class EmotionalScarDecisionLedger:
             return {name: getattr(d, name) for name in (
                 "decision_id", "proposal_id", "owner_id", "decision_tick", "accepted", "rationale")}
         return {
-            "version": 1, "proposals": [proposal(p) for p in self.proposals()],
+            "version": 1, "current_tick": self.current_tick, "proposals": [proposal(p) for p in self.proposals()],
             "decisions": [decision(d) for d in self.decisions()],
             "scars": self.scars.snapshot(),
         }
@@ -233,6 +236,11 @@ class EmotionalScarDecisionLedger:
         result.scars.current_tick = raw_scars.current_tick
         if result.scars.snapshot() != raw_scars.snapshot():
             raise ValueError("accepted decisions do not reproduce the scar ledger")
+        result.current_tick = data.get("current_tick")
+        if isinstance(result.current_tick, bool) or not isinstance(result.current_tick, int) or result.current_tick < 0:
+            raise ValueError("emotional scar decision current_tick is invalid")
+        if result.current_tick < max((d.decision_tick for d in result.decisions()), default=0):
+            raise ValueError("emotional scar decision current_tick precedes decision history")
         if result.snapshot() != data:
             raise ValueError("emotional scar decision snapshot is not canonical")
         return result
