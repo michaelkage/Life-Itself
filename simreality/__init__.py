@@ -811,3 +811,14 @@ __all__ += [
     "EmotionalScar", "EmotionalScarContribution", "EmotionalScarResponse",
     "NPCEmotionalScarLedger", "ScarRecoveryRecord", "EmotionalScarSnapshot",
 ]
+
+
+# Evidence-grounded scar proposals require explicit NPC acceptance or rejection.
+from .emotional_scar_formation import (
+    EmotionalScarDecision, EmotionalScarDecisionLedger, EmotionalScarDecisionSnapshot,
+    EmotionalScarFormationAdapter, EmotionalScarFormationPolicy, EmotionalScarProposal,
+)
+__all__ += [
+    "EmotionalScarDecision", "EmotionalScarDecisionLedger", "EmotionalScarDecisionSnapshot",
+    "EmotionalScarFormationAdapter", "EmotionalScarFormationPolicy", "EmotionalScarProposal",
+]
