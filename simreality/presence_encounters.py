@@ -163,6 +163,8 @@ class PresenceSocialAdapter:
             raise ValueError("tick must be a non-negative integer")
         if events is not None and not isinstance(events, WorldEventLedger):
             raise TypeError("events must be a WorldEventLedger or None")
+        if not isinstance(conversation, bool):
+            raise ValueError("conversation must be a boolean")
         first = self.presence.get(first_id)
         second = self.presence.get(second_id)
         if first is None or second is None or first.status != "at_location" or second.status != "at_location":
@@ -209,6 +211,19 @@ class PresenceSocialAdapter:
             "trust_context": trust_context,
         }
         signature = json.dumps(signature_payload, sort_keys=True, separators=(",", ":"), allow_nan=False)
+        event_id = f"npc_encounter:{encounter_id}"
+        if events is not None:
+            expected_event = WorldEventLedger.make_event(
+                event_id, tick, "npc_encounter",
+                participants=tuple(sorted((first_id, second_id))),
+                attributes={"location_id": actual_location, "conversation": conversation},
+            )
+            try:
+                existing_event = events.get(event_id)
+            except KeyError:
+                existing_event = None
+            if existing_event is not None and existing_event != expected_event:
+                raise ValueError(f"encounter event ID conflicts with world history: {event_id}")
         prior_tick = self.ledger._ticks.get(tick, {}).get(encounter_id)
         if prior_tick is not None:
             if prior_tick[0] != signature:
