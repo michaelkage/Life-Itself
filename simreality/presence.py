@@ -5,7 +5,7 @@ road edge and fractional edge progress; this module does not invent coordinates.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 import json
 import math
 from typing import Iterable
@@ -129,7 +129,6 @@ class PresenceTickAdapter:
              j.edge_progress, j.destination, j.arrived_tick)
             for j in journeys
         ], sort_keys=True, separators=(",", ":"), allow_nan=False)
-        existing = dict((record.owner_id, record) for record in self.ledger._ticks.get(tick, ("", ()))[1])
         if tick in self.ledger._ticks:
             if self.ledger._ticks[tick][0] != signature:
                 raise ValueError(f"conflicting presence tick replay: {tick}")
@@ -137,8 +136,13 @@ class PresenceTickAdapter:
                 self._emit(tick, self.ledger._ticks[tick][1], events)
             return self.ledger._ticks[tick][1]
 
-        updates = []
+        latest_by_owner = {}
         for journey in journeys:
+            previous_journey = latest_by_owner.get(journey.owner_id)
+            if previous_journey is None or (journey.started_tick, journey.journey_id) > (previous_journey.started_tick, previous_journey.journey_id):
+                latest_by_owner[journey.owner_id] = journey
+        updates = []
+        for journey in sorted(latest_by_owner.values(), key=lambda item: item.owner_id):
             if journey.status == "arrived":
                 record = NPCPresence(journey.owner_id, "at_location", journey.destination,
                                      None, None, 0.0, tick)
@@ -149,8 +153,12 @@ class PresenceTickAdapter:
             else:
                 continue
             previous = self.ledger.get(journey.owner_id)
-            if previous is not None and previous.status == "at_location" and journey.started_tick <= tick and previous.location_id != journey.origin:
-                if previous.location_id != journey.path[0]:
+            if previous is not None:
+                if previous.status != "at_location" and previous.journey_id != journey.journey_id:
+                    raise ValueError(f"NPC already has presence on another journey: {journey.owner_id}")
+                if (previous.status == "at_location"
+                        and previous.updated_tick <= journey.started_tick
+                        and previous.location_id != journey.origin):
                     raise ValueError(f"journey origin conflicts with recorded NPC presence: {journey.owner_id}")
             updates.append(record)
         result = self.ledger._sync(tick, signature, tuple(sorted(updates, key=lambda item: item.owner_id)))
