@@ -859,3 +859,8 @@ __all__ += [
     "IdentityGoalReviewDecision", "IdentityGoalReviewDecisionLedger",
     "IdentityGoalReviewProposal", "IdentityGoalReviewSnapshot",
 ]
+
+
+# Replay-safe execution of one planned NPC action against live facts and resources.
+from .action_execution import ActionExecution, ActionExecutionLedger, ActionExecutionPolicy
+__all__ += ["ActionExecution", "ActionExecutionLedger", "ActionExecutionPolicy"]
