@@ -12,7 +12,7 @@ Evaluation accepts exact observed cue IDs and exposure values. A matching scar c
 
 NPCEmotionalScarLedger is deterministic and owner-scoped. Duplicate scar and recovery IDs are idempotent only when their full content matches. Conflicting reuse, duplicate source-event/owner/axis/cue scars, backward time, unknown scars, and cross-owner recovery are rejected.
 
-EmotionalScarSnapshot stores canonical version-1 JSON and validates the complete history on restore. This is a component-level persistence codec; composite world-checkpoint integration and automatic scar creation policies remain future work. The caller must validate source event and memory ownership against the authoritative world and life-history ledgers.
+EmotionalScarSnapshot stores canonical version-1 JSON and validates the complete history on restore. `EmotionalScarFormationAdapter` can turn a sufficiently strong `EmotionalMemoryResponse` into an evidence-grounded proposal. It derives source event and memory IDs from the owner's actual autobiographical record, and a stable proposal key makes repeated appraisal deterministic. Proposals do not create scars. The owner must explicitly accept or reject each proposal through `EmotionalScarDecisionLedger`; rejection remains in the decision history and changes no scar state. Acceptance creates the persistent scar once. Decision snapshots preserve proposals, accepted and rejected decisions, scars, and recovery history. The composite world checkpoint currently persists the scar ledger; decision-ledger checkpoint integration is a separate follow-on.
 
 This is a simulation abstraction, not a clinical diagnosis or a claim that real trauma follows one universal decay curve.
 
