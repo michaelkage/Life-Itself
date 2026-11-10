@@ -20,6 +20,8 @@ from simreality import (
     MemoryReinterpretation, MemoryReflectionLedger,
     EmotionalScar, NPCEmotionalScarLedger,
     EmotionalScarProposal, EmotionalScarDecision, EmotionalScarDecisionLedger,
+    IdentityGoalAction, IdentityGoalAlignmentAdapter, IdentityGoalAlignmentPolicy,
+    IdentityGoalReviewDecision, IdentityGoalReviewDecisionLedger,
 )
 from simreality.presence_encounters import PresenceEncounter, PresenceEncounterLedger, PresenceSocialAdapter
 from simreality.social_familiarity import PresenceFamiliarityAdapter, SocialFamiliarityLedger
@@ -1278,6 +1280,38 @@ class SimulationWorldCheckpointTests(unittest.TestCase):
         self.assertNotIn('"emotional_scars"', payload)
         self.assertIsNone(SimulationWorldCheckpoint.from_json(payload).restore().emotional_scars)
 
+
+
+    def test_identity_goal_reviews_round_trip_with_identity_provenance_and_once_only_application(self):
+        coordinator, npcs, _ = self.make_simulation()
+        goals = GoalBook()
+        goals.add(NPCGoal("career-goal", "speaker", "career", 5.0, confidence=0.6))
+        identity = IdentityDecisionLedger((NPCIdentityProfile("speaker", {"ambition": 0.0}),))
+        proposal = IdentityChangeProposal("event-1", "speaker", "identity-policy", "ambition", 0.0, 0.3, 0.3, 0.8, "participant", 0.1)
+        identity.decide("identity-accepted", proposal, accepted=True, decision_tick=4, rationale="I accept this change")
+        adapter = IdentityGoalAlignmentAdapter(goals, (IdentityGoalAlignmentPolicy("career-alignment", "ambition", "career", IdentityGoalAction.REPRIORITIZE, minimum_abs_delta=0.1, priority_delta=1.5),))
+        review_proposal, = adapter.assess(identity.entries(), current_tick=4)
+        reviews = IdentityGoalReviewDecisionLedger((IdentityGoalReviewDecision("goal-review-1", review_proposal, True, 5, "This goal matters more to me now"),))
+        self.assertTrue(reviews.apply_accepted("goal-review-1", goals))
+        payload = SimulationWorldCheckpoint.capture(5, coordinator, npcs, goal_book=goals, identity_decisions=identity, identity_goal_reviews=reviews).to_json()
+        restored = SimulationWorldCheckpoint.from_json(payload).restore()
+        self.assertEqual(restored.goals.goals["career-goal"].priority, 6.5)
+        self.assertEqual(restored.identity_goal_reviews.entries(), reviews.entries())
+        self.assertFalse(restored.identity_goal_reviews.apply_accepted("goal-review-1", restored.goals))
+        self.assertEqual(SimulationWorldCheckpoint.capture(5, restored.coordinator, restored.npcs, goal_book=restored.goals, identity_decisions=restored.identity_decisions, identity_goal_reviews=restored.identity_goal_reviews).to_json(), payload)
+
+    def test_checkpoint_rejects_identity_goal_review_without_accepted_identity_source(self):
+        coordinator, npcs, _ = self.make_simulation()
+        goals = GoalBook()
+        goals.add(NPCGoal("career-goal", "speaker", "career", 5.0))
+        identity = IdentityDecisionLedger((NPCIdentityProfile("speaker", {"ambition": 0.0}),))
+        proposal = IdentityChangeProposal("event-1", "speaker", "identity-policy", "ambition", 0.0, 0.3, 0.3, 0.8, "participant", 0.1)
+        identity.decide("identity-rejected", proposal, accepted=False, decision_tick=4, rationale="This is not me")
+        from simreality.identity_goal_alignment import IdentityGoalReviewProposal
+        forged = IdentityGoalReviewProposal("identity-rejected", "event-1", "speaker", "identity-policy", "ambition", 0.3, "career-goal", "career-alignment", IdentityGoalAction.REPRIORITIZE, 4, "career", "career", 5.0, 6.0, 0.5, 0.5)
+        reviews = IdentityGoalReviewDecisionLedger((IdentityGoalReviewDecision("forged-review", forged, True, 5, "forged"),))
+        with self.assertRaisesRegex(ValueError, "accepted identity decision"):
+            SimulationWorldCheckpoint.capture(5, coordinator, npcs, goal_book=goals, identity_decisions=identity, identity_goal_reviews=reviews)
 
 if __name__ == "__main__":
     unittest.main()
