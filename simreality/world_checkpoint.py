@@ -1252,6 +1252,11 @@ class SimulationWorldCheckpoint:
             payload["emotional_scar_decisions"] = json.loads(self.emotional_scar_decisions_json)
         if scar_identity_proposals is not None:
             payload["scar_identity_proposals"] = json.loads(scar_identity_proposals.to_json())
+        if self.action_executions_json is not None:
+            payload["action_executions"] = json.loads(self.action_executions_json)
+        if self.action_world_facts_json is not None:
+            payload["action_world_facts"] = json.loads(self.action_world_facts_json)
+            payload["action_resources"] = json.loads(self.action_resources_json)
         return json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False)
 
     @classmethod
@@ -1299,7 +1304,7 @@ class SimulationWorldCheckpoint:
             raise ValueError("invalid simulation world checkpoint") from exc
 
     def restore(self):
-        envelope, npc_snapshot, trust_snapshot, belief_snapshot, memory_snapshot, conversation_snapshot, tick_snapshot, consequence_snapshot, campaign, misconduct_snapshot, routine_snapshot, execution_snapshot, institution_snapshot, institutional_politics, goals_snapshot, goal_event_replay, goal_review_decisions_snapshot, identity_decisions_snapshot, testimony_inquiries_snapshot, testimony_snapshot, travel_snapshot, presence_snapshot, encounter_snapshot, familiarity_snapshot, relationship_snapshot, emotional_snapshot, stress_snapshot, conditioning_snapshot, learning_decisions_snapshot, life_history_snapshot, memory_reflections_snapshot, emotional_scars_snapshot, emotional_scar_decisions_snapshot, scar_identity_proposal_snapshot, identity_goal_review_snapshot, action_execution_snapshot = self._components()
+        envelope, npc_snapshot, trust_snapshot, belief_snapshot, memory_snapshot, conversation_snapshot, tick_snapshot, consequence_snapshot, campaign, misconduct_snapshot, routine_snapshot, execution_snapshot, institution_snapshot, institutional_politics, goals_snapshot, goal_event_replay, goal_review_decisions_snapshot, identity_decisions_snapshot, testimony_inquiries_snapshot, testimony_snapshot, travel_snapshot, presence_snapshot, encounter_snapshot, familiarity_snapshot, relationship_snapshot, emotional_snapshot, stress_snapshot, conditioning_snapshot, learning_decisions_snapshot, life_history_snapshot, memory_reflections_snapshot, emotional_scars_snapshot, emotional_scar_decisions_snapshot, scar_identity_proposal_snapshot, identity_goal_review_snapshot, action_execution_snapshot, action_world_facts, action_resources = self._components()
         events = envelope.restore_event_ledger()
         npcs = npc_snapshot.restore()
         trust = trust_snapshot.restore()
@@ -1353,4 +1358,4 @@ class SimulationWorldCheckpoint:
                                   memory, conversations, coordinator, self.metadata,
                                   consequence_recorder, campaign, misconduct, routines, routine_executions,
                                   routine_institutions, institutional_politics, goals, goal_event_replay,
-                                  goal_review_decisions, identity_decisions, testimony_inquiries, testimony, travel, presence, presence_encounters, familiarity, relationships, emotions, stress, conditioning, psychological_learning_decisions, life_history, memory_reflections, emotional_scars, emotional_scar_decisions, scar_identity_proposals, identity_goal_reviews)
+                                  goal_review_decisions, identity_decisions, testimony_inquiries, testimony, travel, presence, presence_encounters, familiarity, relationships, emotions, stress, conditioning, psychological_learning_decisions, life_history, memory_reflections, emotional_scars, emotional_scar_decisions, scar_identity_proposals, identity_goal_reviews, action_execution_snapshot, set(action_world_facts) if action_world_facts is not None else None, dict(action_resources) if action_resources is not None else None)
