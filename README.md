@@ -364,3 +364,6 @@ The [NPC emotional event persistence codec](docs/NPC-EMOTIONAL-EVENT-PERSISTENCE
 
 
 NPC emotional state is now part of the composite world checkpoint. Pass `emotions=...` to `SimulationWorldCheckpoint.capture`; restored worlds expose `RestoredSimulation.emotions`. The checkpoint cross-validates saved emotional source events and replay ownership against the authoritative world journal and NPC roster. Emotional rules remain authored configuration and must be reattached after loading. See [docs/NPC-EMOTIONS-WORLD-CHECKPOINT.md](docs/NPC-EMOTIONS-WORLD-CHECKPOINT.md). Tests: `tests/test_world_checkpoint.py`.
+
+
+The emotional regulation layer separates felt intensity from outward expression and decision influence. Per-NPC suppression profiles can conceal emotion without changing the underlying state; explicit emotion-to-consideration rules provide transparent, bounded decision contributions without selecting actions. See [docs/NPC-EMOTIONAL-REGULATION.md](docs/NPC-EMOTIONAL-REGULATION.md) and `tests/test_emotional_regulation.py`.
