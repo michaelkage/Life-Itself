@@ -227,6 +227,8 @@ class PresenceSocialAdapter:
         prior = self.ledger.get(encounter_id)
         if prior is not None:
             raise ValueError(f"encounter ID already belongs to another tick: {encounter_id}")
+        if self.ledger._ticks and tick not in self.ledger._ticks and tick <= max(self.ledger._ticks):
+            raise ValueError("new encounter ticks must advance monotonically")
 
         conversation_result = None
         if conversation:
