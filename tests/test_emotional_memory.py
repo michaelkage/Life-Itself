@@ -10,7 +10,7 @@ def make_history():
     history = NPCLifeHistory()
     history.record(AutobiographicalMemory(
         "memory-fire", "alice", "event-fire", 0, ("bob",),
-        "The house burned while Bob was inside", 0.8, -0.9,
+        "The house burned while Bob was inside", 0.8, 0.9,
         tags=("loss", "fear"),
     ))
     history.record(AutobiographicalMemory(
