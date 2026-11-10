@@ -450,3 +450,6 @@ replacement plan. Replan requests are replay-safe and journaled. Tests:
 
 
 Autonomous NPC replanning history is now part of the composite world checkpoint. The saved request signatures, selected goals, plan results, outcomes, and journal references restore alongside action execution state. Reconstruct the execution ledger first, then rebind the NPCActionReplanningCoordinator to the restored GoalBook and shared event journal; replaying an identical request will not duplicate an action. See the action execution and replanning guide (docs/NPC-ACTION-EXECUTION.md).
+
+
+NPC action outcomes can be evaluated against immutable execution records and the authoritative event journal with `ActionPlanEvaluationLedger`. It compares declared effects, resource costs, and duration with observed terminal results, retains evidence event IDs, and exposes a bounded per-action reliability estimate only after a configurable minimum sample count. Learning is a separate projection: it never rewrites prior plans, decisions, or execution history. See [docs/NPC-ACTION-EVALUATION.md](docs/NPC-ACTION-EVALUATION.md) and `tests/test_action_evaluation.py`.
