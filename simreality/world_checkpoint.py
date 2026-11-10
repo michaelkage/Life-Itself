@@ -140,6 +140,11 @@ class RestoredSimulation:
             raise ValueError("execution ledger does not match the restored checkpoint")
         if self.goals is not None and decisions.goals is not self.goals:
             raise ValueError("decision cycle must use the restored GoalBook")
+        if self.action_evaluation_snapshot is not None:
+            if evaluations is None or evaluations.to_snapshot() != self.action_evaluation_snapshot:
+                raise ValueError("replanning restore requires the matching restored action evaluation ledger")
+        elif evaluations is not None:
+            raise ValueError("evaluation ledger was not part of the restored checkpoint")
         return NPCActionReplanningCoordinator.from_snapshot(
             decisions, executions, self.events, self.action_replanning_snapshot,
             evaluations=evaluations,
@@ -904,6 +909,35 @@ class SimulationWorldCheckpoint:
             ActionExecutionLedger._canonical_resources(action_resources)
         if action_replanning_snapshot is not None and action_execution_snapshot is None:
             raise ValueError("replanning history requires checkpointed action execution state")
+        if action_evaluation_snapshot is not None:
+            if action_execution_snapshot is None:
+                raise ValueError("action evaluations require checkpointed action execution state")
+            journal = {event.event_id: event for event in envelope.restore_event_ledger().snapshot()}
+            npc_ids = {npc.entity_id for npc in NPCCollectionSnapshot.from_json(self.npcs_json).restore().values()}
+            raw_evaluations = json.loads(action_evaluation_snapshot.to_json())
+            records = {item["record"]["execution_id"]: item["record"]
+                       for item in json.loads(action_execution_snapshot.to_json())["records"]}
+            seen = set()
+            for evaluation in raw_evaluations["evaluations"]:
+                execution_id = evaluation["execution_id"]
+                record = records.get(execution_id)
+                event = journal.get(evaluation["evaluation_id"])
+                if (execution_id in seen or record is None
+                        or evaluation["owner_id"] not in npc_ids
+                        or record["owner_id"] != evaluation["owner_id"]
+                        or record["action_id"] != evaluation["action_id"]
+                        or record["tick"] > self.current_tick
+                        or event is None or event.tick != record["tick"]
+                        or event.event_type != "npc_action_evaluated"
+                        or event.participants != (record["owner_id"],)
+                        or dict(event.attributes).get("execution_id") != execution_id
+                        or dict(event.attributes).get("action_id") != record["action_id"]):
+                    raise ValueError("action evaluation does not match checkpoint execution and event history")
+                seen.add(execution_id)
+                for evidence_id in evaluation["evidence_event_ids"]:
+                    evidence = journal.get(evidence_id)
+                    if evidence is None or evidence.tick > self.current_tick:
+                        raise ValueError("action evaluation references missing or future evidence")
         if action_replanning_snapshot is not None:
             journal = {event.event_id: event for event in envelope.restore_event_ledger().snapshot()}
             npc_ids = {npc.entity_id for npc in NPCCollectionSnapshot.from_json(self.npcs_json).restore().values()}
