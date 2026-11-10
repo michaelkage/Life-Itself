@@ -829,3 +829,10 @@ __all__ += [
     "EmotionalScarDecision", "EmotionalScarDecisionLedger", "EmotionalScarDecisionSnapshot",
     "EmotionalScarFormationAdapter", "EmotionalScarFormationPolicy", "EmotionalScarProposal",
 ]
+
+
+# Durable provenance for scar-informed identity proposals.
+from .scar_identity_proposals import (
+    ScarIdentityProposalEvidence, ScarIdentityProposalLedger, ScarIdentityProposalSnapshot,
+)
+__all__ += ["ScarIdentityProposalEvidence", "ScarIdentityProposalLedger", "ScarIdentityProposalSnapshot"]
