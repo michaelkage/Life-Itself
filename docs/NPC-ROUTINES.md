@@ -224,3 +224,29 @@ responsible for supplying the simulation minute, disruptions, deterministic
 outcome samples, and any later activity-specific consequences.
 
 Regression coverage: `tests/test_routine_arrival.py`.
+
+
+## Authoritative physical NPC presence
+
+`PresenceLedger` stores each NPC's current symbolic location or their exact
+in-transit road edge and fractional progress. The world driver explicitly
+places NPCs at their initial locations with `place(owner_id, location_id, tick)`;
+no starting location is guessed. `PresenceTickAdapter.synchronize` derives
+updates from the latest journey in `TravelLedger`, so old completed journeys
+cannot pull an NPC back to an earlier destination. An NPC travelling, blocked,
+or unreachable is not counted as occupying a building or street node;
+`occupants(location_id)` returns only NPCs physically at that location.
+Optional `npc_presence_updated` events provide a shared timeline hook for
+witness visibility, social encounters, workplace attendance, and other systems.
+
+Presence tick replay is deterministic and rejects conflicting same-tick travel
+state. `PresenceSnapshot` persists current locations, active edge progress,
+and replay history. `SimulationWorldCheckpoint.capture(..., presence=ledger)`
+includes this state and validates NPC ownership and checkpoint timestamps;
+restoration exposes it as `RestoredSimulation.presence`. Location IDs remain
+symbolic graph nodes: actual world coordinates, animation, collision, and
+continuous spatial interpolation require an explicit world geometry layer and
+are not fabricated by this module.
+
+Regression coverage: `tests/test_presence.py` and
+`tests/test_world_checkpoint.py`.
