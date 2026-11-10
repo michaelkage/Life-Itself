@@ -103,6 +103,15 @@ class RestoredSimulation:
     identity_goal_reviews: IdentityGoalReviewDecisionLedger | None = None
     action_execution_snapshot: ActionExecutionSnapshot | None = None
 
+    def restore_action_execution_ledger(self, planner, policies, goals=None):
+        """Rebind persisted execution progress to runtime planning and goal definitions."""
+        if self.action_execution_snapshot is None:
+            return None
+        return ActionExecutionLedger.from_snapshot(
+            planner, policies, self.events, self.action_execution_snapshot,
+            self.goals if goals is None else goals,
+        )
+
 
 @dataclass(frozen=True)
 class SimulationWorldCheckpoint:
@@ -1144,7 +1153,7 @@ class SimulationWorldCheckpoint:
         return components
 
     def to_json(self):
-        envelope, npcs, trust, beliefs, memory, conversations, ticks, consequence, campaign, misconduct, routines, routine_executions, routine_institutions, institutional_politics, goals, goal_event_replay, goal_review_decisions, identity_decisions, testimony_inquiries, testimony, travel, presence, presence_encounters, familiarity, relationships, emotions, stress, conditioning, learning_decisions, life_history, memory_reflections, emotional_scars, emotional_scar_decisions, scar_identity_proposals, identity_goal_reviews = self._components()
+        envelope, npcs, trust, beliefs, memory, conversations, ticks, consequence, campaign, misconduct, routines, routine_executions, routine_institutions, institutional_politics, goals, goal_event_replay, goal_review_decisions, identity_decisions, testimony_inquiries, testimony, travel, presence, presence_encounters, familiarity, relationships, emotions, stress, conditioning, learning_decisions, life_history, memory_reflections, emotional_scars, emotional_scar_decisions, scar_identity_proposals, identity_goal_reviews, action_execution_snapshot = self._components()
         payload = {
             "schema_version": self.SCHEMA_VERSION, "current_tick": self.current_tick,
             "events": json.loads(envelope.to_json()), "npcs": json.loads(npcs.to_json()),
