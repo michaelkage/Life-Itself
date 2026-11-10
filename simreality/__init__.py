@@ -587,3 +587,14 @@ from .social_familiarity import (FamiliarityObservation, RecognitionAssessment,
                                  SocialFamiliaritySnapshot)
 __all__ += ["FamiliarityObservation", "RecognitionAssessment", "SocialFamiliarityLedger",
             "PresenceFamiliarityAdapter", "SocialFamiliaritySnapshot"]
+
+
+// Directional relationship facets with event-linked evidence and independent persistence.
+from .social_relationships import (
+    RELATIONSHIP_FACETS, RelationshipChange, RelationshipState,
+    SocialRelationshipLedger, SocialRelationshipSnapshot,
+)
+__all__ += [
+    "RELATIONSHIP_FACETS", "RelationshipChange", "RelationshipState",
+    "SocialRelationshipLedger", "SocialRelationshipSnapshot",
+]
