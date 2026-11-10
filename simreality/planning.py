@@ -68,6 +68,7 @@ class DeterministicPlanner:
         *,
         max_expansions: int = 10_000,
         action_reliability: Mapping[str, float] | None = None,
+        plan_reliability: Mapping[tuple[str, ...], float] | None = None,
     ) -> PlanResult:
         start = self._facts(initial_facts)
         goals = self._facts(goal_facts)
@@ -84,6 +85,18 @@ class DeterministicPlanner:
                         or not isinstance(value, (int, float)) or not math.isfinite(value)
                         or not 0.0 <= value <= 1.0):
                     raise ValueError("action reliability must map known actions to finite values in [0, 1]")
+        if plan_reliability is None:
+            plan_confidence = {}
+        else:
+            if not isinstance(plan_reliability, Mapping):
+                raise TypeError("plan_reliability must be a mapping")
+            plan_confidence = dict(plan_reliability)
+            for sequence, value in plan_confidence.items():
+                if (not isinstance(sequence, tuple) or not sequence
+                        or any(action_id not in self.actions for action_id in sequence)
+                        or isinstance(value, bool) or not isinstance(value, (int, float))
+                        or not math.isfinite(value) or not 0.0 <= value <= 1.0):
+                    raise ValueError("plan reliability must map known action sequences to values in [0, 1]")
         if goals <= start:
             return PlanResult(True, (), 0, 0, "goal facts already satisfied")
 
@@ -114,6 +127,11 @@ class DeterministicPlanner:
                                   max(action.cost, int(action.cost * (2.0 - confidence) + 0.5)))
                 next_cost = cost + effective_cost
                 next_path = path + (action.action_id,)
+                if goals <= next_state and next_path in plan_confidence:
+                    # Aggregate plan history contributes a terminal risk premium.
+                    # It changes this proposal only, never declared action costs.
+                    confidence = plan_confidence[next_path]
+                    next_cost += int(next_cost * (1.0 - confidence) + 0.5)
                 previous = best.get(next_state)
                 candidate = (next_cost, next_path)
                 if previous is not None and previous <= candidate:
