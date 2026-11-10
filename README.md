@@ -407,3 +407,6 @@ The [NPC autobiographical life history](docs/NPC-LIFE-HISTORY.md) preserves obse
 
 
 NPC autobiographical memory formation now has an explicit event bridge: authored per-NPC rules turn only observed world events into observer-specific memories with different interpretations, emotional and identity impacts, and optional turning-point status. Stable event/observer/rule IDs make replay safe; changed historical interpretations are rejected. Optional conflict and learning-decision references are preserved. See [docs/NPC-MEMORY-FORMATION.md](docs/NPC-MEMORY-FORMATION.md) and `tests/test_npc_memory_formation.py`.
+
+
+The [NPC autobiographical memory recall layer](docs/NPC-MEMORY-RECALL.md) retrieves owner-specific memories from explicitly observed cues and authored associations. Salience, emotional weighting, thresholds, and top-K selection shape deterministic recall without altering memories or forcing behavior. Tests: `tests/test_npc_memory_recall.py`.
