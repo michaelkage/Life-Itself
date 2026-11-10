@@ -115,6 +115,14 @@ class PersonalityAdaptationAssessment:
         expected = min(1.0, sum(abs(x.weighted_impact) for x in self.contributions))
         if not math.isclose(self.accumulated_evidence, expected, rel_tol=1e-12, abs_tol=1e-12):
             raise ValueError("accumulated_evidence must match memory contributions")
+        if not math.isclose(
+            self.proposal.evidence_strength, self.accumulated_evidence,
+            rel_tol=1e-12, abs_tol=1e-12,
+        ):
+            raise ValueError("proposal evidence must match accumulated memory evidence")
+        latest = self.contributions[-1]
+        if self.proposal.event_id != latest.event_id:
+            raise ValueError("proposal event must reference the latest contributing memory")
 
 
 class PersonalityAdaptationAdapter:
