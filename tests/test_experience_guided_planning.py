@@ -155,3 +155,42 @@ def test_action_outcome_memory_does_not_change_goal_priority():
         history, transfers, "npc", 1, goals)
     assert adjustments == {}
     assert evidence_ids == {}
+
+
+def test_replanning_uses_goal_experience_to_select_between_goals():
+    events = WorldEventLedger((
+        WorldEventLedger.make_event("community-event", 1, "goal_outcome",
+                                    participants=("alice",)),
+        WorldEventLedger.make_event("community-chat", 2, "conversation",
+                                    participants=("alice", "bob")),
+    ))
+    history = NPCLifeHistory((AutobiographicalMemory(
+        "community-memory", "alice", "community-event", 1, (),
+        "The community project succeeded", 0.9, 0.1,
+        tags=("community", "goal:success")),))
+    transfers = NPCExperienceTransferLedger(events, history)
+    transfers.transfer("community-report", "bob", "alice", "community-memory",
+                       "community-chat", confidence=1.0)
+    planner = DeterministicPlanner((
+        PlanningAction("do-goal", frozenset({"start"}),
+                       frozenset({"community-done", "routine-done"})),
+    ))
+    goals = GoalBook()
+    goals.add(NPCGoal("community-goal", "bob", "community", 3.9,
+                      metadata={"experience_tags": "community"}))
+    goals.add(NPCGoal("routine-goal", "bob", "routine", 4.0))
+    executions = ActionExecutionLedger(planner, (), events)
+    decisions = NPCDecisionCycle(goals, planner)
+    replanning = NPCActionReplanningCoordinator(
+        decisions, executions, events,
+        life_history=history, experience_transfers=transfers,
+    )
+    result = replanning.replan(
+        "bob", 2, {"start"}, {},
+        {"community-goal": {"community-done"},
+         "routine-goal": {"routine-done"}},
+        reason="apply reported strategic experience",
+    )
+    assert result.decision.goal_id == "community-goal"
+    assert result.decision.experience_evidence_ids == ("community-report",)
+    assert result.decision.experience_evidence_sources == (("community-report", "reported"),)
