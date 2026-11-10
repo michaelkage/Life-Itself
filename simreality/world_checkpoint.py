@@ -306,11 +306,7 @@ class SimulationWorldCheckpoint:
             for record in encounter_snapshot.records:
                 if any(owner not in known_presence for owner in record.participants):
                     raise ValueError("encounter participants require saved physical presence")
-                if any(known_presence[owner].updated_tick > record.tick
-                       or known_presence[owner].status != "at_location"
-                       or known_presence[owner].location_id != record.location_id
-                       for owner in record.participants):
-                    raise ValueError("encounter participants do not match saved physical presence")
+                # Presence is current state; participants may have moved since this historical encounter.
         misconduct_snapshot = None
         if misconduct is not None:
             if not isinstance(misconduct, MisconductReportingSystem):
@@ -495,11 +491,7 @@ class SimulationWorldCheckpoint:
             for record in encounter_snapshot.records:
                 if any(owner not in presence_by_owner for owner in record.participants):
                     raise ValueError("encounter participants require saved physical presence")
-                if any(presence_by_owner[owner].updated_tick > record.tick
-                       or presence_by_owner[owner].status != "at_location"
-                       or presence_by_owner[owner].location_id != record.location_id
-                       for owner in record.participants):
-                    raise ValueError("encounter participants do not match saved physical presence")
+                # Current presence may have advanced beyond the historical encounter.
         return components
 
     def to_json(self):
