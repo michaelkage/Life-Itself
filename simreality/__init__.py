@@ -836,3 +836,8 @@ from .scar_identity_proposals import (
     ScarIdentityProposalEvidence, ScarIdentityProposalLedger, ScarIdentityProposalSnapshot,
 )
 __all__ += ["ScarIdentityProposalEvidence", "ScarIdentityProposalLedger", "ScarIdentityProposalSnapshot"]
+
+
+# Scar-informed identity proposals remain read-only and require explicit decisions.
+from .emotional_scar_identity import EmotionalScarIdentityAdapter, ScarIdentityPolicy
+__all__ += ["EmotionalScarIdentityAdapter", "ScarIdentityPolicy"]
