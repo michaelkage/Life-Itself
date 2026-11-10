@@ -635,3 +635,11 @@ __all__ += ["CopingProfile", "NPCStressLedger", "NPCStressSnapshot", "StressAsse
 
 from .emotional_stress_save_state import NPCStressSnapshot
 __all__ += ["NPCStressSnapshot"]
+
+
+# Individualized, read-only behavioral effects of accumulated stress.
+from .stress_adaptation import (
+    CHANNELS as STRESS_ADAPTATION_CHANNELS, StressAdaptationProfile,
+    StressBehaviorAdapter, StressBehaviorSignal,
+)
+__all__ += ["STRESS_ADAPTATION_CHANNELS", "StressAdaptationProfile", "StressBehaviorAdapter", "StressBehaviorSignal"]
