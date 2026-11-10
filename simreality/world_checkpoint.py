@@ -903,7 +903,7 @@ class SimulationWorldCheckpoint:
         return components
 
     def to_json(self):
-        envelope, npcs, trust, beliefs, memory, conversations, ticks, consequence, campaign, misconduct, routines, routine_executions, routine_institutions, institutional_politics, goals, goal_event_replay, goal_review_decisions, identity_decisions, testimony_inquiries, testimony, travel, presence, presence_encounters, familiarity, relationships, emotions, stress, conditioning, learning_decisions, life_history, memory_reflections = self._components()
+        envelope, npcs, trust, beliefs, memory, conversations, ticks, consequence, campaign, misconduct, routines, routine_executions, routine_institutions, institutional_politics, goals, goal_event_replay, goal_review_decisions, identity_decisions, testimony_inquiries, testimony, travel, presence, presence_encounters, familiarity, relationships, emotions, stress, conditioning, learning_decisions, life_history, memory_reflections, emotional_scars = self._components()
         payload = {
             "schema_version": self.SCHEMA_VERSION, "current_tick": self.current_tick,
             "events": json.loads(envelope.to_json()), "npcs": json.loads(npcs.to_json()),
