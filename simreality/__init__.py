@@ -841,3 +841,8 @@ __all__ += ["ScarIdentityProposalEvidence", "ScarIdentityProposalLedger", "ScarI
 # Scar-informed identity proposals remain read-only and require explicit decisions.
 from .emotional_scar_identity import EmotionalScarIdentityAdapter, ScarIdentityPolicy
 __all__ += ["EmotionalScarIdentityAdapter", "ScarIdentityPolicy"]
+
+
+# Read-only join of experience, scar, proposal, NPC decision, and identity outcome.
+from .identity_evolution_audit import IdentityEvolutionAuditRecord, IdentityEvolutionAuditTrail
+__all__ += ["IdentityEvolutionAuditRecord", "IdentityEvolutionAuditTrail"]
