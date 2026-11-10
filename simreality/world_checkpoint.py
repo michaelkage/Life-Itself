@@ -665,6 +665,9 @@ class SimulationWorldCheckpoint:
                 raise ValueError("action execution ledger must share the checkpoint world event journal")
             if action_executions.goals is not None and action_executions.goals is not goal_book:
                 raise ValueError("action execution ledger must share the checkpoint GoalBook")
+            if any(policy.goal_progress for policy in action_executions.policies.values()):
+                if goal_book is None or action_executions.goals is not goal_book:
+                    raise ValueError("goal-progress action policies require the checkpoint GoalBook to be shared by the execution ledger")
             known_npcs = set(npcs)
             journal = {event.event_id: event for event in coordinator.events.snapshot()}
             action_execution_snapshot = action_executions.to_snapshot()
