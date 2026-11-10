@@ -36,6 +36,14 @@ class PresenceSnapshot:
         tick_ids = [item[0] for item in self.ticks]
         if tick_ids != sorted(tick_ids) or len(tick_ids) != len(set(tick_ids)):
             raise ValueError("presence ticks must be unique and increasing")
+        for tick, signature, records in self.ticks:
+            if isinstance(tick, bool) or not isinstance(tick, int) or tick < 0 or not isinstance(signature, str) or not signature:
+                raise ValueError("invalid presence tick history entry")
+            if not isinstance(records, tuple) or any(not isinstance(r, NPCPresence) for r in records):
+                raise ValueError("presence tick records must be NPCPresence values")
+            owners = [r.owner_id for r in records]
+            if owners != sorted(owners) or len(owners) != len(set(owners)):
+                raise ValueError("presence tick records must have unique sorted owners")
 
     @classmethod
     def capture(cls, ledger):
