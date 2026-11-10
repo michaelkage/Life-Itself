@@ -49,11 +49,12 @@ class ScarIdentityProposalLedger:
         return evidence
 
     def record_many(self, evidence):
+        items = tuple(evidence)
         candidate = ScarIdentityProposalLedger(self.entries())
-        for item in evidence:
+        for item in items:
             candidate.record(item)
         self._records = candidate._records
-        return tuple(self._records[(x.proposal.event_id, x.proposal.npc_id, x.proposal.policy_id)] for x in evidence)
+        return tuple(self._records[(x.proposal.event_id, x.proposal.npc_id, x.proposal.policy_id)] for x in items)
 
     def entries(self):
         return tuple(sorted(self._records.values(), key=lambda r: (
