@@ -136,7 +136,8 @@ class GoalBook:
         if status == GoalStatus.COMPLETED:
             goal.progress = 1.0
 
-    def evaluate(self, goal_id: str, current_tick: int) -> GoalEvaluation:
+    def evaluate(self, goal_id: str, current_tick: int,
+                 experience_adjustments: dict[str, float] | None = None) -> GoalEvaluation:
         if current_tick < 0:
             raise ValueError("current_tick must be non-negative")
         goal = self.goals[goal_id]
@@ -160,23 +161,29 @@ class GoalBook:
         # nearly finished goals do not always eclipse more important obligations.
         score = goal.priority * (0.5 + 0.5 * goal.confidence) * urgency
         score *= 1.0 - 0.25 * goal.progress
+        adjustment = (experience_adjustments or {}).get(goal_id, 0.0)
+        if not math.isfinite(adjustment) or not -0.25 <= adjustment <= 0.25:
+            raise ValueError("experience adjustment must be finite and within [-0.25, 0.25]")
+        score *= 1.0 + adjustment
         return GoalEvaluation(goal_id, True, score, "prerequisites satisfied")
 
-    def ranked(self, owner_id: str, current_tick: int) -> tuple[NPCGoal, ...]:
+    def ranked(self, owner_id: str, current_tick: int,
+               experience_adjustments: dict[str, float] | None = None) -> tuple[NPCGoal, ...]:
         """Return actionable goals in deterministic priority order."""
         candidates: list[tuple[float, str, NPCGoal]] = []
         for goal in self.goals.values():
             if goal.owner_id != owner_id:
                 continue
-            result = self.evaluate(goal.goal_id, current_tick)
+            result = self.evaluate(goal.goal_id, current_tick, experience_adjustments)
             if result.actionable:
                 candidates.append((-result.score, goal.goal_id, goal))
         candidates.sort(key=lambda item: (item[0], item[1]))
         return tuple(item[2] for item in candidates)
 
-    def choose(self, owner_id: str, current_tick: int) -> NPCGoal | None:
+    def choose(self, owner_id: str, current_tick: int,
+               experience_adjustments: dict[str, float] | None = None) -> NPCGoal | None:
         """Return the highest-scoring actionable goal with a stable tie-break."""
-        ranked = self.ranked(owner_id, current_tick)
+        ranked = self.ranked(owner_id, current_tick, experience_adjustments)
         return ranked[0] if ranked else None
 
     def snapshot(self) -> tuple[tuple[object, ...], ...]:
