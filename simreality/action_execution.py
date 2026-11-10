@@ -220,12 +220,12 @@ class ActionExecutionLedger:
                 active.action_index, active.started_tick, tick, progress,
                 active.duration_ticks, active.reserved_resources,
             )
-            self._active[execution_id] = updated
             event = WorldEventLedger.make_event(
                 f"action-execution:{execution_id}:tick:{tick}", tick, "npc_action_progress",
                 participants=(active.owner_id,), attributes={"execution_id": execution_id, "progress_ticks": progress, "duration_ticks": active.duration_ticks},
             )
             self.events.append(event)
+            self._active[execution_id] = updated
             return updated
 
         status = "interrupted" if interruption is not None else "completed"
