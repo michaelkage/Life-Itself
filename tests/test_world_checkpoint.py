@@ -22,6 +22,7 @@ from simreality import (
     EmotionalScarProposal, EmotionalScarDecision, EmotionalScarDecisionLedger,
     IdentityGoalAction, IdentityGoalAlignmentAdapter, IdentityGoalAlignmentPolicy,
     IdentityGoalReviewDecision, IdentityGoalReviewDecisionLedger,
+    ActionExecutionLedger, ActionExecutionPolicy,
 )
 from simreality.presence_encounters import PresenceEncounter, PresenceEncounterLedger, PresenceSocialAdapter
 from simreality.social_familiarity import PresenceFamiliarityAdapter, SocialFamiliarityLedger
@@ -29,6 +30,7 @@ from simreality.emotional_events import EmotionalEventRule, NPCEmotionalEventLed
 from simreality.psychological_conditioning import ConditioningProfile, NPCConditioningLedger
 from simreality.psychological_interpretation import LearningProposal
 from simreality.psychological_learning_decisions import PsychologicalLearningDecisionLedger
+from simreality.planning import DeterministicPlanner, PlanningAction
 
 
 class SimulationWorldCheckpointTests(unittest.TestCase):
@@ -1312,6 +1314,62 @@ class SimulationWorldCheckpointTests(unittest.TestCase):
         reviews = IdentityGoalReviewDecisionLedger((IdentityGoalReviewDecision("forged-review", forged, True, 5, "forged"),))
         with self.assertRaisesRegex(ValueError, "accepted identity decision"):
             SimulationWorldCheckpoint.capture(5, coordinator, npcs, goal_book=goals, identity_decisions=identity, identity_goal_reviews=reviews)
+    def test_action_execution_and_world_resources_restore_atomically(self):
+        coordinator, npcs, _ = self.make_simulation()
+        planner = DeterministicPlanner((
+            PlanningAction("collect-grain", frozenset({"at-field"}),
+                           frozenset({"has-grain"})),
+        ))
+        policies = (ActionExecutionPolicy("collect-grain", (("energy", 2.0),),
+                                          duration_ticks=2),)
+        ledger = ActionExecutionLedger(planner, policies, coordinator.events)
+        facts, resources = {"at-field"}, {"energy": 5.0}
+        ledger.start("collect-1", "speaker", 4, "collect-grain", facts, resources,
+                     plan_actions=("collect-grain",))
+        ledger.advance("collect-1", 5, facts, resources)
+        payload = SimulationWorldCheckpoint.capture(
+            5, coordinator, npcs, action_executions=ledger,
+            action_world_facts=facts, action_resources=resources,
+        ).to_json()
+        restored = SimulationWorldCheckpoint.from_json(payload).restore()
+        self.assertEqual(restored.action_world_facts, {"at-field"})
+        self.assertEqual(restored.action_resources, {"energy": 5.0})
+        resumed = restored.restore_action_execution_ledger(planner, policies)
+        self.assertEqual(resumed.active("collect-1").progress_ticks, 1)
+        result = resumed.advance("collect-1", 6, restored.action_world_facts,
+                                 restored.action_resources)
+        self.assertEqual(result.status, "completed")
+        self.assertEqual(restored.action_world_facts, {"at-field", "has-grain"})
+        self.assertEqual(restored.action_resources, {"energy": 3.0})
+
+    def test_action_checkpoint_requires_atomic_facts_and_resources(self):
+        coordinator, npcs, _ = self.make_simulation()
+        planner = DeterministicPlanner((
+            PlanningAction("collect-grain", frozenset({"at-field"}),
+                           frozenset({"has-grain"})),
+        ))
+        ledger = ActionExecutionLedger(planner, (), coordinator.events)
+        with self.assertRaisesRegex(ValueError, "require world facts and resource balances"):
+            SimulationWorldCheckpoint.capture(
+                4, coordinator, npcs, action_executions=ledger,
+            )
+
+    def test_action_checkpoint_rejects_execution_after_checkpoint_tick(self):
+        coordinator, npcs, _ = self.make_simulation()
+        planner = DeterministicPlanner((
+            PlanningAction("collect-grain", frozenset({"at-field"}),
+                           frozenset({"has-grain"})),
+        ))
+        ledger = ActionExecutionLedger(planner, (), coordinator.events)
+        facts, resources = {"at-field"}, {}
+        ledger.start("future-action", "speaker", 5, "collect-grain", facts, resources,
+                     plan_actions=("collect-grain",))
+        with self.assertRaisesRegex(ValueError, "active action execution"):
+            SimulationWorldCheckpoint.capture(
+                4, coordinator, npcs, action_executions=ledger,
+                action_world_facts=facts, action_resources=resources,
+            )
+
 
 if __name__ == "__main__":
     unittest.main()
