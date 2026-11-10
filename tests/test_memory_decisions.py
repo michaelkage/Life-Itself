@@ -25,10 +25,11 @@ def test_explicit_signed_associations_translate_recall_into_choice_signals():
         MemoryChoiceAssociation("a3", "alice", "m1", "avoid", -1.0),
     ))
     influence = MemoryDecisionInfluenceAdapter.evaluate(profile, result)
-    assert influence.contributions_for("approach") == (
-        ("m1", 0.6), ("m2", -0.25),
-    )
-    assert influence.contributions_for("avoid") == (("m1", -0.8),)
+    approach = influence.contributions_for("approach")
+    assert tuple(memory_id for memory_id, _ in approach) == ("m1", "m2")
+    assert tuple(value for _, value in approach) == pytest.approx((0.6, -0.25))
+    avoid = influence.contributions_for("avoid")
+    assert tuple(value for _, value in avoid) == pytest.approx((-0.8,))
 
 
 def test_accumulated_contributions_are_bounded_to_prevent_memory_dominance():
@@ -39,7 +40,7 @@ def test_accumulated_contributions_are_bounded_to_prevent_memory_dominance():
         MemoryChoiceAssociation("a1", "alice", "m1", "choice", 1.0),
         MemoryChoiceAssociation("a2", "alice", "m2", "choice", 1.0),
     ))
-    values = influence = MemoryDecisionInfluenceAdapter.evaluate(profile, result)
+    influence = MemoryDecisionInfluenceAdapter.evaluate(profile, result)
     assert sum(value for _, value in influence.contributions_for("choice")) == pytest.approx(1.0)
 
 
