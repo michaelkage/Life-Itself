@@ -58,6 +58,7 @@ from .emotional_scars import NPCEmotionalScarLedger
 from .emotional_scars_save_state import EmotionalScarSnapshot
 from .emotional_scar_formation import EmotionalScarDecisionLedger, EmotionalScarDecisionSnapshot
 from .scar_identity_proposals import ScarIdentityProposalLedger, ScarIdentityProposalSnapshot
+from .identity_goal_alignment import IdentityGoalReviewDecisionLedger, IdentityGoalReviewSnapshot
 
 
 @dataclass(frozen=True)
@@ -98,6 +99,7 @@ class RestoredSimulation:
     emotional_scars: NPCEmotionalScarLedger | None = None
     emotional_scar_decisions: EmotionalScarDecisionLedger | None = None
     scar_identity_proposals: ScarIdentityProposalLedger | None = None
+    identity_goal_reviews: IdentityGoalReviewDecisionLedger | None = None
 
 
 @dataclass(frozen=True)
@@ -145,6 +147,7 @@ class SimulationWorldCheckpoint:
     emotional_scars_json: str | None = None
     emotional_scar_decisions_json: str | None = None
     scar_identity_proposals_json: str | None = None
+    identity_goal_reviews_json: str | None = None
 
     SCHEMA_VERSION = 1
 
@@ -176,7 +179,7 @@ class SimulationWorldCheckpoint:
                 consequence_recorder=None, campaign=None, misconduct=None, routines=None,
                 routine_executions=None, routine_institutions=None, institutional_politics=None,
                 goal_book=None, goal_event_adapter=None, goal_review_decisions=None, identity_decisions=None,
-                testimony_inquiries=None, testimony=None, travel=None, presence=None, presence_encounters=None, familiarity=None, relationships=None, emotions=None, stress=None, conditioning=None, psychological_learning_decisions=None, life_history=None, memory_reflections=None, emotional_scars=None, emotional_scar_decisions=None, scar_identity_proposals=None):
+                testimony_inquiries=None, testimony=None, travel=None, presence=None, presence_encounters=None, familiarity=None, relationships=None, emotions=None, stress=None, conditioning=None, psychological_learning_decisions=None, life_history=None, memory_reflections=None, emotional_scars=None, emotional_scar_decisions=None, scar_identity_proposals=None, identity_goal_reviews=None):
         if not isinstance(coordinator, SimulationTickCoordinator):
             raise TypeError("coordinator must be a SimulationTickCoordinator")
         if not isinstance(npcs, dict):
@@ -262,6 +265,35 @@ class SimulationWorldCheckpoint:
                 present = record[2] in source_event.participants if record[12] == "participant" else record[2] in source_event.witnesses
                 if not present:
                     raise ValueError("identity decision role does not match its source event")
+        if identity_goal_reviews is not None and not isinstance(identity_goal_reviews, IdentityGoalReviewDecisionLedger):
+            raise TypeError("identity_goal_reviews must be an IdentityGoalReviewDecisionLedger or None")
+        identity_goal_review_snapshot = IdentityGoalReviewSnapshot.capture(identity_goal_reviews) if identity_goal_reviews is not None else None
+        if identity_goal_review_snapshot is not None:
+            if goal_book is None or identity_snapshot is None:
+                raise ValueError("identity-goal reviews require the corresponding GoalBook and identity decisions")
+            identity_by_id = {record[0]: record for record in identity_snapshot.decisions}
+            goal_owners = {goal.goal_id: goal.owner_id for goal in goal_book.goals.values()}
+            events_by_id = {event.event_id: event for event in coordinator.events.snapshot()}
+            for record in identity_goal_review_snapshot.records:
+                (decision_id, accepted, decision_tick, _rationale, identity_id, event_id,
+                 owner_id, identity_policy_id, axis, delta, goal_id, _policy_id, _action,
+                 proposed_tick, _current_category, _proposed_category, _current_priority,
+                 _proposed_priority, _current_confidence, _proposed_confidence) = record
+                identity = identity_by_id.get(identity_id)
+                source = events_by_id.get(event_id)
+                if (identity is None or not identity[5] or identity[2] != owner_id
+                        or identity[1] != event_id or identity[3] != identity_policy_id
+                        or identity[4] != axis or not math.isclose(identity[10], delta, abs_tol=1e-12)
+                        or identity[6] > proposed_tick or proposed_tick > decision_tick
+                        or decision_tick > current_tick):
+                    raise ValueError("identity-goal review does not follow its accepted identity decision")
+                if goal_owners.get(goal_id) != owner_id:
+                    raise ValueError("identity-goal review references an unknown goal or owner")
+                if source is None or source.tick > identity[6]:
+                    raise ValueError("identity-goal review references a missing or future source event")
+                if (identity[12] == "participant" and owner_id not in source.participants) or (
+                        identity[12] == "witness" and owner_id not in source.witnesses):
+                    raise ValueError("identity-goal review role does not match its source event")
         if testimony_inquiries is not None and not isinstance(testimony_inquiries, TestimonyInquiryLedger):
             raise TypeError("testimony_inquiries must be a TestimonyInquiryLedger or None")
         inquiry_snapshot = TestimonyInquirySnapshot.capture(testimony_inquiries) if testimony_inquiries is not None else None
@@ -634,6 +666,7 @@ class SimulationWorldCheckpoint:
             scar_snapshot.to_json() if scar_snapshot is not None else None,
             scar_decision_snapshot.to_json() if scar_decision_snapshot is not None else None,
             scar_identity_proposal_snapshot.to_json() if scar_identity_proposal_snapshot is not None else None,
+            identity_goal_review_snapshot.to_json() if identity_goal_review_snapshot is not None else None,
         )
 
     def _components(self):
@@ -675,6 +708,7 @@ class SimulationWorldCheckpoint:
             EmotionalScarSnapshot.from_json(self.emotional_scars_json) if self.emotional_scars_json is not None else None,
             EmotionalScarDecisionSnapshot.from_json(self.emotional_scar_decisions_json) if self.emotional_scar_decisions_json is not None else None,
             ScarIdentityProposalSnapshot.from_json(self.scar_identity_proposals_json) if self.scar_identity_proposals_json is not None else None,
+            IdentityGoalReviewSnapshot.from_json(self.identity_goal_reviews_json) if self.identity_goal_reviews_json is not None else None,
         )
         goals_snapshot, goal_replay, goal_review_decisions = components[14], components[15], components[16]
         identity_decisions = components[17]
@@ -694,6 +728,33 @@ class SimulationWorldCheckpoint:
         emotional_scars_snapshot = components[31]
         emotional_scar_decisions_snapshot = components[32]
         scar_identity_proposal_snapshot = components[33]
+        identity_goal_review_snapshot = components[34]
+        if identity_goal_review_snapshot is not None:
+            if goals_snapshot is None or identity_decisions is None:
+                raise ValueError("identity-goal reviews require the corresponding GoalBook and identity decisions")
+            identity_by_id = {record[0]: record for record in identity_decisions.decisions}
+            goal_owners = {record[0]: record[1] for record in goals_snapshot.records}
+            journal = {event.event_id: event for event in envelope.restore_event_ledger().snapshot()}
+            for record in identity_goal_review_snapshot.records:
+                (decision_id, accepted, decision_tick, _rationale, identity_id, event_id,
+                 owner_id, identity_policy_id, axis, delta, goal_id, _policy_id, _action,
+                 proposed_tick, _current_category, _proposed_category, _current_priority,
+                 _proposed_priority, _current_confidence, _proposed_confidence) = record
+                identity = identity_by_id.get(identity_id)
+                source = journal.get(event_id)
+                if (identity is None or not identity[5] or identity[2] != owner_id
+                        or identity[1] != event_id or identity[3] != identity_policy_id
+                        or identity[4] != axis or not math.isclose(identity[10], delta, abs_tol=1e-12)
+                        or identity[6] > proposed_tick or proposed_tick > decision_tick
+                        or decision_tick > self.current_tick):
+                    raise ValueError("identity-goal review does not follow its accepted identity decision")
+                if goal_owners.get(goal_id) != owner_id:
+                    raise ValueError("identity-goal review references an unknown goal or owner")
+                if source is None or source.tick > identity[6]:
+                    raise ValueError("identity-goal review references a missing or future source event")
+                if (identity[12] == "participant" and owner_id not in source.participants) or (
+                        identity[12] == "witness" and owner_id not in source.witnesses):
+                    raise ValueError("identity-goal review role does not match its source event")
         if scar_identity_proposal_snapshot is not None:
             if emotional_scars_snapshot is None or identity_decisions is None:
                 raise ValueError("scar identity proposals require emotional scars and identity decisions")
@@ -1022,7 +1083,7 @@ class SimulationWorldCheckpoint:
         return components
 
     def to_json(self):
-        envelope, npcs, trust, beliefs, memory, conversations, ticks, consequence, campaign, misconduct, routines, routine_executions, routine_institutions, institutional_politics, goals, goal_event_replay, goal_review_decisions, identity_decisions, testimony_inquiries, testimony, travel, presence, presence_encounters, familiarity, relationships, emotions, stress, conditioning, learning_decisions, life_history, memory_reflections, emotional_scars, emotional_scar_decisions, scar_identity_proposals = self._components()
+        envelope, npcs, trust, beliefs, memory, conversations, ticks, consequence, campaign, misconduct, routines, routine_executions, routine_institutions, institutional_politics, goals, goal_event_replay, goal_review_decisions, identity_decisions, testimony_inquiries, testimony, travel, presence, presence_encounters, familiarity, relationships, emotions, stress, conditioning, learning_decisions, life_history, memory_reflections, emotional_scars, emotional_scar_decisions, scar_identity_proposals, identity_goal_reviews = self._components()
         payload = {
             "schema_version": self.SCHEMA_VERSION, "current_tick": self.current_tick,
             "events": json.loads(envelope.to_json()), "npcs": json.loads(npcs.to_json()),
@@ -1055,6 +1116,8 @@ class SimulationWorldCheckpoint:
             payload["goal_review_decisions"] = json.loads(goal_review_decisions.to_json())
         if identity_decisions is not None:
             payload["identity_decisions"] = json.loads(identity_decisions.to_json())
+        if identity_goal_reviews is not None:
+            payload["identity_goal_reviews"] = json.loads(identity_goal_reviews.to_json())
         if testimony_inquiries is not None:
             payload["testimony_inquiries"] = json.loads(testimony_inquiries.to_json())
         if testimony is not None:
@@ -1128,14 +1191,15 @@ class SimulationWorldCheckpoint:
                        json.dumps(raw["memory_reflections"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("memory_reflections") is not None else None,
                        json.dumps(raw["emotional_scars"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("emotional_scars") is not None else None,
                        json.dumps(raw["emotional_scar_decisions"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("emotional_scar_decisions") is not None else None,
-                       json.dumps(raw["scar_identity_proposals"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("scar_identity_proposals") is not None else None)
+                       json.dumps(raw["scar_identity_proposals"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("scar_identity_proposals") is not None else None,
+                       json.dumps(raw["identity_goal_reviews"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("identity_goal_reviews") is not None else None)
         except ValueError:
             raise
         except (TypeError, KeyError, IndexError, json.JSONDecodeError) as exc:
             raise ValueError("invalid simulation world checkpoint") from exc
 
     def restore(self):
-        envelope, npc_snapshot, trust_snapshot, belief_snapshot, memory_snapshot, conversation_snapshot, tick_snapshot, consequence_snapshot, campaign, misconduct_snapshot, routine_snapshot, execution_snapshot, institution_snapshot, institutional_politics, goals_snapshot, goal_event_replay, goal_review_decisions_snapshot, identity_decisions_snapshot, testimony_inquiries_snapshot, testimony_snapshot, travel_snapshot, presence_snapshot, encounter_snapshot, familiarity_snapshot, relationship_snapshot, emotional_snapshot, stress_snapshot, conditioning_snapshot, learning_decisions_snapshot, life_history_snapshot, memory_reflections_snapshot, emotional_scars_snapshot, emotional_scar_decisions_snapshot, scar_identity_proposal_snapshot = self._components()
+        envelope, npc_snapshot, trust_snapshot, belief_snapshot, memory_snapshot, conversation_snapshot, tick_snapshot, consequence_snapshot, campaign, misconduct_snapshot, routine_snapshot, execution_snapshot, institution_snapshot, institutional_politics, goals_snapshot, goal_event_replay, goal_review_decisions_snapshot, identity_decisions_snapshot, testimony_inquiries_snapshot, testimony_snapshot, travel_snapshot, presence_snapshot, encounter_snapshot, familiarity_snapshot, relationship_snapshot, emotional_snapshot, stress_snapshot, conditioning_snapshot, learning_decisions_snapshot, life_history_snapshot, memory_reflections_snapshot, emotional_scars_snapshot, emotional_scar_decisions_snapshot, scar_identity_proposal_snapshot, identity_goal_review_snapshot = self._components()
         events = envelope.restore_event_ledger()
         npcs = npc_snapshot.restore()
         trust = trust_snapshot.restore()
@@ -1184,8 +1248,9 @@ class SimulationWorldCheckpoint:
         emotional_scars = emotional_scars_snapshot.restore() if emotional_scars_snapshot is not None else None
         emotional_scar_decisions = emotional_scar_decisions_snapshot.restore() if emotional_scar_decisions_snapshot is not None else None
         scar_identity_proposals = ScarIdentityProposalLedger.from_snapshot(scar_identity_proposal_snapshot) if scar_identity_proposal_snapshot is not None else None
+        identity_goal_reviews = identity_goal_review_snapshot.restore() if identity_goal_review_snapshot is not None else None
         return RestoredSimulation(self.current_tick, events, npcs, trust, beliefs,
                                   memory, conversations, coordinator, self.metadata,
                                   consequence_recorder, campaign, misconduct, routines, routine_executions,
                                   routine_institutions, institutional_politics, goals, goal_event_replay,
-                                  goal_review_decisions, identity_decisions, testimony_inquiries, testimony, travel, presence, presence_encounters, familiarity, relationships, emotions, stress, conditioning, psychological_learning_decisions, life_history, memory_reflections, emotional_scars, emotional_scar_decisions, scar_identity_proposals)
+                                  goal_review_decisions, identity_decisions, testimony_inquiries, testimony, travel, presence, presence_encounters, familiarity, relationships, emotions, stress, conditioning, psychological_learning_decisions, life_history, memory_reflections, emotional_scars, emotional_scar_decisions, scar_identity_proposals, identity_goal_reviews)
