@@ -49,6 +49,15 @@ class SocialFamiliarityTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "both directional"):
             adapter.observe_encounter("meeting-1", {("alice", "bob"): 0.5})
 
+
+    def test_invalid_second_direction_does_not_partially_update_ledger(self):
+        _, adapter = self.setup_encounter()
+        with self.assertRaisesRegex(ValueError, "strength"):
+            adapter.observe_encounter(
+                "meeting-1", {("alice", "bob"): 0.6, ("bob", "alice"): 2.0}
+            )
+        self.assertEqual(adapter.ledger.snapshot(), ())
+
     def test_historical_familiarity_and_snapshot_round_trip(self):
         _, adapter = self.setup_encounter()
         adapter.observe_encounter("meeting-1", {("alice", "bob"): 0.5, ("bob", "alice"): 0.25})
