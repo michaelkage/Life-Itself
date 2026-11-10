@@ -83,5 +83,15 @@ class IdentityGoalAlignmentTests(unittest.TestCase):
             ledger.apply_accepted("goal-decision-4", self.goals)
 
 
+
+    def test_completed_goal_is_stale_and_cannot_be_reprioritized(self):
+        proposal, = self.adapter.assess((self.accepted,), current_tick=5)
+        ledger = IdentityGoalReviewDecisionLedger((
+            IdentityGoalReviewDecision("goal-decision-5", proposal, True, 6, "Accepted"),
+        ))
+        self.goals.set_status("career-1", GoalStatus.COMPLETED)
+        with self.assertRaisesRegex(ValueError, "stale"):
+            ledger.apply_accepted("goal-decision-5", self.goals)
+
 if __name__ == "__main__":
     unittest.main()
