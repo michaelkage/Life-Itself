@@ -436,3 +436,6 @@ Scar-informed identity proposals now retain their exact source scar, authored po
 
 
 The [NPC action execution and recovery layer](docs/NPC-ACTION-EXECUTION.md) takes explicit steps from an approved plan, rechecks live preconditions, supports multi-tick work with resource reservations, resumes active progress from canonical snapshots, and releases reservations on interruption or cancellation. Completed actions can advance explicitly mapped GoalBook progress. Execution is journaled and replay-safe; the world driver still owns replanning and atomically checkpointing facts, resources, and the event journal. Tests: `tests/test_action_execution.py`.
+
+
+NPC action execution state can be included in `SimulationWorldCheckpoint` with `action_executions`, `action_world_facts`, and `action_resources`. Restore the checkpoint, then call `RestoredSimulation.restore_action_execution_ledger(planner, policies)` to resume active actions against the restored world event journal and resource/fact state.
