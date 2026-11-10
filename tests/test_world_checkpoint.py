@@ -20,6 +20,7 @@ from simreality import (
 )
 from simreality.presence_encounters import PresenceEncounter, PresenceEncounterLedger, PresenceSocialAdapter
 from simreality.social_familiarity import PresenceFamiliarityAdapter, SocialFamiliarityLedger
+from simreality.emotional_events import EmotionalEventRule, NPCEmotionalEventLedger
 
 
 class SimulationWorldCheckpointTests(unittest.TestCase):
@@ -889,6 +890,61 @@ class SimulationWorldCheckpointTests(unittest.TestCase):
             SimulationWorldCheckpoint.capture(
                 4, coordinator, npcs, relationships=unrelated,
             )
+
+
+    def test_emotional_state_round_trips_with_world_event_provenance(self):
+        coordinator, npcs, _ = self.make_simulation()
+        emotions = NPCEmotionalEventLedger()
+        emotions.advance(
+            4, coordinator.events.snapshot(),
+            event_rules=(
+                EmotionalEventRule("incident-grief", "incident", "witness", "grief", 0.7),
+                EmotionalEventRule("incident-anger", "incident", "participant", "anger", 0.3),
+            ),
+        )
+        payload = SimulationWorldCheckpoint.capture(
+            4, coordinator, npcs, emotions=emotions,
+        ).to_json()
+        restored = SimulationWorldCheckpoint.from_json(payload).restore()
+        self.assertIsNotNone(restored.emotions)
+        self.assertEqual(restored.emotions.snapshot(), emotions.snapshot())
+        self.assertAlmostEqual(restored.emotions.state_for("listener").intensities["grief"], 0.7)
+        self.assertAlmostEqual(restored.emotions.state_for("speaker").intensities["anger"], 0.3)
+        self.assertEqual(
+            SimulationWorldCheckpoint.capture(
+                4, restored.coordinator, restored.npcs, emotions=restored.emotions,
+            ).to_json(),
+            payload,
+        )
+
+    def test_emotional_checkpoint_rejects_unknown_npc_state(self):
+        coordinator, npcs, _ = self.make_simulation()
+        from simreality.identity_context import NPCEmotionalState
+        emotions = NPCEmotionalEventLedger({
+            "missing-npc": NPCEmotionalState("missing-npc", 4, {"anger": 0.5}),
+        }, current_tick=4)
+        with self.assertRaisesRegex(ValueError, "missing from checkpoint"):
+            SimulationWorldCheckpoint.capture(4, coordinator, npcs, emotions=emotions)
+
+    def test_emotional_checkpoint_rejects_event_not_in_authoritative_journal(self):
+        coordinator, npcs, _ = self.make_simulation()
+        emotions = NPCEmotionalEventLedger()
+        invented = WorldEventLedger.make_event(
+            "invented-emotion-source", 3, "incident", participants=("speaker",),
+        )
+        emotions.advance(
+            4, (invented,),
+            event_rules=(EmotionalEventRule("anger", "incident", "participant", "anger", 0.4),),
+        )
+        with self.assertRaisesRegex(ValueError, "authoritative world journal"):
+            SimulationWorldCheckpoint.capture(4, coordinator, npcs, emotions=emotions)
+
+    def test_emotional_checkpoint_section_is_optional(self):
+        coordinator, npcs, _ = self.make_simulation()
+        payload = SimulationWorldCheckpoint.capture(4, coordinator, npcs).to_json()
+        self.assertNotIn('"emotions"', payload)
+        self.assertIsNone(SimulationWorldCheckpoint.from_json(payload).restore().emotions)
+
 
 if __name__ == "__main__":
     unittest.main()
