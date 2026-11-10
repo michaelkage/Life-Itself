@@ -572,7 +572,8 @@ class SimulationWorldCheckpoint:
                     d = matching[0]
                     if (d[4] != proposal.axis or d[8] != proposal.before or d[9] != proposal.after
                             or d[10] != proposal.delta or d[12] != proposal.role):
-                        raise ValueError("identity decision disagrees with its scar-informed proposal")\n        if reflection_snapshot is not None:
+                        raise ValueError("identity decision disagrees with its scar-informed proposal")
+        if reflection_snapshot is not None:
             reflection_ledger = reflection_snapshot.restore(life_history)
             if any(entry.tick > current_tick or entry.owner_id not in npcs for entry in reflection_ledger.entries()):
                 raise ValueError("memory reflections reference an unknown NPC or future tick")
