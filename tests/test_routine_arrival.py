@@ -76,6 +76,17 @@ class RoutineArrivalAdapterTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "conflicting"):
             self.process(551)
 
+    def test_later_ticks_do_not_execute_the_same_arrived_journey_again(self):
+        first = self.process(550)[0]
+        later = self.adapter.process(
+            4, 551, self.book, self.travel,
+            outcome_samples={"shift": 0.75},
+        )[0]
+        self.assertEqual(first.status, "executed")
+        self.assertEqual(later.status, "already_executed")
+        self.assertEqual(later.execution, first.execution)
+        self.assertEqual(len(self.ledger.snapshot()), 1)
+
     def test_non_arrived_and_non_routine_journeys_are_ignored(self):
         travel = TravelLedger((TravelJourney(
             "other", "another", "a", "b", ("a", "b"), ("road",),
