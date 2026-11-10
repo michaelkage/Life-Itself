@@ -412,6 +412,13 @@ class ActionPlanEvaluationLedger:
                     or set(item.observed_goal_facts) & set(item.missing_goal_facts)
                     or not 0.0 <= item.confidence <= 1.0):
                 raise ValueError("aggregate plan evaluation lacks matching plan, records, or event provenance")
+            expected_evidence = tuple(dict.fromkeys(
+                event_id for record in records
+                for event_id in (restored[record.execution_id].evidence_event_ids
+                                 if record.execution_id in restored else ())
+            ))
+            if item.evidence_event_ids != expected_evidence:
+                raise ValueError("aggregate plan evaluation evidence differs from its action evaluations")
             for evidence_id in item.evidence_event_ids:
                 try:
                     evidence_event = self.events.get(evidence_id)
