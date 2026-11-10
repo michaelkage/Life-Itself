@@ -212,9 +212,10 @@ window. Arrival after the block ends is recorded as missed, or redirected only
 when that routine defines an explicit fallback. A late arrival beyond the
 flexibility window follows the same fallback/missed rule.
 
-Execution IDs are derived from the journey and routine IDs, so duplicate
-processing or replay after restore returns the stored execution instead of
-applying the activity twice. The existing `RoutineExecutionSnapshot` and
+Execution IDs are derived from the journey, routine, and processing tick.
+A same-tick retry must reproduce the exact request and result; a later tick
+recognizes the journey's prior execution and cannot execute that activity again.
+The existing `RoutineExecutionSnapshot` and `SimulationWorldCheckpoint` persist those records, and the arrived journey itself is already retained by `TravelSnapshot`. The existing `RoutineExecutionSnapshot` and
 `SimulationWorldCheckpoint` persist those records; the arrived journey itself
 is already retained by `TravelSnapshot`. Optionally pass a
 `RoutineWorldEventAdapter` to materialize the resolved activity as a
