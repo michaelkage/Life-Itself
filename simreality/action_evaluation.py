@@ -198,9 +198,10 @@ class ActionPlanEvaluationLedger:
             return existing
         start_id = f"action-execution:{execution_id}:started"
         finish_id = record.event_id
-        finish_event = self.events.get(finish_id)
-        if finish_event is None:
-            raise ValueError("terminal execution is missing its authoritative world event")
+        try:
+            finish_event = self.events.get(finish_id)
+        except KeyError as exc:
+            raise ValueError("terminal execution is missing its authoritative world event") from exc
         if finish_event.event_type != "npc_action_execution" or finish_event.participants != (record.owner_id,):
             raise ValueError("execution journal provenance is inconsistent")
         finish_attrs = dict(finish_event.attributes)
