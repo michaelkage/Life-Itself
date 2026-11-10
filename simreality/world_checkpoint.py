@@ -758,8 +758,21 @@ class SimulationWorldCheckpoint:
                     evidence = journal.get(evidence_id)
                     if (evidence is None or evidence.tick > current_tick
                             or record.owner_id not in evidence.participants
-                            or dict(evidence.attributes).get("execution_id") != execution_id):
+                            or dict(evidence.attributes).get("execution_id") != evaluation["execution_id"]):
                         raise ValueError("action evaluation references missing or mismatched evidence")
+            for plan_evaluation in raw_evaluations.get("plan_evaluations", []):
+                plan_id = plan_evaluation["plan_id"]
+                event = journal.get(f"npc-plan-evaluation:{plan_id}")
+                if (event is None or event.event_type != "npc_plan_evaluated"
+                        or event.participants != (plan_evaluation["owner_id"],)
+                        or event.tick > current_tick
+                        or dict(event.attributes).get("plan_id") != plan_id):
+                    raise ValueError("aggregate plan evaluation does not match checkpoint event history")
+                for evidence_id in plan_evaluation["evidence_event_ids"]:
+                    evidence = journal.get(evidence_id)
+                    if (evidence is None or evidence.tick > current_tick
+                            or plan_evaluation["owner_id"] not in evidence.participants):
+                        raise ValueError("aggregate plan evaluation references invalid evidence")
         if action_replanning is not None:
             if not isinstance(action_replanning, NPCActionReplanningCoordinator):
                 raise TypeError("action_replanning must be an NPCActionReplanningCoordinator or None")
@@ -943,6 +956,19 @@ class SimulationWorldCheckpoint:
                             or record["owner_id"] not in evidence.participants
                             or dict(evidence.attributes).get("execution_id") != execution_id):
                         raise ValueError("action evaluation references missing or mismatched evidence")
+            for plan_evaluation in raw_evaluations.get("plan_evaluations", []):
+                plan_id = plan_evaluation["plan_id"]
+                event = journal.get(f"npc-plan-evaluation:{plan_id}")
+                if (event is None or event.event_type != "npc_plan_evaluated"
+                        or event.participants != (plan_evaluation["owner_id"],)
+                        or event.tick > self.current_tick
+                        or dict(event.attributes).get("plan_id") != plan_id):
+                    raise ValueError("aggregate plan evaluation does not match checkpoint event history")
+                for evidence_id in plan_evaluation["evidence_event_ids"]:
+                    evidence = journal.get(evidence_id)
+                    if (evidence is None or evidence.tick > self.current_tick
+                            or plan_evaluation["owner_id"] not in evidence.participants):
+                        raise ValueError("aggregate plan evaluation references invalid evidence")
         if action_replanning_snapshot is not None:
             journal = {event.event_id: event for event in envelope.restore_event_ledger().snapshot()}
             npc_ids = {npc.entity_id for npc in NPCCollectionSnapshot.from_json(self.npcs_json).restore().values()}
