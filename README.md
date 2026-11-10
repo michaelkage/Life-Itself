@@ -370,3 +370,6 @@ The emotional regulation layer separates felt intensity from outward expression 
 
 
 NPC stress is now tracked independently from emotion and identity. Individual coping profiles model reappraisal, distraction, support-seeking, suppression costs, resilience, recovery, exhaustion thresholds, and breaking-point assessments. Canonical snapshots preserve stress and replay history. See [docs/NPC-EMOTIONAL-STRESS.md](docs/NPC-EMOTIONAL-STRESS.md) and `tests/test_emotional_stress.py`.
+
+
+NPC stress now participates in composite world checkpoints. Stress ledgers are validated against the authoritative event journal and NPC roster, survive save/restore with replay history, and remain optional for older checkpoints. Coping profiles are authored configuration and are reattached after loading. See [docs/NPC-EMOTIONAL-STRESS-CHECKPOINT.md](docs/NPC-EMOTIONAL-STRESS-CHECKPOINT.md) and `tests/test_emotional_stress_checkpoint.py`.
