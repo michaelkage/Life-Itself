@@ -40,6 +40,8 @@ from .testimony_inquiry_save_state import TestimonyInquirySnapshot
 from .testimony import TestimonyLedger
 from .travel import TravelLedger
 from .travel_save_state import TravelSnapshot
+from .presence import PresenceLedger
+from .presence_save_state import PresenceSnapshot
 
 
 @dataclass(frozen=True)
@@ -67,6 +69,7 @@ class RestoredSimulation:
     testimony_inquiries: TestimonyInquiryLedger | None = None
     testimony: TestimonyLedger | None = None
     travel: TravelLedger | None = None
+    presence: PresenceLedger | None = None
 
 
 @dataclass(frozen=True)
@@ -101,6 +104,7 @@ class SimulationWorldCheckpoint:
     testimony_inquiries_json: str | None = None
     testimony_json: str | None = None
     travel_json: str | None = None
+    presence_json: str | None = None
 
     SCHEMA_VERSION = 1
 
@@ -132,7 +136,7 @@ class SimulationWorldCheckpoint:
                 consequence_recorder=None, campaign=None, misconduct=None, routines=None,
                 routine_executions=None, routine_institutions=None, institutional_politics=None,
                 goal_book=None, goal_event_adapter=None, goal_review_decisions=None, identity_decisions=None,
-                testimony_inquiries=None, testimony=None, travel=None):
+                testimony_inquiries=None, testimony=None, travel=None, presence=None):
         if not isinstance(coordinator, SimulationTickCoordinator):
             raise TypeError("coordinator must be a SimulationTickCoordinator")
         if not isinstance(npcs, dict):
@@ -269,6 +273,16 @@ class SimulationWorldCheckpoint:
             known_routines = {block.routine_id for block in routines.snapshot()}
             if any(record.routine_id not in known_routines for record in execution_snapshot.records):
                 raise ValueError("routine execution history references an unknown routine")
+        if presence is not None and not isinstance(presence, PresenceLedger):
+            raise TypeError("presence must be a PresenceLedger or None")
+        presence_snapshot = PresenceSnapshot.capture(presence) if presence is not None else None
+        if presence_snapshot is not None:
+            if any(record.updated_tick > current_tick for record in presence_snapshot.records):
+                raise ValueError("NPC presence cannot be updated after the checkpoint tick")
+            if any(tick > current_tick for tick, _signature, _records in presence_snapshot.ticks):
+                raise ValueError("presence tick history cannot occur after the checkpoint tick")
+            if any(record.owner_id not in npcs for record in presence_snapshot.records):
+                raise ValueError("presence records reference NPCs missing from checkpoint")
         misconduct_snapshot = None
         if misconduct is not None:
             if not isinstance(misconduct, MisconductReportingSystem):
@@ -304,6 +318,7 @@ class SimulationWorldCheckpoint:
             inquiry_snapshot.to_json() if inquiry_snapshot is not None else None,
             testimony.to_json() if testimony is not None else None,
             travel_snapshot.to_json() if travel_snapshot is not None else None,
+            presence_snapshot.to_json() if presence_snapshot is not None else None,
         )
 
     def _components(self):
@@ -332,12 +347,22 @@ class SimulationWorldCheckpoint:
             TestimonyInquirySnapshot.from_json(self.testimony_inquiries_json) if self.testimony_inquiries_json is not None else None,
             TestimonyLedger.from_json(self.testimony_json) if self.testimony_json is not None else None,
             TravelSnapshot.from_json(self.travel_json) if self.travel_json is not None else None,
+            PresenceSnapshot.from_json(self.presence_json) if self.presence_json is not None else None,
         )
         goals_snapshot, goal_replay, goal_review_decisions = components[14], components[15], components[16]
         identity_decisions = components[17]
         testimony_inquiries = components[18]
         testimony = components[19]
         travel_snapshot = components[20]
+        presence_snapshot = components[21]
+        if presence_snapshot is not None:
+            if any(record.updated_tick > self.current_tick for record in presence_snapshot.records):
+                raise ValueError("NPC presence cannot be updated after the checkpoint tick")
+            if any(tick > self.current_tick for tick, _signature, _records in presence_snapshot.ticks):
+                raise ValueError("presence tick history cannot occur after the checkpoint tick")
+            npc_ids = {npc.entity_id for npc in NPCCollectionSnapshot.from_json(self.npcs_json).restore().values()}
+            if any(record.owner_id not in npc_ids for record in presence_snapshot.records):
+                raise ValueError("presence records reference NPCs missing from checkpoint")
         if travel_snapshot is not None:
             if any(journey.started_tick > self.current_tick or (journey.arrived_tick is not None and journey.arrived_tick > self.current_tick) for journey in travel_snapshot.journeys):
                 raise ValueError("travel journeys cannot start or arrive after the checkpoint tick")
@@ -465,6 +490,8 @@ class SimulationWorldCheckpoint:
             payload["testimony"] = json.loads(testimony.to_json())
         if travel is not None:
             payload["travel"] = json.loads(travel.to_json())
+        if len(components) > 21 and components[21] is not None:
+            payload["presence"] = json.loads(components[21].to_json())
         return json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False)
 
     @classmethod
@@ -491,14 +518,15 @@ class SimulationWorldCheckpoint:
                        json.dumps(raw["identity_decisions"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("identity_decisions") is not None else None,
                        json.dumps(raw["testimony_inquiries"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("testimony_inquiries") is not None else None,
                        json.dumps(raw["testimony"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("testimony") is not None else None,
-                       json.dumps(raw["travel"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("travel") is not None else None)
+                       json.dumps(raw["travel"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("travel") is not None else None,
+                       json.dumps(raw["presence"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("presence") is not None else None)
         except ValueError:
             raise
         except (TypeError, KeyError, IndexError, json.JSONDecodeError) as exc:
             raise ValueError("invalid simulation world checkpoint") from exc
 
     def restore(self):
-        envelope, npc_snapshot, trust_snapshot, belief_snapshot, memory_snapshot, conversation_snapshot, tick_snapshot, consequence_snapshot, campaign, misconduct_snapshot, routine_snapshot, execution_snapshot, institution_snapshot, institutional_politics, goals_snapshot, goal_event_replay, goal_review_decisions_snapshot, identity_decisions_snapshot, testimony_inquiries_snapshot, testimony_snapshot, travel_snapshot = self._components()
+        envelope, npc_snapshot, trust_snapshot, belief_snapshot, memory_snapshot, conversation_snapshot, tick_snapshot, consequence_snapshot, campaign, misconduct_snapshot, routine_snapshot, execution_snapshot, institution_snapshot, institutional_politics, goals_snapshot, goal_event_replay, goal_review_decisions_snapshot, identity_decisions_snapshot, testimony_inquiries_snapshot, testimony_snapshot, travel_snapshot, presence_snapshot = self._components()
         events = envelope.restore_event_ledger()
         npcs = npc_snapshot.restore()
         trust = trust_snapshot.restore()
@@ -533,8 +561,9 @@ class SimulationWorldCheckpoint:
         testimony_inquiries = testimony_inquiries_snapshot.restore() if testimony_inquiries_snapshot is not None else None
         testimony = testimony_snapshot if testimony_snapshot is not None else None
         travel = travel_snapshot.restore() if travel_snapshot is not None else None
+        presence = presence_snapshot.restore() if presence_snapshot is not None else None
         return RestoredSimulation(self.current_tick, events, npcs, trust, beliefs,
                                   memory, conversations, coordinator, self.metadata,
                                   consequence_recorder, campaign, misconduct, routines, routine_executions,
                                   routine_institutions, institutional_politics, goals, goal_event_replay,
-                                  goal_review_decisions, identity_decisions, testimony_inquiries, testimony, travel)
+                                  goal_review_decisions, identity_decisions, testimony_inquiries, testimony, travel, presence)
