@@ -47,6 +47,7 @@ class ActionEvaluationTests(unittest.TestCase):
         self.executions.start("repair-extra", "npc", 1, "repair", facts, resources,
                               plan_actions=("repair",))
         self.executions.advance("repair-extra", 2, facts, resources)
+        self.executions.advance("repair-extra", 3, facts, resources)
         result = self.evaluations.evaluate("repair-extra")
         self.assertEqual(result.observed_added_facts, ("fixed", "safe"))
         snapshot = self.evaluations.to_snapshot()
