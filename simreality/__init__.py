@@ -737,3 +737,14 @@ __all__ += [
     "AutobiographicalMemoryProfile", "AutobiographicalMemoryRule",
     "NPCAutobiographicalMemoryAdapter",
 ]
+
+
+# Owner-scoped, cue-driven retrieval of autobiographical memories.
+from .npc_memory_recall import (
+    MemoryRecallProfile, MemoryRecallResult, MemoryRecallRule,
+    NPCMemoryRecallAdapter, RecalledMemory,
+)
+__all__ += [
+    "MemoryRecallProfile", "MemoryRecallResult", "MemoryRecallRule",
+    "NPCMemoryRecallAdapter", "RecalledMemory",
+]
