@@ -111,6 +111,8 @@ class ActionEvaluationTests(unittest.TestCase):
             executions, events, evaluations.to_snapshot(),
         )
         self.assertEqual(restored.plan_history, (second.plan_evaluation,))
+        self.assertEqual(restored.plan_reliabilities(), evaluations.plan_reliabilities())
+        self.assertEqual(restored.plan_reliabilities()[("shelter-goal", ("gather", "build"))], 1.0)
 
     def test_plan_evaluation_records_goal_failure_after_interruption(self):
         planner = DeterministicPlanner((
