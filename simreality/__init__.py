@@ -846,3 +846,16 @@ __all__ += ["EmotionalScarIdentityAdapter", "ScarIdentityPolicy"]
 # Read-only join of experience, scar, proposal, NPC decision, and identity outcome.
 from .identity_evolution_audit import IdentityEvolutionAuditRecord, IdentityEvolutionAuditTrail
 __all__ += ["IdentityEvolutionAuditRecord", "IdentityEvolutionAuditTrail"]
+
+
+# Accepted identity changes can prompt a separate, explicit NPC goal review.
+from .identity_goal_alignment import (
+    IdentityGoalAction, IdentityGoalAlignmentAdapter, IdentityGoalAlignmentPolicy,
+    IdentityGoalReviewDecision, IdentityGoalReviewDecisionLedger,
+    IdentityGoalReviewProposal, IdentityGoalReviewSnapshot,
+)
+__all__ += [
+    "IdentityGoalAction", "IdentityGoalAlignmentAdapter", "IdentityGoalAlignmentPolicy",
+    "IdentityGoalReviewDecision", "IdentityGoalReviewDecisionLedger",
+    "IdentityGoalReviewProposal", "IdentityGoalReviewSnapshot",
+]
