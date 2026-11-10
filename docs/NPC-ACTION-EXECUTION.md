@@ -94,3 +94,19 @@ the post-action world state. Interrupted actions also trigger a fresh decision
 against current goal priorities and facts. The returned
 `NPCActionProgression` keeps the terminal result, any newly active step, and
 any replacement-plan result distinct.
+
+
+
+## Checkpointing replanning history
+
+Pass `action_replanning=coordinator` to
+`SimulationWorldCheckpoint.capture` alongside the matching action execution
+ledger, world facts, resource balances, and GoalBook. The composite checkpoint
+stores the canonical request signatures, decisions, plan revisions, outcomes,
+and journal event references. Restore the execution ledger first with
+`restore_action_execution_ledger`, rebuild the `NPCDecisionCycle` from the
+restored GoalBook and runtime planner, then call
+`restore_action_replanning_coordinator(decisions, executions)`. Identical
+requests after recovery return the original result without starting duplicate
+actions. Checkpoint validation verifies every persisted replan against its
+owner, tick, and authoritative `npc_action_replanned` event.
