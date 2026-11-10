@@ -85,6 +85,47 @@ class NPCActionReplanningTests(unittest.TestCase):
         self.assertEqual(self.ledger.get("interrupted-work").status, "interrupted")
         self.assertIsNotNone(self.events.get("action-execution:interrupted-work:finished"))
 
+
+    def test_completed_action_automatically_starts_next_plan_step(self):
+        facts, resources = {"at-market"}, {"cash": 10.0}
+        first = self.coordinator.replan(
+            "npc-1", 1, facts, resources,
+            {"repair": {"machine-fixed"}, "rest": {"rested"}},
+            reason="repair required",
+        )
+        self.assertEqual(first.action_id, "buy-parts")
+        progression = self.coordinator.advance(
+            first.execution_id, 2, facts, resources,
+            {"repair": {"machine-fixed"}, "rest": {"rested"}},
+        )
+        self.assertEqual(progression.execution.status, "completed")
+        self.assertEqual(progression.next_active.action_id, "repair-machine")
+        self.assertEqual(progression.next_active.action_index, 1)
+        final = self.coordinator.advance(
+            progression.next_active.execution_id, 3, facts, resources,
+            {"repair": {"machine-fixed"}, "rest": {"rested"}},
+        )
+        self.assertEqual(final.execution.status, "completed")
+        self.assertIsNone(final.next_active)
+        self.assertIn("machine-fixed", facts)
+        self.assertEqual(resources["cash"], 6.0)
+
+    def test_interrupted_action_automatically_replans_from_live_state(self):
+        facts, resources = {"at-market"}, {"cash": 10.0}
+        first = self.coordinator.replan(
+            "npc-1", 1, facts, resources,
+            {"repair": {"machine-fixed"}, "rest": {"rested"}},
+            reason="repair required",
+        )
+        progression = self.coordinator.advance(
+            first.execution_id, 2, {"has-kit"}, resources,
+            {"repair": {"machine-fixed"}, "rest": {"rested"}},
+            interruption="market closed and kit found",
+        )
+        self.assertEqual(progression.execution.status, "interrupted")
+        self.assertEqual(progression.replanning.action_id, "repair-with-kit")
+        self.assertEqual(self.ledger.get(first.execution_id).status, "interrupted")
+
     def test_identical_replan_request_is_replay_safe(self):
         args = ("npc-1", 1, {"has-kit"}, {"cash": 10.0},
                 {"repair": {"machine-fixed"}, "rest": {"rested"}})
