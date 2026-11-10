@@ -42,7 +42,7 @@ class CopingProfile:
     def effectiveness(self, strategy: str) -> float:
         if strategy not in ("reappraisal", "distraction", "support_seeking", "suppression"):
             raise ValueError("unknown coping strategy")
-        return getattr(self, strategy)
+        return self.suppression_cost if strategy == "suppression" else getattr(self, strategy)
 
 
 @dataclass(frozen=True)
@@ -109,7 +109,7 @@ class NPCStressLedger:
             if actual != expected:
                 raise ValueError("stress record ID reused with conflicting content")
             return prior
-        if event_id in self._events and self._events[event_id] != (owner_id, tick):
+        event_key = (event_id, owner_id)\n        if event_key in self._events and self._events[event_key] != tick:
             raise ValueError("stress event ID reused with conflicting owner or tick")
         # Advance passive recovery before applying a later stressor.
         self.advance(tick, {owner_id: profile})
@@ -121,7 +121,7 @@ class NPCStressLedger:
         record = StressRecord(record_id, event_id, owner_id, tick, intensity,
                               strategy, reduction, suppression_load, net)
         self._records[record_id] = record
-        self._events[event_id] = (owner_id, tick)
+        self._events[event_key] = tick
         return record
 
     def advance(self, tick: int, profiles=None):
@@ -181,7 +181,7 @@ class NPCStressLedger:
         ledger = cls(current_tick=data["current_tick"], initial_stress=data["stress"])
         for item in data["records"]:
             record = StressRecord(**item)
-            if record.record_id in ledger._records or record.event_id in ledger._events:
+            event_key = (record.event_id, record.owner_id)\n            if record.record_id in ledger._records or event_key in ledger._events:
                 raise ValueError("duplicate stress replay identity")
             if record.tick > ledger.current_tick:
                 raise ValueError("stress record cannot occur after current_tick")
@@ -190,7 +190,7 @@ class NPCStressLedger:
             if record.strategy not in ("reappraisal", "distraction", "support_seeking", "suppression"):
                 raise ValueError("unknown persisted coping strategy")
             ledger._records[record.record_id] = record
-            ledger._events[record.event_id] = (record.owner_id, record.tick)
+            ledger._events[event_key] = record.tick
         return ledger
 
 
