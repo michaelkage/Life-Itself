@@ -112,7 +112,6 @@ class NPCStressLedger:
         event_key = (event_id, owner_id)
         if event_key in self._events:
             raise ValueError("world event already applied to this NPC's stress ledger")
-            raise ValueError("stress event ID reused with conflicting owner or tick")
         # Advance passive recovery before applying a later stressor.
         self.advance(tick, {owner_id: profile})
         reduction = intensity * effectiveness
