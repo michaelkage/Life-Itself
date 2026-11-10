@@ -197,7 +197,8 @@ class IdentityGoalReviewDecisionLedger:
         goal = goals.goals.get(proposal.goal_id)
         if goal is None or goal.owner_id != proposal.owner_id:
             raise ValueError("proposal goal is missing or owned by another NPC")
-        if (goal.category != proposal.current_category
+        if (goal.status != GoalStatus.ACTIVE
+                or goal.category != proposal.current_category
                 or not math.isclose(goal.priority, proposal.current_priority, abs_tol=1e-12)
                 or not math.isclose(goal.confidence, proposal.current_confidence, abs_tol=1e-12)):
             raise ValueError("goal changed after proposal; reassessment is stale")
