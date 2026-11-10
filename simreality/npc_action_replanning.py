@@ -155,8 +155,9 @@ class NPCActionReplanningCoordinator:
     def from_snapshot(cls, decisions: NPCDecisionCycle,
                       executions: ActionExecutionLedger,
                       events: WorldEventLedger,
-                      snapshot: NPCReplanningSnapshot) -> "NPCActionReplanningCoordinator":
-        coordinator = cls(decisions, executions, events)
+                      snapshot: NPCReplanningSnapshot,
+                      evaluations: ActionPlanEvaluationLedger | None = None) -> "NPCActionReplanningCoordinator":
+        coordinator = cls(decisions, executions, events, evaluations)
         coordinator.restore_snapshot(snapshot)
         return coordinator
 
