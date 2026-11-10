@@ -874,5 +874,6 @@ __all__ += ["NPCActionProgression", "NPCActionReplanningCoordinator", "NPCReplan
 # Evidence-grounded NPC action outcome evaluation and bounded reliability learning.
 from .action_evaluation import (
     ActionEvaluationSnapshot, ActionPlanEvaluationLedger, NPCActionEvaluation,
+    NPCPlanEvaluation,
 )
-__all__ += ["ActionEvaluationSnapshot", "ActionPlanEvaluationLedger", "NPCActionEvaluation"]
+__all__ += ["ActionEvaluationSnapshot", "ActionPlanEvaluationLedger", "NPCActionEvaluation", "NPCPlanEvaluation"]
