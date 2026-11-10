@@ -10,15 +10,15 @@ from dataclasses import dataclass
 import hashlib
 import json
 
-from .action_execution import ActionExecutionLedger
+from .action_execution import ActionExecution, ActionExecutionLedger, ActiveActionExecution
 from .npc_autonomy import NPCDecision, NPCDecisionCycle
 from .world_events import WorldEventLedger
 
 
 @dataclass(frozen=True)
 class NPCActionProgression:
-    execution: object
-    next_active: object | None
+    execution: ActionExecution | ActiveActionExecution
+    next_active: ActiveActionExecution | None
     replanning: NPCReplanningResult | None
 
 
