@@ -15,7 +15,9 @@ class NPCStressSnapshot:
         if not isinstance(self.payload, str):
             raise TypeError("payload must be a string")
         restored = NPCStressLedger.from_snapshot(json.loads(self.payload))
-        canonical = json.dumps(restored.snapshot(), sort_keys=True, separators=(",", ":"), allow_nan=False)
+        canonical = (json.dumps(raw, sort_keys=True, separators=(",", ":"), allow_nan=False)
+                     if raw.get("version") == 1 else
+                     json.dumps(restored.snapshot(), sort_keys=True, separators=(",", ":"), allow_nan=False))
         if canonical != self.payload:
             raise ValueError("NPC stress snapshot must use canonical JSON")
 
