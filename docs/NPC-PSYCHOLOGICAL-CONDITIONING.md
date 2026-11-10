@@ -27,7 +27,8 @@ No association is shared unless an integration explicitly copies evidence.
 Every learning record has a stable record ID and source world-event ID.
 Replaying the same record is idempotent; conflicting record reuse and duplicate
 source-event/cue learning for one NPC are rejected. Snapshots use canonical JSON
-and preserve both current associations and the learning history. Conditioning can
+and preserve current associations, learning history, and per-NPC decay clocks so
+one NPC's update never advances another NPC's recovery clock. Conditioning can
 also be passed as `conditioning=...` to `SimulationWorldCheckpoint.capture`;
 restored worlds expose `RestoredSimulation.conditioning`. The composite checkpoint
 validates each learning record against the authoritative event journal and NPC roster.
