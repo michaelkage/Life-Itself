@@ -696,3 +696,11 @@ __all__ += [
     "PsychologicalLearningDecision", "PsychologicalLearningDecisionLedger",
     "PsychologicalLearningDecisionSnapshot",
 ]
+
+
+# Integrated social-belief and associative-conditioning choice appraisal.
+from .integrated_decisions import (
+    IntegratedChoiceResult, IntegratedDecisionResult,
+    IntegratedPsychologicalDecisionAdapter,
+)
+__all__ += ["IntegratedChoiceResult", "IntegratedDecisionResult", "IntegratedPsychologicalDecisionAdapter"]
