@@ -49,8 +49,14 @@ class PresenceEncounterSnapshot:
                 signatures = json.loads(signature)
             except json.JSONDecodeError as exc:
                 raise ValueError("invalid encounter tick signature") from exc
-            if not isinstance(signatures, dict) or sorted(signatures) != sorted(x.encounter_id for x in records):
-                raise ValueError("encounter tick signature IDs do not match records")
+            if (not isinstance(signatures, dict)
+                    or sorted(signatures) != sorted(x.encounter_id for x in records)
+                    or json.dumps(signatures, sort_keys=True, separators=(",", ":")) != signature):
+                raise ValueError("encounter tick signature IDs do not match canonical records")
+            if any(record.tick != tick for record in records):
+                raise ValueError("encounter tick records must match their history tick")
+            if any(record not in self.records for record in records):
+                raise ValueError("encounter tick history references a missing record")
 
     @classmethod
     def capture(cls, ledger):
