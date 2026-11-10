@@ -400,3 +400,5 @@ Integrated psychological decisions now combine observer-specific social beliefs,
 
 
 NPC cognitive dissonance is now tracked as explicit owner-specific conflict history. Belief contradictions and commitment/action mismatches receive bounded assessments; NPCs can explicitly rationalize, avoid, seek evidence, acknowledge, or reconsider without silently changing beliefs or identity. Canonical snapshots preserve the conflict and response history. See [docs/NPC-COGNITIVE-DISSONANCE.md](docs/NPC-COGNITIVE-DISSONANCE.md) and `tests/test_cognitive_dissonance.py`.
+
+Repeated unresolved psychological conflicts can now generate small, bounded identity-change proposals through explicit author-defined mappings. The bridge aggregates repeated dissonance, preserves the NPC's ability to refuse change, and routes proposals through the existing replay-safe identity decision ledger. See [docs/NPC-DISSONANCE-IDENTITY-EVOLUTION.md](docs/NPC-DISSONANCE-IDENTITY-EVOLUTION.md) and `tests/test_dissonance_identity.py`.
