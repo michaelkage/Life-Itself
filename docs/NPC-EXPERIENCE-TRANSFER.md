@@ -59,3 +59,10 @@ replanning = NPCActionReplanningCoordinator(
 ```
 
 Personal evidence has the strongest influence, witnessed evidence is weaker, and reported evidence is additionally discounted by its transfer confidence. The resulting bounded estimate adjusts proposal costs; it is not treated as a world fact or proof of success. Existing execution-derived reliability remains primary when both sources are available. Each resulting `NPCDecision` retains the evidence IDs and their source classes (`personal`, `witnessed`, or `reported`), and replanning snapshots preserve that attribution. Composite checkpoint restoration reconnects the restored history and transfer ledger to the replanning coordinator. Historical evaluations and completed executions are not rewritten.
+
+
+## Experience-guided goal priority
+
+Goals may opt into strategic outcome evidence by setting comma-separated exact tags in `NPCGoal.metadata["experience_tags"]`, for example `{"experience_tags": "rescue,community"}`. A matching autobiographical memory must contain exactly one of `goal:success` or `goal:failure` as well as one matching tag. Action outcome markers (`outcome:success` / `outcome:failure`) are intentionally not reused as goal outcomes.
+
+The goal guidance projection applies a bounded adjustment of at most ±25% to the evaluated score. It does not modify the goal's stored priority, confidence, progress, or status. Goal dependencies, deadlines, status eligibility, and deterministic tie-breaking remain in force. The adjustment is supplied only for the current decision/replanning call; evidence IDs and source classes are included in the resulting decision and its request signature. Reports remain attributed to their source NPC and are discounted according to the existing evidence weights.
