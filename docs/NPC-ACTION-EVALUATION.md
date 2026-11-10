@@ -73,3 +73,29 @@ Aggregate evaluations are replay-safe and included in the same
 `ActionEvaluationSnapshot` and composite world checkpoint as individual
 action evaluations. The event journal records each result as
 `npc_plan_evaluated`.
+
+
+## Reliability-aware adaptive planning
+
+Action reliability becomes available to planning only after the configured
+minimum number of terminal observations. The replanning coordinator passes
+those estimates into the deterministic planner, which adds a bounded risk
+premium to less reliable actions. An action's declared base cost is never
+mutated, and an action without sufficient observations retains its declared
+cost.
+
+Aggregate plan outcomes are learned separately by goal and exact ordered action
+sequence. Only plans with an observed terminal world state update this
+projection; a plan interrupted before its goal state can be observed does not
+create a fabricated success or failure sample. The planner applies a terminal
+risk premium to previously observed low-reliability sequences when evaluating
+candidate paths for the matching goal. Thus a historically successful sequence
+can win against an equally costly but unreliable alternative, while goal
+priority, preconditions, declared action effects, and deterministic tie
+breaking remain intact.
+
+Inspect the learned aggregate projection with
+`ActionPlanEvaluationLedger.plan_reliabilities()`. Both action and plan
+learning projections are included in evaluation snapshots and composite world
+checkpoints. Restoring a checkpoint restores the learning evidence used by
+subsequent planning; prior decisions and action costs remain unchanged.
