@@ -38,10 +38,14 @@ class PresenceEncounter:
             raise ValueError("participant IDs must be non-empty strings")
         if self.participants[0] == self.participants[1]:
             raise ValueError("an NPC cannot encounter themselves")
+        if self.participants != tuple(sorted(self.participants)):
+            raise ValueError("encounter participants must be sorted canonically")
         if self.conversation_id is not None and (not isinstance(self.conversation_id, str) or not self.conversation_id.strip()):
             raise ValueError("conversation_id must be None or non-empty")
-        if not isinstance(self.trust_interaction_ids, tuple) or tuple(sorted(set(self.trust_interaction_ids))) != self.trust_interaction_ids:
-            raise ValueError("trust interaction IDs must be unique and sorted")
+        if (not isinstance(self.trust_interaction_ids, tuple)
+                or any(not isinstance(x, str) or not x.strip() for x in self.trust_interaction_ids)
+                or tuple(sorted(set(self.trust_interaction_ids))) != self.trust_interaction_ids):
+            raise ValueError("trust interaction IDs must be unique, non-empty, and sorted")
 
 
 @dataclass(frozen=True)
