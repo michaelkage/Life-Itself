@@ -814,6 +814,8 @@ class SimulationWorldCheckpoint:
             payload["stress"] = json.loads(stress.to_json())
         if conditioning is not None:
             payload["conditioning"] = json.loads(conditioning.to_json())
+        if learning_decisions is not None:
+            payload["psychological_learning_decisions"] = json.loads(learning_decisions.to_json())
         if self.psychological_learning_decisions_json is not None:
             payload["psychological_learning_decisions"] = json.loads(self.psychological_learning_decisions_json)
         return json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False)
