@@ -1,66 +1,57 @@
-# Replay-safe NPC action execution
+# NPC action execution, recovery, and goal progress
 
-The symbolic planner remains read-only. It returns an ordered sequence of action
-IDs; the world driver then submits one selected step to
-`ActionExecutionLedger.execute`. Execution is not an implicit side effect of
-planning.
+The symbolic planner remains read-only. The world driver supplies a successful plan's
+ordered action IDs and explicitly selects each step. The executor rechecks live
+preconditions and never chooses an NPC's intent or replans autonomously.
 
-## Execution contract
+## One-tick compatibility path
 
-- The caller supplies the approved plan's complete action-ID tuple and the
-  selected zero-based step. The action ID must match that plan step.
-- The executor rechecks the action's preconditions against current world facts.
-  A plan that has become stale is blocked rather than blindly applied.
-- Optional `ActionExecutionPolicy` records explicit resource costs by action.
-  Missing resource balances count as zero; insufficient resources block the
-  action without consuming anything.
-- The caller may supply an explicit interruption reason. Interrupted actions
-  are journaled but do not apply effects or spend resources.
-- A completed action applies declared add/delete effects and resource costs
-  atomically within the caller-owned mutable fact set and resource dictionary.
-- Each execution emits an immutable `npc_action_execution` world event with
-  owner, action, status, and reason.
-- Stable execution IDs are idempotent. Reusing an ID with different owner,
-  tick, action, plan step, world facts, resources, or interruption is rejected.
+`ActionExecutionLedger.execute` preserves the original one-shot interface. It
+validates the selected plan step, applies declared add/delete effects and resource
+costs only when live preconditions and balances permit, and writes an immutable
+`npc_action_execution` event. Stable execution IDs are idempotent; conflicting
+reuse is rejected.
 
-## Example
+## Multi-tick actions
 
-```python
-from simreality import (
-    ActionExecutionLedger, ActionExecutionPolicy,
-    DeterministicPlanner, PlanningAction, WorldEventLedger,
-)
+Use `start`, `advance`, and `cancel` for actions with duration:
 
-planner = DeterministicPlanner((
-    PlanningAction("buy-tools", frozenset({"at-shop"}),
-                   frozenset({"has-tools"})),
-    PlanningAction("repair-bike", frozenset({"has-tools"}),
-                   frozenset({"bike-fixed"})),
-))
-events = WorldEventLedger()
-executor = ActionExecutionLedger(
-    planner, (ActionExecutionPolicy("buy-tools", (("cash", 5.0),)),), events
-)
+- `ActionExecutionPolicy.duration_ticks` sets the number of advances required.
+- `start` checks preconditions and reserves the declared resource costs. Reserved
+  resources remain in the caller's balance but cannot be reserved by another
+  active action in the same ledger.
+- `advance` records progress. Preconditions are checked again on every tick.
+  Effects and resource deductions occur only when the final tick completes.
+- An interruption or changed preconditions finalizes the action without effects
+  or spending and releases its reservation.
+- `cancel` explicitly ends an active action and releases its reservation.
+- The caller decides whether to replan after a blocked, interrupted, or cancelled
+  action; this layer does not silently alter the approved plan.
 
-# Supplied by the planner's successful PlanResult.
-plan = ("buy-tools", "repair-bike")
-facts = {"at-shop"}
-resources = {"cash": 12.0}
+Every start, progress tick, and terminal result is written to the shared world
+event journal. The world event journal must be checkpointed alongside this ledger.
 
-first = executor.execute(
-    "tick-10:step-0", "npc-1", 10, plan[0], facts, resources,
-    plan_actions=plan, action_index=0,
-)
-if first.status == "completed":
-    second = executor.execute(
-        "tick-11:step-1", "npc-1", 11, plan[1], facts, resources,
-        plan_actions=plan, action_index=1,
-    )
-```
+## Persistence and recovery
 
-The executor does not invent resource prices, decide whether a disruption
-occurred, retry blocked actions, choose a new goal, or infer an NPC's intent.
-The world driver supplies those facts and decides whether to replan. This first
-slice records execution in the shared event journal; durable action-execution
-snapshot/checkpoint integration and C++ runtime integration remain follow-up
-work. Tests are in `tests/test_action_execution.py`.
+`to_json` / `to_snapshot` produce a canonical versioned snapshot containing
+completed execution records and active progress. Restore with
+`ActionExecutionLedger.from_json(planner, policies, restored_events, payload)`
+or `from_snapshot`. Restoring verifies action IDs, plan step selection, progress
+bounds, duplicate IDs, and the existence of corresponding journal events. An
+active action resumes from its stored progress and keeps its resource reservation.
+
+The snapshot does not duplicate the world event journal or world facts/resource
+balances. Restore the authoritative world checkpoint first, then restore this
+ledger against its event journal, and resume with the restored fact/resource state.
+Callers should checkpoint facts, resource balances, this ledger, and the event
+journal atomically to avoid inconsistent recovery.
+
+## Goal progress
+
+A policy may declare `goal_progress=(("goal-id", 0.1), ...)`. When the action
+completes, the ledger applies the increments to the supplied `GoalBook`, capped
+at 1.0. Interrupted and cancelled actions do not advance goals. Goal IDs must
+exist in that book. The caller remains responsible for choosing meaningful,
+evidence-based action-to-goal mappings.
+
+Tests: `tests/test_action_execution.py`.
