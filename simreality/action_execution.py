@@ -92,6 +92,7 @@ class ActionExecutionLedger:
     def execute(self, execution_id: str, owner_id: str, tick: int,
                 action_id: str, world_facts: set[str] | frozenset[str],
                 resources: dict[str, float], *,
+                plan_actions: tuple[str, ...], action_index: int = 0,
                 interruption: str | None = None) -> ActionExecution:
         if not isinstance(execution_id, str) or not execution_id.strip():
             raise ValueError("execution_id must be non-empty")
@@ -101,6 +102,14 @@ class ActionExecutionLedger:
             raise ValueError("tick must be a non-negative integer")
         if action_id not in self.planner.actions:
             raise ValueError(f"unknown action: {action_id}")
+        if not isinstance(plan_actions, tuple) or not plan_actions or any(
+            item not in self.planner.actions for item in plan_actions
+        ):
+            raise ValueError("plan_actions must be a non-empty tuple of known action IDs")
+        if isinstance(action_index, bool) or not isinstance(action_index, int) or not 0 <= action_index < len(plan_actions):
+            raise ValueError("action_index must identify an action in plan_actions")
+        if plan_actions[action_index] != action_id:
+            raise ValueError("action_id does not match the selected plan step")
         if interruption is not None and (not isinstance(interruption, str) or not interruption.strip()):
             raise ValueError("interruption must be non-empty text or None")
         if not isinstance(world_facts, set):
@@ -113,6 +122,7 @@ class ActionExecutionLedger:
         request = json.dumps({
             "owner": owner_id, "tick": tick, "action": action_id,
             "facts": sorted(facts), "resources": sorted(balances.items()),
+            "plan_actions": plan_actions, "action_index": action_index,
             "interruption": interruption,
         }, sort_keys=True, separators=(",", ":"), allow_nan=False)
         previous = self._records.get(execution_id)
