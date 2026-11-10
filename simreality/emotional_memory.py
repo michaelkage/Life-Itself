@@ -99,6 +99,10 @@ class EmotionalMemoryResponse:
         for axis, value in self.intensities:
             _text("emotion axis", axis)
             _unit("emotion intensity", value)
+        if not isinstance(self.contributions, tuple) or any(
+            not isinstance(x, EmotionalMemoryContribution) for x in self.contributions
+        ):
+            raise TypeError("contributions must contain EmotionalMemoryContribution values")
         keys = [(x.association_id, x.memory_id, x.cue_id, x.emotion_axis) for x in self.contributions]
         if keys != sorted(keys) or len(keys) != len(set(keys)):
             raise ValueError("contributions must be uniquely sorted")
@@ -141,12 +145,11 @@ class EmotionalMemoryAdapter:
                 raise KeyError(
                     f"association {association.association_id} references a memory not owned by {profile.owner_id}"
                 )
+            if memory.tick > current_tick:
+                raise ValueError("cannot emotionally react to a memory from a future tick")
             exposure = exposures.get(association.cue_id, 0.0)
             if exposure <= 0.0:
                 continue
-            if memory.tick > current_tick:
-                raise ValueError("cannot emotionally react to a memory from a future tick")
-            elapsed = current_tick - memory.tick
             salience = history.recall_salience(
                 memory.memory_id, current_tick, half_life_ticks=half_life_ticks,
             )
