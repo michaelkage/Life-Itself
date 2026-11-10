@@ -215,6 +215,85 @@ class IdentityGoalReviewDecisionLedger:
     def is_applied(self, decision_id):
         return decision_id in self._applied
 
-    def snapshot(self):
-        return tuple((d.decision_id, d.proposal.proposal_id, d.accepted,
-                      d.decision_tick, d.rationale, d.proposal) for d in self.entries()), tuple(sorted(self._applied))
+
+@dataclass(frozen=True)
+class IdentityGoalReviewSnapshot:
+    records: tuple[tuple[object, ...], ...]
+    applied_decision_ids: tuple[str, ...]
+    SCHEMA_VERSION = 1
+
+    @classmethod
+    def capture(cls, ledger: IdentityGoalReviewDecisionLedger):
+        if not isinstance(ledger, IdentityGoalReviewDecisionLedger):
+            raise TypeError("ledger must be IdentityGoalReviewDecisionLedger")
+        records = []
+        for item in ledger.entries():
+            p = item.proposal
+            records.append((
+                item.decision_id, item.accepted, item.decision_tick, item.rationale,
+                p.identity_decision_id, p.event_id, p.owner_id, p.identity_policy_id,
+                p.identity_axis, p.identity_delta, p.goal_id, p.policy_id, p.action.value,
+                p.proposed_tick, p.current_category, p.proposed_category,
+                p.current_priority, p.proposed_priority, p.current_confidence,
+                p.proposed_confidence,
+            ))
+        return cls(tuple(sorted(records, key=lambda row: row[0])),
+                   tuple(sorted(ledger._applied)))
+
+    def __post_init__(self):
+        if not isinstance(self.records, tuple) or not isinstance(self.applied_decision_ids, tuple):
+            raise ValueError("snapshot collections must be tuples")
+        ids = tuple(row[0] for row in self.records if isinstance(row, tuple) and row)
+        if len(ids) != len(self.records) or ids != tuple(sorted(ids)) or len(set(ids)) != len(ids):
+            raise ValueError("snapshot decision IDs must be unique and sorted")
+        for row in self.records:
+            if len(row) != 20:
+                raise ValueError("invalid identity-goal decision record")
+            proposal = IdentityGoalReviewProposal(
+                row[4], row[5], row[6], row[7], row[8], row[9], row[10], row[11],
+                IdentityGoalAction(row[12]), row[13], row[14], row[15], row[16],
+                row[17], row[18], row[19],
+            )
+            IdentityGoalReviewDecision(row[0], proposal, row[1], row[2], row[3])
+        if self.applied_decision_ids != tuple(sorted(set(self.applied_decision_ids))):
+            raise ValueError("applied decision IDs must be unique and sorted")
+        if not set(self.applied_decision_ids).issubset(ids):
+            raise ValueError("applied IDs must reference saved decisions")
+        if any(not next(row[1] for row in self.records if row[0] == key)
+               for key in self.applied_decision_ids):
+            raise ValueError("rejected decisions cannot be marked applied")
+
+    def to_json(self):
+        import json
+        return json.dumps({"schema_version": self.SCHEMA_VERSION,
+                           "records": [list(row) for row in self.records],
+                           "applied_decision_ids": list(self.applied_decision_ids)},
+                          sort_keys=True, separators=(",", ":"), allow_nan=False)
+
+    @classmethod
+    def from_json(cls, payload):
+        import json
+        try:
+            raw = json.loads(payload)
+            if not isinstance(raw, dict) or raw.get("schema_version") != cls.SCHEMA_VERSION:
+                raise ValueError("unsupported identity-goal snapshot schema")
+            result = cls(tuple(tuple(row) for row in raw["records"]),
+                         tuple(raw["applied_decision_ids"]))
+            if result.to_json() != payload:
+                raise ValueError("identity-goal snapshot must use canonical JSON")
+            return result
+        except ValueError:
+            raise
+        except (TypeError, KeyError, IndexError, json.JSONDecodeError) as exc:
+            raise ValueError("invalid identity-goal snapshot") from exc
+
+    def restore(self):
+        decisions = []
+        for row in self.records:
+            proposal = IdentityGoalReviewProposal(
+                row[4], row[5], row[6], row[7], row[8], row[9], row[10], row[11],
+                IdentityGoalAction(row[12]), row[13], row[14], row[15], row[16],
+                row[17], row[18], row[19],
+            )
+            decisions.append(IdentityGoalReviewDecision(row[0], proposal, row[1], row[2], row[3]))
+        return IdentityGoalReviewDecisionLedger(decisions, self.applied_decision_ids)
