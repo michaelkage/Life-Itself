@@ -134,6 +134,7 @@ class MemoryDecisionInfluenceAdapter:
             )
         output = []
         for choice_id, entries in sorted(grouped.items()):
+            entries.sort(key=lambda item: item[0])
             # Multiple memories accumulate, with a hard bound so the memory
             # subsystem cannot overwhelm the rest of the appraisal pipeline.
             total = max(-1.0, min(1.0, sum(value for _, value in entries)))
