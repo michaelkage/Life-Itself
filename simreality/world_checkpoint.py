@@ -789,6 +789,10 @@ class SimulationWorldCheckpoint:
                 raise ValueError("replanning coordinator and checkpoint must share the action evaluation ledger")
             if action_replanning.decisions.goals is not goal_book:
                 raise ValueError("replanning coordinator must share the checkpoint GoalBook")
+            if action_replanning.experience_transfers is not None and (
+                    action_replanning.experience_transfers is not experience_transfers
+                    or action_replanning.life_history is not life_history):
+                raise ValueError("experience-aware replanning must share the checkpoint life history and transfer ledger")
             action_replanning_snapshot = action_replanning.to_snapshot()
             raw_replanning = json.loads(action_replanning_snapshot.to_json())
             for request in raw_replanning["requests"]:
