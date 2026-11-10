@@ -13,6 +13,8 @@ import json
 from .action_execution import ActionExecution, ActionExecutionLedger, ActiveActionExecution
 from .action_evaluation import ActionPlanEvaluationLedger, NPCActionEvaluation, NPCPlanEvaluation
 from .npc_autonomy import NPCDecision, NPCDecisionCycle
+from .npc_life_history import NPCLifeHistory
+from .npc_experience_transfer import NPCExperienceTransferLedger, experience_action_guidance
 from .planning import PlanResult
 from .world_events import WorldEventLedger
 
@@ -75,7 +77,9 @@ class NPCActionReplanningCoordinator:
     def __init__(self, decisions: NPCDecisionCycle,
                  executions: ActionExecutionLedger,
                  events: WorldEventLedger | None = None,
-                 evaluations: ActionPlanEvaluationLedger | None = None) -> None:
+                 evaluations: ActionPlanEvaluationLedger | None = None,
+                 life_history: NPCLifeHistory | None = None,
+                 experience_transfers: NPCExperienceTransferLedger | None = None) -> None:
         if not isinstance(decisions, NPCDecisionCycle):
             raise TypeError("decisions must be an NPCDecisionCycle")
         if not isinstance(executions, ActionExecutionLedger):
@@ -88,6 +92,14 @@ class NPCActionReplanningCoordinator:
         if evaluations is not None and (evaluations.executions is not executions or evaluations.events is not self.events):
             raise ValueError("evaluation ledger must share the coordinator execution ledger and event journal")
         self.evaluations = evaluations
+        if (life_history is None) != (experience_transfers is None):
+            raise ValueError("life_history and experience_transfers must be supplied together")
+        if experience_transfers is not None and experience_transfers.history is not life_history:
+            raise ValueError("experience transfers must share the supplied life history")
+        if experience_transfers is not None and experience_transfers.events is not self.events:
+            raise ValueError("experience transfers must share the coordinator event journal")
+        self.life_history = life_history
+        self.experience_transfers = experience_transfers
         self._requests: dict[str, tuple[str, NPCReplanningResult]] = {}
 
     def to_snapshot(self) -> NPCReplanningSnapshot:
@@ -105,6 +117,7 @@ class NPCActionReplanningCoordinator:
                 "owner_id": result.owner_id, "tick": result.tick,
                 "reason": result.reason, "goal_id": decision.goal_id,
                 "goal_category": decision.goal_category, "decision_reason": decision.reason,
+                "experience_evidence_ids": list(decision.experience_evidence_ids),
                 "plan": plan, "status": result.status,
                 "execution_id": result.execution_id, "action_id": result.action_id,
                 "rejected_reason": result.rejected_reason, "event_id": result.event_id,
@@ -133,7 +146,8 @@ class NPCActionReplanningCoordinator:
                     or attributes.get("request_id") != request_id
                     or attributes.get("status") != item["status"]
                     or attributes.get("action_id", "") != (item["action_id"] or "")
-                    or attributes.get("reason") != item["reason"]):
+                    or attributes.get("reason") != item["reason"]
+                    or attributes.get("experience_evidence_ids", "[]") != json.dumps(item.get("experience_evidence_ids", []), separators=(",", ":"))):
                 raise ValueError("replanning history does not match its world event")
             plan_data = item["plan"]
             plan = None if plan_data is None else PlanResult(
@@ -143,6 +157,7 @@ class NPCActionReplanningCoordinator:
             decision = NPCDecision(
                 item["owner_id"], item["tick"], item["goal_id"],
                 item["goal_category"], plan, item["decision_reason"],
+                tuple(item.get("experience_evidence_ids", ())),
             )
             result = NPCReplanningResult(
                 request_id, item["owner_id"], item["tick"], item["reason"], decision,
@@ -157,8 +172,10 @@ class NPCActionReplanningCoordinator:
                       executions: ActionExecutionLedger,
                       events: WorldEventLedger,
                       snapshot: NPCReplanningSnapshot,
-                      evaluations: ActionPlanEvaluationLedger | None = None) -> "NPCActionReplanningCoordinator":
-        coordinator = cls(decisions, executions, events, evaluations)
+                      evaluations: ActionPlanEvaluationLedger | None = None,
+                      life_history: NPCLifeHistory | None = None,
+                      experience_transfers: NPCExperienceTransferLedger | None = None) -> "NPCActionReplanningCoordinator":
+        coordinator = cls(decisions, executions, events, evaluations, life_history, experience_transfers)
         coordinator.restore_snapshot(snapshot)
         return coordinator
 
@@ -202,9 +219,19 @@ class NPCActionReplanningCoordinator:
             }
         plan_reliability = (self.evaluations.plan_reliabilities()
                             if self.evaluations is not None else {})
+        experience_ids: set[str] = set()
+        if self.experience_transfers is not None:
+            experience_reliability, evidence_by_action = experience_action_guidance(
+                self.life_history, self.experience_transfers, owner_id, tick,
+                self.decisions.planner.actions)
+            for action_id, value in experience_reliability.items():
+                prior = action_reliability.get(action_id)
+                action_reliability[action_id] = value if prior is None else 0.75 * prior + 0.25 * value
+                experience_ids.update(evidence_by_action[action_id])
         request = {
             "owner": owner_id, "tick": tick, "facts": facts, "resources": balances,
             "action_reliability": sorted(action_reliability.items()),
+            "experience_evidence_ids": sorted(experience_ids),
             "plan_reliability": [[goal_id, list(actions), value]
                                  for (goal_id, actions), value in sorted(plan_reliability.items())],
             "goal_facts": {key: sorted(value) for key, value in sorted(goal_facts.items())},
@@ -237,6 +264,10 @@ class NPCActionReplanningCoordinator:
             action_reliability=action_reliability,
             plan_reliability=plan_reliability,
         )
+        if experience_ids:
+            decision = NPCDecision(decision.owner_id, decision.tick, decision.goal_id,
+                                   decision.goal_category, decision.plan, decision.reason,
+                                   tuple(sorted(experience_ids)))
         execution_id = None
         action_id = None
         rejected_reason = None
@@ -271,6 +302,7 @@ class NPCActionReplanningCoordinator:
                 "request_id": request_id, "reason": reason, "goal_id": decision.goal_id or "",
                 "status": status, "action_id": action_id or "",
                 "rejected_reason": rejected_reason or "",
+                "experience_evidence_ids": json.dumps(sorted(experience_ids), separators=(",", ":")),
             },
         ))
         result = NPCReplanningResult(
