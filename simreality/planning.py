@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import heapq
+import math
+from collections.abc import Mapping
 
 
 @dataclass(frozen=True)
@@ -65,11 +67,23 @@ class DeterministicPlanner:
         goal_facts: frozenset[str] | set[str] | tuple[str, ...],
         *,
         max_expansions: int = 10_000,
+        action_reliability: Mapping[str, float] | None = None,
     ) -> PlanResult:
         start = self._facts(initial_facts)
         goals = self._facts(goal_facts)
         if isinstance(max_expansions, bool) or not isinstance(max_expansions, int) or max_expansions < 1:
             raise ValueError("max_expansions must be a positive integer")
+        if action_reliability is None:
+            reliability = {}
+        else:
+            if not isinstance(action_reliability, Mapping):
+                raise TypeError("action_reliability must be a mapping")
+            reliability = dict(action_reliability)
+            for action_id, value in reliability.items():
+                if (action_id not in self.actions or isinstance(value, bool)
+                        or not isinstance(value, (int, float)) or not math.isfinite(value)
+                        or not 0.0 <= value <= 1.0):
+                    raise ValueError("action reliability must map known actions to finite values in [0, 1]")
         if goals <= start:
             return PlanResult(True, (), 0, 0, "goal facts already satisfied")
 
@@ -93,7 +107,12 @@ class DeterministicPlanner:
                 if not action.preconditions <= state:
                     continue
                 next_state = (state - action.delete_effects) | action.add_effects
-                next_cost = cost + action.cost
+                # Reliability only adds a bounded risk premium; it never makes
+                # an action cheaper than its declared base cost.
+                confidence = reliability.get(action.action_id)
+                effective_cost = (action.cost if confidence is None else
+                                  max(action.cost, int(action.cost * (2.0 - confidence) + 0.5)))
+                next_cost = cost + effective_cost
                 next_path = path + (action.action_id,)
                 previous = best.get(next_state)
                 candidate = (next_cost, next_path)
