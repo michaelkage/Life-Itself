@@ -150,6 +150,8 @@ class RestoredSimulation:
         return NPCActionReplanningCoordinator.from_snapshot(
             decisions, executions, self.events, self.action_replanning_snapshot,
             evaluations=evaluations,
+            life_history=self.life_history if self.experience_transfers is not None else None,
+            experience_transfers=self.experience_transfers,
         )
 
 
