@@ -42,7 +42,7 @@ class CopingProfile:
     def effectiveness(self, strategy: str) -> float:
         if strategy not in ("reappraisal", "distraction", "support_seeking", "suppression"):
             raise ValueError("unknown coping strategy")
-        return self.suppression_cost if strategy == "suppression" else getattr(self, strategy)
+        return 0.0 if strategy == "suppression" else getattr(self, strategy)
 
 
 @dataclass(frozen=True)
