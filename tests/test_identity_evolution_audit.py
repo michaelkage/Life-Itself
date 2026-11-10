@@ -4,6 +4,7 @@ from simreality.emotional_scars import EmotionalScar, NPCEmotionalScarLedger
 from simreality.identity_decisions import IdentityDecisionLedger
 from simreality.identity_evolution import IdentityChangeProposal, NPCIdentityProfile
 from simreality.identity_evolution_audit import IdentityEvolutionAuditTrail
+from simreality.npc_life_history import AutobiographicalMemory, NPCLifeHistory
 from simreality.scar_identity_proposals import (
     ScarIdentityProposalEvidence, ScarIdentityProposalLedger,
 )
@@ -16,6 +17,11 @@ class IdentityEvolutionAuditTrailTests(unittest.TestCase):
             WorldEventLedger.make_event(
                 "experience-1", 2, "incident", participants=("npc-a",),
             ),
+        ))
+        self.history = NPCLifeHistory()
+        self.history.record(AutobiographicalMemory(
+            "memory-a", "npc-a", "experience-1", 2, (),
+            "I was frightened in the crowded room", 0.8, -0.1,
         ))
         self.scars = NPCEmotionalScarLedger()
         self.scars.add_scar(EmotionalScar(
@@ -41,7 +47,7 @@ class IdentityEvolutionAuditTrailTests(unittest.TestCase):
             decision_tick=5, rationale="I choose to be more guarded",
         )
         record, = IdentityEvolutionAuditTrail.build(
-            self.events, self.scars, self.proposals, self.identities,
+            self.events, self.history, self.scars, self.proposals, self.identities,
         )
         self.assertEqual(record.event_id, "experience-1")
         self.assertEqual(record.memory_id, "memory-a")
@@ -56,13 +62,13 @@ class IdentityEvolutionAuditTrailTests(unittest.TestCase):
             decision_tick=5, rationale="This does not define me",
         )
         rejected_record, = IdentityEvolutionAuditTrail.build(
-            self.events, self.scars, self.proposals, rejected,
+            self.events, self.history, self.scars, self.proposals, rejected,
         )
         self.assertEqual(rejected_record.status, "rejected")
         self.assertAlmostEqual(rejected_record.resulting_trait, 0.2)
         pending = IdentityDecisionLedger((NPCIdentityProfile("npc-a", {"trust": 0.2}),))
         pending_record, = IdentityEvolutionAuditTrail.build(
-            self.events, self.scars, self.proposals, pending,
+            self.events, self.history, self.scars, self.proposals, pending,
         )
         self.assertEqual(pending_record.status, "pending")
         self.assertIsNone(pending_record.resulting_trait)
@@ -78,7 +84,7 @@ class IdentityEvolutionAuditTrailTests(unittest.TestCase):
         )
         with self.assertRaisesRegex(ValueError, "disagrees with its original proposal"):
             IdentityEvolutionAuditTrail.build(
-                self.events, self.scars, self.proposals, self.identities,
+                self.events, self.history, self.scars, self.proposals, self.identities,
             )
 
 
