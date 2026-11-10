@@ -1423,13 +1423,12 @@ class SimulationWorldCheckpointTests(unittest.TestCase):
         planned = replanning.replan(
             "speaker", 4, facts, resources, goal_facts, reason="food needed",
         )
-        replanning.advance(planned.execution_id, 5, facts, resources, goal_facts)
         progression = replanning.advance(
-            planned.execution_id, 6, facts, resources, goal_facts,
+            planned.execution_id, 5, facts, resources, goal_facts,
         )
         self.assertIsNotNone(progression.evaluation)
         payload = SimulationWorldCheckpoint.capture(
-            6, coordinator, npcs, goal_book=goals,
+            5, coordinator, npcs, goal_book=goals,
             action_executions=executions, action_world_facts=facts,
             action_resources=resources, action_replanning=replanning,
             action_evaluations=evaluations,
@@ -1447,7 +1446,7 @@ class SimulationWorldCheckpointTests(unittest.TestCase):
         self.assertIs(restored_replanning.evaluations, restored_evaluations)
         self.assertEqual(
             SimulationWorldCheckpoint.capture(
-                6, restored.coordinator, restored.npcs, goal_book=restored.goals,
+                5, restored.coordinator, restored.npcs, goal_book=restored.goals,
                 action_executions=restored_executions,
                 action_world_facts=restored.action_world_facts,
                 action_resources=restored.action_resources,
