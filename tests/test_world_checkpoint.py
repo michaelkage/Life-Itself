@@ -32,6 +32,7 @@ from simreality.psychological_conditioning import ConditioningProfile, NPCCondit
 from simreality.psychological_interpretation import LearningProposal
 from simreality.psychological_learning_decisions import PsychologicalLearningDecisionLedger
 from simreality.planning import DeterministicPlanner, PlanningAction
+from simreality.npc_experience_transfer import NPCExperienceTransferLedger
 
 
 class SimulationWorldCheckpointTests(unittest.TestCase):
@@ -1489,3 +1490,52 @@ class SimulationWorldCheckpointTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+    def test_checkpoint_round_trip_persists_reported_npc_experiences(self):
+        coordinator, npcs, _ = self.make_simulation()
+        coordinator.events.append(WorldEventLedger.make_event(
+            "chat-transfer", 4, "conversation",
+            participants=("speaker", "listener"),
+        ))
+        history = NPCLifeHistory((AutobiographicalMemory(
+            "speaker-memory", "speaker", "event-1", 3, ("listener",),
+            "I experienced the incident first-hand", 0.7, 0.2,
+        ),))
+        transfers = NPCExperienceTransferLedger(coordinator.events, history)
+        transfers.transfer("share-1", "listener", "speaker", "speaker-memory",
+                           "chat-transfer", confidence=0.75)
+        checkpoint = SimulationWorldCheckpoint.capture(
+            4, coordinator, npcs, life_history=history,
+            experience_transfers=transfers,
+        )
+        restored = SimulationWorldCheckpoint.from_json(checkpoint.to_json()).restore()
+        self.assertIsNotNone(restored.experience_transfers)
+        self.assertEqual(restored.experience_transfers.received_by("listener"),
+                         transfers.received_by("listener"))
+        self.assertEqual(
+            SimulationWorldCheckpoint.capture(
+                4, restored.coordinator, restored.npcs,
+                life_history=restored.life_history,
+                experience_transfers=restored.experience_transfers,
+            ).to_json(),
+            checkpoint.to_json(),
+        )
+
+    def test_checkpoint_rejects_experience_transfers_without_shared_life_history(self):
+        coordinator, npcs, _ = self.make_simulation()
+        coordinator.events.append(WorldEventLedger.make_event(
+            "chat-transfer", 4, "conversation",
+            participants=("speaker", "listener"),
+        ))
+        history = NPCLifeHistory((AutobiographicalMemory(
+            "speaker-memory", "speaker", "event-1", 3, ("listener",),
+            "I experienced the incident first-hand", 0.7, 0.2,
+        ),))
+        transfers = NPCExperienceTransferLedger(coordinator.events, history)
+        transfers.transfer("share-1", "listener", "speaker", "speaker-memory",
+                           "chat-transfer", confidence=0.75)
+        with self.assertRaisesRegex(ValueError, "require the checkpoint autobiographical life history"):
+            SimulationWorldCheckpoint.capture(
+                4, coordinator, npcs, experience_transfers=transfers,
+            )
