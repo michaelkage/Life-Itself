@@ -373,10 +373,21 @@ class ActionPlanEvaluationLedger:
             item = NPCPlanEvaluation(**values)
             plan = plans.get(item.plan_id)
             event = self.events.get(f"npc-plan-evaluation:{item.plan_id}")
-            if (plan is None or event is None or event.event_type != "npc_plan_evaluated"
+            records = [record for record in self.executions.snapshot()
+                       if record.execution_id.startswith(item.plan_id + ":step:")]
+            records.sort(key=lambda record: int(record.execution_id.rsplit(":step:", 1)[1]))
+            if (plan is None or plan["owner_id"] != item.owner_id
+                    or plan["goal_id"] != item.goal_id
+                    or plan["planned_actions"] != item.planned_actions
+                    or event is None or event.event_type != "npc_plan_evaluated"
                     or event.participants != (item.owner_id,)
-                    or dict(event.attributes).get("plan_id") != item.plan_id):
-                raise ValueError("aggregate plan evaluation lacks matching plan or event provenance")
+                    or not records or event.tick != records[-1].tick
+                    or dict(event.attributes).get("plan_id") != item.plan_id
+                    or tuple(record.action_id for record in records if record.status == "completed") != item.completed_actions
+                    or tuple(record.action_id for record in records if record.status != "completed") != item.failed_actions
+                    or set(item.observed_goal_facts) | set(item.missing_goal_facts) != set(item.expected_goal_facts)
+                    or set(item.observed_goal_facts) & set(item.missing_goal_facts)):
+                raise ValueError("aggregate plan evaluation lacks matching plan, records, or event provenance")
             if any(self.events.get(event_id) is None for event_id in item.evidence_event_ids):
                 raise ValueError("aggregate plan evaluation references missing evidence")
             plan_evaluations[item.plan_id] = item
