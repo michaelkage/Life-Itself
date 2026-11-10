@@ -361,3 +361,6 @@ NPC familiarity and recognition are now modeled separately from trust. Confirmed
 
 
 The [NPC emotional event persistence codec](docs/NPC-EMOTIONAL-EVENT-PERSISTENCE.md) adds canonical, versioned component snapshots for transient emotion intensities, source event facts, and event/rule replay signatures. Restored ledgers can safely reject duplicate emotional impulses; authored event and decay rules are reattached by the simulation. This is currently a component-level codec and is not yet part of the composite world checkpoint. Tests: `tests/test_emotional_events_save_state.py`.
+
+
+NPC emotional state is now part of the composite world checkpoint. Pass `emotions=...` to `SimulationWorldCheckpoint.capture`; restored worlds expose `RestoredSimulation.emotions`. The checkpoint cross-validates saved emotional source events and replay ownership against the authoritative world journal and NPC roster. Emotional rules remain authored configuration and must be reattached after loading. See [docs/NPC-EMOTIONS-WORLD-CHECKPOINT.md](docs/NPC-EMOTIONS-WORLD-CHECKPOINT.md). Tests: `tests/test_world_checkpoint.py`.
