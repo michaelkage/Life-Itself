@@ -149,7 +149,8 @@ class NPCActionReplanningCoordinator:
                     or attributes.get("status") != item["status"]
                     or attributes.get("action_id", "") != (item["action_id"] or "")
                     or attributes.get("reason") != item["reason"]
-                    or attributes.get("experience_evidence_ids", "[]") != json.dumps(item.get("experience_evidence_ids", []), separators=(",", ":"))\n                    or attributes.get("experience_evidence_sources", "[]") != json.dumps(item.get("experience_evidence_sources", []), separators=(",", ":"))):
+                    or attributes.get("experience_evidence_ids", "[]") != json.dumps(item.get("experience_evidence_ids", []), separators=(",", ":"))
+                    or attributes.get("experience_evidence_sources", "[]") != json.dumps(item.get("experience_evidence_sources", []), separators=(",", ":"))):
                 raise ValueError("replanning history does not match its world event")
             plan_data = item["plan"]
             plan = None if plan_data is None else PlanResult(
@@ -228,14 +229,17 @@ class NPCActionReplanningCoordinator:
             experience_reliability, evidence_by_action = experience_action_guidance(
                 self.life_history, self.experience_transfers, owner_id, tick,
                 self.decisions.planner.actions)
-            experience_sources = {item.evidence_id: item.source_class for item in strategic_experience_evidence(\n                self.life_history, self.experience_transfers, owner_id, tick)}\n            for action_id, value in experience_reliability.items():
+            experience_sources = {item.evidence_id: item.source_class for item in strategic_experience_evidence(
+                self.life_history, self.experience_transfers, owner_id, tick)}
+            for action_id, value in experience_reliability.items():
                 prior = action_reliability.get(action_id)
                 action_reliability[action_id] = value if prior is None else 0.75 * prior + 0.25 * value
                 experience_ids.update(evidence_by_action[action_id])
         request = {
             "owner": owner_id, "tick": tick, "facts": facts, "resources": balances,
             "action_reliability": sorted(action_reliability.items()),
-            "experience_evidence_ids": sorted(experience_ids),\n            "experience_evidence_sources": sorted((key, experience_sources[key]) for key in experience_ids),
+            "experience_evidence_ids": sorted(experience_ids),
+            "experience_evidence_sources": sorted((key, experience_sources[key]) for key in experience_ids),
             "plan_reliability": [[goal_id, list(actions), value]
                                  for (goal_id, actions), value in sorted(plan_reliability.items())],
             "goal_facts": {key: sorted(value) for key, value in sorted(goal_facts.items())},
@@ -271,7 +275,8 @@ class NPCActionReplanningCoordinator:
         if experience_ids:
             decision = NPCDecision(decision.owner_id, decision.tick, decision.goal_id,
                                    decision.goal_category, decision.plan, decision.reason,
-                                   tuple(sorted(experience_ids)),\n                                   tuple(sorted((key, experience_sources[key]) for key in experience_ids)))
+                                   tuple(sorted(experience_ids)),
+                                   tuple(sorted((key, experience_sources[key]) for key in experience_ids)))
         execution_id = None
         action_id = None
         rejected_reason = None
@@ -306,7 +311,8 @@ class NPCActionReplanningCoordinator:
                 "request_id": request_id, "reason": reason, "goal_id": decision.goal_id or "",
                 "status": status, "action_id": action_id or "",
                 "rejected_reason": rejected_reason or "",
-                "experience_evidence_ids": json.dumps(sorted(experience_ids), separators=(",", ":")),\n                "experience_evidence_sources": json.dumps(sorted((key, experience_sources[key]) for key in experience_ids), separators=(",", ":")),
+                "experience_evidence_ids": json.dumps(sorted(experience_ids), separators=(",", ":")),
+                "experience_evidence_sources": json.dumps(sorted((key, experience_sources[key]) for key in experience_ids), separators=(",", ":")),
             },
         ))
         result = NPCReplanningResult(
