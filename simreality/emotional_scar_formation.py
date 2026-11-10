@@ -235,17 +235,12 @@ class EmotionalScarDecisionLedger:
             key=lambda d: (d.decision_tick, d.decision_id),
         ):
             result.decide(decision)
-        # Reapply recovery history only after accepted decisions have recreated
-        # the exact scar set. This preserves chronology and replay validation.
-        for recovery in raw_scars.recoveries():
-            result.scars.recover(
-                recovery_id=recovery.recovery_id, scar_id=recovery.scar_id,
-                owner_id=recovery.owner_id, tick=recovery.tick,
-                amount=recovery.amount, method=recovery.method,
-            )
-        result.scars.current_tick = raw_scars.current_tick
-        if result.scars.snapshot() != raw_scars.snapshot():
-            raise ValueError("accepted decisions do not reproduce the scar ledger")
+        # The accepted decisions must reproduce the scar records exactly.
+        # Restore the authoritative scar ledger afterward so recovery actions
+        # interleaved between later scar creations retain their original order.
+        if result.scars.scars() != raw_scars.scars():
+            raise ValueError("accepted decisions do not reproduce the scar records")
+        result.scars = raw_scars
         result.current_tick = data.get("current_tick")
         if isinstance(result.current_tick, bool) or not isinstance(result.current_tick, int) or result.current_tick < 0:
             raise ValueError("emotional scar decision current_tick is invalid")
