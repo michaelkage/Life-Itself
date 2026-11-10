@@ -13,6 +13,7 @@ from .emotional_scars import NPCEmotionalScarLedger
 from .identity_decisions import IdentityDecisionLedger
 from .identity_evolution import IdentityChangeProposal
 from .world_events import WorldEventLedger
+from .scar_identity_proposals import ScarIdentityProposalEvidence
 
 
 @dataclass(frozen=True)
@@ -48,7 +49,7 @@ class EmotionalScarIdentityAdapter:
     """Convert active accepted scars into bounded, read-only identity proposals."""
 
     @staticmethod
-    def propose(scars: NPCEmotionalScarLedger, identities: IdentityDecisionLedger,
+    def propose_evidence(scars: NPCEmotionalScarLedger, identities: IdentityDecisionLedger,
                 events: WorldEventLedger, policies, tick: int):
         if not isinstance(scars, NPCEmotionalScarLedger):
             raise TypeError("scars must be NPCEmotionalScarLedger")
@@ -99,11 +100,21 @@ class EmotionalScarIdentityAdapter:
                 # Each scar receives a distinct policy key because the identity
                 # decision ledger indexes decisions by event/NPC/policy.
                 proposal_policy_id = f"{policy.policy_id}:{scar.scar_id}"
-                result.append(IdentityChangeProposal(
+                proposal = IdentityChangeProposal(
                     scar.source_event_id, scar.owner_id, proposal_policy_id,
                     policy.identity_axis, before, after, delta, severity, role,
                     policy.maximum_delta,
+                )
+                result.append(ScarIdentityProposalEvidence(
+                    proposal, scar.scar_id, policy.policy_id, scar.emotion_axis,
+                    scar.cue_id, tick, severity,
                 ))
-        return tuple(sorted(result, key=lambda p: (
-            p.event_id, p.npc_id, p.policy_id, p.axis,
+        return tuple(sorted(result, key=lambda item: (
+            item.evaluated_tick, item.proposal.event_id, item.proposal.npc_id,
+            item.proposal.policy_id, item.proposal.axis,
         )))
+
+    @staticmethod
+    def propose(scars, identities, events, policies, tick):
+        return tuple(item.proposal for item in EmotionalScarIdentityAdapter.propose_evidence(
+            scars, identities, events, policies, tick))
