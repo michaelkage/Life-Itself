@@ -25,6 +25,7 @@ class ActionExecutionLedgerTests(unittest.TestCase):
         resources = {"cash": 8.0}
         result = self.ledger.execute(
             "tick-1:buy-tools", "npc-1", 1, "buy-tools", facts, resources,
+            plan_actions=("buy-tools",),
         )
         self.assertEqual(result.status, "completed")
         self.assertEqual(facts, {"at-shop", "has-tools"})
@@ -37,6 +38,7 @@ class ActionExecutionLedgerTests(unittest.TestCase):
         resources = {"cash": 8.0}
         result = self.ledger.execute(
             "tick-1:buy-tools", "npc-1", 1, "buy-tools", facts, resources,
+            plan_actions=("buy-tools",),
         )
         self.assertEqual(result.status, "blocked")
         self.assertEqual(facts, set())
@@ -47,6 +49,7 @@ class ActionExecutionLedgerTests(unittest.TestCase):
         resources = {"cash": 4.0}
         result = self.ledger.execute(
             "tick-1:buy-tools", "npc-1", 1, "buy-tools", facts, resources,
+            plan_actions=("buy-tools",),
         )
         self.assertEqual(result.status, "blocked")
         self.assertEqual(result.reason, "insufficient resources")
@@ -69,10 +72,12 @@ class ActionExecutionLedgerTests(unittest.TestCase):
         resources = {"cash": 8.0}
         first = self.ledger.execute(
             "tick-1:buy-tools", "npc-1", 1, "buy-tools", facts, resources,
+            plan_actions=("buy-tools",),
         )
         replay = self.ledger.execute(
             "tick-1:buy-tools", "npc-1", 1, "buy-tools",
             {"at-shop"}, {"cash": 8.0},
+            plan_actions=("buy-tools",),
         )
         self.assertEqual(first, replay)
         self.assertEqual(resources, {"cash": 3.0})
@@ -80,6 +85,7 @@ class ActionExecutionLedgerTests(unittest.TestCase):
             self.ledger.execute(
                 "tick-1:buy-tools", "npc-1", 1, "buy-tools",
                 {"at-shop"}, {"cash": 7.0},
+                plan_actions=("buy-tools",),
             )
 
     def test_distinct_actions_can_advance_the_same_plan(self):
@@ -87,9 +93,11 @@ class ActionExecutionLedgerTests(unittest.TestCase):
         resources = {"cash": 8.0}
         first = self.ledger.execute(
             "tick-1:buy-tools", "npc-1", 1, "buy-tools", facts, resources,
+            plan_actions=("buy-tools",),
         )
         second = self.ledger.execute(
             "tick-2:repair-bike", "npc-1", 2, "repair-bike", facts, resources,
+            plan_actions=("buy-tools",),
         )
         self.assertEqual(first.status, "completed")
         self.assertEqual(second.status, "completed")
