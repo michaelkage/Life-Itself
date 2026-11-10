@@ -726,7 +726,7 @@ class SimulationWorldCheckpoint:
                         or request["owner_id"] not in event.participants
                         or event.event_type != "npc_action_replanned"
                         or dict(event.attributes).get("request_id") != request["request_id"]
-                        or dict(event.attributes).get("status") != request["status")):
+                        or dict(event.attributes).get("status") != request["status"]):
                     raise ValueError("replanning request does not match checkpoint NPCs and event history")
         envelope = SimulationSaveEnvelope.capture(current_tick, coordinator.events)
         return cls(
