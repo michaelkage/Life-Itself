@@ -373,3 +373,6 @@ NPC stress is now tracked independently from emotion and identity. Individual co
 
 
 NPC stress now participates in composite world checkpoints. Stress ledgers are validated against the authoritative event journal and NPC roster, survive save/restore with replay history, and remain optional for older checkpoints. Coping profiles are authored configuration and are reattached after loading. See [docs/NPC-EMOTIONAL-STRESS-CHECKPOINT.md](docs/NPC-EMOTIONAL-STRESS-CHECKPOINT.md) and `tests/test_emotional_stress_checkpoint.py`.
+
+
+Stress-driven behavioral adaptation now projects individual stress and exhaustion sensitivity into explicit decision considerations for social engagement, work performance, sleep priority, risk tolerance, routine flexibility, and conflict sensitivity. It is read-only and does not force behavior. See [docs/NPC-STRESS-BEHAVIOR-ADAPTATION.md](docs/NPC-STRESS-BEHAVIOR-ADAPTATION.md) and `tests/test_stress_behavior_adaptation.py`.
