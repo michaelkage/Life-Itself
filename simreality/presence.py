@@ -80,6 +80,8 @@ class PresenceLedger:
         previous = self._records.get(owner_id)
         if previous is not None and previous.status != "at_location":
             raise ValueError("cannot relocate an NPC while a journey is active")
+        if previous is not None and previous.location_id != location_id:
+            raise ValueError("existing NPCs must move through an explicit travel journey")
         if previous is not None and tick < previous.updated_tick:
             raise ValueError("presence updates must be monotonic")
         record = NPCPresence(owner_id, "at_location", location_id, None, None, 0.0, tick)
