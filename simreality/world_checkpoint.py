@@ -97,6 +97,7 @@ class RestoredSimulation:
     memory_reflections: MemoryReflectionLedger | None = None
     emotional_scars: NPCEmotionalScarLedger | None = None
     emotional_scar_decisions: EmotionalScarDecisionLedger | None = None
+    scar_identity_proposals: ScarIdentityProposalLedger | None = None
 
 
 @dataclass(frozen=True)
@@ -143,6 +144,7 @@ class SimulationWorldCheckpoint:
     memory_reflections_json: str | None = None
     emotional_scars_json: str | None = None
     emotional_scar_decisions_json: str | None = None
+    scar_identity_proposals_json: str | None = None
 
     SCHEMA_VERSION = 1
 
@@ -665,6 +667,7 @@ class SimulationWorldCheckpoint:
         memory_reflections_snapshot = components[30]
         emotional_scars_snapshot = components[31]
         emotional_scar_decisions_snapshot = components[32]
+        scar_identity_proposal_snapshot = components[33]
         if emotional_scar_decisions_snapshot is not None:
             if life_history_snapshot is None or emotional_scars_snapshot is None:
                 raise ValueError("emotional scar decisions require autobiographical life history and the corresponding scar ledger")
@@ -1128,7 +1131,6 @@ class SimulationWorldCheckpoint:
         memory_reflections = memory_reflections_snapshot.restore(life_history) if memory_reflections_snapshot is not None else None
         emotional_scars = emotional_scars_snapshot.restore() if emotional_scars_snapshot is not None else None
         emotional_scar_decisions = emotional_scar_decisions_snapshot.restore() if emotional_scar_decisions_snapshot is not None else None
-        scar_identity_proposals = ScarIdentityProposalLedger.from_snapshot(scar_identity_proposal_snapshot) if scar_identity_proposal_snapshot is not None else None
         scar_identity_proposals = ScarIdentityProposalLedger.from_snapshot(scar_identity_proposal_snapshot) if scar_identity_proposal_snapshot is not None else None
         return RestoredSimulation(self.current_tick, events, npcs, trust, beliefs,
                                   memory, conversations, coordinator, self.metadata,
