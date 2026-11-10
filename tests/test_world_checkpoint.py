@@ -17,6 +17,7 @@ from simreality import (
     TestimonyLedger, TestimonyRecord, TestimonyDetail,
     InquiryInvestigationPipeline, RouteEdge, PersonalRoutePlanner,
     TravelTickAdapter, PresenceLedger, AutobiographicalMemory, NPCLifeHistory,
+    MemoryReinterpretation, MemoryReflectionLedger,
 )
 from simreality.presence_encounters import PresenceEncounter, PresenceEncounterLedger, PresenceSocialAdapter
 from simreality.social_familiarity import PresenceFamiliarityAdapter, SocialFamiliarityLedger
@@ -1005,6 +1006,78 @@ class SimulationWorldCheckpointTests(unittest.TestCase):
         payload = SimulationWorldCheckpoint.capture(4, coordinator, npcs).to_json()
         self.assertNotIn('"emotions"', payload)
         self.assertIsNone(SimulationWorldCheckpoint.from_json(payload).restore().emotions)
+
+
+    def test_checkpoint_round_trip_persists_memory_reflections(self):
+        coordinator, npcs, _ = self.make_simulation()
+        history = NPCLifeHistory()
+        history.record(AutobiographicalMemory(
+            "memory-reflect-1", "speaker", "event-1", 3, ("listener",),
+            "The witness abandoned me", 0.8, -0.2,
+        ))
+        reflections = MemoryReflectionLedger(history)
+        reflections.record(MemoryReinterpretation(
+            "reflection-1", "speaker", "memory-reflect-1", 4,
+            "The witness abandoned me",
+            "The witness may have been afraid",
+            "I learned more about what happened",
+        ))
+        checkpoint = SimulationWorldCheckpoint.capture(
+            4, coordinator, npcs, life_history=history,
+            memory_reflections=reflections,
+        )
+        payload = checkpoint.to_json()
+        restored = SimulationWorldCheckpoint.from_json(payload).restore()
+        self.assertIsNotNone(restored.memory_reflections)
+        self.assertEqual(restored.memory_reflections.entries(), reflections.entries())
+        self.assertEqual(
+            restored.memory_reflections.current_interpretation("speaker", "memory-reflect-1"),
+            "The witness may have been afraid",
+        )
+        self.assertEqual(
+            restored.life_history.memories("speaker")[0].interpretation,
+            "The witness abandoned me",
+        )
+        self.assertEqual(
+            SimulationWorldCheckpoint.capture(
+                4, restored.coordinator, restored.npcs,
+                life_history=restored.life_history,
+                memory_reflections=restored.memory_reflections,
+            ).to_json(),
+            payload,
+        )
+
+    def test_checkpoint_rejects_memory_reflections_without_matching_life_history(self):
+        coordinator, npcs, _ = self.make_simulation()
+        history = NPCLifeHistory()
+        history.record(AutobiographicalMemory(
+            "memory-reflect-2", "speaker", "event-1", 3, ("listener",),
+            "The witness abandoned me", 0.8, -0.2,
+        ))
+        reflections = MemoryReflectionLedger(history)
+        with self.assertRaisesRegex(ValueError, "require the corresponding"):
+            SimulationWorldCheckpoint.capture(
+                4, coordinator, npcs, memory_reflections=reflections,
+            )
+
+    def test_checkpoint_rejects_reflection_after_checkpoint_tick(self):
+        coordinator, npcs, _ = self.make_simulation()
+        history = NPCLifeHistory()
+        history.record(AutobiographicalMemory(
+            "memory-reflect-3", "speaker", "event-1", 3, ("listener",),
+            "The witness abandoned me", 0.8, -0.2,
+        ))
+        reflections = MemoryReflectionLedger(history)
+        reflections.record(MemoryReinterpretation(
+            "reflection-3", "speaker", "memory-reflect-3", 5,
+            "The witness abandoned me", "I understand it differently",
+            "Later reflection",
+        ))
+        with self.assertRaisesRegex(ValueError, "future tick"):
+            SimulationWorldCheckpoint.capture(
+                4, coordinator, npcs, life_history=history,
+                memory_reflections=reflections,
+            )
 
 
 if __name__ == "__main__":
