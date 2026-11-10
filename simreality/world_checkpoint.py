@@ -59,6 +59,7 @@ from .emotional_scars_save_state import EmotionalScarSnapshot
 from .emotional_scar_formation import EmotionalScarDecisionLedger, EmotionalScarDecisionSnapshot
 from .scar_identity_proposals import ScarIdentityProposalLedger, ScarIdentityProposalSnapshot
 from .identity_goal_alignment import IdentityGoalReviewDecisionLedger, IdentityGoalReviewSnapshot
+from .action_execution import ActionExecutionLedger, ActionExecutionSnapshot
 
 
 @dataclass(frozen=True)
@@ -100,6 +101,7 @@ class RestoredSimulation:
     emotional_scar_decisions: EmotionalScarDecisionLedger | None = None
     scar_identity_proposals: ScarIdentityProposalLedger | None = None
     identity_goal_reviews: IdentityGoalReviewDecisionLedger | None = None
+    action_execution_snapshot: ActionExecutionSnapshot | None = None
 
 
 @dataclass(frozen=True)
@@ -148,6 +150,7 @@ class SimulationWorldCheckpoint:
     emotional_scar_decisions_json: str | None = None
     scar_identity_proposals_json: str | None = None
     identity_goal_reviews_json: str | None = None
+    action_executions_json: str | None = None
 
     SCHEMA_VERSION = 1
 
@@ -179,7 +182,7 @@ class SimulationWorldCheckpoint:
                 consequence_recorder=None, campaign=None, misconduct=None, routines=None,
                 routine_executions=None, routine_institutions=None, institutional_politics=None,
                 goal_book=None, goal_event_adapter=None, goal_review_decisions=None, identity_decisions=None,
-                testimony_inquiries=None, testimony=None, travel=None, presence=None, presence_encounters=None, familiarity=None, relationships=None, emotions=None, stress=None, conditioning=None, psychological_learning_decisions=None, life_history=None, memory_reflections=None, emotional_scars=None, emotional_scar_decisions=None, scar_identity_proposals=None, identity_goal_reviews=None):
+                testimony_inquiries=None, testimony=None, travel=None, presence=None, presence_encounters=None, familiarity=None, relationships=None, emotions=None, stress=None, conditioning=None, psychological_learning_decisions=None, life_history=None, memory_reflections=None, emotional_scars=None, emotional_scar_decisions=None, scar_identity_proposals=None, identity_goal_reviews=None, action_executions=None):
         if not isinstance(coordinator, SimulationTickCoordinator):
             raise TypeError("coordinator must be a SimulationTickCoordinator")
         if not isinstance(npcs, dict):
@@ -628,6 +631,36 @@ class SimulationWorldCheckpoint:
                         or action.owner_id not in source.participants + source.witnesses
                         or action.target_id not in source.participants + source.witnesses):
                     raise ValueError("personal history action does not match its source world event")
+        action_execution_snapshot = None
+        if action_executions is not None:
+            if not isinstance(action_executions, ActionExecutionLedger):
+                raise TypeError("action_executions must be an ActionExecutionLedger or None")
+            if action_executions.events is not coordinator.events:
+                raise ValueError("action execution ledger must share the checkpoint world event journal")
+            if action_executions.goals is not None and action_executions.goals is not goal_book:
+                raise ValueError("action execution ledger must share the checkpoint GoalBook")
+            known_npcs = set(npcs)
+            journal = {event.event_id: event for event in coordinator.events.snapshot()}
+            action_execution_snapshot = action_executions.to_snapshot()
+            for record in action_executions.snapshot():
+                event = journal.get(record.event_id)
+                if (record.owner_id not in known_npcs or record.tick > current_tick
+                        or event is None or event.tick != record.tick
+                        or record.owner_id not in event.participants
+                        or event.event_type != "npc_action_execution"):
+                    raise ValueError("action execution record does not match checkpoint NPCs and event history")
+            for active in action_executions.active():
+                started = journal.get("action-execution:" + active.execution_id + ":started")
+                if (active.owner_id not in known_npcs or active.started_tick > current_tick
+                        or active.last_tick > current_tick or started is None
+                        or started.tick != active.started_tick
+                        or active.owner_id not in started.participants
+                        or started.event_type != "npc_action_started"):
+                    raise ValueError("active action execution does not match checkpoint NPCs and event history")
+                for event_id, event in journal.items():
+                    if event_id.startswith("action-execution:" + active.execution_id + ":tick:"):
+                        if event.tick > current_tick or event.event_type != "npc_action_progress":
+                            raise ValueError("action execution progress event is invalid for checkpoint")
         envelope = SimulationSaveEnvelope.capture(current_tick, coordinator.events)
         return cls(
             current_tick, envelope.to_json(),
@@ -667,6 +700,7 @@ class SimulationWorldCheckpoint:
             scar_decision_snapshot.to_json() if scar_decision_snapshot is not None else None,
             scar_identity_proposal_snapshot.to_json() if scar_identity_proposal_snapshot is not None else None,
             identity_goal_review_snapshot.to_json() if identity_goal_review_snapshot is not None else None,
+            action_execution_snapshot.to_json() if action_execution_snapshot is not None else None,
         )
 
     def _components(self):
