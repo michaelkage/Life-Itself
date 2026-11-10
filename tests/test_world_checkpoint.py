@@ -16,7 +16,7 @@ from simreality import (
     TestimonyInquiry, TestimonyInquiryLedger, TestimonyResponse,
     TestimonyLedger, TestimonyRecord, TestimonyDetail,
     InquiryInvestigationPipeline, RouteEdge, PersonalRoutePlanner,
-    TravelTickAdapter,
+    TravelTickAdapter, PresenceLedger,
 )
 
 
@@ -47,6 +47,29 @@ class SimulationWorldCheckpointTests(unittest.TestCase):
         intent = ConversationIntent("chat-3", "listener", "speaker")
         coordinator.step(3, npcs, event_ids=("event-1",), conversations=(intent,))
         return coordinator, npcs, consequences
+
+
+    def test_checkpoint_round_trip_persists_physical_presence(self):
+        coordinator, npcs, _ = self.make_simulation()
+        presence = PresenceLedger()
+        presence.place("speaker", "courthouse", 2)
+        presence.place("listener", "street", 3)
+        checkpoint = SimulationWorldCheckpoint.capture(
+            4, coordinator, npcs, presence=presence,
+        )
+        restored = SimulationWorldCheckpoint.from_json(checkpoint.to_json()).restore()
+        self.assertIsNotNone(restored.presence)
+        self.assertEqual(restored.presence.occupants("courthouse"), ("speaker",))
+        self.assertEqual(restored.presence.occupants("street"), ("listener",))
+
+    def test_checkpoint_rejects_presence_for_unknown_npc(self):
+        coordinator, npcs, _ = self.make_simulation()
+        presence = PresenceLedger()
+        presence.place("missing-npc", "street", 1)
+        with self.assertRaisesRegex(ValueError, "missing from checkpoint"):
+            SimulationWorldCheckpoint.capture(
+                4, coordinator, npcs, presence=presence,
+            )
 
     def test_round_trip_restores_dependencies_and_idempotent_tick_replay(self):
         coordinator, npcs, consequences = self.make_simulation()
