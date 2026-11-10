@@ -10,7 +10,7 @@ Create an `AutobiographicalMemory` with a unique memory ID, owner, source event,
 
 ## Forgiveness and reconciliation
 
-`act(..., action="forgive")` records a deliberate forgiveness choice. `action="reconcile"` is a separate later choice and requires prior forgiveness for the same owner, target, and event. Neither action erases the memory, changes the historical event, restores trust, or forces renewed contact. Trust remains in the social relationship systems and must be changed by their own explicit evidence and policies.
+`act(..., action="forgive")` records a deliberate forgiveness choice. `action="reconcile"` is a separate choice and can occur with or without forgiveness for the same owner, target, and event. Neither action erases the memory, changes the historical event, restores trust, or forces renewed contact. Trust remains in the social relationship systems and must be changed by their own explicit evidence and policies.
 
 ## Persistence and boundaries
 
