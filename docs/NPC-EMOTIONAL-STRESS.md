@@ -19,9 +19,11 @@ a clinical model of human psychology.
 ## Accumulation and recovery
 
 Repeated stressors accumulate up to 1. Recovery occurs only when the caller
-advances the ledger with that NPC's coping profile. Recovery is
-`recovery_per_tick * (1 + resilience)` per elapsed tick, bounded at zero.
-Missing profiles do not silently recover.
+advances the ledger with that NPC's coping profile. Each NPC has an independent
+recovery clock: advancing one owner never consumes elapsed recovery time for
+another owner whose profile was omitted. Recovery is
+`recovery_per_tick * (1 + resilience)` per owner-specific elapsed tick, bounded
+at zero. Missing profiles do not silently recover.
 
 ## Exhaustion and breaking point
 
@@ -32,8 +34,10 @@ aggression, withdrawal, or any other action.
 
 ## Persistence and replay
 
-`NPCStressSnapshot` stores canonical stress state and append-only stressor
-records. Reusing a record ID with identical content is idempotent; conflicting
+`NPCStressSnapshot` schema v2 stores canonical stress state, each owner's last
+recovery tick, and append-only stressor records. Schema v1 snapshots remain
+readable; because v1 did not store per-owner clocks, restored owners begin at
+the legacy snapshot's global tick. Reusing a record ID with identical content is idempotent; conflicting
 reuse is rejected. The same world event may stress multiple NPCs, but each
 event ID is unique per owner in this ledger.
 
