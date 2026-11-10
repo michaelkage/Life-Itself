@@ -385,3 +385,6 @@ NPC psychological conditioning is also integrated into `SimulationWorldCheckpoin
 
 
 Context-sensitive psychological triggers now activate an NPC's learned associations only when explicitly observed cues and authored context requirements match. NPC-specific context exclusions allow similar situations to be interpreted differently. Trigger evaluation is read-only and never forces a reaction. See [docs/NPC-PSYCHOLOGICAL-TRIGGERS.md](docs/NPC-PSYCHOLOGICAL-TRIGGERS.md) and `tests/test_psychological_triggers.py`.
+
+
+NPCs can now interpret the same authoritative event differently through owner-specific `NPCInterpretationProfile` rules. The interpreter emits reviewable learning proposals rather than silently mutating conditioning, preserving the distinction between what happened and what an NPC believes happened. See [docs/NPC-EVENT-INTERPRETATION.md](docs/NPC-EVENT-INTERPRETATION.md) and `tests/test_npc_event_interpretation.py`.
