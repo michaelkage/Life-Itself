@@ -51,6 +51,7 @@ from .emotional_events_save_state import EmotionalEventSnapshot
 from .emotional_stress import NPCStressLedger
 from .emotional_stress_save_state import NPCStressSnapshot
 from .psychological_conditioning import NPCConditioningLedger, NPCConditioningSnapshot
+from .psychological_learning_decisions import PsychologicalLearningDecisionSnapshot, PsychologicalLearningDecisionLedger
 
 
 @dataclass(frozen=True)
@@ -85,6 +86,7 @@ class RestoredSimulation:
     emotions: NPCEmotionalEventLedger | None = None
     stress: NPCStressLedger | None = None
     conditioning: NPCConditioningLedger | None = None
+    psychological_learning_decisions: PsychologicalLearningDecisionLedger | None = None
 
 
 @dataclass(frozen=True)
@@ -126,6 +128,7 @@ class SimulationWorldCheckpoint:
     emotions_json: str | None = None
     stress_json: str | None = None
     conditioning_json: str | None = None
+    psychological_learning_decisions_json: str | None = None
 
     SCHEMA_VERSION = 1
 
@@ -157,7 +160,7 @@ class SimulationWorldCheckpoint:
                 consequence_recorder=None, campaign=None, misconduct=None, routines=None,
                 routine_executions=None, routine_institutions=None, institutional_politics=None,
                 goal_book=None, goal_event_adapter=None, goal_review_decisions=None, identity_decisions=None,
-                testimony_inquiries=None, testimony=None, travel=None, presence=None, presence_encounters=None, familiarity=None, relationships=None, emotions=None, stress=None, conditioning=None):
+                testimony_inquiries=None, testimony=None, travel=None, presence=None, presence_encounters=None, familiarity=None, relationships=None, emotions=None, stress=None, conditioning=None, psychological_learning_decisions=None):
         if not isinstance(coordinator, SimulationTickCoordinator):
             raise TypeError("coordinator must be a SimulationTickCoordinator")
         if not isinstance(npcs, dict):
@@ -416,6 +419,27 @@ class SimulationWorldCheckpoint:
                     raise ValueError("conditioning record does not match its source world event")
                 if record.tick > current_tick:
                     raise ValueError("conditioning records cannot occur after the checkpoint tick")
+        if psychological_learning_decisions is not None and not isinstance(psychological_learning_decisions, PsychologicalLearningDecisionLedger):
+            raise TypeError("psychological_learning_decisions must be a PsychologicalLearningDecisionLedger or None")
+        learning_decision_snapshot = PsychologicalLearningDecisionSnapshot.capture(psychological_learning_decisions) if psychological_learning_decisions is not None else None
+        if learning_decision_snapshot is not None:
+            if conditioning_snapshot is None:
+                raise ValueError("psychological learning decisions require the corresponding conditioning ledger")
+            conditioning_records = {record.record_id: record for record in conditioning_snapshot.restore().records()}
+            journal_events = {event.event_id: event for event in coordinator.events.snapshot()}
+            for item in learning_decision_snapshot.decisions:
+                decision_id, owner_id, source_event_id, rule_id, cue, accepted, decision_tick = item[:7]
+                if owner_id not in npcs or decision_tick > current_tick:
+                    raise ValueError("psychological learning decisions reference an unknown NPC or future tick")
+                source_event = journal_events.get(source_event_id)
+                if source_event is None or source_event.tick > decision_tick or owner_id not in source_event.participants + source_event.witnesses:
+                    raise ValueError("psychological learning decision does not match its source world event")
+                applied = conditioning_records.get(f"psych-learning:{decision_id}")
+                if accepted:
+                    if applied is None or (applied.owner_id, applied.source_event_id, applied.cue, applied.tick) != (owner_id, source_event_id, cue, decision_tick):
+                        raise ValueError("accepted psychological learning decision is missing its conditioning record")
+                elif applied is not None:
+                    raise ValueError("rejected psychological learning decision cannot have an applied conditioning record")
         if relationships is not None and not isinstance(relationships, SocialRelationshipLedger):
             raise TypeError("relationships must be a SocialRelationshipLedger or None")
         relationship_snapshot = SocialRelationshipSnapshot.capture(relationships) if relationships is not None else None
@@ -820,14 +844,14 @@ class SimulationWorldCheckpoint:
                        json.dumps(raw["relationships"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("relationships") is not None else None,
                        json.dumps(raw["emotions"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("emotions") is not None else None,
                        json.dumps(raw["stress"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("stress") is not None else None,
-                       json.dumps(raw["conditioning"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("conditioning") is not None else None)
+                       json.dumps(raw["conditioning"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("conditioning") is not None else None,\n                       json.dumps(raw["psychological_learning_decisions"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("psychological_learning_decisions") is not None else None)
         except ValueError:
             raise
         except (TypeError, KeyError, IndexError, json.JSONDecodeError) as exc:
             raise ValueError("invalid simulation world checkpoint") from exc
 
     def restore(self):
-        envelope, npc_snapshot, trust_snapshot, belief_snapshot, memory_snapshot, conversation_snapshot, tick_snapshot, consequence_snapshot, campaign, misconduct_snapshot, routine_snapshot, execution_snapshot, institution_snapshot, institutional_politics, goals_snapshot, goal_event_replay, goal_review_decisions_snapshot, identity_decisions_snapshot, testimony_inquiries_snapshot, testimony_snapshot, travel_snapshot, presence_snapshot, encounter_snapshot, familiarity_snapshot, relationship_snapshot, emotional_snapshot, stress_snapshot, conditioning_snapshot = self._components()
+        envelope, npc_snapshot, trust_snapshot, belief_snapshot, memory_snapshot, conversation_snapshot, tick_snapshot, consequence_snapshot, campaign, misconduct_snapshot, routine_snapshot, execution_snapshot, institution_snapshot, institutional_politics, goals_snapshot, goal_event_replay, goal_review_decisions_snapshot, identity_decisions_snapshot, testimony_inquiries_snapshot, testimony_snapshot, travel_snapshot, presence_snapshot, encounter_snapshot, familiarity_snapshot, relationship_snapshot, emotional_snapshot, stress_snapshot, conditioning_snapshot, learning_decisions_snapshot = self._components()
         events = envelope.restore_event_ledger()
         npcs = npc_snapshot.restore()
         trust = trust_snapshot.restore()
@@ -874,4 +898,4 @@ class SimulationWorldCheckpoint:
                                   memory, conversations, coordinator, self.metadata,
                                   consequence_recorder, campaign, misconduct, routines, routine_executions,
                                   routine_institutions, institutional_politics, goals, goal_event_replay,
-                                  goal_review_decisions, identity_decisions, testimony_inquiries, testimony, travel, presence, presence_encounters, familiarity, relationships, emotions, stress, conditioning)
+                                  goal_review_decisions, identity_decisions, testimony_inquiries, testimony, travel, presence, presence_encounters, familiarity, relationships, emotions, stress, conditioning, psychological_learning_decisions)
