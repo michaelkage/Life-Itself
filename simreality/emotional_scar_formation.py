@@ -99,7 +99,7 @@ class EmotionalScarFormationAdapter:
         if not isinstance(policy, EmotionalScarFormationPolicy):
             raise TypeError("policy must be EmotionalScarFormationPolicy")
         memories = {m.memory_id: m for m in history.memories(response.owner_id)}
-        proposals = []
+        selected = {}
         for item in response.contributions:
             if item.intensity < policy.minimum_intensity:
                 continue
@@ -108,18 +108,23 @@ class EmotionalScarFormationAdapter:
                 raise ValueError("emotional response contribution is not owned by response owner")
             if memory.tick > response.sampled_tick:
                 raise ValueError("source memory is from after emotional appraisal")
+            key = (memory.event_id, item.cue_id, item.emotion_axis)
+            prior = selected.get(key)
+            # One scar candidate per source event/cue/axis. If multiple memories
+            # from the same event contribute, retain the strongest evidence;
+            # ties resolve by stable memory ID rather than iteration order.
+            if prior is None or (item.intensity, item.memory_id) > (prior[0].intensity, prior[0].memory.memory_id):
+                selected[key] = (item, memory)
+        proposals = []
+        for (event_id, cue_id, axis), (item, memory) in sorted(selected.items()):
             severity = min(1.0, item.intensity * policy.severity_scale)
             if severity <= 0:
                 continue
-            # Stable identity means replaying the same appraisal cannot create
-            # a second proposal for the same owner, memory, cue, axis and policy.
-            key = "|".join((policy.policy_id, response.owner_id, item.memory_id,
-                            item.cue_id, item.emotion_axis))
+            key = "|".join((policy.policy_id, response.owner_id, event_id, cue_id, axis))
             proposal_id = "scar-proposal:" + str(__import__("hashlib").sha256(key.encode()).hexdigest()[:24])
             proposals.append(EmotionalScarProposal(
-                proposal_id, response.owner_id, memory.event_id, memory.memory_id,
-                response.sampled_tick, item.emotion_axis, item.cue_id,
-                severity, policy.retained_per_tick,
+                proposal_id, response.owner_id, event_id, memory.memory_id,
+                response.sampled_tick, axis, cue_id, severity, policy.retained_per_tick,
             ))
         return tuple(sorted(proposals, key=lambda p: p.proposal_id))
 
@@ -133,6 +138,7 @@ class EmotionalScarDecisionLedger:
             raise TypeError("scar_ledger must be NPCEmotionalScarLedger or None")
         self.scars = scar_ledger or NPCEmotionalScarLedger()
         self._proposals = {}
+        self._source_keys = {}
         self._decisions = {}
         self._proposal_decisions = {}
         self.current_tick = self.scars.current_tick
@@ -161,9 +167,13 @@ class EmotionalScarDecisionLedger:
             if prior != proposal:
                 raise ValueError("proposal ID reused with conflicting content")
             return prior
-        if proposal.proposed_tick < self.scars.current_tick:
-            raise ValueError("proposal tick cannot precede scar ledger current_tick")
+        if proposal.proposed_tick < self.current_tick:
+            raise ValueError("proposal tick cannot precede decision ledger current_tick")
+        source_key = (proposal.owner_id, proposal.source_event_id, proposal.emotion_axis, proposal.cue_id)
+        if source_key in self._source_keys:
+            raise ValueError("source event already has a proposal for this owner, axis and cue")
         self._proposals[proposal.proposal_id] = proposal
+        self._source_keys[source_key] = proposal.proposal_id
         self.current_tick = max(self.current_tick, proposal.proposed_tick)
         return proposal
 
