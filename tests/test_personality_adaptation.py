@@ -98,7 +98,7 @@ def test_future_memories_missing_roles_and_invalid_rules_are_rejected():
         AutobiographicalMemory("future-2", "alice", "e2", 10, (), "Future two", 0.5, 0.2, tags=("x",)),
     ))
     profile = NPCIdentityProfile("alice", {"confidence": 0.0})
-    rule = PersonalityAdaptationRule("x-confidence", "x", "confidence", 0.05)
+    rule = PersonalityAdaptationRule("x-confidence", "support", "confidence", 0.05)
     with pytest.raises(ValueError, match="future memory"):
         PersonalityAdaptationAdapter.propose(
             history, (profile,), (rule,), current_tick=8,
