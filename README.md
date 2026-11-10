@@ -430,3 +430,6 @@ Scar-informed identity proposals now retain their exact source scar, authored po
 
 
 `IdentityEvolutionAuditTrail` provides a read-only join from authoritative experience and owner-specific autobiographical memory through accepted scar, exact identity proposal, NPC consent decision, and resulting trait value. Rebuild it from the restored event, life-history, scar, proposal, and identity-decision ledgers. See `docs/NPC-IDENTITY-EVOLUTION.md` and `tests/test_identity_evolution_audit.py`.
+
+
+`IdentityEvolutionAuditTrail.build(events, life_history, scars, proposals, decisions)` provides a read-only join from authoritative experience and owner-specific autobiographical memory through accepted scar, exact identity proposal, NPC consent decision, and resulting trait value. Rebuild it from the restored event, life-history, scar, proposal, and identity-decision ledgers. See `docs/NPC-IDENTITY-EVOLUTION.md` and `tests/test_identity_evolution_audit.py`.
