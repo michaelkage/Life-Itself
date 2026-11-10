@@ -61,6 +61,25 @@ class PersonalityMemoryContribution:
     salience: float
     weighted_impact: float
 
+    def __post_init__(self):
+        for name in ("memory_id", "event_id"):
+            if not isinstance(getattr(self, name), str) or not getattr(self, name).strip():
+                raise ValueError(f"{name} must be a non-empty string")
+        if isinstance(self.tick, bool) or not isinstance(self.tick, int) or self.tick < 0:
+            raise ValueError("tick must be a non-negative integer")
+        for name, low, high in (("identity_impact", -1.0, 1.0),
+                                ("salience", 0.0, 1.0),
+                                ("weighted_impact", -1.0, 1.0)):
+            value = getattr(self, name)
+            if (isinstance(value, bool) or not isinstance(value, (int, float))
+                    or not math.isfinite(value) or not low <= value <= high):
+                raise ValueError(f"{name} must be finite and in [{low}, {high}]")
+        if not math.isclose(
+            self.weighted_impact, self.identity_impact * self.salience,
+            rel_tol=1e-12, abs_tol=1e-12,
+        ):
+            raise ValueError("weighted_impact must equal identity_impact times salience")
+
 
 @dataclass(frozen=True)
 class PersonalityAdaptationAssessment:
@@ -70,6 +89,32 @@ class PersonalityAdaptationAssessment:
     contributions: tuple[PersonalityMemoryContribution, ...]
     accumulated_evidence: float
     proposal: IdentityChangeProposal
+
+    def __post_init__(self):
+        for name in ("npc_id", "rule_id", "axis"):
+            if not isinstance(getattr(self, name), str) or not getattr(self, name).strip():
+                raise ValueError(f"{name} must be a non-empty string")
+        if not isinstance(self.proposal, IdentityChangeProposal):
+            raise TypeError("proposal must be an IdentityChangeProposal")
+        if not isinstance(self.contributions, tuple) or not self.contributions or any(
+            not isinstance(x, PersonalityMemoryContribution) for x in self.contributions
+        ):
+            raise ValueError("contributions must be a non-empty tuple of memory contributions")
+        keys = [(x.tick, x.memory_id) for x in self.contributions]
+        if keys != sorted(keys) or len({x.memory_id for x in self.contributions}) != len(self.contributions):
+            raise ValueError("memory contributions must be uniquely sorted")
+        if (isinstance(self.accumulated_evidence, bool)
+                or not isinstance(self.accumulated_evidence, (int, float))
+                or not math.isfinite(self.accumulated_evidence)
+                or not 0.0 <= self.accumulated_evidence <= 1.0):
+            raise ValueError("accumulated_evidence must be finite and in [0, 1]")
+        if (self.proposal.npc_id, self.proposal.policy_id, self.proposal.axis) != (
+            self.npc_id, self.rule_id, self.axis
+        ):
+            raise ValueError("proposal identity must match its assessment")
+        expected = min(1.0, sum(abs(x.weighted_impact) for x in self.contributions))
+        if not math.isclose(self.accumulated_evidence, expected, rel_tol=1e-12, abs_tol=1e-12):
+            raise ValueError("accumulated_evidence must match memory contributions")
 
 
 class PersonalityAdaptationAdapter:
