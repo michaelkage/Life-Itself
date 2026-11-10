@@ -55,7 +55,7 @@ class PresenceEncounterLedger:
 
     def __init__(self, records: Iterable[PresenceEncounter] = ()):
         self._records: dict[str, PresenceEncounter] = {}
-        self._ticks: dict[int, tuple[str, tuple[PresenceEncounter, ...]]] = {}
+        self._ticks: dict[int, dict[str, tuple[str, PresenceEncounter]]] = {}
         for record in records:
             if not isinstance(record, PresenceEncounter):
                 raise TypeError("records must contain PresenceEncounter values")
@@ -70,28 +70,43 @@ class PresenceEncounterLedger:
         return tuple(sorted(self._records.values(), key=lambda x: (x.tick, x.encounter_id)))
 
     def tick_snapshot(self):
-        return tuple((tick, signature, records) for tick, (signature, records) in sorted(self._ticks.items()))
+        return tuple(
+            (tick, json.dumps({key: value[0] for key, value in sorted(entries.items())},
+                              sort_keys=True, separators=(",", ":")),
+             tuple(value[1] for _key, value in sorted(entries.items())))
+            for tick, entries in sorted(self._ticks.items())
+        )
 
     def _record(self, tick: int, signature: str, record: PresenceEncounter):
-        prior = self._ticks.get(tick)
+        entries = self._ticks.get(tick)
+        if entries is None:
+            if self._ticks and tick <= max(self._ticks):
+                raise ValueError("new encounter ticks must advance monotonically")
+            entries = {}
+            self._ticks[tick] = entries
+        prior = entries.get(record.encounter_id)
         if prior is not None:
             if prior[0] != signature:
-                raise ValueError(f"conflicting encounter tick replay: {tick}")
-            return prior[1][0]
-        if self._ticks and tick <= max(self._ticks):
-            raise ValueError("encounter ticks must advance monotonically")
+                raise ValueError(f"conflicting encounter replay: {record.encounter_id}")
+            return prior[1]
         existing = self._records.get(record.encounter_id)
         if existing is not None and existing != record:
             raise ValueError(f"encounter ID reused with different content: {record.encounter_id}")
         self._records.setdefault(record.encounter_id, record)
-        batch = (self._records[record.encounter_id],)
-        self._ticks[tick] = (signature, batch)
-        return batch[0]
+        stored = self._records[record.encounter_id]
+        entries[record.encounter_id] = (signature, stored)
+        return stored
 
     def _restore_tick(self, tick, signature, records):
         if tick in self._ticks:
             raise ValueError(f"duplicate encounter tick: {tick}")
-        self._ticks[tick] = (signature, records)
+        signatures = json.loads(signature)
+        if not isinstance(signatures, dict) or sorted(signatures) != sorted(x.encounter_id for x in records):
+            raise ValueError("encounter tick signature IDs do not match records")
+        self._ticks[tick] = {
+            record.encounter_id: (signatures[record.encounter_id], record)
+            for record in records
+        }
 
 
 class PresenceSocialAdapter:
@@ -186,12 +201,19 @@ class PresenceSocialAdapter:
             "trust_context": trust_context,
         }
         signature = json.dumps(signature_payload, sort_keys=True, separators=(",", ":"), allow_nan=False)
-        prior_tick = self.ledger._ticks.get(tick)
+        prior_tick = self.ledger._ticks.get(tick, {}).get(encounter_id)
         if prior_tick is not None:
             if prior_tick[0] != signature:
-                raise ValueError(f"conflicting encounter tick replay: {tick}")
-            existing = prior_tick[1][0]
+                raise ValueError(f"conflicting encounter replay: {encounter_id}")
+            existing = prior_tick[1]
             result = self._cached_result(existing, listener, speaker, conversation_adapter)
+            if events is not None:
+                events.append(WorldEventLedger.make_event(
+                    f"npc_encounter:{encounter_id}", tick, "npc_encounter",
+                    participants=existing.participants,
+                    attributes={"location_id": existing.location_id,
+                                "conversation": existing.conversation_id is not None},
+                ))
             return result
 
         prior = self.ledger.get(encounter_id)
