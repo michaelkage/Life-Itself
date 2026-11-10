@@ -23,6 +23,31 @@ class DeterministicPlannerTests(unittest.TestCase):
         ])
         self.assertEqual(planner.plan({"start"}, {"goal"}).actions, ("a-route",))
 
+
+    def test_learned_reliability_breaks_equal_cost_ties_without_rewriting_base_costs(self):
+        planner = DeterministicPlanner([
+            PlanningAction("a-unreliable", frozenset({"start"}), frozenset({"goal"}), cost=2),
+            PlanningAction("z-reliable", frozenset({"start"}), frozenset({"goal"}), cost=2),
+        ])
+        baseline = planner.plan({"start"}, {"goal"})
+        learned = planner.plan(
+            {"start"}, {"goal"},
+            action_reliability={"a-unreliable": 0.0, "z-reliable": 1.0},
+        )
+        self.assertEqual(baseline.actions, ("a-unreliable",))
+        self.assertEqual(learned.actions, ("z-reliable",))
+        self.assertEqual(planner.actions["a-unreliable"].cost, 2)
+        self.assertEqual(planner.actions["z-reliable"].cost, 2)
+
+    def test_reliability_input_is_validated(self):
+        planner = DeterministicPlanner([
+            PlanningAction("go", frozenset({"start"}), frozenset({"goal"})),
+        ])
+        with self.assertRaises(ValueError):
+            planner.plan({"start"}, {"goal"}, action_reliability={"unknown": 0.8})
+        with self.assertRaises(ValueError):
+            planner.plan({"start"}, {"goal"}, action_reliability={"go": 1.1})
+
     def test_preconditions_are_respected(self):
         planner = DeterministicPlanner([
             PlanningAction("unlock", frozenset({"key"}), frozenset({"door-open"})),
