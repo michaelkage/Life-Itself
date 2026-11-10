@@ -367,3 +367,6 @@ NPC emotional state is now part of the composite world checkpoint. Pass `emotion
 
 
 The emotional regulation layer separates felt intensity from outward expression and decision influence. Per-NPC suppression profiles can conceal emotion without changing the underlying state; explicit emotion-to-consideration rules provide transparent, bounded decision contributions without selecting actions. See [docs/NPC-EMOTIONAL-REGULATION.md](docs/NPC-EMOTIONAL-REGULATION.md) and `tests/test_emotional_regulation.py`.
+
+
+NPC stress is now tracked independently from emotion and identity. Individual coping profiles model reappraisal, distraction, support-seeking, suppression costs, resilience, recovery, exhaustion thresholds, and breaking-point assessments. Canonical snapshots preserve stress and replay history. See [docs/NPC-EMOTIONAL-STRESS.md](docs/NPC-EMOTIONAL-STRESS.md) and `tests/test_emotional_stress.py`.
