@@ -4,6 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from .emotional_scars import NPCEmotionalScarLedger
 from .identity_decisions import IdentityDecisionLedger, IdentityChangeDecision
+from .npc_life_history import NPCLifeHistory
 from .scar_identity_proposals import ScarIdentityProposalLedger
 from .world_events import WorldEventLedger
 
@@ -43,11 +44,13 @@ class IdentityEvolutionAuditTrail:
     """
 
     @staticmethod
-    def build(events: WorldEventLedger, scars: NPCEmotionalScarLedger,
-              proposals: ScarIdentityProposalLedger,
+    def build(events: WorldEventLedger, life_history: NPCLifeHistory,
+              scars: NPCEmotionalScarLedger, proposals: ScarIdentityProposalLedger,
               decisions: IdentityDecisionLedger):
         if not isinstance(events, WorldEventLedger):
             raise TypeError("events must be WorldEventLedger")
+        if not isinstance(life_history, NPCLifeHistory):
+            raise TypeError("life_history must be NPCLifeHistory")
         if not isinstance(scars, NPCEmotionalScarLedger):
             raise TypeError("scars must be NPCEmotionalScarLedger")
         if not isinstance(proposals, ScarIdentityProposalLedger):
@@ -56,6 +59,7 @@ class IdentityEvolutionAuditTrail:
             raise TypeError("decisions must be IdentityDecisionLedger")
         journal = {event.event_id: event for event in events.snapshot()}
         scar_index = {scar.scar_id: scar for scar in scars.scars()}
+        memory_index = {memory.memory_id: memory for memory in life_history.memories()}
         decision_index = {
             (item.event_id, item.npc_id, item.policy_id): item
             for item in decisions.entries()
@@ -65,10 +69,13 @@ class IdentityEvolutionAuditTrail:
             proposal = evidence.proposal
             scar = scar_index.get(evidence.scar_id)
             event = journal.get(proposal.event_id)
-            if (scar is None or event is None or scar.owner_id != proposal.npc_id
+            memory = memory_index.get(scar.source_memory_id) if scar is not None else None
+            if (scar is None or event is None or memory is None or scar.owner_id != proposal.npc_id
                     or scar.source_event_id != proposal.event_id
                     or scar.emotion_axis != evidence.emotion_axis
                     or scar.cue_id != evidence.cue_id
+                    or memory.owner_id != proposal.npc_id or memory.event_id != proposal.event_id
+                    or memory.tick > scar.created_tick
                     or event.tick > scar.created_tick
                     or scar.created_tick > evidence.evaluated_tick
                     or event.tick > evidence.evaluated_tick
