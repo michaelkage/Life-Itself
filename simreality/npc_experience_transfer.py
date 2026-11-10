@@ -168,6 +168,7 @@ class StrategicExperienceEvidence:
     source_class: str
     confidence: float
     influence: float
+    tags: tuple[str, ...] = ()
 
     def __post_init__(self):
         for name in ("owner_id", "evidence_id", "event_id", "account", "source_class"):
@@ -178,6 +179,9 @@ class StrategicExperienceEvidence:
             raise ValueError("invalid strategic evidence source class")
         if isinstance(self.tick, bool) or not isinstance(self.tick, int) or self.tick < 0:
             raise ValueError("tick must be a non-negative integer")
+        if (not isinstance(self.tags, tuple) or any(not isinstance(tag, str) or not tag.strip() for tag in self.tags)
+                or len(set(self.tags)) != len(self.tags)):
+            raise ValueError("tags must be unique non-empty strings in a tuple")
         for name in ("confidence", "influence"):
             value = getattr(self, name)
             if (isinstance(value, bool) or not isinstance(value, (int, float))
@@ -219,7 +223,7 @@ def strategic_experience_evidence(history: NPCLifeHistory,
             continue
         evidence.append(StrategicExperienceEvidence(
             owner_id, memory.memory_id, memory.event_id, memory.tick,
-            memory.interpretation, source_class, 1.0, weight))
+            memory.interpretation, source_class, 1.0, weight, memory.tags))
 
     for report in transfers.received_by(owner_id):
         if report.transfer_tick > current_tick:
@@ -227,7 +231,57 @@ def strategic_experience_evidence(history: NPCLifeHistory,
         evidence.append(StrategicExperienceEvidence(
             owner_id, report.transfer_id, report.source_event_id,
             report.transfer_tick, report.account, "reported",
-            report.confidence, 0.35 * report.confidence))
+            report.confidence, 0.35 * report.confidence,
+            next(m.tags for m in history.memories(report.source_npc_id) if m.memory_id == report.source_memory_id)))
 
     evidence.sort(key=lambda x: (-x.tick, -x.influence, x.evidence_id))
     return tuple(evidence[:limit])
+
+
+def experience_action_guidance(history: NPCLifeHistory,
+                               transfers: NPCExperienceTransferLedger,
+                               owner_id: str, current_tick: int, actions,
+                               *, limit: int = 100) -> tuple[dict[str, float], dict[str, tuple[str, ...]]]:
+    """Project explicitly tagged outcome memories onto matching actions.
+
+    Action tags match memory tags exactly. Memories must carry exactly one
+    polarity tag: outcome:success or outcome:failure. Evidence is deduplicated
+    by original event per action, retaining its strongest source.
+    """
+    evidence = strategic_experience_evidence(history, transfers, owner_id,
+                                             current_tick, limit=limit)
+    source_memories = {m.memory_id: m for m in history.memories()}
+    reports = {r.transfer_id: r for r in transfers.snapshot().records}
+    reliability = {}
+    evidence_ids = {}
+    for action_id, action in sorted(actions.items()):
+        action_tags = set(action.experience_tags)
+        if not action_tags:
+            continue
+        matched = {}
+        for item in evidence:
+            memory_id = (item.evidence_id if item.source_class != "reported"
+                         else reports[item.evidence_id].source_memory_id)
+            tags = set(source_memories[memory_id].tags)
+            outcomes = tags & {"outcome:success", "outcome:failure"}
+            if len(outcomes) != 1 or not (action_tags & (tags - outcomes)):
+                continue
+            prior = matched.get(item.event_id)
+            if prior is None or item.influence > prior.influence:
+                matched[item.event_id] = item
+        if not matched:
+            continue
+        weighted_delta = 0.0
+        total_weight = 0.0
+        ids = []
+        for item in sorted(matched.values(), key=lambda x: (x.event_id, x.evidence_id)):
+            memory_id = (item.evidence_id if item.source_class != "reported"
+                         else reports[item.evidence_id].source_memory_id)
+            tags = set(source_memories[memory_id].tags)
+            polarity = 1.0 if "outcome:success" in tags else -1.0
+            weighted_delta += item.influence * polarity * 0.5
+            total_weight += item.influence
+            ids.append(item.evidence_id)
+        reliability[action_id] = min(1.0, max(0.0, (0.5 + weighted_delta) / (1.0 + total_weight)))
+        evidence_ids[action_id] = tuple(sorted(ids))
+    return reliability, evidence_ids
