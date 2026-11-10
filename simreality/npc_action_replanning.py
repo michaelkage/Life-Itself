@@ -212,7 +212,7 @@ class NPCActionReplanningCoordinator:
             if active is not None:
                 if active.owner_id != owner_id:
                     raise ValueError("active execution belongs to another NPC")
-                cancelled = self.executions.cancel(active_execution_id, tick, f"replan: {reason}")
+                self.executions.cancel(active_execution_id, tick, f"replan: {reason}")
                 if self.evaluations is not None:
                     self.evaluations.evaluate(active_execution_id)
                     prior_plan_id = active_execution_id.rsplit(":step:", 1)[0]
