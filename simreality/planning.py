@@ -19,12 +19,17 @@ class PlanningAction:
     add_effects: frozenset[str]
     delete_effects: frozenset[str] = frozenset()
     cost: int = 1
+    experience_tags: tuple[str, ...] = ()
 
     def validate(self) -> None:
         if not self.action_id.strip():
             raise ValueError("action_id must be non-empty")
         if isinstance(self.cost, bool) or not isinstance(self.cost, int) or self.cost <= 0:
             raise ValueError("action cost must be a positive integer")
+        if (not isinstance(self.experience_tags, tuple)
+                or any(not isinstance(tag, str) or not tag.strip() for tag in self.experience_tags)
+                or len(set(self.experience_tags)) != len(self.experience_tags)):
+            raise ValueError("experience_tags must be unique non-empty strings in a tuple")
         if self.add_effects & self.delete_effects:
             raise ValueError("an action cannot add and delete the same fact")
         if any(not isinstance(fact, str) or not fact.strip()
