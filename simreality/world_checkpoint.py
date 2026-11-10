@@ -550,6 +550,25 @@ class SimulationWorldCheckpoint:
         stress_snapshot = components[26]
         conditioning_snapshot = components[27]
         learning_decisions_snapshot = components[28]
+        if learning_decisions_snapshot is not None:
+            npc_ids = {npc.entity_id for npc in NPCCollectionSnapshot.from_json(self.npcs_json).restore().values()}
+            conditioning_records = ({record.record_id: record for record in conditioning_snapshot.restore().records()}
+                                   if conditioning_snapshot is not None else {})
+            if conditioning_snapshot is None:
+                raise ValueError("psychological learning decisions require the corresponding conditioning ledger")
+            journal_events = {event.event_id: event for event in envelope.restore_event_ledger().snapshot()}
+            for item in learning_decisions_snapshot.decisions:
+                decision_id, owner_id, source_event_id, _rule_id, cue, accepted, decision_tick = item[:7]
+                if owner_id not in npc_ids or decision_tick > self.current_tick:
+                    raise ValueError("psychological learning decisions reference an unknown NPC or future tick")
+                source_event = journal_events.get(source_event_id)
+                if source_event is None or source_event.tick > decision_tick or owner_id not in source_event.participants + source_event.witnesses:
+                    raise ValueError("psychological learning decision does not match its source world event")
+                applied = conditioning_records.get(f"psych-learning:{decision_id}")
+                if accepted and (applied is None or (applied.owner_id, applied.source_event_id, applied.cue, applied.tick) != (owner_id, source_event_id, cue, decision_tick)):
+                    raise ValueError("accepted psychological learning decision is missing its conditioning record")
+                if not accepted and applied is not None:
+                    raise ValueError("rejected psychological learning decision cannot have an applied conditioning record")
         if presence_snapshot is not None:
             if any(record.updated_tick > self.current_tick for record in presence_snapshot.records):
                 raise ValueError("NPC presence cannot be updated after the checkpoint tick")
