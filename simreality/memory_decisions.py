@@ -107,7 +107,7 @@ class MemoryDecisionInfluenceAdapter:
             # subsystem cannot overwhelm the rest of the appraisal pipeline.
             total = max(-1.0, min(1.0, sum(value for _, value in entries)))
             raw_total = sum(value for _, value in entries)
-            scale = total / raw_total if raw_total else 0.0
+            scale = total / raw_total if abs(raw_total) > 1.0 else 1.0
             output.append((choice_id, tuple(
                 (memory_id, value * scale) for memory_id, value in entries
             )))
