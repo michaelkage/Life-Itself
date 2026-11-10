@@ -5,7 +5,11 @@ with the authored `PlanningAction` effects and `ActionExecutionPolicy` resource
 costs and duration. It requires the same execution ledger and authoritative
 world-event journal.
 
-Call `evaluate(execution_id)` after an action reaches a terminal state. The
+Call `evaluate(execution_id)` after an action reaches a terminal state. For automatic
+integration, construct `NPCActionReplanningCoordinator(..., evaluations=ledger)`;
+each terminal step returned by `advance()` then carries its
+`NPCActionEvaluation` in `NPCActionProgression.evaluation`. Intermediate
+progress ticks are not evaluated. The
 result records expected and observed fact additions/deletions, missing expected
 effects, unexpected additions, resource deltas, elapsed ticks, deviation flags,
 and exact journal evidence IDs. Cancelled, interrupted, and failed executions
