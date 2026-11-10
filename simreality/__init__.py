@@ -704,3 +704,11 @@ from .integrated_decisions import (
     IntegratedPsychologicalDecisionAdapter,
 )
 __all__ += ["IntegratedChoiceResult", "IntegratedDecisionResult", "IntegratedPsychologicalDecisionAdapter"]
+
+
+# Explicit, owner-specific cognitive dissonance and response history.
+from .cognitive_dissonance import (
+    CognitiveDissonanceLedger, CognitiveDissonanceSnapshot,
+    DissonanceDecision, DissonanceInput,
+)
+__all__ += ["CognitiveDissonanceLedger", "CognitiveDissonanceSnapshot", "DissonanceDecision", "DissonanceInput"]
