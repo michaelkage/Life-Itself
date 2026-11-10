@@ -568,3 +568,9 @@ __all__ += ["RoutineArrivalAdapter", "RoutineArrivalResult"]
 from .presence import NPCPresence, PresenceLedger, PresenceTickAdapter
 from .presence_save_state import PresenceSnapshot
 __all__ += ["NPCPresence", "PresenceLedger", "PresenceTickAdapter", "PresenceSnapshot"]
+
+
+# Presence-gated social encounters and their canonical replay persistence.
+from .presence_encounters import PresenceEncounter, PresenceEncounterResult, PresenceEncounterLedger, PresenceSocialAdapter
+from .presence_encounter_save_state import PresenceEncounterSnapshot
+__all__ += ["PresenceEncounter", "PresenceEncounterResult", "PresenceEncounterLedger", "PresenceSocialAdapter", "PresenceEncounterSnapshot"]
