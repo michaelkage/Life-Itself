@@ -456,3 +456,6 @@ NPC action outcomes can be evaluated against immutable execution records and the
 
 
 Action evaluation history and its bounded reliability projection are also persisted by `SimulationWorldCheckpoint` using `action_evaluations=...`. Restore the execution ledger first, then call `RestoredSimulation.restore_action_evaluation_ledger(executions)`, and pass that ledger to `restore_action_replanning_coordinator(decisions, executions, evaluations)`. The checkpoint validates each evaluation against its terminal execution record, evaluation journal event, and evidence event IDs. Older checkpoints without evaluation state remain compatible. See [docs/NPC-ACTION-EVALUATION.md](docs/NPC-ACTION-EVALUATION.md).
+
+
+Multi-step NPC plans now receive aggregate outcome assessments in addition to per-action evaluations. The aggregate records the goal facts expected by the selected plan, which were actually observed at its terminal step, incomplete goal facts, completed/failed steps, and evidence-linked action deviations. Access the result through `NPCActionProgression.plan_evaluation`; the append-only history is available from `ActionPlanEvaluationLedger.plan_history` and is included in evaluation snapshots and world checkpoints.
