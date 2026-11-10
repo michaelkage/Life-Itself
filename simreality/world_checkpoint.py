@@ -300,9 +300,9 @@ class SimulationWorldCheckpoint:
             encounter_owners = {owner for record in encounter_snapshot.records for owner in record.participants}
             if any(owner not in npcs for owner in encounter_owners):
                 raise ValueError("encounter records reference NPCs missing from checkpoint")
-            if presence_snapshot is None:
+            if (encounter_snapshot.records or encounter_snapshot.ticks) and presence_snapshot is None:
                 raise ValueError("presence encounters require the corresponding presence ledger")
-            known_presence = {record.owner_id: record for record in presence_snapshot.records}
+            known_presence = {record.owner_id: record for record in presence_snapshot.records} if presence_snapshot is not None else {}
             for record in encounter_snapshot.records:
                 if any(owner not in known_presence for owner in record.participants):
                     raise ValueError("encounter participants require saved physical presence")
@@ -493,9 +493,9 @@ class SimulationWorldCheckpoint:
             npc_ids = {npc.entity_id for npc in NPCCollectionSnapshot.from_json(self.npcs_json).restore().values()}
             if any(owner not in npc_ids for record in encounter_snapshot.records for owner in record.participants):
                 raise ValueError("encounter records reference NPCs missing from checkpoint")
-            if presence_snapshot is None:
+            if (encounter_snapshot.records or encounter_snapshot.ticks) and presence_snapshot is None:
                 raise ValueError("presence encounters require the corresponding presence ledger")
-            presence_by_owner = {record.owner_id: record for record in presence_snapshot.records}
+            presence_by_owner = {record.owner_id: record for record in presence_snapshot.records} if presence_snapshot is not None else {}
             trust_by_id = {item.interaction_id: item for item in components[2].interactions}
             conversation_ids = {key for key, _signature, _result in components[5].entries}
             for record in encounter_snapshot.records:
