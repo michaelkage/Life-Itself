@@ -84,8 +84,11 @@ class ScarIdentityProposalSnapshot:
         if not isinstance(self.records, tuple) or any(not isinstance(r, ScarIdentityProposalEvidence) for r in self.records):
             raise ValueError("invalid scar identity proposal records")
         keys = [(r.proposal.event_id, r.proposal.npc_id, r.proposal.policy_id) for r in self.records]
-        if keys != sorted(keys, key=lambda k: next((r.evaluated_tick for r in self.records if (r.proposal.event_id, r.proposal.npc_id, r.proposal.policy_id) == k), 0)) and len(keys) != len(set(keys)):
+        if len(keys) != len(set(keys)):
             raise ValueError("duplicate scar identity proposal records")
+        expected = tuple(sorted(self.records, key=lambda r: (r.evaluated_tick, r.proposal.event_id, r.proposal.npc_id, r.proposal.policy_id)))
+        if self.records != expected:
+            raise ValueError("scar identity proposal records must be chronologically sorted")
 
     @staticmethod
     def _record(r):
