@@ -799,3 +799,15 @@ __all__ += [
     "PersonalityConditionedEmotion", "PersonalityEmotionAdapter",
     "PersonalityEmotionContribution", "PersonalityEmotionRule",
 ]
+
+
+# Persistent, cue-triggered emotional scars with explicit recovery history.
+from .emotional_scars import (
+    EmotionalScar, EmotionalScarContribution, EmotionalScarResponse,
+    NPCEmotionalScarLedger, ScarRecoveryRecord,
+)
+from .emotional_scars_save_state import EmotionalScarSnapshot
+__all__ += [
+    "EmotionalScar", "EmotionalScarContribution", "EmotionalScarResponse",
+    "NPCEmotionalScarLedger", "ScarRecoveryRecord", "EmotionalScarSnapshot",
+]
