@@ -881,9 +881,9 @@ class SimulationWorldCheckpointTests(unittest.TestCase):
             SimulationWorldCheckpoint.capture(4, coordinator, npcs, relationships=missing)
         unrelated = SocialRelationshipLedger((
             RelationshipChange("unrelated-source", "event-1", "listener", "speaker",
-                               3, "warmth", 0.2),
+                               2, "warmth", 0.2),
         ))
-        # Both NPCs must be participants or witnesses of the cited event.
+        # The source event occurs at tick 3, so a claimed change at tick 2 predates it.
         self.assertEqual(len(unrelated.snapshot()), 1)
         with self.assertRaisesRegex(ValueError, "does not match its source world event"):
             SimulationWorldCheckpoint.capture(
