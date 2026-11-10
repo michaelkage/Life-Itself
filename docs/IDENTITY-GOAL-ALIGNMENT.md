@@ -78,3 +78,34 @@ restored_decisions = IdentityGoalReviewSnapshot.from_json(saved).restore()
 `SimulationWorldCheckpoint.capture` now persists the goal-review ledger alongside the GoalBook and identity-decision ledger. Checkpoint validation requires every review to reference an accepted identity decision for the same NPC, source event, policy, axis, and delta; the source event role and all review timestamps are checked again during restore. Legacy checkpoints remain valid because the new field is optional.\n\nThis module is deliberately an advisory bridge and explicit application layer.
 Policy authoring determines what an identity axis means for a goal category;
 the engine does not infer psychological meaning from trait names.
+
+
+## Downstream planning and daily-life integration
+
+An accepted goal review changes the existing GoalBook; it does not directly
+execute an action or force a routine. The existing decision and daily-life
+adapters consume that updated state on their next assessment:
+
+1. IdentityGoalReviewDecisionLedger.apply_accepted applies the separately
+   accepted change exactly once, after its stale-state checks.
+2. NPCDecisionCycle.decide reads the same GoalBook and ranks its currently
+   actionable goals. A changed priority can therefore change which goal is
+   considered first on the next decision tick.
+3. The planner still requires an explicit desired-facts mapping and a valid
+   sequence of actions with satisfied preconditions. If the highest-ranked
+   goal cannot be planned, the cycle tries lower-ranked actionable goals.
+4. GoalLifeAdapter.assess can translate the updated active-goal ranking into
+   advisory routine-priority proposals. It still checks available time,
+   resources, confidence, stress, obligations, social support, and setbacks.
+   It does not edit the routine schedule or execute the activity.
+
+The integration is deliberately pull-based: the planner and daily-life adapter
+read the canonical GoalBook when called. No extra priority cache needs to be
+synchronized, and a restored checkpoint's GoalBook priorities are immediately
+visible to those consumers. The identity-goal decision snapshot preserves
+review provenance and exactly-once markers; the world checkpoint restores the
+goal book and review history as separate, coordinated components.
+
+The regression suite includes an end-to-end planning test proving that a
+separately accepted goal review changes the next selected plan, and a rejection
+test proving that a rejected review leaves the planning choice unchanged.
