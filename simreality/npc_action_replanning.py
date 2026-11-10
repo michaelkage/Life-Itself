@@ -16,6 +16,13 @@ from .world_events import WorldEventLedger
 
 
 @dataclass(frozen=True)
+class NPCActionProgression:
+    execution: object
+    next_active: object | None
+    replanning: NPCReplanningResult | None
+
+
+@dataclass(frozen=True)
 class NPCReplanningResult:
     request_id: str
     owner_id: str
@@ -144,3 +151,53 @@ class NPCActionReplanningCoordinator:
         )
         self._requests[request_id] = (signature, result)
         return result
+
+    def advance(self, execution_id: str, tick: int, world_facts: set[str],
+                resources: dict[str, float], goal_facts, *,
+                interruption: str | None = None,
+                max_expansions: int = 10_000) -> NPCActionProgression:
+        """Advance one action, continue its plan, or replan after failure.
+
+        Each plan step receives its own stable execution ID. The prior action's
+        terminal record remains in the ledger when the next step starts.
+        """
+        active = self.executions.active(execution_id)
+        if active is None:
+            raise KeyError(execution_id)
+        terminal_or_active = self.executions.advance(
+            execution_id, tick, world_facts, resources, interruption=interruption,
+        )
+        if not hasattr(terminal_or_active, "status"):
+            return NPCActionProgression(terminal_or_active, terminal_or_active, None)
+        if terminal_or_active.status != "completed":
+            replanning = self.replan(
+                active.owner_id, tick, world_facts, resources, goal_facts,
+                reason=terminal_or_active.reason,
+                max_expansions=max_expansions,
+            )
+            return NPCActionProgression(terminal_or_active, None, replanning)
+
+        next_index = active.action_index + 1
+        if next_index >= len(active.plan_actions):
+            return NPCActionProgression(terminal_or_active, None, None)
+
+        remaining = active.plan_actions[next_index:]
+        failure = self._resource_failure(remaining, resources)
+        next_id = f"{execution_id.rsplit(':step:', 1)[0]}:step:{next_index}"
+        if failure is None:
+            try:
+                next_active = self.executions.start(
+                    next_id, active.owner_id, tick, remaining[0],
+                    world_facts, resources, plan_actions=active.plan_actions,
+                    action_index=next_index,
+                )
+                return NPCActionProgression(terminal_or_active, next_active, None)
+            except ValueError as exc:
+                failure = str(exc)
+
+        replanning = self.replan(
+            active.owner_id, tick, world_facts, resources, goal_facts,
+            reason=f"remaining plan is no longer feasible: {failure}",
+            max_expansions=max_expansions,
+        )
+        return NPCActionProgression(terminal_or_active, None, replanning)
