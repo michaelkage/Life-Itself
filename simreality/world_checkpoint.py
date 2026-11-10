@@ -493,7 +493,8 @@ class SimulationWorldCheckpoint:
         encounter_snapshot = components[22]
         familiarity_snapshot = components[23]
         relationship_snapshot = components[24]
-        emotional_snapshot = components[25]\n        stress_snapshot = components[26]
+        emotional_snapshot = components[25]
+        stress_snapshot = components[26]
         if presence_snapshot is not None:
             if any(record.updated_tick > self.current_tick for record in presence_snapshot.records):
                 raise ValueError("NPC presence cannot be updated after the checkpoint tick")
@@ -754,7 +755,8 @@ class SimulationWorldCheckpoint:
                        json.dumps(raw["presence_encounters"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("presence_encounters") is not None else None,
                        json.dumps(raw["familiarity"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("familiarity") is not None else None,
                        json.dumps(raw["relationships"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("relationships") is not None else None,
-                       json.dumps(raw["emotions"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("emotions") is not None else None,\n                       json.dumps(raw["stress"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("stress") is not None else None)
+                       json.dumps(raw["emotions"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("emotions") is not None else None,
+                       json.dumps(raw["stress"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("stress") is not None else None)
         except ValueError:
             raise
         except (TypeError, KeyError, IndexError, json.JSONDecodeError) as exc:
@@ -801,7 +803,8 @@ class SimulationWorldCheckpoint:
         familiarity = familiarity_snapshot.restore() if familiarity_snapshot is not None else None
         relationship_snapshot = SocialRelationshipSnapshot.from_json(self.relationships_json) if self.relationships_json is not None else None
         relationships = relationship_snapshot.restore() if relationship_snapshot is not None else None
-        emotions = emotional_snapshot.restore() if emotional_snapshot is not None else None\n        stress = stress_snapshot.restore() if stress_snapshot is not None else None
+        emotions = emotional_snapshot.restore() if emotional_snapshot is not None else None
+        stress = stress_snapshot.restore() if stress_snapshot is not None else None
         return RestoredSimulation(self.current_tick, events, npcs, trust, beliefs,
                                   memory, conversations, coordinator, self.metadata,
                                   consequence_recorder, campaign, misconduct, routines, routine_executions,
