@@ -462,3 +462,6 @@ Multi-step NPC plans now receive aggregate outcome assessments in addition to pe
 
 
 NPC replanning now incorporates evidence-bounded learning. Once enough terminal observations exist, action reliability adjusts proposal costs without changing declared action costs. Aggregate plan reliability is learned separately for each goal and ordered action sequence, allowing previously unreliable routes to receive a bounded risk premium. Unobserved interruptions do not become fabricated plan outcome samples. Both projections persist with action-evaluation snapshots and world checkpoints.
+
+
+NPC strategic experience transfer is now available as a provenance-safe component in `simreality/npc_experience_transfer.py`. A recipient stores a reported account—not a personal memory—with links to the source autobiographical memory, original event, source role, and later communication event. Transfers are idempotent and component snapshots revalidate their evidence chain. See `docs/NPC-EXPERIENCE-TRANSFER.md` and `tests/test_npc_experience_transfer.py`. This component snapshot is not yet part of the composite world checkpoint.
