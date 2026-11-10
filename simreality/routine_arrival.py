@@ -78,8 +78,21 @@ class RoutineArrivalAdapter:
             block = blocks.get(journey.routine_id)
             if block is None or block.owner_id != journey.owner_id or block.location_id != journey.destination:
                 raise ValueError(f"arrived journey does not match a saved routine: {journey.journey_id}")
-            execution_id = f"arrival:{journey.journey_id}:{block.routine_id}"
+            execution_prefix = f"arrival:{journey.journey_id}:{block.routine_id}:"
+            execution_id = f"{execution_prefix}{tick}"
             previous = self.executions.get(execution_id)
+            if previous is None:
+                earlier = next(
+                    (item for item in self.executions.snapshot()
+                     if item.execution_id.startswith(execution_prefix)),
+                    None,
+                )
+                if earlier is not None:
+                    results.append(RoutineArrivalResult(
+                        journey.journey_id, block.routine_id, block.owner_id,
+                        "already_executed", earlier,
+                    ))
+                    continue
             if minute_of_day < block.start_minute and previous is None:
                 results.append(RoutineArrivalResult(
                     journey.journey_id, block.routine_id, block.owner_id, "waiting",
