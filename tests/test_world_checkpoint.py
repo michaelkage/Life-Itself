@@ -749,6 +749,10 @@ class SimulationWorldCheckpointTests(unittest.TestCase):
         self.assertIsNotNone(restored.familiarity)
         self.assertEqual(restored.familiarity.snapshot(), familiarity_adapter.ledger.snapshot())
         self.assertAlmostEqual(restored.familiarity.familiarity("speaker", "listener"), 0.8)
+        recognition = restored.familiarity.assess_recognition(
+            "speaker", "listener", identity_cue_available=True, threshold=0.7,
+        )
+        self.assertTrue(recognition.recognized)
         self.assertEqual(
             SimulationWorldCheckpoint.capture(
                 4, restored.coordinator, restored.npcs, presence=restored.presence,
