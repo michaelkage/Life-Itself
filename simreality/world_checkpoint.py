@@ -668,6 +668,30 @@ class SimulationWorldCheckpoint:
         emotional_scars_snapshot = components[31]
         emotional_scar_decisions_snapshot = components[32]
         scar_identity_proposal_snapshot = components[33]
+        if scar_identity_proposal_snapshot is not None:
+            if emotional_scars_snapshot is None or identity_decisions is None:
+                raise ValueError("scar identity proposals require emotional scars and identity decisions")
+            scar_by_id = {scar.scar_id: scar for scar in emotional_scars_snapshot.restore().scars()}
+            journal = {event.event_id: event for event in envelope.restore_event_ledger().snapshot()}
+            for evidence in scar_identity_proposal_snapshot.records:
+                proposal = evidence.proposal
+                scar = scar_by_id.get(evidence.scar_id)
+                source = journal.get(proposal.event_id)
+                if (scar is None or scar.owner_id != proposal.npc_id or scar.source_event_id != proposal.event_id
+                        or scar.emotion_axis != evidence.emotion_axis or scar.cue_id != evidence.cue_id
+                        or source is None or source.tick > evidence.evaluated_tick
+                        or evidence.evaluated_tick > self.current_tick or evidence.evaluated_tick < scar.created_tick
+                        or proposal.evidence_strength != evidence.severity):
+                    raise ValueError("scar identity proposal provenance does not match saved scar and event history")
+                if proposal.npc_id not in {profile[0] for profile in identity_decisions.profiles}:
+                    raise ValueError("scar identity proposal references an unknown identity profile")
+                matches = [d for d in identity_decisions.decisions if d[1] == proposal.event_id
+                           and d[2] == proposal.npc_id and d[3] == proposal.policy_id]
+                if len(matches) > 1 or (matches and (
+                        matches[0][4] != proposal.axis or matches[0][8] != proposal.before
+                        or matches[0][9] != proposal.after or matches[0][10] != proposal.delta
+                        or matches[0][12] != proposal.role)):
+                    raise ValueError("identity decision disagrees with its scar-informed proposal")
         if emotional_scar_decisions_snapshot is not None:
             if life_history_snapshot is None or emotional_scars_snapshot is None:
                 raise ValueError("emotional scar decisions require autobiographical life history and the corresponding scar ledger")
