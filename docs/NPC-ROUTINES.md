@@ -198,3 +198,28 @@ version 1 snapshots remain readable. Because the snapshot is included in
 the matching `RoutineBook` (routine ID, owner, and destination are validated).
 A commute in progress therefore retains its routine purpose after save/load. Regression coverage is in
 `tests/test_routine_travel.py`.
+
+
+## Arrival-gated routine execution
+
+`RoutineArrivalAdapter` is the hand-off from completed travel to scheduled
+activity. It scans only journeys whose status is `arrived` and which carry a
+`routine_id`; the journey owner and destination must still match the saved
+routine block. An NPC who arrives before the scheduled start waits at the
+destination and no execution record is created. Arrival during the block
+executes the activity, with lateness consuming the block's explicit flexibility
+window. Arrival after the block ends is recorded as missed, or redirected only
+when that routine defines an explicit fallback. A late arrival beyond the
+flexibility window follows the same fallback/missed rule.
+
+Execution IDs are derived from the journey and routine IDs, so duplicate
+processing or replay after restore returns the stored execution instead of
+applying the activity twice. The existing `RoutineExecutionSnapshot` and
+`SimulationWorldCheckpoint` persist those records; the arrived journey itself
+is already retained by `TravelSnapshot`. Optionally pass a
+`RoutineWorldEventAdapter` to materialize the resolved activity as a
+`routine_execution` event on the shared timeline. The world driver remains
+responsible for supplying the simulation minute, disruptions, deterministic
+outcome samples, and any later activity-specific consequences.
+
+Regression coverage: `tests/test_routine_arrival.py`.
