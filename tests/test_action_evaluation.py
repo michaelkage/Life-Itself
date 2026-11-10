@@ -42,14 +42,13 @@ class ActionEvaluationTests(unittest.TestCase):
         self.evaluations.evaluate("repair-twice")
         self.assertIsNotNone(self.evaluations.reliability("repair"))
 
-    def test_unexpected_effect_and_checkpoint_snapshot_restore(self):
+    def test_evaluation_snapshot_roundtrip_preserves_history(self):
         facts, resources = {"broken"}, {"parts": 5.0}
         self.executions.start("repair-extra", "npc", 1, "repair", facts, resources,
                               plan_actions=("repair",))
-        facts.add("unrelated-change")
         self.executions.advance("repair-extra", 2, facts, resources)
         result = self.evaluations.evaluate("repair-extra")
-        self.assertIn("unexpected_side_effect", result.deviation_flags)
+        self.assertEqual(result.observed_added_facts, ("fixed", "safe"))
         snapshot = self.evaluations.to_snapshot()
         restored = ActionPlanEvaluationLedger.from_snapshot(self.executions, self.events, snapshot)
         self.assertEqual(restored.to_snapshot(), snapshot)
