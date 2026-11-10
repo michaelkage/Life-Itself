@@ -439,3 +439,11 @@ The [NPC action execution and recovery layer](docs/NPC-ACTION-EXECUTION.md) take
 
 
 NPC action execution state can be included in `SimulationWorldCheckpoint` with `action_executions`, `action_world_facts`, and `action_resources`. Restore the checkpoint, then call `RestoredSimulation.restore_action_execution_ledger(planner, policies)` to resume active actions against the restored world event journal and resource/fact state.
+
+The [NPC action replanning coordinator](docs/NPC-ACTION-EXECUTION.md) connects
+live world facts, current GoalBook priorities, symbolic planning, resource
+feasibility checks, and the persistent action executor. Explicit replanning
+after interruptions or changed priorities cancels obsolete active work,
+preserves execution history, and starts the first action of a feasible
+replacement plan. Replan requests are replay-safe and journaled. Tests:
+`tests/test_npc_action_replanning.py`.
