@@ -46,6 +46,8 @@ class PresenceEncounter:
                 or any(not isinstance(x, str) or not x.strip() for x in self.trust_interaction_ids)
                 or tuple(sorted(set(self.trust_interaction_ids))) != self.trust_interaction_ids):
             raise ValueError("trust interaction IDs must be unique, non-empty, and sorted")
+        if self.trust_interaction_ids and len(self.trust_interaction_ids) != 2:
+            raise ValueError("a bilateral encounter must record both trust directions")
 
 
 @dataclass(frozen=True)
