@@ -51,3 +51,25 @@ After restoring the world, reconstruct in this order:
 The restored coordinator uses the restored evaluation ledger for subsequent
 terminal action steps. Checkpoints created before evaluation persistence remain
 valid and simply return no evaluation snapshot.
+
+
+## Aggregate multi-step plan evaluation
+
+The same ledger also evaluates the outcome of a complete goal-directed plan.
+The replanning coordinator registers each selected plan with its owner, goal,
+ordered action IDs, and expected goal facts. As steps terminate, their immutable
+action evaluations are retained. When the plan completes, fails, or is
+superseded by a replan, `NPCActionProgression.plan_evaluation` carries an
+`NPCPlanEvaluation`.
+
+The aggregate compares the expected goal facts with the final facts observed
+in the last terminal execution record. It reports achieved and missing goal
+facts, completed and failed action steps, action-level deviations, terminal
+status, and the combined evidence event IDs. A plan is not considered
+successful merely because its individual actions returned `completed`: the
+goal facts must also be present.
+
+Aggregate evaluations are replay-safe and included in the same
+`ActionEvaluationSnapshot` and composite world checkpoint as individual
+action evaluations. The event journal records each result as
+`npc_plan_evaluated`.
