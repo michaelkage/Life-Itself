@@ -160,6 +160,8 @@ class ActionPlanEvaluationLedger:
             flags.add(terminal_status)
         if missing_goal_facts:
             flags.add("goal_not_achieved")
+        for action_evaluation in evaluations:
+            flags.update(f"action_deviation:{flag}" for flag in action_evaluation.deviation_flags)
         if len(records) < len(expected_actions) and terminal_status == "completed":
             flags.add("plan_steps_incomplete")
         evidence = tuple(dict.fromkeys(
@@ -321,9 +323,10 @@ class ActionPlanEvaluationLedger:
             record = self.executions.get(execution_id)
             if record is None or record.owner_id != data["owner_id"] or record.action_id != data["action_id"]:
                 raise ValueError("evaluation references an unknown or mismatched execution")
-            event = self.events.get(data["evaluation_id"])
-            if event is None:
-                raise ValueError("evaluation is missing its authoritative world event")
+            try:
+                event = self.events.get(data["evaluation_id"])
+            except KeyError as exc:
+                raise ValueError("evaluation is missing its authoritative world event") from exc
             attrs = dict(event.attributes)
             if (event.event_type != "npc_action_evaluated" or event.tick != record.tick
                     or event.participants != (record.owner_id,)
@@ -339,8 +342,10 @@ class ActionPlanEvaluationLedger:
                 values[key] = tuple((x[0], x[1]) for x in values[key])
             evaluation = NPCActionEvaluation(**values)
             for evidence_id in evaluation.evidence_event_ids:
-                if self.events.get(evidence_id) is None:
-                    raise ValueError("evaluation references missing evidence event")
+                try:
+                    self.events.get(evidence_id)
+                except KeyError as exc:
+                    raise ValueError("evaluation references missing evidence event") from exc
             restored[execution_id] = evaluation
         learning = raw["learning"]
         if not isinstance(learning, dict):
@@ -372,7 +377,10 @@ class ActionPlanEvaluationLedger:
                 values[key] = tuple(values[key])
             item = NPCPlanEvaluation(**values)
             plan = plans.get(item.plan_id)
-            event = self.events.get(f"npc-plan-evaluation:{item.plan_id}")
+            try:
+                event = self.events.get(f"npc-plan-evaluation:{item.plan_id}")
+            except KeyError:
+                event = None
             records = [record for record in self.executions.snapshot()
                        if record.execution_id.startswith(item.plan_id + ":step:")]
             records.sort(key=lambda record: int(record.execution_id.rsplit(":step:", 1)[1]))
@@ -386,10 +394,16 @@ class ActionPlanEvaluationLedger:
                     or tuple(record.action_id for record in records if record.status == "completed") != item.completed_actions
                     or tuple(record.action_id for record in records if record.status != "completed") != item.failed_actions
                     or set(item.observed_goal_facts) | set(item.missing_goal_facts) != set(item.expected_goal_facts)
-                    or set(item.observed_goal_facts) & set(item.missing_goal_facts)):
+                    or set(item.observed_goal_facts) & set(item.missing_goal_facts)
+                    or not 0.0 <= item.confidence <= 1.0):
                 raise ValueError("aggregate plan evaluation lacks matching plan, records, or event provenance")
-            if any(self.events.get(event_id) is None for event_id in item.evidence_event_ids):
-                raise ValueError("aggregate plan evaluation references missing evidence")
+            for evidence_id in item.evidence_event_ids:
+                try:
+                    evidence_event = self.events.get(evidence_id)
+                except KeyError as exc:
+                    raise ValueError("aggregate plan evaluation references missing evidence") from exc
+                if item.owner_id not in evidence_event.participants:
+                    raise ValueError("aggregate plan evaluation evidence has a different owner")
             plan_evaluations[item.plan_id] = item
         self._evaluations = restored
         self._learning = {key: dict(value) for key, value in learning.items()}
