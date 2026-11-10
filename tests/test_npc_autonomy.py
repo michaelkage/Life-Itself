@@ -88,5 +88,114 @@ class NPCDecisionCycleTests(unittest.TestCase):
         self.assertIn("rent", result.reason)
 
 
+    def test_accepted_identity_goal_review_changes_the_next_planning_choice(self):
+        from simreality.identity_decisions import IdentityChangeDecision
+        from simreality.identity_goal_alignment import (
+            IdentityGoalAction, IdentityGoalAlignmentAdapter,
+            IdentityGoalAlignmentPolicy, IdentityGoalReviewDecision,
+            IdentityGoalReviewDecisionLedger,
+        )
+
+        goals = GoalBook()
+        goals.add(NPCGoal("career", "npc-1", "career", priority=5.0))
+        goals.add(NPCGoal("security", "npc-1", "security", priority=6.0))
+        planner = DeterministicPlanner([
+            PlanningAction("advance-career", frozenset({"employed"}),
+                           frozenset({"career-progress"})),
+            PlanningAction("secure-home", frozenset({"employed"}),
+                           frozenset({"home-secure"})),
+        ])
+        cycle = NPCDecisionCycle(goals, planner)
+        goal_facts = {
+            "career": {"career-progress"},
+            "security": {"home-secure"},
+        }
+
+        before = cycle.decide("npc-1", 4, {"employed"}, goal_facts)
+        self.assertEqual(before.goal_id, "security")
+
+        identity_decision = IdentityChangeDecision(
+            "identity-career-1", "event-career-1", "npc-1",
+            "ambition-policy", "ambition", True, 4,
+            "I now value professional growth", 0.0, 0.3, 0.3, 0.8,
+            "participant",
+        )
+        adapter = IdentityGoalAlignmentAdapter(goals, (
+            IdentityGoalAlignmentPolicy(
+                "ambition-career", "ambition", "career",
+                IdentityGoalAction.REPRIORITIZE,
+                minimum_abs_delta=0.1, priority_delta=3.0,
+            ),
+        ))
+        proposal, = adapter.assess((identity_decision,), current_tick=4)
+        ledger = IdentityGoalReviewDecisionLedger()
+        review = IdentityGoalReviewDecision(
+            "career-review-1", proposal, True, 5,
+            "This goal now matters more to me",
+        )
+        ledger.record(review)
+
+        # Identity acceptance alone is insufficient; the separate goal review
+        # must be accepted and applied before planning sees the new priority.
+        self.assertEqual(cycle.decide("npc-1", 5, {"employed"}, goal_facts).goal_id,
+                         "security")
+        self.assertTrue(ledger.apply_accepted("career-review-1", goals))
+        after = cycle.decide("npc-1", 5, {"employed"}, goal_facts)
+        self.assertEqual(after.goal_id, "career")
+        self.assertEqual(after.plan.actions, ("advance-career",))
+        self.assertEqual(goals.goals["career"].priority, 8.0)
+
+    def test_rejected_identity_goal_review_cannot_change_planning_choice(self):
+        from simreality.identity_decisions import IdentityChangeDecision
+        from simreality.identity_goal_alignment import (
+            IdentityGoalAction, IdentityGoalAlignmentAdapter,
+            IdentityGoalAlignmentPolicy, IdentityGoalReviewDecision,
+            IdentityGoalReviewDecisionLedger,
+        )
+
+        goals = GoalBook()
+        goals.add(NPCGoal("career", "npc-1", "career", priority=5.0))
+        goals.add(NPCGoal("security", "npc-1", "security", priority=6.0))
+        identity_decision = IdentityChangeDecision(
+            "identity-career-2", "event-career-2", "npc-1",
+            "ambition-policy", "ambition", True, 4,
+            "I now value professional growth", 0.0, 0.3, 0.3, 0.8,
+            "participant",
+        )
+        adapter = IdentityGoalAlignmentAdapter(goals, (
+            IdentityGoalAlignmentPolicy(
+                "ambition-career", "ambition", "career",
+                IdentityGoalAction.REPRIORITIZE,
+                minimum_abs_delta=0.1, priority_delta=3.0,
+            ),
+        ))
+        proposal, = adapter.assess((identity_decision,), current_tick=4)
+        ledger = IdentityGoalReviewDecisionLedger((
+            IdentityGoalReviewDecision(
+                "career-review-rejected", proposal, False, 5,
+                "I want to keep my current priorities",
+            ),
+        ))
+        planner = DeterministicPlanner([
+            PlanningAction("advance-career", frozenset({"employed"}),
+                           frozenset({"career-progress"})),
+            PlanningAction("secure-home", frozenset({"employed"}),
+                           frozenset({"home-secure"})),
+        ])
+        cycle = NPCDecisionCycle(goals, planner)
+        before = cycle.decide(
+            "npc-1", 5, {"employed"},
+            {"career": {"career-progress"}, "security": {"home-secure"}},
+        )
+        with self.assertRaisesRegex(ValueError, "rejected"):
+            ledger.apply_accepted("career-review-rejected", goals)
+        after = cycle.decide(
+            "npc-1", 5, {"employed"},
+            {"career": {"career-progress"}, "security": {"home-secure"}},
+        )
+        self.assertEqual(before, after)
+        self.assertEqual(after.goal_id, "security")
+
+
 if __name__ == "__main__":
     unittest.main()
