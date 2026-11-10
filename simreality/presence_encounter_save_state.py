@@ -43,6 +43,14 @@ class PresenceEncounterSnapshot:
                 raise ValueError("invalid encounter tick")
             if not isinstance(records, tuple) or any(not isinstance(x, PresenceEncounter) for x in records):
                 raise ValueError("tick records must contain PresenceEncounter values")
+            if [(x.tick, x.encounter_id) for x in records] != sorted((x.tick, x.encounter_id) for x in records):
+                raise ValueError("tick encounter records must be canonically ordered")
+            try:
+                signatures = json.loads(signature)
+            except json.JSONDecodeError as exc:
+                raise ValueError("invalid encounter tick signature") from exc
+            if not isinstance(signatures, dict) or sorted(signatures) != sorted(x.encounter_id for x in records):
+                raise ValueError("encounter tick signature IDs do not match records")
 
     @classmethod
     def capture(cls, ledger):
