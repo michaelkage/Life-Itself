@@ -215,7 +215,7 @@ flexibility window follows the same fallback/missed rule.
 Execution IDs are derived from the journey, routine, and processing tick.
 A same-tick retry must reproduce the exact request and result; a later tick
 recognizes the journey's prior execution and cannot execute that activity again.
-The existing `RoutineExecutionSnapshot` and `SimulationWorldCheckpoint` persist those records, and the arrived journey itself is already retained by `TravelSnapshot`. The existing `RoutineExecutionSnapshot` and
+The existing `RoutineExecutionSnapshot` and
 `SimulationWorldCheckpoint` persist those records; the arrived journey itself
 is already retained by `TravelSnapshot`. Optionally pass a
 `RoutineWorldEventAdapter` to materialize the resolved activity as a
