@@ -899,7 +899,7 @@ class SimulationWorldCheckpointTests(unittest.TestCase):
             4, coordinator.events.snapshot(),
             event_rules=(
                 EmotionalEventRule("incident-grief", "incident", "witness", "grief", 0.7),
-                EmotionalEventRule("incident-anger", "incident", "participant", "anger", 0.3),
+                EmotionalEventRule("incident-anger", "incident", "witness", "anger", 0.3),
             ),
         )
         payload = SimulationWorldCheckpoint.capture(
