@@ -70,6 +70,13 @@ class PsychologicalLearningDecisionTests(unittest.TestCase):
         self.assertEqual(restored.entries(), ledger.entries())
         self.assertEqual(PsychologicalLearningDecisionSnapshot.capture(restored).to_json(), encoded)
 
+    def test_snapshot_rejects_boolean_schema_version(self):
+        encoded = PsychologicalLearningDecisionSnapshot.capture(
+            PsychologicalLearningDecisionLedger()).to_json()
+        malformed = encoded.replace('"schema_version":1', '"schema_version":true', 1)
+        with self.assertRaisesRegex(ValueError, "schema"):
+            PsychologicalLearningDecisionSnapshot.from_json(malformed)
+
     def test_failed_application_does_not_record_decision(self):
         ledger = PsychologicalLearningDecisionLedger()
         with self.assertRaisesRegex(ValueError, "profile owner"):
