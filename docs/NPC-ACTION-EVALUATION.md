@@ -30,3 +30,24 @@ are validated against terminal records and their `npc_action_evaluated`
 journal events.
 
 Tests: `tests/test_action_evaluation.py`.
+
+
+## Composite world checkpoint integration
+
+Pass the same evaluation ledger used by the replanning coordinator as
+`action_evaluations=...` to `SimulationWorldCheckpoint.capture`, alongside
+`action_executions`, `action_world_facts`, `action_resources`, and
+`action_replanning`. Capture rejects mismatched execution ledgers, event
+journals, or coordinator bindings, and validates every evaluation against its
+terminal execution, its `npc_action_evaluated` event, and all evidence event
+IDs. Evaluation state cannot be checkpointed without its execution state.
+
+After restoring the world, reconstruct in this order:
+
+1. `restore_action_execution_ledger(planner, policies)`
+2. `restore_action_evaluation_ledger(executions)`
+3. `restore_action_replanning_coordinator(decisions, executions, evaluations)`
+
+The restored coordinator uses the restored evaluation ledger for subsequent
+terminal action steps. Checkpoints created before evaluation persistence remain
+valid and simply return no evaluation snapshot.
