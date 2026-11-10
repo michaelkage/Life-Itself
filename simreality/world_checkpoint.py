@@ -645,6 +645,7 @@ class SimulationWorldCheckpoint:
             MemoryReflectionSnapshot.from_json(self.memory_reflections_json) if self.memory_reflections_json is not None else None,
             EmotionalScarSnapshot.from_json(self.emotional_scars_json) if self.emotional_scars_json is not None else None,
             EmotionalScarDecisionSnapshot.from_json(self.emotional_scar_decisions_json) if self.emotional_scar_decisions_json is not None else None,
+            ScarIdentityProposalSnapshot.from_json(self.scar_identity_proposals_json) if self.scar_identity_proposals_json is not None else None,
         )
         goals_snapshot, goal_replay, goal_review_decisions = components[14], components[15], components[16]
         identity_decisions = components[17]
@@ -1124,9 +1125,10 @@ class SimulationWorldCheckpoint:
         life_history = life_history_snapshot.restore() if life_history_snapshot is not None else None
         memory_reflections = memory_reflections_snapshot.restore(life_history) if memory_reflections_snapshot is not None else None
         emotional_scars = emotional_scars_snapshot.restore() if emotional_scars_snapshot is not None else None
-        emotional_scar_decisions = emotional_scar_decisions_snapshot.restore() if emotional_scar_decisions_snapshot is not None else None\n        scar_identity_proposals = ScarIdentityProposalLedger.from_snapshot(scar_identity_proposal_snapshot) if scar_identity_proposal_snapshot is not None else None
+        emotional_scar_decisions = emotional_scar_decisions_snapshot.restore() if emotional_scar_decisions_snapshot is not None else None
+        scar_identity_proposals = ScarIdentityProposalLedger.from_snapshot(scar_identity_proposal_snapshot) if scar_identity_proposal_snapshot is not None else None\n        scar_identity_proposals = ScarIdentityProposalLedger.from_snapshot(scar_identity_proposal_snapshot) if scar_identity_proposal_snapshot is not None else None
         return RestoredSimulation(self.current_tick, events, npcs, trust, beliefs,
                                   memory, conversations, coordinator, self.metadata,
                                   consequence_recorder, campaign, misconduct, routines, routine_executions,
                                   routine_institutions, institutional_politics, goals, goal_event_replay,
-                                  goal_review_decisions, identity_decisions, testimony_inquiries, testimony, travel, presence, presence_encounters, familiarity, relationships, emotions, stress, conditioning, psychological_learning_decisions, life_history, memory_reflections, emotional_scars, emotional_scar_decisions)
+                                  goal_review_decisions, identity_decisions, testimony_inquiries, testimony, travel, presence, presence_encounters, familiarity, relationships, emotions, stress, conditioning, psychological_learning_decisions, life_history, memory_reflections, emotional_scars, emotional_scar_decisions, scar_identity_proposals)
