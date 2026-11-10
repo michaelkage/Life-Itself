@@ -919,7 +919,8 @@ class SimulationWorldCheckpoint:
                        json.dumps(raw["relationships"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("relationships") is not None else None,
                        json.dumps(raw["emotions"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("emotions") is not None else None,
                        json.dumps(raw["stress"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("stress") is not None else None,
-                       json.dumps(raw["conditioning"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("conditioning") is not None else None,\n                       json.dumps(raw["psychological_learning_decisions"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("psychological_learning_decisions") is not None else None,
+                       json.dumps(raw["conditioning"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("conditioning") is not None else None,
+                       json.dumps(raw["psychological_learning_decisions"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("psychological_learning_decisions") is not None else None,
                        json.dumps(raw["life_history"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("life_history") is not None else None)
         except ValueError:
             raise
