@@ -61,6 +61,37 @@ class MemoryDecisionInfluence:
     # choice_id -> (memory_id, signed contribution), sorted and bounded in aggregate.
     choice_contributions: tuple[tuple[str, tuple[tuple[str, float], ...]], ...]
 
+    def __post_init__(self):
+        if not isinstance(self.owner_id, str) or not self.owner_id.strip():
+            raise ValueError("owner_id must be a non-empty string")
+        if isinstance(self.current_tick, bool) or not isinstance(self.current_tick, int) or self.current_tick < 0:
+            raise ValueError("current_tick must be a non-negative integer")
+        if not isinstance(self.choice_contributions, tuple):
+            raise TypeError("choice_contributions must be a tuple")
+        choices = []
+        for choice_id, values in self.choice_contributions:
+            if not isinstance(choice_id, str) or not choice_id.strip():
+                raise ValueError("choice IDs must be non-empty strings")
+            if not isinstance(values, tuple):
+                raise TypeError("each choice contribution collection must be a tuple")
+            memory_ids = []
+            total = 0.0
+            for memory_id, value in values:
+                if not isinstance(memory_id, str) or not memory_id.strip():
+                    raise ValueError("memory IDs must be non-empty strings")
+                if (isinstance(value, bool) or not isinstance(value, (int, float))
+                        or not math.isfinite(value) or not -1.0 <= value <= 1.0):
+                    raise ValueError("memory contributions must be finite and in [-1, 1]")
+                memory_ids.append(memory_id)
+                total += value
+            if memory_ids != sorted(set(memory_ids)):
+                raise ValueError("memory contribution IDs must be unique and sorted")
+            if not -1.000000000001 <= total <= 1.000000000001:
+                raise ValueError("aggregate choice memory influence must be in [-1, 1]")
+            choices.append(choice_id)
+        if choices != sorted(set(choices)):
+            raise ValueError("choice contributions must be unique and sorted")
+
     def contributions_for(self, choice_id: str) -> tuple[tuple[str, float], ...]:
         for key, values in self.choice_contributions:
             if key == choice_id:
