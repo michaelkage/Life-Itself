@@ -285,3 +285,55 @@ def experience_action_guidance(history: NPCLifeHistory,
         reliability[action_id] = min(1.0, max(0.0, (0.5 + weighted_delta) / (1.0 + total_weight)))
         evidence_ids[action_id] = tuple(sorted(ids))
     return reliability, evidence_ids
+
+
+def experience_goal_guidance(history: NPCLifeHistory,
+                              transfers: NPCExperienceTransferLedger,
+                              owner_id: str, current_tick: int, goals,
+                              *, limit: int = 100):
+    """Return bounded, read-only goal priority adjustments and their provenance.
+
+    Goals opt in through comma-separated exact tags in
+    goal.metadata["experience_tags"]. Memories must carry one explicit
+    goal:success or goal:failure marker plus a matching tag. Action outcome
+    memories are deliberately not treated as goal outcome evidence.
+    """
+    evidence = strategic_experience_evidence(history, transfers, owner_id,
+                                             current_tick, limit=limit)
+    memories = {m.memory_id: m for m in history.memories()}
+    reports = {r.transfer_id: r for r in transfers.snapshot().records}
+    adjustments, evidence_ids, sources = {}, {}, {}
+    for goal in sorted(goals.goals.values(), key=lambda item: item.goal_id):
+        if goal.owner_id != owner_id:
+            continue
+        tags = {tag.strip() for tag in goal.metadata.get("experience_tags", "").split(",")
+                if tag.strip()}
+        if not tags:
+            continue
+        matched = {}
+        for item in evidence:
+            memory_id = (item.evidence_id if item.source_class != "reported"
+                         else reports[item.evidence_id].source_memory_id)
+            memory_tags = set(memories[memory_id].tags)
+            outcomes = memory_tags & {"goal:success", "goal:failure"}
+            if len(outcomes) != 1 or not (tags & (memory_tags - outcomes)):
+                continue
+            prior = matched.get(item.event_id)
+            if prior is None or item.influence > prior.influence:
+                matched[item.event_id] = item
+        if not matched:
+            continue
+        delta, total = 0.0, 0.0
+        ids = []
+        for item in sorted(matched.values(), key=lambda x: (x.event_id, x.evidence_id)):
+            memory_id = (item.evidence_id if item.source_class != "reported"
+                         else reports[item.evidence_id].source_memory_id)
+            polarity = 1.0 if "goal:success" in memories[memory_id].tags else -1.0
+            delta += item.influence * polarity
+            total += item.influence
+            ids.append(item.evidence_id)
+        adjustments[goal.goal_id] = max(-0.25, min(0.25, 0.25 * delta / (1.0 + total)))
+        evidence_ids[goal.goal_id] = tuple(sorted(ids))
+        for item in matched.values():
+            sources[item.evidence_id] = item.source_class
+    return adjustments, evidence_ids, sources
