@@ -248,6 +248,8 @@ Belief-aware choice appraisal is documented in [docs/NPC-BELIEF-AWARE-APPRAISAL.
 
 Observer-specific trust is documented in [docs/NPC-SOCIAL-TRUST.md](docs/NPC-SOCIAL-TRUST.md), with regression tests in `tests/test_social_trust.py`. Trust remains distinct from objective truth and global reputation.
 
+Directional familiarity and cue-gated recognition are documented in [docs/NPC-FAMILIARITY.md](docs/NPC-FAMILIARITY.md), with regression tests in `tests/test_social_familiarity.py`.
+
 
 Trust-aware belief integration is documented in [docs/NPC-SOCIAL-BELIEFS.md](docs/NPC-SOCIAL-BELIEFS.md), with regression coverage in `tests/test_social_beliefs.py`. Trust is sampled when an NPC hears a report; later trust changes do not silently rewrite past beliefs.
 
