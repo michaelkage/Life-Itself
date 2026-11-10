@@ -663,3 +663,14 @@ from .psychological_triggers import (
 __all__ += [
     "PsychologicalTrigger", "PsychologicalTriggerAdapter", "TriggerActivation",
 ]
+
+
+# Observer-specific interpretation proposals from immutable world events.
+from .psychological_interpretation import (
+    EventInterpretationRule, LearningProposal, NPCEventInterpreter,
+    NPCInterpretationProfile,
+)
+__all__ += [
+    "EventInterpretationRule", "LearningProposal", "NPCEventInterpreter",
+    "NPCInterpretationProfile",
+]
