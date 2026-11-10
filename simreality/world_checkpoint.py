@@ -52,6 +52,7 @@ from .emotional_stress import NPCStressLedger
 from .emotional_stress_save_state import NPCStressSnapshot
 from .psychological_conditioning import NPCConditioningLedger, NPCConditioningSnapshot
 from .psychological_learning_decisions import PsychologicalLearningDecisionSnapshot, PsychologicalLearningDecisionLedger
+from .npc_life_history import NPCLifeHistory, LifeHistorySnapshot
 
 
 @dataclass(frozen=True)
@@ -87,6 +88,7 @@ class RestoredSimulation:
     stress: NPCStressLedger | None = None
     conditioning: NPCConditioningLedger | None = None
     psychological_learning_decisions: PsychologicalLearningDecisionLedger | None = None
+    life_history: NPCLifeHistory | None = None
 
 
 @dataclass(frozen=True)
@@ -129,6 +131,7 @@ class SimulationWorldCheckpoint:
     stress_json: str | None = None
     conditioning_json: str | None = None
     psychological_learning_decisions_json: str | None = None
+    life_history_json: str | None = None
 
     SCHEMA_VERSION = 1
 
@@ -160,7 +163,7 @@ class SimulationWorldCheckpoint:
                 consequence_recorder=None, campaign=None, misconduct=None, routines=None,
                 routine_executions=None, routine_institutions=None, institutional_politics=None,
                 goal_book=None, goal_event_adapter=None, goal_review_decisions=None, identity_decisions=None,
-                testimony_inquiries=None, testimony=None, travel=None, presence=None, presence_encounters=None, familiarity=None, relationships=None, emotions=None, stress=None, conditioning=None, psychological_learning_decisions=None):
+                testimony_inquiries=None, testimony=None, travel=None, presence=None, presence_encounters=None, familiarity=None, relationships=None, emotions=None, stress=None, conditioning=None, psychological_learning_decisions=None, life_history=None):
         if not isinstance(coordinator, SimulationTickCoordinator):
             raise TypeError("coordinator must be a SimulationTickCoordinator")
         if not isinstance(npcs, dict):
@@ -467,6 +470,28 @@ class SimulationWorldCheckpoint:
             if any(decision.tick > current_tick for decision in misconduct_snapshot.decisions):
                 raise ValueError("misconduct review decisions cannot occur after the checkpoint tick")
             misconduct_snapshot.restore(coordinator.events)  # validate incident references before saving
+        if life_history is not None and not isinstance(life_history, NPCLifeHistory):
+            raise TypeError("life_history must be an NPCLifeHistory or None")
+        life_history_snapshot = life_history.snapshot() if life_history is not None else None
+        if life_history_snapshot is not None:
+            known_npcs = set(npcs)
+            journal_events = {event.event_id: event for event in coordinator.events.snapshot()}
+            for memory in life_history.memories():
+                if memory.owner_id not in known_npcs or any(x not in known_npcs for x in memory.involved_npc_ids):
+                    raise ValueError("autobiographical memory references NPCs missing from checkpoint")
+                source = journal_events.get(memory.event_id)
+                if (source is None or source.tick > memory.tick or memory.tick > current_tick
+                        or memory.owner_id not in source.participants + source.witnesses
+                        or any(x not in source.participants + source.witnesses for x in memory.involved_npc_ids)):
+                    raise ValueError("autobiographical memory does not match its source world event")
+            for action in life_history.actions():
+                source = journal_events.get(action.event_id)
+                if (action.owner_id not in known_npcs or action.target_id not in known_npcs
+                        or action.tick > current_tick or source is None
+                        or source.tick > action.tick
+                        or action.owner_id not in source.participants + source.witnesses
+                        or action.target_id not in source.participants + source.witnesses):
+                    raise ValueError("personal history action does not match its source world event")
         envelope = SimulationSaveEnvelope.capture(current_tick, coordinator.events)
         return cls(
             current_tick, envelope.to_json(),
@@ -500,6 +525,7 @@ class SimulationWorldCheckpoint:
             stress_snapshot.to_json() if stress_snapshot is not None else None,
             conditioning_snapshot.to_json() if conditioning_snapshot is not None else None,
             learning_decision_snapshot.to_json() if learning_decision_snapshot is not None else None,
+            life_history_snapshot.to_json() if life_history_snapshot is not None else None,
         )
 
     def _components(self):
@@ -536,6 +562,7 @@ class SimulationWorldCheckpoint:
             NPCStressSnapshot.from_json(self.stress_json) if self.stress_json is not None else None,
             NPCConditioningSnapshot.from_json(self.conditioning_json) if self.conditioning_json is not None else None,
             PsychologicalLearningDecisionSnapshot.from_json(self.psychological_learning_decisions_json) if self.psychological_learning_decisions_json is not None else None,
+            LifeHistorySnapshot.from_json(self.life_history_json) if self.life_history_json is not None else None,
         )
         goals_snapshot, goal_replay, goal_review_decisions = components[14], components[15], components[16]
         identity_decisions = components[17]
@@ -550,6 +577,7 @@ class SimulationWorldCheckpoint:
         stress_snapshot = components[26]
         conditioning_snapshot = components[27]
         learning_decisions_snapshot = components[28]
+        life_history_snapshot = components[29]
         if learning_decisions_snapshot is not None:
             npc_ids = {npc.entity_id for npc in NPCCollectionSnapshot.from_json(self.npcs_json).restore().values()}
             conditioning_records = ({record.record_id: record for record in conditioning_snapshot.restore().records()}
@@ -777,10 +805,29 @@ class SimulationWorldCheckpoint:
                 if (record.owner_id not in source.participants + source.witnesses
                         or source.tick > record.tick or record.tick > self.current_tick):
                     raise ValueError("conditioning record does not match its source world event")
+        if life_history_snapshot is not None:
+            history = life_history_snapshot.restore()
+            npc_ids = {npc.entity_id for npc in NPCCollectionSnapshot.from_json(self.npcs_json).restore().values()}
+            journal = {event.event_id: event for event in envelope.restore_event_ledger().snapshot()}
+            for memory in history.memories():
+                source = journal.get(memory.event_id)
+                if (memory.owner_id not in npc_ids or any(x not in npc_ids for x in memory.involved_npc_ids)
+                        or source is None or source.tick > memory.tick or memory.tick > self.current_tick
+                        or memory.owner_id not in source.participants + source.witnesses
+                        or any(x not in source.participants + source.witnesses for x in memory.involved_npc_ids)):
+                    raise ValueError("autobiographical memory does not match saved NPCs and source event")
+            for action in history.actions():
+                source = journal.get(action.event_id)
+                if (action.owner_id not in npc_ids or action.target_id not in npc_ids
+                        or action.tick > self.current_tick or source is None
+                        or source.tick > action.tick
+                        or action.owner_id not in source.participants + source.witnesses
+                        or action.target_id not in source.participants + source.witnesses):
+                    raise ValueError("personal history action does not match saved NPCs and source event")
         return components
 
     def to_json(self):
-        envelope, npcs, trust, beliefs, memory, conversations, ticks, consequence, campaign, misconduct, routines, routine_executions, routine_institutions, institutional_politics, goals, goal_event_replay, goal_review_decisions, identity_decisions, testimony_inquiries, testimony, travel, presence, presence_encounters, familiarity, relationships, emotions, stress, conditioning, learning_decisions = self._components()
+        envelope, npcs, trust, beliefs, memory, conversations, ticks, consequence, campaign, misconduct, routines, routine_executions, routine_institutions, institutional_politics, goals, goal_event_replay, goal_review_decisions, identity_decisions, testimony_inquiries, testimony, travel, presence, presence_encounters, familiarity, relationships, emotions, stress, conditioning, learning_decisions, life_history = self._components()
         payload = {
             "schema_version": self.SCHEMA_VERSION, "current_tick": self.current_tick,
             "events": json.loads(envelope.to_json()), "npcs": json.loads(npcs.to_json()),
@@ -837,6 +884,8 @@ class SimulationWorldCheckpoint:
             payload["psychological_learning_decisions"] = json.loads(learning_decisions.to_json())
         if self.psychological_learning_decisions_json is not None:
             payload["psychological_learning_decisions"] = json.loads(self.psychological_learning_decisions_json)
+        if life_history is not None:
+            payload["life_history"] = json.loads(life_history.to_json())
         return json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False)
 
     @classmethod
@@ -870,14 +919,15 @@ class SimulationWorldCheckpoint:
                        json.dumps(raw["relationships"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("relationships") is not None else None,
                        json.dumps(raw["emotions"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("emotions") is not None else None,
                        json.dumps(raw["stress"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("stress") is not None else None,
-                       json.dumps(raw["conditioning"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("conditioning") is not None else None,\n                       json.dumps(raw["psychological_learning_decisions"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("psychological_learning_decisions") is not None else None)
+                       json.dumps(raw["conditioning"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("conditioning") is not None else None,\n                       json.dumps(raw["psychological_learning_decisions"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("psychological_learning_decisions") is not None else None,
+                       json.dumps(raw["life_history"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("life_history") is not None else None)
         except ValueError:
             raise
         except (TypeError, KeyError, IndexError, json.JSONDecodeError) as exc:
             raise ValueError("invalid simulation world checkpoint") from exc
 
     def restore(self):
-        envelope, npc_snapshot, trust_snapshot, belief_snapshot, memory_snapshot, conversation_snapshot, tick_snapshot, consequence_snapshot, campaign, misconduct_snapshot, routine_snapshot, execution_snapshot, institution_snapshot, institutional_politics, goals_snapshot, goal_event_replay, goal_review_decisions_snapshot, identity_decisions_snapshot, testimony_inquiries_snapshot, testimony_snapshot, travel_snapshot, presence_snapshot, encounter_snapshot, familiarity_snapshot, relationship_snapshot, emotional_snapshot, stress_snapshot, conditioning_snapshot, learning_decisions_snapshot = self._components()
+        envelope, npc_snapshot, trust_snapshot, belief_snapshot, memory_snapshot, conversation_snapshot, tick_snapshot, consequence_snapshot, campaign, misconduct_snapshot, routine_snapshot, execution_snapshot, institution_snapshot, institutional_politics, goals_snapshot, goal_event_replay, goal_review_decisions_snapshot, identity_decisions_snapshot, testimony_inquiries_snapshot, testimony_snapshot, travel_snapshot, presence_snapshot, encounter_snapshot, familiarity_snapshot, relationship_snapshot, emotional_snapshot, stress_snapshot, conditioning_snapshot, learning_decisions_snapshot, life_history_snapshot = self._components()
         events = envelope.restore_event_ledger()
         npcs = npc_snapshot.restore()
         trust = trust_snapshot.restore()
@@ -921,8 +971,9 @@ class SimulationWorldCheckpoint:
         stress = stress_snapshot.restore() if stress_snapshot is not None else None
         conditioning = conditioning_snapshot.restore() if conditioning_snapshot is not None else None
         psychological_learning_decisions = learning_decisions_snapshot.restore() if learning_decisions_snapshot is not None else None
+        life_history = life_history_snapshot.restore() if life_history_snapshot is not None else None
         return RestoredSimulation(self.current_tick, events, npcs, trust, beliefs,
                                   memory, conversations, coordinator, self.metadata,
                                   consequence_recorder, campaign, misconduct, routines, routine_executions,
                                   routine_institutions, institutional_politics, goals, goal_event_replay,
-                                  goal_review_decisions, identity_decisions, testimony_inquiries, testimony, travel, presence, presence_encounters, familiarity, relationships, emotions, stress, conditioning, psychological_learning_decisions)
+                                  goal_review_decisions, identity_decisions, testimony_inquiries, testimony, travel, presence, presence_encounters, familiarity, relationships, emotions, stress, conditioning, psychological_learning_decisions, life_history)
