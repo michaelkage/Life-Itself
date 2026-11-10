@@ -38,6 +38,11 @@ class DeterministicPlannerTests(unittest.TestCase):
         self.assertEqual(learned.actions, ("z-reliable",))
         self.assertEqual(planner.actions["a-unreliable"].cost, 2)
         self.assertEqual(planner.actions["z-reliable"].cost, 2)
+        plan_learned = planner.plan(
+            {"start"}, {"goal"},
+            plan_reliability={("a-unreliable",): 0.0, ("z-reliable",): 1.0},
+        )
+        self.assertEqual(plan_learned.actions, ("z-reliable",))
 
     def test_reliability_input_is_validated(self):
         planner = DeterministicPlanner([
@@ -47,6 +52,8 @@ class DeterministicPlannerTests(unittest.TestCase):
             planner.plan({"start"}, {"goal"}, action_reliability={"unknown": 0.8})
         with self.assertRaises(ValueError):
             planner.plan({"start"}, {"goal"}, action_reliability={"go": 1.1})
+        with self.assertRaises(ValueError):
+            planner.plan({"start"}, {"goal"}, plan_reliability={("unknown",): 0.8})
 
     def test_preconditions_are_respected(self):
         planner = DeterministicPlanner([
