@@ -397,3 +397,6 @@ NPCs can now explicitly accept or reject observer-specific psychological learnin
 
 
 Integrated psychological decisions now combine observer-specific social beliefs, stable value/bias profiles, and individually learned cue associations in one transparent read-only ranking pass. Claim effects and cue exposures remain explicitly authored; per-source contributions are retained for inspection. See [docs/NPC-INTEGRATED-DECISIONS.md](docs/NPC-INTEGRATED-DECISIONS.md) and `tests/test_integrated_decisions.py`.
+
+
+NPC cognitive dissonance is now tracked as explicit owner-specific conflict history. Belief contradictions and commitment/action mismatches receive bounded assessments; NPCs can explicitly rationalize, avoid, seek evidence, acknowledge, or reconsider without silently changing beliefs or identity. Canonical snapshots preserve the conflict and response history. See [docs/NPC-COGNITIVE-DISSONANCE.md](docs/NPC-COGNITIVE-DISSONANCE.md) and `tests/test_cognitive_dissonance.py`.
