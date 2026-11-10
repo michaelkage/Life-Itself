@@ -102,6 +102,8 @@ class RestoredSimulation:
     scar_identity_proposals: ScarIdentityProposalLedger | None = None
     identity_goal_reviews: IdentityGoalReviewDecisionLedger | None = None
     action_execution_snapshot: ActionExecutionSnapshot | None = None
+    action_world_facts: set[str] | None = None
+    action_resources: dict[str, float] | None = None
 
     def restore_action_execution_ledger(self, planner, policies, goals=None):
         """Rebind persisted execution progress to runtime planning and goal definitions."""
@@ -160,6 +162,8 @@ class SimulationWorldCheckpoint:
     scar_identity_proposals_json: str | None = None
     identity_goal_reviews_json: str | None = None
     action_executions_json: str | None = None
+    action_world_facts_json: str | None = None
+    action_resources_json: str | None = None
 
     SCHEMA_VERSION = 1
 
@@ -191,7 +195,7 @@ class SimulationWorldCheckpoint:
                 consequence_recorder=None, campaign=None, misconduct=None, routines=None,
                 routine_executions=None, routine_institutions=None, institutional_politics=None,
                 goal_book=None, goal_event_adapter=None, goal_review_decisions=None, identity_decisions=None,
-                testimony_inquiries=None, testimony=None, travel=None, presence=None, presence_encounters=None, familiarity=None, relationships=None, emotions=None, stress=None, conditioning=None, psychological_learning_decisions=None, life_history=None, memory_reflections=None, emotional_scars=None, emotional_scar_decisions=None, scar_identity_proposals=None, identity_goal_reviews=None, action_executions=None):
+                testimony_inquiries=None, testimony=None, travel=None, presence=None, presence_encounters=None, familiarity=None, relationships=None, emotions=None, stress=None, conditioning=None, psychological_learning_decisions=None, life_history=None, memory_reflections=None, emotional_scars=None, emotional_scar_decisions=None, scar_identity_proposals=None, identity_goal_reviews=None, action_executions=None, action_world_facts=None, action_resources=None):
         if not isinstance(coordinator, SimulationTickCoordinator):
             raise TypeError("coordinator must be a SimulationTickCoordinator")
         if not isinstance(npcs, dict):
@@ -641,6 +645,19 @@ class SimulationWorldCheckpoint:
                         or action.target_id not in source.participants + source.witnesses):
                     raise ValueError("personal history action does not match its source world event")
         action_execution_snapshot = None
+        action_world_facts_payload = None
+        action_resources_payload = None
+        if (action_world_facts is None) != (action_resources is None):
+            raise ValueError("action_world_facts and action_resources must be supplied together")
+        if action_executions is not None and (action_world_facts is None or action_resources is None):
+            raise ValueError("action execution checkpoints require world facts and resource balances")
+        if action_world_facts is not None:
+            if not isinstance(action_world_facts, set) or not isinstance(action_resources, dict):
+                raise TypeError("action_world_facts and action_resources must be a set and dict")
+            normalized_facts = ActionExecutionLedger._canonical_facts(action_world_facts)
+            normalized_resources = ActionExecutionLedger._canonical_resources(action_resources)
+            action_world_facts_payload = json.dumps(sorted(normalized_facts), separators=(",", ":"), allow_nan=False)
+            action_resources_payload = json.dumps(normalized_resources, sort_keys=True, separators=(",", ":"), allow_nan=False)
         if action_executions is not None:
             if not isinstance(action_executions, ActionExecutionLedger):
                 raise TypeError("action_executions must be an ActionExecutionLedger or None")
@@ -710,6 +727,8 @@ class SimulationWorldCheckpoint:
             scar_identity_proposal_snapshot.to_json() if scar_identity_proposal_snapshot is not None else None,
             identity_goal_review_snapshot.to_json() if identity_goal_review_snapshot is not None else None,
             action_execution_snapshot.to_json() if action_execution_snapshot is not None else None,
+            action_world_facts_payload,
+            action_resources_payload,
         )
 
     def _components(self):
