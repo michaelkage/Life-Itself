@@ -69,6 +69,7 @@ Engine-independent Python reference systems:
 | `simreality/presence_encounter_save_state.py` | Social encounter persistence | Saves encounter history and per-tick replay signatures; integrated into composite world checkpoints |
 | `simreality/presence_witnesses.py` | Witness eligibility | Requires recorded co-location and an explicit observation opportunity before a candidate can be named as a witness |
 | `simreality/social_familiarity.py` | NPC familiarity and recognition | Builds directional familiarity from explicit encounter exposure; recognition also requires an explicit identity cue; remains separate from trust |
+| `simreality/social_relationships.py` | NPC relationship evolution | Tracks independent directed warmth, resentment, rivalry, obligation, dependence, respect, fear, and comfort facets from explicit event-linked evidence; supports coexistence and replay-safe persistence |
 | `simreality/routine_tick.py` | Routine tick adapter | Selects active routines for an explicit tick, scopes supplied disruptions per NPC, and records replay-safe executions using explicit samples; called by the coordinator's named routine phase |
 | `simreality/npc_autonomy.py` | NPC autonomy | Read-only decision cycle that connects selected goals to explicit desired facts and bounded plans |
 | `simreality/appraisal.py` | NPC values and bias | Transparent value-weighted choice appraisal; different NPCs can rank the same hard choice differently |
@@ -248,7 +249,7 @@ Belief-aware choice appraisal is documented in [docs/NPC-BELIEF-AWARE-APPRAISAL.
 
 Observer-specific trust is documented in [docs/NPC-SOCIAL-TRUST.md](docs/NPC-SOCIAL-TRUST.md), with regression tests in `tests/test_social_trust.py`. Trust remains distinct from objective truth and global reputation.
 
-Directional familiarity and cue-gated recognition are documented in [docs/NPC-FAMILIARITY.md](docs/NPC-FAMILIARITY.md), with regression tests in `tests/test_social_familiarity.py`.
+Directional familiarity and cue-gated recognition are documented in [docs/NPC-FAMILIARITY.md](docs/NPC-FAMILIARITY.md), with regression tests in `tests/test_social_familiarity.py`. Independent, observer-specific relationship facets are documented in [docs/NPC-RELATIONSHIPS.md](docs/NPC-RELATIONSHIPS.md), with regression tests in `tests/test_social_relationships.py`.
 
 
 Trust-aware belief integration is documented in [docs/NPC-SOCIAL-BELIEFS.md](docs/NPC-SOCIAL-BELIEFS.md), with regression coverage in `tests/test_social_beliefs.py`. Trust is sampled when an NPC hears a report; later trust changes do not silently rewrite past beliefs.
@@ -355,4 +356,4 @@ Presence-gated social encounters now connect physical location to social life. C
 Witness eligibility now has a physical-presence gate. A candidate must be at the event's explicit location and the world driver must confirm an observation opportunity. This prevents NPCs who are elsewhere or travelling from becoming witnesses merely because they exist in the simulation. The adapter returns assessments without mutating the objective event; the world driver uses the eligible list when creating the event's witness record.
 
 
-NPC familiarity and recognition are now modeled separately from trust. Confirmed encounters can contribute different exposure strengths in each direction, allowing one NPC to remember a meeting more strongly than the other. Repeated exposure compounds into familiarity; recognition still requires an explicit identity cue. The history is persisted in composite world checkpoints and never automatically changes trust, affection, or agreement. See [docs/NPC-FAMILIARITY.md](docs/NPC-FAMILIARITY.md).
+NPC familiarity and recognition are now modeled separately from trust. Confirmed encounters can contribute different exposure strengths in each direction, allowing one NPC to remember a meeting more strongly than the other. Repeated exposure compounds into familiarity; recognition still requires an explicit identity cue. The history is persisted in composite world checkpoints and never automatically changes trust, affection, or agreement. See [docs/NPC-FAMILIARITY.md](docs/NPC-FAMILIARITY.md). NPC relationship evolution now uses separate directed facets for warmth, resentment, rivalry, obligation, dependence, respect, fear, and comfort. The facets can coexist, update only from explicit event-linked evidence, and persist with source validation in world checkpoints. See [docs/NPC-RELATIONSHIPS.md](docs/NPC-RELATIONSHIPS.md).
