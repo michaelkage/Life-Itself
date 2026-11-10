@@ -66,6 +66,7 @@ class NPCConditioningLedger:
             raise ValueError("current_tick must be a non-negative integer")
         self.current_tick = current_tick
         self._associations = {}
+        self._owner_ticks = {}
         self._records = {}
         self._events = {}
         for key, value in (associations or {}).items():
@@ -77,6 +78,7 @@ class NPCConditioningLedger:
             if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or not -1 <= value <= 1:
                 raise ValueError("association values must be finite and in [-1, 1]")
             self._associations[(owner, cue)] = float(value)
+            self._owner_ticks[owner] = current_tick
 
     def association_for(self, owner_id, cue):
         _identifier(owner_id, "owner_id")
@@ -130,14 +132,18 @@ class NPCConditioningLedger:
         for owner, profile in profiles.items():
             if not isinstance(profile, ConditioningProfile) or profile.owner_id != owner:
                 raise ValueError("profiles must be keyed by matching owner IDs")
-        elapsed = tick - self.current_tick
-        if elapsed:
-            for (owner, cue), value in tuple(self._associations.items()):
-                profile = profiles.get(owner)
-                if profile is None or profile.spontaneous_recovery_rate == 0:
-                    continue
-                factor = max(0.0, 1.0 - profile.spontaneous_recovery_rate) ** elapsed
-                self._associations[(owner, cue)] = value * factor
+        if tick > self.current_tick:
+            for owner, profile in sorted(profiles.items()):
+                last_tick = self._owner_ticks.get(owner, self.current_tick)
+                elapsed = tick - last_tick
+                if elapsed:
+                    rate = profile.spontaneous_recovery_rate
+                    if rate:
+                        factor = max(0.0, 1.0 - rate) ** elapsed
+                        for (association_owner, cue), value in tuple(self._associations.items()):
+                            if association_owner == owner:
+                                self._associations[(owner, cue)] = value * factor
+                self._owner_ticks[owner] = tick
             self.current_tick = tick
         return tuple(self.assess(owner, cue) for owner, profile in sorted(profiles.items())
                      for cue in sorted(c for o, c in self._associations if o == owner))
@@ -153,8 +159,9 @@ class NPCConditioningLedger:
 
     def snapshot(self):
         return {
-            "version": 1,
+            "version": 2,
             "current_tick": self.current_tick,
+            "owner_ticks": dict(sorted(self._owner_ticks.items())),
             "associations": [
                 {"owner_id": owner, "cue": cue, "value": value}
                 for (owner, cue), value in sorted(self._associations.items())
@@ -170,7 +177,7 @@ class NPCConditioningLedger:
 
     @classmethod
     def from_snapshot(cls, data):
-        if not isinstance(data, dict) or data.get("version") != 1:
+        if not isinstance(data, dict) or data.get("version") not in (1, 2):
             raise ValueError("unsupported conditioning snapshot")
         associations = {}
         for item in data["associations"]:
@@ -179,6 +186,19 @@ class NPCConditioningLedger:
                 raise ValueError("duplicate persisted conditioning association")
             associations[key] = item["value"]
         ledger = cls(current_tick=data["current_tick"], associations=associations)
+        if data.get("version") == 2:
+            owner_ticks = data.get("owner_ticks")
+            if not isinstance(owner_ticks, dict):
+                raise ValueError("conditioning owner_ticks must be a mapping")
+            for owner, last_tick in owner_ticks.items():
+                _identifier(owner, "owner_id")
+                if isinstance(last_tick, bool) or not isinstance(last_tick, int) or not 0 <= last_tick <= ledger.current_tick:
+                    raise ValueError("conditioning owner tick is invalid")
+            if any(owner not in owner_ticks for owner, _cue in ledger._associations):
+                raise ValueError("conditioning association is missing owner tick")
+            ledger._owner_ticks = dict(owner_ticks)
+        else:
+            ledger._owner_ticks = {owner: ledger.current_tick for owner, _cue in ledger._associations}
         for item in data["records"]:
             record = ConditioningRecord(**item)
             if record.record_id in ledger._records:
