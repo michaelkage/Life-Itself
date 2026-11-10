@@ -60,6 +60,7 @@ from .emotional_scar_formation import EmotionalScarDecisionLedger, EmotionalScar
 from .scar_identity_proposals import ScarIdentityProposalLedger, ScarIdentityProposalSnapshot
 from .identity_goal_alignment import IdentityGoalReviewDecisionLedger, IdentityGoalReviewSnapshot
 from .action_execution import ActionExecutionLedger, ActionExecutionSnapshot
+from .npc_action_replanning import NPCActionReplanningCoordinator, NPCReplanningSnapshot
 
 
 @dataclass(frozen=True)
@@ -104,6 +105,7 @@ class RestoredSimulation:
     action_execution_snapshot: ActionExecutionSnapshot | None = None
     action_world_facts: set[str] | None = None
     action_resources: dict[str, float] | None = None
+    action_replanning_snapshot: NPCReplanningSnapshot | None = None
 
     def restore_action_execution_ledger(self, planner, policies, goals=None):
         """Rebind persisted execution progress to runtime planning and goal definitions."""
@@ -112,6 +114,16 @@ class RestoredSimulation:
         return ActionExecutionLedger.from_snapshot(
             planner, policies, self.events, self.action_execution_snapshot,
             self.goals if goals is None else goals,
+        )
+
+    def restore_action_replanning_coordinator(self, decisions, executions):
+        """Restore replay-safe replanning requests over the restored execution ledger."""
+        if self.action_replanning_snapshot is None:
+            return None
+        if executions.events is not self.events:
+            raise ValueError("restored execution ledger must share the restored event journal")
+        return NPCActionReplanningCoordinator.from_snapshot(
+            decisions, executions, self.events, self.action_replanning_snapshot,
         )
 
 
@@ -164,6 +176,7 @@ class SimulationWorldCheckpoint:
     action_executions_json: str | None = None
     action_world_facts_json: str | None = None
     action_resources_json: str | None = None
+    action_replanning_json: str | None = None
 
     SCHEMA_VERSION = 1
 
@@ -195,7 +208,7 @@ class SimulationWorldCheckpoint:
                 consequence_recorder=None, campaign=None, misconduct=None, routines=None,
                 routine_executions=None, routine_institutions=None, institutional_politics=None,
                 goal_book=None, goal_event_adapter=None, goal_review_decisions=None, identity_decisions=None,
-                testimony_inquiries=None, testimony=None, travel=None, presence=None, presence_encounters=None, familiarity=None, relationships=None, emotions=None, stress=None, conditioning=None, psychological_learning_decisions=None, life_history=None, memory_reflections=None, emotional_scars=None, emotional_scar_decisions=None, scar_identity_proposals=None, identity_goal_reviews=None, action_executions=None, action_world_facts=None, action_resources=None):
+                testimony_inquiries=None, testimony=None, travel=None, presence=None, presence_encounters=None, familiarity=None, relationships=None, emotions=None, stress=None, conditioning=None, psychological_learning_decisions=None, life_history=None, memory_reflections=None, emotional_scars=None, emotional_scar_decisions=None, scar_identity_proposals=None, identity_goal_reviews=None, action_executions=None, action_world_facts=None, action_resources=None, action_replanning=None):
         if not isinstance(coordinator, SimulationTickCoordinator):
             raise TypeError("coordinator must be a SimulationTickCoordinator")
         if not isinstance(npcs, dict):
@@ -647,6 +660,7 @@ class SimulationWorldCheckpoint:
         action_execution_snapshot = None
         action_world_facts_payload = None
         action_resources_payload = None
+        action_replanning_snapshot = None
         if (action_world_facts is None) != (action_resources is None):
             raise ValueError("action_world_facts and action_resources must be supplied together")
         if action_executions is not None and (action_world_facts is None or action_resources is None):
@@ -690,6 +704,24 @@ class SimulationWorldCheckpoint:
                     if event_id.startswith("action-execution:" + active.execution_id + ":tick:"):
                         if event.tick > current_tick or event.event_type != "npc_action_progress":
                             raise ValueError("action execution progress event is invalid for checkpoint")
+        if action_replanning is not None:
+            if not isinstance(action_replanning, NPCActionReplanningCoordinator):
+                raise TypeError("action_replanning must be an NPCActionReplanningCoordinator or None")
+            if action_executions is None or action_replanning.executions is not action_executions:
+                raise ValueError("replanning history requires the checkpoint action execution ledger")
+            if action_replanning.events is not coordinator.events:
+                raise ValueError("replanning coordinator must share the checkpoint world event journal")
+            if action_replanning.decisions.goals is not goal_book:
+                raise ValueError("replanning coordinator must share the checkpoint GoalBook")
+            action_replanning_snapshot = action_replanning.to_snapshot()
+            raw_replanning = json.loads(action_replanning_snapshot.to_json())
+            for request in raw_replanning["requests"]:
+                event = coordinator.events.get(request["event_id"])
+                if (request["owner_id"] not in npcs or request["tick"] > current_tick
+                        or event.tick != request["tick"]
+                        or request["owner_id"] not in event.participants
+                        or event.event_type != "npc_action_replanned"):
+                    raise ValueError("replanning request does not match checkpoint NPCs and event history")
         envelope = SimulationSaveEnvelope.capture(current_tick, coordinator.events)
         return cls(
             current_tick, envelope.to_json(),
@@ -732,6 +764,7 @@ class SimulationWorldCheckpoint:
             action_execution_snapshot.to_json() if action_execution_snapshot is not None else None,
             action_world_facts_payload,
             action_resources_payload,
+            action_replanning_snapshot.to_json() if action_replanning_snapshot is not None else None,
         )
 
     def _components(self):
@@ -777,6 +810,7 @@ class SimulationWorldCheckpoint:
             ActionExecutionSnapshot.from_json(self.action_executions_json) if self.action_executions_json is not None else None,
             json.loads(self.action_world_facts_json) if self.action_world_facts_json is not None else None,
             json.loads(self.action_resources_json) if self.action_resources_json is not None else None,
+            NPCReplanningSnapshot.from_json(self.action_replanning_json) if self.action_replanning_json is not None else None,
         )
         goals_snapshot, goal_replay, goal_review_decisions = components[14], components[15], components[16]
         identity_decisions = components[17]
@@ -800,6 +834,7 @@ class SimulationWorldCheckpoint:
         action_execution_snapshot = components[35]
         action_world_facts = components[36]
         action_resources = components[37]
+        action_replanning_snapshot = components[38]
         if (action_world_facts is None) != (action_resources is None):
             raise ValueError("action world facts and resources must be checkpointed together")
         if action_execution_snapshot is not None and (action_world_facts is None or action_resources is None):
@@ -807,6 +842,18 @@ class SimulationWorldCheckpoint:
         if action_world_facts is not None:
             ActionExecutionLedger._canonical_facts(action_world_facts)
             ActionExecutionLedger._canonical_resources(action_resources)
+        if action_replanning_snapshot is not None and action_execution_snapshot is None:
+            raise ValueError("replanning history requires checkpointed action execution state")
+        if action_replanning_snapshot is not None:
+            journal = {event.event_id: event for event in envelope.restore_event_ledger().snapshot()}
+            npc_ids = {npc.entity_id for npc in NPCCollectionSnapshot.from_json(self.npcs_json).restore().values()}
+            for request in json.loads(action_replanning_snapshot.to_json())["requests"]:
+                event = journal.get(request["event_id"])
+                if (request["owner_id"] not in npc_ids or request["tick"] > self.current_tick
+                        or event is None or event.tick != request["tick"]
+                        or request["owner_id"] not in event.participants
+                        or event.event_type != "npc_action_replanned"):
+                    raise ValueError("replanning request does not match checkpoint NPCs and event history")
         if action_execution_snapshot is not None:
             journal = {event.event_id: event for event in envelope.restore_event_ledger().snapshot()}
             npc_ids = {npc.entity_id for npc in NPCCollectionSnapshot.from_json(self.npcs_json).restore().values()}
@@ -1186,7 +1233,7 @@ class SimulationWorldCheckpoint:
         return components
 
     def to_json(self):
-        envelope, npcs, trust, beliefs, memory, conversations, ticks, consequence, campaign, misconduct, routines, routine_executions, routine_institutions, institutional_politics, goals, goal_event_replay, goal_review_decisions, identity_decisions, testimony_inquiries, testimony, travel, presence, presence_encounters, familiarity, relationships, emotions, stress, conditioning, learning_decisions, life_history, memory_reflections, emotional_scars, emotional_scar_decisions, scar_identity_proposals, identity_goal_reviews, action_execution_snapshot, action_world_facts, action_resources = self._components()
+        envelope, npcs, trust, beliefs, memory, conversations, ticks, consequence, campaign, misconduct, routines, routine_executions, routine_institutions, institutional_politics, goals, goal_event_replay, goal_review_decisions, identity_decisions, testimony_inquiries, testimony, travel, presence, presence_encounters, familiarity, relationships, emotions, stress, conditioning, learning_decisions, life_history, memory_reflections, emotional_scars, emotional_scar_decisions, scar_identity_proposals, identity_goal_reviews, action_execution_snapshot, action_world_facts, action_resources, action_replanning_snapshot = self._components()
         payload = {
             "schema_version": self.SCHEMA_VERSION, "current_tick": self.current_tick,
             "events": json.loads(envelope.to_json()), "npcs": json.loads(npcs.to_json()),
@@ -1260,6 +1307,8 @@ class SimulationWorldCheckpoint:
         if self.action_world_facts_json is not None:
             payload["action_world_facts"] = json.loads(self.action_world_facts_json)
             payload["action_resources"] = json.loads(self.action_resources_json)
+        if action_replanning_snapshot is not None:
+            payload["action_replanning"] = json.loads(action_replanning_snapshot.to_json())
         return json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False)
 
     @classmethod
@@ -1303,7 +1352,8 @@ class SimulationWorldCheckpoint:
                        json.dumps(raw["identity_goal_reviews"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("identity_goal_reviews") is not None else None,
                        json.dumps(raw["action_executions"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("action_executions") is not None else None,
                        json.dumps(raw["action_world_facts"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("action_world_facts") is not None else None,
-                       json.dumps(raw["action_resources"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("action_resources") is not None else None)
+                       json.dumps(raw["action_resources"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("action_resources") is not None else None,
+                       json.dumps(raw["action_replanning"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("action_replanning") is not None else None)
         except ValueError:
             raise
         except (TypeError, KeyError, IndexError, json.JSONDecodeError) as exc:
@@ -1364,4 +1414,4 @@ class SimulationWorldCheckpoint:
                                   memory, conversations, coordinator, self.metadata,
                                   consequence_recorder, campaign, misconduct, routines, routine_executions,
                                   routine_institutions, institutional_politics, goals, goal_event_replay,
-                                  goal_review_decisions, identity_decisions, testimony_inquiries, testimony, travel, presence, presence_encounters, familiarity, relationships, emotions, stress, conditioning, psychological_learning_decisions, life_history, memory_reflections, emotional_scars, emotional_scar_decisions, scar_identity_proposals, identity_goal_reviews, action_execution_snapshot, set(action_world_facts) if action_world_facts is not None else None, dict(action_resources) if action_resources is not None else None)
+                                  goal_review_decisions, identity_decisions, testimony_inquiries, testimony, travel, presence, presence_encounters, familiarity, relationships, emotions, stress, conditioning, psychological_learning_decisions, life_history, memory_reflections, emotional_scars, emotional_scar_decisions, scar_identity_proposals, identity_goal_reviews, action_execution_snapshot, set(action_world_facts) if action_world_facts is not None else None, dict(action_resources) if action_resources is not None else None, action_replanning_snapshot)
