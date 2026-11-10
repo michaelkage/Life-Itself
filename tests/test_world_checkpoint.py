@@ -1350,6 +1350,55 @@ class SimulationWorldCheckpointTests(unittest.TestCase):
         self.assertEqual(restored.action_world_facts, {"at-field", "has-grain"})
         self.assertEqual(restored.action_resources, {"energy": 3.0})
 
+
+    def test_replanning_history_restores_with_action_checkpoint(self):
+        from simreality.action_execution import ActionExecutionLedger, ActionExecutionPolicy
+        from simreality.npc_action_replanning import NPCActionReplanningCoordinator
+        from simreality.npc_autonomy import NPCDecisionCycle
+        from simreality.planning import DeterministicPlanner, PlanningAction
+
+        coordinator, npcs, _ = self.make_simulation()
+        goals = GoalBook()
+        goals.add(NPCGoal("food-goal", "speaker", "survival", 8.0))
+        planner = DeterministicPlanner((
+            PlanningAction("get-food", frozenset({"at-market"}), frozenset({"has-food"})),
+        ))
+        policies = (ActionExecutionPolicy("get-food"),)
+        ledger = ActionExecutionLedger(planner, policies, coordinator.events, goals)
+        decisions = NPCDecisionCycle(goals, planner)
+        replanning = NPCActionReplanningCoordinator(decisions, ledger)
+        facts, resources = {"at-market"}, {"cash": 3.0}
+        goal_facts = {"food-goal": {"has-food"}}
+        first = replanning.replan(
+            "speaker", 4, facts, resources, goal_facts, reason="food needed",
+        )
+        self.assertEqual(first.status, "started")
+        payload = SimulationWorldCheckpoint.capture(
+            4, coordinator, npcs, goal_book=goals,
+            action_executions=ledger, action_world_facts=facts,
+            action_resources=resources, action_replanning=replanning,
+        ).to_json()
+
+        restored = SimulationWorldCheckpoint.from_json(payload).restore()
+        restored_ledger = restored.restore_action_execution_ledger(planner, policies)
+        restored_decisions = NPCDecisionCycle(restored.goals, planner)
+        restored_replanning = restored.restore_action_replanning_coordinator(
+            restored_decisions, restored_ledger,
+        )
+        repeated = restored_replanning.replan(
+            "speaker", 4, facts, resources, goal_facts, reason="food needed",
+        )
+        self.assertEqual(repeated, first)
+        self.assertEqual(len(restored_ledger.active()), 1)
+        self.assertEqual(
+            SimulationWorldCheckpoint.capture(
+                4, restored.coordinator, restored.npcs, goal_book=restored.goals,
+                action_executions=restored_ledger, action_world_facts=restored.action_world_facts,
+                action_resources=restored.action_resources, action_replanning=restored_replanning,
+            ).to_json(),
+            payload,
+        )
+
     def test_action_checkpoint_requires_atomic_facts_and_resources(self):
         coordinator, npcs, _ = self.make_simulation()
         planner = DeterministicPlanner((
