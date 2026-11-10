@@ -719,3 +719,10 @@ from .dissonance_identity import (
     DissonanceIdentityAssessment, DissonanceIdentityBridge, DissonanceIdentityRule,
 )
 __all__ += ["DissonanceIdentityAssessment", "DissonanceIdentityBridge", "DissonanceIdentityRule"]
+
+
+# Observer-owned autobiographical history, forgiveness, and separate reconciliation.
+from .npc_life_history import (
+    AutobiographicalMemory, LifeHistorySnapshot, NPCLifeHistory, PersonalHistoryAction,
+)
+__all__ += ["AutobiographicalMemory", "LifeHistorySnapshot", "NPCLifeHistory", "PersonalHistoryAction"]
