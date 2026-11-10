@@ -22,6 +22,7 @@ class NPCDecision:
     goal_category: str | None
     plan: PlanResult | None
     reason: str
+    experience_evidence_ids: tuple[str, ...] = ()
 
     @property
     def actionable(self) -> bool:
