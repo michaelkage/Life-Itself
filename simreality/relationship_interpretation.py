@@ -10,7 +10,7 @@ import math
 from dataclasses import dataclass
 from typing import Mapping
 
-from .beliefs import BeliefLedger
+from .social_beliefs import SocialBeliefSystem
 from .social_relationships import (
     RELATIONSHIP_FACETS, RelationshipChange, SocialRelationshipLedger,
 )
@@ -85,14 +85,14 @@ class NPCRelationshipInterpreter:
         self,
         events: WorldEventLedger,
         relationships: SocialRelationshipLedger,
-        beliefs: BeliefLedger | None = None,
+        beliefs: SocialBeliefSystem | None = None,
     ):
         if not isinstance(events, WorldEventLedger):
             raise TypeError("events must be a WorldEventLedger")
         if not isinstance(relationships, SocialRelationshipLedger):
             raise TypeError("relationships must be a SocialRelationshipLedger")
-        if beliefs is not None and not isinstance(beliefs, BeliefLedger):
-            raise TypeError("beliefs must be a BeliefLedger or None")
+        if beliefs is not None and not isinstance(beliefs, SocialBeliefSystem):
+            raise TypeError("beliefs must be a SocialBeliefSystem or None")
         self.events = events
         self.relationships = relationships
         self.beliefs = beliefs
@@ -135,7 +135,7 @@ class NPCRelationshipInterpreter:
                 contributions[(facet, f"bias:{cue}")] = strength * coefficient
         for claim_id in sorted(profile.claim_responses or {}):
             if self.beliefs is None:
-                raise ValueError("claim responses require a BeliefLedger")
+                raise ValueError("claim responses require a SocialBeliefSystem")
             confidence = self.beliefs.get(observer_id, claim_id).confidence
             signed_confidence = 2.0 * confidence - 1.0
             for facet, coefficient in sorted(profile.claim_responses[claim_id].items()):
@@ -146,11 +146,12 @@ class NPCRelationshipInterpreter:
         for (facet, source), amount in sorted(contributions.items()):
             facet_totals[facet] += amount
             trace.append((facet, source, amount))
+        touched_facets = {facet for facet, _source in contributions}
         changes = []
         for facet in RELATIONSHIP_FACETS:
-            delta = min(1.0, max(-1.0, facet_totals[facet]))
-            if delta == 0.0:
+            if facet not in touched_facets:
                 continue
+            delta = min(1.0, max(-1.0, facet_totals[facet]))
             changes.append(RelationshipChange(
                 change_id=f"relationship:{event_id}:{observer_id}:{target_id}:{facet}",
                 source_event_id=event_id,
