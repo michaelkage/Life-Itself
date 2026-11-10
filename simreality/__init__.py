@@ -674,3 +674,14 @@ __all__ += [
     "EventInterpretationRule", "LearningProposal", "NPCEventInterpreter",
     "NPCInterpretationProfile",
 ]
+
+
+# Read-only choice appraisal informed by owner-specific learned associations.
+from .psychological_decisions import (
+    ConditionedChoiceResult, ConditionedDecisionProfile,
+    ConditionedDecisionResult, PsychologicalDecisionAdapter,
+)
+__all__ += [
+    "ConditionedChoiceResult", "ConditionedDecisionProfile",
+    "ConditionedDecisionResult", "PsychologicalDecisionAdapter",
+]
