@@ -122,6 +122,10 @@ class RestoredSimulation:
             return None
         if executions.events is not self.events:
             raise ValueError("restored execution ledger must share the restored event journal")
+        if self.action_execution_snapshot is None or executions.to_snapshot() != self.action_execution_snapshot:
+            raise ValueError("execution ledger does not match the restored checkpoint")
+        if self.goals is not None and decisions.goals is not self.goals:
+            raise ValueError("decision cycle must use the restored GoalBook")
         return NPCActionReplanningCoordinator.from_snapshot(
             decisions, executions, self.events, self.action_replanning_snapshot,
         )
@@ -720,7 +724,9 @@ class SimulationWorldCheckpoint:
                 if (request["owner_id"] not in npcs or request["tick"] > current_tick
                         or event.tick != request["tick"]
                         or request["owner_id"] not in event.participants
-                        or event.event_type != "npc_action_replanned"):
+                        or event.event_type != "npc_action_replanned"
+                        or dict(event.attributes).get("request_id") != request["request_id"]
+                        or dict(event.attributes).get("status") != request["status")):
                     raise ValueError("replanning request does not match checkpoint NPCs and event history")
         envelope = SimulationSaveEnvelope.capture(current_tick, coordinator.events)
         return cls(
