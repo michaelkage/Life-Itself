@@ -394,3 +394,6 @@ Learned psychological associations now feed into explicit candidate-choice appra
 
 
 NPCs can now explicitly accept or reject observer-specific psychological learning proposals. Accepted proposals apply one replay-safe conditioning record; rejected proposals and rationales remain in history without changing associations. Later contradictory experiences can gradually revise a learned association. See [docs/NPC-PSYCHOLOGICAL-LEARNING-DECISIONS.md](docs/NPC-PSYCHOLOGICAL-LEARNING-DECISIONS.md) and tests/test_psychological_learning_decisions.py.
+
+
+Integrated psychological decisions now combine observer-specific social beliefs, stable value/bias profiles, and individually learned cue associations in one transparent read-only ranking pass. Claim effects and cue exposures remain explicitly authored; per-source contributions are retained for inspection. See [docs/NPC-INTEGRATED-DECISIONS.md](docs/NPC-INTEGRATED-DECISIONS.md) and `tests/test_integrated_decisions.py`.
