@@ -63,6 +63,21 @@ class PresenceSocialTests(unittest.TestCase):
         self.assertGreater(trust.get("a", "b").trust, 0.5)
         self.assertLess(trust.get("b", "a").trust, 0.5)
 
+
+    def test_multiple_encounters_can_be_recorded_in_one_tick(self):
+        presence = PresenceLedger()
+        for npc_id, location in (("a", "cafe"), ("b", "cafe"), ("c", "cafe"), ("d", "cafe")):
+            presence.place(npc_id, location, 1)
+        adapter = PresenceSocialAdapter(presence)
+        adapter.encounter("same-tick-1", "a", "b", 2, opportunity=True)
+        adapter.encounter("same-tick-2", "c", "d", 2, opportunity=True)
+        self.assertEqual(len(adapter.ledger.snapshot()), 2)
+        restored = PresenceEncounterSnapshot.from_json(
+            PresenceEncounterSnapshot.capture(adapter.ledger).to_json()
+        ).restore()
+        self.assertEqual(restored.snapshot(), adapter.ledger.snapshot())
+        self.assertEqual(restored.tick_snapshot(), adapter.ledger.tick_snapshot())
+
     def test_encounter_snapshot_preserves_replay(self):
         _, _, _, adapter = self.setup_world()
         adapter.encounter("e5", "a", "b", 2, opportunity=True)
