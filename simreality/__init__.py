@@ -726,3 +726,14 @@ from .npc_life_history import (
     AutobiographicalMemory, LifeHistorySnapshot, NPCLifeHistory, PersonalHistoryAction,
 )
 __all__ += ["AutobiographicalMemory", "LifeHistorySnapshot", "NPCLifeHistory", "PersonalHistoryAction"]
+
+
+# Observer-specific autobiographical memory formation from witnessed world events.
+from .npc_memory_formation import (
+    AutobiographicalMemoryProfile, AutobiographicalMemoryRule,
+    NPCAutobiographicalMemoryAdapter,
+)
+__all__ += [
+    "AutobiographicalMemoryProfile", "AutobiographicalMemoryRule",
+    "NPCAutobiographicalMemoryAdapter",
+]
