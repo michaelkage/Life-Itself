@@ -388,3 +388,6 @@ Context-sensitive psychological triggers now activate an NPC's learned associati
 
 
 NPCs can now interpret the same authoritative event differently through owner-specific `NPCInterpretationProfile` rules. The interpreter emits reviewable learning proposals rather than silently mutating conditioning, preserving the distinction between what happened and what an NPC believes happened. See [docs/NPC-EVENT-INTERPRETATION.md](docs/NPC-EVENT-INTERPRETATION.md) and `tests/test_npc_event_interpretation.py`.
+
+
+Learned psychological associations now feed into explicit candidate-choice appraisal through `PsychologicalDecisionAdapter`. NPC-specific cue sensitivities and caller-supplied cue exposure can change how options are ranked while preserving the base value score and a transparent per-cue breakdown. The adapter is deterministic, read-only, and does not execute choices. See [docs/NPC-PSYCHOLOGICAL-DECISIONS.md](docs/NPC-PSYCHOLOGICAL-DECISIONS.md) and `tests/test_psychological_decisions.py`.
