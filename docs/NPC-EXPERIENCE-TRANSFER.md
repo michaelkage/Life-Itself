@@ -1,0 +1,11 @@
+# NPC strategic experience transfer
+
+The experience-transfer ledger adds a provenance-preserving channel for sharing a specific autobiographical experience.
+
+A transfer requires a source-owned autobiographical memory, its original event in the authoritative journal with the source recorded as participant or witness, and a later communication event whose participants include both source and recipient. Confidence is supplied by the caller; the ledger does not infer that a report is true.
+
+The recipient receives a reported-experience record, not an autobiographical memory. The record retains source memory ID, original event ID, source role, original tick, communication event ID, transfer tick, account, and confidence. Hearsay therefore cannot silently become first-person experience.
+
+Transfer IDs are idempotent; conflicting reuse is rejected. The same source memory cannot be resent to the same recipient in the same communication under another ID. Canonical component snapshots preserve the records, and restoration revalidates the full source and communication chain.
+
+This first stage deliberately does not mutate recipient beliefs, personal memories, plans, or action evaluations. A later decision adapter can consume reported accounts with a lower evidence weight than direct experience while retaining attribution.
