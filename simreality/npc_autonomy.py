@@ -44,6 +44,7 @@ class NPCDecisionCycle:
         *,
         max_expansions: int = 10_000,
         action_reliability: Mapping[str, float] | None = None,
+        plan_reliability: Mapping[tuple[str, ...], float] | None = None,
     ) -> NPCDecision:
         """Propose a plan for the highest-ranked goal that can currently be planned.
 
@@ -74,6 +75,7 @@ class NPCDecisionCycle:
                     world_facts, goal_facts[goal.goal_id],
                     max_expansions=max_expansions,
                     action_reliability=action_reliability,
+                    plan_reliability=plan_reliability,
                 )
                 reason = plan.reason if plan.success else f"planning failed: {plan.reason}"
                 candidate = NPCDecision(
