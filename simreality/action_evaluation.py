@@ -100,6 +100,8 @@ class ActionPlanEvaluationLedger:
         start_id = f"action-execution:{execution_id}:started"
         finish_id = record.event_id
         finish_event = self.events.get(finish_id)
+        if finish_event is None:
+            raise ValueError("terminal execution is missing its authoritative world event")
         if finish_event.event_type != "npc_action_execution" or finish_event.participants != (record.owner_id,):
             raise ValueError("execution journal provenance is inconsistent")
         finish_attrs = dict(finish_event.attributes)
@@ -216,6 +218,8 @@ class ActionPlanEvaluationLedger:
             if record is None or record.owner_id != data["owner_id"] or record.action_id != data["action_id"]:
                 raise ValueError("evaluation references an unknown or mismatched execution")
             event = self.events.get(data["evaluation_id"])
+            if event is None:
+                raise ValueError("evaluation is missing its authoritative world event")
             attrs = dict(event.attributes)
             if (event.event_type != "npc_action_evaluated" or event.tick != record.tick
                     or event.participants != (record.owner_id,)
@@ -231,7 +235,8 @@ class ActionPlanEvaluationLedger:
                 values[key] = tuple((x[0], x[1]) for x in values[key])
             evaluation = NPCActionEvaluation(**values)
             for evidence_id in evaluation.evidence_event_ids:
-                self.events.get(evidence_id)
+                if self.events.get(evidence_id) is None:
+                    raise ValueError("evaluation references missing evidence event")
             restored[execution_id] = evaluation
         learning = raw["learning"]
         if not isinstance(learning, dict):
