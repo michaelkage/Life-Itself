@@ -410,3 +410,6 @@ NPC autobiographical memory formation now has an explicit event bridge: authored
 
 
 The [NPC autobiographical memory recall layer](docs/NPC-MEMORY-RECALL.md) retrieves owner-specific memories from explicitly observed cues and authored associations. Salience, emotional weighting, thresholds, and top-K selection shape deterministic recall without altering memories or forcing behavior. Tests: `tests/test_npc_memory_recall.py`.
+
+
+NPC memories can now be reinterpreted over time without rewriting the original account. The [memory reflection ledger](docs/NPC-MEMORY-REFLECTION.md) stores owner-specific, append-only interpretation changes with chronological validation and a canonical component snapshot. The [cue-driven recall layer](docs/NPC-MEMORY-RECALL.md) retrieves matching memories using authored cue associations, salience, and optional emotional weighting. These are component-level systems; reflection snapshots are not yet included in the composite world checkpoint. Tests: `tests/test_npc_memory_reflection.py` and `tests/test_npc_memory_recall.py`.
