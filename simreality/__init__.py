@@ -629,6 +629,9 @@ __all__ += [
 
 # Individual coping strategies, accumulated stress, exhaustion, and recovery.
 from .emotional_stress import (
-    CopingProfile, NPCStressLedger, NPCStressSnapshot, StressAssessment, StressRecord,
+    CopingProfile, NPCStressLedger, StressAssessment, StressRecord,
 )
 __all__ += ["CopingProfile", "NPCStressLedger", "NPCStressSnapshot", "StressAssessment", "StressRecord"]
+
+from .emotional_stress_save_state import NPCStressSnapshot
+__all__ += ["NPCStressSnapshot"]
