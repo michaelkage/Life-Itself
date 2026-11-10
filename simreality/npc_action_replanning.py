@@ -302,4 +302,4 @@ class NPCActionReplanningCoordinator:
             reason=f"remaining plan is no longer feasible: {failure}",
             max_expansions=max_expansions,
         )
-        return NPCActionProgression(terminal_or_active, None, replanning)
+        return NPCActionProgression(terminal_or_active, None, replanning, evaluation)
