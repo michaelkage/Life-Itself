@@ -423,6 +423,13 @@ from .goal_review import GoalReviewAction, GoalReviewEvaluator, GoalReviewPolicy
 __all__ += ["GoalReviewAction", "GoalReviewEvaluator", "GoalReviewPolicy", "GoalReviewProposal"]
 
 
+# Accepted emotional scars can inform, but never automatically change, identity proposals.
+from .emotional_scar_identity import (
+    EmotionalScarIdentityAdapter, ScarIdentityPolicy,
+)
+__all__ += ["EmotionalScarIdentityAdapter", "ScarIdentityPolicy"]
+
+
 # Append-only NPC decisions on goal reassessment proposals, with canonical persistence.
 from .goal_review_decisions import GoalReviewDecision, GoalReviewDecisionLedger
 from .goal_review_decisions_save_state import GoalReviewDecisionSnapshot
