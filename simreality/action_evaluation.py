@@ -99,21 +99,29 @@ class ActionPlanEvaluationLedger:
             return existing
         start_id = f"action-execution:{execution_id}:started"
         finish_id = record.event_id
-        start_event = self.events.get(start_id)
         finish_event = self.events.get(finish_id)
-        if (start_event.event_type != "npc_action_started"
-                or finish_event.event_type != "npc_action_execution"
-                or start_event.tick > record.tick
-                or start_event.participants != (record.owner_id,)
-                or finish_event.participants != (record.owner_id,)):
+        if finish_event.event_type != "npc_action_execution" or finish_event.participants != (record.owner_id,):
             raise ValueError("execution journal provenance is inconsistent")
-        start_attrs, finish_attrs = dict(start_event.attributes), dict(finish_event.attributes)
-        if (start_attrs.get("execution_id") != execution_id
-                or start_attrs.get("action_id") != record.action_id
-                or finish_attrs.get("execution_id") != execution_id
+        finish_attrs = dict(finish_event.attributes)
+        if (finish_attrs.get("execution_id") != execution_id
                 or finish_attrs.get("action_id") != record.action_id
                 or finish_attrs.get("status") != record.status):
             raise ValueError("execution record does not match journal evidence")
+        start_event = None
+        try:
+            start_event = self.events.get(start_id)
+        except KeyError:
+            # The legacy one-shot execute() path records a single terminal event.
+            if finish_id != f"action-execution:{execution_id}":
+                raise ValueError("multi-tick execution is missing its start event")
+        if start_event is not None:
+            start_attrs = dict(start_event.attributes)
+            if (start_event.event_type != "npc_action_started"
+                    or start_event.tick > record.tick
+                    or start_event.participants != (record.owner_id,)
+                    or start_attrs.get("execution_id") != execution_id
+                    or start_attrs.get("action_id") != record.action_id):
+                raise ValueError("execution start event is inconsistent")
 
         action = self.executions.planner.actions[record.action_id]
         policy = self.executions.policies.get(record.action_id)
@@ -131,8 +139,8 @@ class ActionPlanEvaluationLedger:
             for key, value in before_resources.items()
             if value - after_resources.get(key, 0.0) > 1e-12
         ))
-        expected_duration = policy.duration_ticks if policy else 1
-        observed_duration = record.tick - start_event.tick
+        expected_duration = (policy.duration_ticks if policy and start_event is not None else 1)
+        observed_duration = (record.tick - start_event.tick if start_event is not None else 1)
         flags = []
         if record.status != "completed":
             flags.append(record.status)
@@ -144,11 +152,13 @@ class ActionPlanEvaluationLedger:
             flags.append("resource_variance")
         if observed_duration != expected_duration:
             flags.append("duration_variance")
-        evidence = tuple(event.event_id for event in self.events.query(
-            start_tick=start_event.tick, end_tick=record.tick,
-            participant_id=record.owner_id,
-        ) if dict(event.attributes).get("execution_id") == execution_id)
-        if start_id not in evidence or finish_id not in evidence:
+        evidence = ((finish_id,) if start_event is None else tuple(
+            event.event_id for event in self.events.query(
+                start_tick=start_event.tick, end_tick=record.tick,
+                participant_id=record.owner_id,
+            ) if dict(event.attributes).get("execution_id") == execution_id
+        ))
+        if finish_id not in evidence or (start_event is not None and start_id not in evidence):
             raise ValueError("execution evidence range is incomplete")
         evaluation_id = f"action-evaluation:{execution_id}"
         result = NPCActionEvaluation(
