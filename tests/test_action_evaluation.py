@@ -136,6 +136,32 @@ class ActionEvaluationTests(unittest.TestCase):
         self.assertEqual(progression.plan_evaluation.missing_goal_facts, ("shelter",))
         self.assertIn("goal_not_achieved", progression.plan_evaluation.deviation_flags)
 
+
+    def test_replanning_cancellation_closes_prior_plan_without_fabricating_goal_state(self):
+        planner = DeterministicPlanner((
+            PlanningAction("gather", frozenset({"at-site"}), frozenset({"materials"})),
+            PlanningAction("build", frozenset({"materials"}), frozenset({"shelter"})),
+        ))
+        events = WorldEventLedger()
+        executions = ActionExecutionLedger(planner, (), events)
+        evaluations = ActionPlanEvaluationLedger(executions)
+        goals = GoalBook()
+        goals.add(NPCGoal("shelter-goal", "npc", "survival", 9.0))
+        coordinator = NPCActionReplanningCoordinator(
+            NPCDecisionCycle(goals, planner), executions, events, evaluations,
+        )
+        facts, resources = {"at-site"}, {}
+        goal_facts = {"shelter-goal": {"shelter"}}
+        first = coordinator.replan("npc", 1, facts, resources, goal_facts, reason="start")
+        coordinator.replan(
+            "npc", 2, facts, resources, goal_facts,
+            reason="new information", active_execution_id=first.execution_id,
+        )
+        prior = evaluations.plan_history[0]
+        self.assertEqual(prior.terminal_status, "replanned")
+        self.assertIn("goal_observation_unavailable", prior.deviation_flags)
+        self.assertEqual(prior.missing_goal_facts, ())
+
     def test_cancelled_action_is_recorded_as_non_success(self):
         facts, resources = {"broken"}, {"parts": 5.0}
         self.executions.start("cancel-me", "npc", 1, "repair", facts, resources,
