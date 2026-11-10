@@ -11,7 +11,7 @@ import hashlib
 import json
 
 from .action_execution import ActionExecution, ActionExecutionLedger, ActiveActionExecution
-from .action_evaluation import ActionPlanEvaluationLedger, NPCActionEvaluation
+from .action_evaluation import ActionPlanEvaluationLedger, NPCActionEvaluation, NPCPlanEvaluation
 from .npc_autonomy import NPCDecision, NPCDecisionCycle
 from .planning import PlanResult
 from .world_events import WorldEventLedger
@@ -46,7 +46,7 @@ class NPCActionProgression:
     next_active: ActiveActionExecution | None
     replanning: NPCReplanningResult | None
     evaluation: NPCActionEvaluation | None = None
-    plan_evaluation: object | None = None
+    plan_evaluation: NPCPlanEvaluation | None = None
 
 
 @dataclass(frozen=True)
