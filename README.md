@@ -391,3 +391,6 @@ NPCs can now interpret the same authoritative event differently through owner-sp
 
 
 Learned psychological associations now feed into explicit candidate-choice appraisal through `PsychologicalDecisionAdapter`. NPC-specific cue sensitivities and caller-supplied cue exposure can change how options are ranked while preserving the base value score and a transparent per-cue breakdown. The adapter is deterministic, read-only, and does not execute choices. See [docs/NPC-PSYCHOLOGICAL-DECISIONS.md](docs/NPC-PSYCHOLOGICAL-DECISIONS.md) and `tests/test_psychological_decisions.py`.
+
+
+NPCs can now explicitly accept or reject observer-specific psychological learning proposals. Accepted proposals apply one replay-safe conditioning record; rejected proposals and rationales remain in history without changing associations. Later contradictory experiences can gradually revise a learned association. See [docs/NPC-PSYCHOLOGICAL-LEARNING-DECISIONS.md](docs/NPC-PSYCHOLOGICAL-LEARNING-DECISIONS.md) and tests/test_psychological_learning_decisions.py.
