@@ -416,3 +416,5 @@ NPC memories can now be reinterpreted over time without rewriting the original a
 
 
 The [memory-driven decision layer](docs/MEMORY-DRIVEN-DECISIONS.md) translates explicitly associated recalled experiences into bounded choice-appraisal signals. It can feed the integrated belief/value/conditioning decision ranker while preserving NPC agency: it influences scores but never executes or forces a choice. Tests: `tests/test_memory_decisions.py` and the memory-influence cases in `tests/test_integrated_decisions.py`.
+
+The new [cue-triggered emotional memory layer](docs/EMOTIONAL-MEMORY.md) connects explicit observations—such as a person's presence, a location, a sound, or a situation—to an NPC's own autobiographical memories. Per-owner associations map remembered experiences to separate emotion axes, allowing affection and resentment to coexist when different memories are activated by the same cue. Exposure, memory salience, and authored sensitivity produce bounded, attributable response strengths. Evaluation is deterministic and read-only; it does not mutate the emotional ledger or infer what a cue means. Tests: `tests/test_emotional_memory.py`.
