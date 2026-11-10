@@ -287,6 +287,7 @@ class NPCActionReplanningCoordinator:
             action_reliability=action_reliability,
             plan_reliability=plan_reliability,
             goal_experience_adjustments=goal_adjustments,
+            goal_motivational_adjustments=goal_motivational_adjustments,
         )
         if experience_ids:
             decision = NPCDecision(decision.owner_id, decision.tick, decision.goal_id,
