@@ -758,6 +758,17 @@ __all__ += [
     "MemoryReflectionLedger", "MemoryReflectionSnapshot", "MemoryReinterpretation",
 ]
 
+# Cue-triggered, memory-grounded emotional responses with explicit provenance.
+from .emotional_memory import (
+    EmotionalMemoryAdapter, EmotionalMemoryAssociation,
+    EmotionalMemoryContribution, EmotionalMemoryProfile, EmotionalMemoryResponse,
+)
+__all__ += [
+    "EmotionalMemoryAdapter", "EmotionalMemoryAssociation",
+    "EmotionalMemoryContribution", "EmotionalMemoryProfile",
+    "EmotionalMemoryResponse",
+]
+
 # Bounded, owner-specific influence of recalled autobiographical memories on choices.
 from .memory_decisions import (
     MemoryChoiceAssociation, MemoryDecisionInfluence,
