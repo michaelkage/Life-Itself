@@ -16,6 +16,7 @@ from .goals import GoalBook, NPCGoal, GoalStatus
 from .identity_context import NPCEmotionalState
 from .stress_adaptation import StressBehaviorSignal
 from .npc_life_history import NPCLifeHistory
+from .npc_experience_transfer import StrategicExperienceEvidence
 
 
 @dataclass(frozen=True)
@@ -112,6 +113,7 @@ class NPCGoalEmergence:
         emotional_state: NPCEmotionalState | None = None,
         stress_signal: StressBehaviorSignal | None = None,
         history: NPCLifeHistory | None = None,
+        experience_evidence: tuple[StrategicExperienceEvidence, ...] = (),
     ) -> tuple[NPCGoalProposal, ...]:
         if not isinstance(goals, GoalBook):
             raise TypeError("goals must be GoalBook")
@@ -133,6 +135,8 @@ class NPCGoalEmergence:
             raise ValueError("stress signal must belong to owner and not be from the future")
         if history is not None and not isinstance(history, NPCLifeHistory):
             raise TypeError("history must be NPCLifeHistory")
+        if not isinstance(experience_evidence, tuple) or any(not isinstance(x, StrategicExperienceEvidence) or x.owner_id != owner_id or x.tick > current_tick for x in experience_evidence):
+            raise ValueError("experience evidence must be a tuple of owner-matched, non-future strategic evidence")
         emotions = dict(emotional_state.intensities) if emotional_state else {}
         stress = dict(stress_signal.modifiers) if stress_signal else {}
         memories = tuple(m for m in history.memories(owner_id) if m.tick <= current_tick) if history else ()
@@ -149,9 +153,14 @@ class NPCGoalEmergence:
             if rule.experience_tag is not None:
                 matches = [m for m in memories if rule.experience_tag in m.tags
                            and (m.turning_point or not rule.require_turning_point)]
+                strategic = [x for x in experience_evidence
+                             if rule.experience_tag in x.tags
+                             and (not rule.require_turning_point or x.source_class == "personal")]
                 evidence.extend(m.memory_id for m in matches)
                 sources.extend("personal_memory" for _ in matches)
-                if matches:
+                evidence.extend(x.evidence_id for x in strategic)
+                sources.extend(x.source_class for x in strategic)
+                if matches or strategic:
                     triggers.append("experience:" + rule.experience_tag)
             if not triggers:
                 continue
