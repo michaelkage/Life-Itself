@@ -751,10 +751,15 @@ class SimulationWorldCheckpoint:
                         or dict(event.attributes).get("execution_id") != record.execution_id
                         or dict(event.attributes).get("action_id") != record.action_id):
                     raise ValueError("action evaluation does not match checkpoint execution and event history")
-                for evidence_id in evaluation["evidence_event_ids"]:
+                evidence_ids = evaluation["evidence_event_ids"]
+                if record.event_id not in evidence_ids:
+                    raise ValueError("action evaluation omits its terminal execution event")
+                for evidence_id in evidence_ids:
                     evidence = journal.get(evidence_id)
-                    if evidence is None or evidence.tick > current_tick:
-                        raise ValueError("action evaluation references missing or future evidence")
+                    if (evidence is None or evidence.tick > current_tick
+                            or record["owner_id"] not in evidence.participants
+                            or dict(evidence.attributes).get("execution_id") != execution_id):
+                        raise ValueError("action evaluation references missing or mismatched evidence")
         if action_replanning is not None:
             if not isinstance(action_replanning, NPCActionReplanningCoordinator):
                 raise TypeError("action_replanning must be an NPCActionReplanningCoordinator or None")
@@ -929,10 +934,15 @@ class SimulationWorldCheckpoint:
                         or dict(event.attributes).get("action_id") != record["action_id"]):
                     raise ValueError("action evaluation does not match checkpoint execution and event history")
                 seen.add(execution_id)
-                for evidence_id in evaluation["evidence_event_ids"]:
+                evidence_ids = evaluation["evidence_event_ids"]
+                if record["event_id"] not in evidence_ids:
+                    raise ValueError("action evaluation omits its terminal execution event")
+                for evidence_id in evidence_ids:
                     evidence = journal.get(evidence_id)
-                    if evidence is None or evidence.tick > self.current_tick:
-                        raise ValueError("action evaluation references missing or future evidence")
+                    if (evidence is None or evidence.tick > self.current_tick
+                            or record["owner_id"] not in evidence.participants
+                            or dict(evidence.attributes).get("execution_id") != execution_id):
+                        raise ValueError("action evaluation references missing or mismatched evidence")
         if action_replanning_snapshot is not None:
             journal = {event.event_id: event for event in envelope.restore_event_ledger().snapshot()}
             npc_ids = {npc.entity_id for npc in NPCCollectionSnapshot.from_json(self.npcs_json).restore().values()}
