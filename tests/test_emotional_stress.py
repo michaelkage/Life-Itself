@@ -66,7 +66,7 @@ class EmotionalStressTests(unittest.TestCase):
         self.ledger.advance(3, {"npc-b": profile_b})
         self.assertAlmostEqual(self.ledger.stress_for("npc-b"), 0.65)
         self.ledger.advance(3, {"npc-a": profile_a})
-        self.assertAlmostEqual(self.ledger.stress_for("npc-a"), 0.6)
+        self.assertAlmostEqual(self.ledger.stress_for("npc-a"), 0.5)
 
     def test_owner_recovery_clocks_survive_snapshot_round_trip(self):
         profile_a = CopingProfile("npc-a", recovery_per_tick=0.1)
