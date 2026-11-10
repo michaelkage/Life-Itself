@@ -625,3 +625,10 @@ __all__ += [
     "EmotionalDecisionAdapter", "EmotionalDecisionInfluence", "EmotionalDecisionRule",
     "EmotionalExpression", "EmotionalExpressionAdapter", "EmotionalRegulationProfile",
 ]
+
+
+# Individual coping strategies, accumulated stress, exhaustion, and recovery.
+from .emotional_stress import (
+    CopingProfile, NPCStressLedger, NPCStressSnapshot, StressAssessment, StressRecord,
+)
+__all__ += ["CopingProfile", "NPCStressLedger", "NPCStressSnapshot", "StressAssessment", "StressRecord"]
