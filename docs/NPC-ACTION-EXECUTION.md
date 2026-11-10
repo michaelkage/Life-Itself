@@ -41,10 +41,14 @@ bounds, duplicate IDs, and the existence of corresponding journal events. An
 active action resumes from its stored progress and keeps its resource reservation.
 
 The snapshot does not duplicate the world event journal or world facts/resource
-balances. Restore the authoritative world checkpoint first, then restore this
-ledger against its event journal, and resume with the restored fact/resource state.
-Callers should checkpoint facts, resource balances, this ledger, and the event
-journal atomically to avoid inconsistent recovery.
+balances. `SimulationWorldCheckpoint.capture(..., action_executions=ledger,
+action_world_facts=facts, action_resources=resources)` stores all four together.
+Restore the composite checkpoint, then call
+`restored.restore_action_execution_ledger(planner, policies)` to rebind the
+saved execution state to runtime action definitions. The restored simulation
+exposes `action_world_facts` and `action_resources` as mutable state for the
+resumed ledger. Checkpoint validation rejects future actions, missing owners,
+and mismatched or absent journal events.
 
 ## Goal progress
 
