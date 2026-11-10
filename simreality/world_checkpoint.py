@@ -306,6 +306,14 @@ class SimulationWorldCheckpoint:
             for record in encounter_snapshot.records:
                 if any(owner not in known_presence for owner in record.participants):
                     raise ValueError("encounter participants require saved physical presence")
+                for interaction_id in record.trust_interaction_ids:
+                    interaction = trust._interactions.get(interaction_id)
+                    if (interaction is None or interaction.observed_tick != record.tick
+                            or {interaction.observer_id, interaction.target_id} != set(record.participants)):
+                        raise ValueError("encounter trust history does not match its participants")
+                if (record.conversation_id is not None
+                        and record.conversation_id not in coordinator.conversation_adapter._results):
+                    raise ValueError("encounter references a conversation missing from checkpoint replay")
                 # Presence is current state; participants may have moved since this historical encounter.
         misconduct_snapshot = None
         if misconduct is not None:
@@ -488,9 +496,18 @@ class SimulationWorldCheckpoint:
             if presence_snapshot is None:
                 raise ValueError("presence encounters require the corresponding presence ledger")
             presence_by_owner = {record.owner_id: record for record in presence_snapshot.records}
+            trust_by_id = {item.interaction_id: item for item in components[2].interactions}
+            conversation_ids = {key for key, _signature, _result in components[5].entries}
             for record in encounter_snapshot.records:
                 if any(owner not in presence_by_owner for owner in record.participants):
                     raise ValueError("encounter participants require saved physical presence")
+                for interaction_id in record.trust_interaction_ids:
+                    interaction = trust_by_id.get(interaction_id)
+                    if (interaction is None or interaction.observed_tick != record.tick
+                            or {interaction.observer_id, interaction.target_id} != set(record.participants)):
+                        raise ValueError("encounter trust history does not match its participants")
+                if record.conversation_id is not None and record.conversation_id not in conversation_ids:
+                    raise ValueError("encounter references a conversation missing from checkpoint replay")
                 # Current presence may have advanced beyond the historical encounter.
         return components
 
