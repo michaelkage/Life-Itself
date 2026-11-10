@@ -95,10 +95,11 @@ class NPCActionReplanningTests(unittest.TestCase):
         self.assertIsNotNone(self.events.get(first.event_id))
 
     def test_replanning_preserves_prior_execution_records(self):
+        facts = {"has-kit"}
         self.ledger.execute("completed-before-replan", "npc-1", 1, "repair-with-kit",
-                            {"has-kit"}, {}, plan_actions=("repair-with-kit",))
+                            facts, {}, plan_actions=("repair-with-kit",))
         result = self.coordinator.replan(
-            "npc-1", 2, {"has-kit"}, {"cash": 10.0},
+            "npc-1", 2, facts, {"cash": 10.0},
             {"repair": {"machine-fixed"}, "rest": {"rested"}},
             reason="verify history",
         )
