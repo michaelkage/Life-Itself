@@ -468,3 +468,6 @@ NPC strategic experience transfer is now available as a provenance-safe componen
 
 
 Experience-aware NPC replanning can now optionally use autobiographical and transferred experience. Actions declare exact `experience_tags`; only matching memories with explicit `outcome:success` or `outcome:failure` tags affect bounded action guidance. Personal, witnessed, and reported evidence retain distinct weights, repeated reports of one event are deduplicated, and the selected decision preserves evidence IDs. See [docs/NPC-EXPERIENCE-TRANSFER.md](docs/NPC-EXPERIENCE-TRANSFER.md) and [tests/test_experience_guided_planning.py](tests/test_experience_guided_planning.py).
+
+
+NPC goal selection can also consume explicit goal-outcome memories. Goals opt in with `metadata["experience_tags"]`; only matching memories tagged `goal:success` or `goal:failure` adjust their evaluated score, within a ±25% bound. Stored goal priority and progress remain unchanged. See [the experience-transfer guide](docs/NPC-EXPERIENCE-TRANSFER.md) and the goal-priority regression tests.
