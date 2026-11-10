@@ -837,5 +837,58 @@ class SimulationWorldCheckpointTests(unittest.TestCase):
             )
 
 
+    def test_relationship_facets_round_trip_and_validate_source_event(self):
+        from simreality import RelationshipChange, SocialRelationshipLedger
+        coordinator, npcs, _ = self.make_simulation()
+        relationships = SocialRelationshipLedger((
+            RelationshipChange("warmth-1", "event-1", "speaker", "listener",
+                               3, "warmth", 0.8, "protected-me"),
+            RelationshipChange("resentment-1", "event-1", "speaker", "listener",
+                               3, "resentment", 0.6, "betrayed-me"),
+            RelationshipChange("respect-1", "event-1", "listener", "speaker",
+                               3, "respect", 0.4, "stood-ground"),
+        ))
+        payload = SimulationWorldCheckpoint.capture(
+            4, coordinator, npcs, relationships=relationships,
+        ).to_json()
+        restored = SimulationWorldCheckpoint.from_json(payload).restore()
+        self.assertEqual(restored.relationships.snapshot(), relationships.snapshot())
+        self.assertAlmostEqual(
+            restored.relationships.relationship("speaker", "listener").value("warmth"), 0.8,
+        )
+        self.assertAlmostEqual(
+            restored.relationships.relationship("speaker", "listener").value("resentment"), 0.6,
+        )
+        self.assertAlmostEqual(
+            restored.relationships.relationship("listener", "speaker").value("respect"), 0.4,
+        )
+        self.assertEqual(
+            SimulationWorldCheckpoint.capture(
+                4, restored.coordinator, restored.npcs,
+                relationships=restored.relationships,
+            ).to_json(),
+            payload,
+        )
+
+    def test_relationship_checkpoint_rejects_missing_or_nonparticipant_source(self):
+        from simreality import RelationshipChange, SocialRelationshipLedger
+        coordinator, npcs, _ = self.make_simulation()
+        missing = SocialRelationshipLedger((
+            RelationshipChange("missing-source", "no-event", "speaker", "listener",
+                               3, "warmth", 0.2),
+        ))
+        with self.assertRaisesRegex(ValueError, "missing world event"):
+            SimulationWorldCheckpoint.capture(4, coordinator, npcs, relationships=missing)
+        unrelated = SocialRelationshipLedger((
+            RelationshipChange("unrelated-source", "event-1", "listener", "speaker",
+                               3, "warmth", 0.2),
+        ))
+        # Both NPCs must be participants or witnesses of the cited event.
+        self.assertEqual(len(unrelated.snapshot()), 1)
+        with self.assertRaisesRegex(ValueError, "does not match its source world event"):
+            SimulationWorldCheckpoint.capture(
+                4, coordinator, npcs, relationships=unrelated,
+            )
+
 if __name__ == "__main__":
     unittest.main()
