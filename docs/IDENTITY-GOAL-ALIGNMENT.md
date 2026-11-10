@@ -75,6 +75,6 @@ restored_decisions = IdentityGoalReviewSnapshot.from_json(saved).restore()
   markers in canonical JSON, so a restored ledger does not reapply completed
   changes.
 
-This module is deliberately an advisory bridge and explicit application layer.
+`SimulationWorldCheckpoint.capture` now persists the goal-review ledger alongside the GoalBook and identity-decision ledger. Checkpoint validation requires every review to reference an accepted identity decision for the same NPC, source event, policy, axis, and delta; the source event role and all review timestamps are checked again during restore. Legacy checkpoints remain valid because the new field is optional.\n\nThis module is deliberately an advisory bridge and explicit application layer.
 Policy authoring determines what an identity axis means for a goal category;
 the engine does not infer psychological meaning from trait names.
