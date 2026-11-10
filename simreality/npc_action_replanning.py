@@ -12,7 +12,31 @@ import json
 
 from .action_execution import ActionExecution, ActionExecutionLedger, ActiveActionExecution
 from .npc_autonomy import NPCDecision, NPCDecisionCycle
+from .planning import PlanResult
 from .world_events import WorldEventLedger
+
+
+
+@dataclass(frozen=True)
+class NPCReplanningSnapshot:
+    """Canonical, versioned idempotency history for autonomous replanning."""
+    payload_json: str
+
+    def to_json(self) -> str:
+        raw = json.loads(self.payload_json)
+        if not isinstance(raw, dict) or raw.get("schema_version") != 1 or not isinstance(raw.get("requests"), list):
+            raise ValueError("invalid NPC replanning snapshot")
+        canonical = json.dumps(raw, sort_keys=True, separators=(",", ":"), allow_nan=False)
+        if canonical != self.payload_json:
+            raise ValueError("NPC replanning snapshot must be canonical JSON")
+        return canonical
+
+    @classmethod
+    def from_json(cls, payload: str) -> "NPCReplanningSnapshot":
+        raw = json.loads(payload)
+        snapshot = cls(json.dumps(raw, sort_keys=True, separators=(",", ":"), allow_nan=False))
+        snapshot.to_json()
+        return snapshot
 
 
 @dataclass(frozen=True)
@@ -58,6 +82,75 @@ class NPCActionReplanningCoordinator:
         if self.events is not executions.events:
             raise ValueError("replanning and execution must share one event journal")
         self._requests: dict[str, tuple[str, NPCReplanningResult]] = {}
+
+    def to_snapshot(self) -> NPCReplanningSnapshot:
+        requests = []
+        for request_id, (signature, result) in sorted(self._requests.items()):
+            decision = result.decision
+            plan = None if decision.plan is None else {
+                "success": decision.plan.success, "actions": list(decision.plan.actions),
+                "total_cost": decision.plan.total_cost,
+                "expanded_states": decision.plan.expanded_states,
+                "reason": decision.plan.reason,
+            }
+            requests.append({
+                "request_id": request_id, "signature": signature,
+                "owner_id": result.owner_id, "tick": result.tick,
+                "reason": result.reason, "goal_id": decision.goal_id,
+                "goal_category": decision.goal_category, "decision_reason": decision.reason,
+                "plan": plan, "status": result.status,
+                "execution_id": result.execution_id, "action_id": result.action_id,
+                "rejected_reason": result.rejected_reason, "event_id": result.event_id,
+            })
+        payload = {"schema_version": 1, "requests": requests}
+        return NPCReplanningSnapshot(json.dumps(payload, sort_keys=True,
+                                                  separators=(",", ":"), allow_nan=False))
+
+    def restore_snapshot(self, snapshot: NPCReplanningSnapshot) -> None:
+        if not isinstance(snapshot, NPCReplanningSnapshot):
+            raise TypeError("snapshot must be an NPCReplanningSnapshot")
+        raw = json.loads(snapshot.to_json())
+        restored = {}
+        for item in raw["requests"]:
+            signature = item["signature"]
+            request_id = hashlib.sha256(signature.encode("utf-8")).hexdigest()
+            if request_id != item["request_id"] or request_id in restored:
+                raise ValueError("replanning request identity is invalid or duplicated")
+            request_data = json.loads(signature)
+            if request_data.get("owner") != item["owner_id"] or request_data.get("tick") != item["tick"]:
+                raise ValueError("replanning request metadata does not match its signature")
+            event = self.events.get(item["event_id"])
+            attributes = dict(event.attributes)
+            if (event.event_type != "npc_action_replanned" or event.tick != item["tick"]
+                    or item["owner_id"] not in event.participants
+                    or attributes.get("request_id") != request_id
+                    or attributes.get("status") != item["status"]):
+                raise ValueError("replanning history does not match its world event")
+            plan_data = item["plan"]
+            plan = None if plan_data is None else PlanResult(
+                plan_data["success"], tuple(plan_data["actions"]), plan_data["total_cost"],
+                plan_data["expanded_states"], plan_data["reason"],
+            )
+            decision = NPCDecision(
+                item["owner_id"], item["tick"], item["goal_id"],
+                item["goal_category"], plan, item["decision_reason"],
+            )
+            result = NPCReplanningResult(
+                request_id, item["owner_id"], item["tick"], item["reason"], decision,
+                item["status"], item["execution_id"], item["action_id"],
+                item["rejected_reason"], item["event_id"],
+            )
+            restored[request_id] = (signature, result)
+        self._requests = restored
+
+    @classmethod
+    def from_snapshot(cls, decisions: NPCDecisionCycle,
+                      executions: ActionExecutionLedger,
+                      events: WorldEventLedger,
+                      snapshot: NPCReplanningSnapshot) -> "NPCActionReplanningCoordinator":
+        coordinator = cls(decisions, executions, events)
+        coordinator.restore_snapshot(snapshot)
+        return coordinator
 
     def _resource_failure(self, actions: tuple[str, ...],
                           resources: dict[str, float]) -> str | None:
