@@ -193,8 +193,10 @@ class ActionExecutionLedger:
             if record is not None:
                 return record
             raise KeyError(execution_id)
-        if isinstance(tick, bool) or not isinstance(tick, int) or tick <= active.last_tick:
-            raise ValueError("advance tick must be greater than the previous execution tick")
+        if isinstance(tick, bool) or not isinstance(tick, int) or tick < active.last_tick:
+            raise ValueError("advance tick cannot precede the previous execution tick")
+        if tick == active.last_tick:
+            return active
         if not isinstance(world_facts, set) or not isinstance(resources, dict):
             raise TypeError("world_facts and resources must be mutable set/dict values")
         if interruption is not None and (not isinstance(interruption, str) or not interruption.strip()):
@@ -269,6 +271,8 @@ class ActionExecutionLedger:
             raise KeyError(execution_id)
         if not isinstance(reason, str) or not reason.strip():
             raise ValueError("cancellation reason must be non-empty")
+        if isinstance(tick, bool) or not isinstance(tick, int) or tick < active.last_tick:
+            raise ValueError("cancellation tick cannot precede the previous execution tick")
         # Cancellation is finalized through advance, so the same release and event path applies.
         facts = set()
         # Cancellation does not require current facts/resources; no effects or costs are applied.
