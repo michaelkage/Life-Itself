@@ -156,14 +156,18 @@ class ActionPlanEvaluationLedger:
             raise ValueError("terminal action records do not follow the registered plan order")
         completed_actions = tuple(record.action_id for record in records if record.status == "completed")
         failed_actions = tuple(record.action_id for record in records if record.status != "completed")
-        final_facts = set(records[-1].facts_after)
+        final_record = records[-1]
+        observation_available = bool(final_record.facts_before or final_record.facts_after)
+        final_facts = set(final_record.facts_after)
         expected_facts = plan["expected_goal_facts"]
-        observed_goal_facts = tuple(sorted(set(expected_facts) & final_facts))
-        missing_goal_facts = tuple(sorted(set(expected_facts) - final_facts))
+        observed_goal_facts = tuple(sorted(set(expected_facts) & final_facts)) if observation_available else ()
+        missing_goal_facts = tuple(sorted(set(expected_facts) - final_facts)) if observation_available else ()
         flags = set()
         if terminal_status != "completed":
             flags.add(terminal_status)
-        if missing_goal_facts:
+        if not observation_available:
+            flags.add("goal_observation_unavailable")
+        elif missing_goal_facts:
             flags.add("goal_not_achieved")
         for action_evaluation in evaluations:
             flags.update(f"action_deviation:{flag}" for flag in action_evaluation.deviation_flags)
@@ -177,7 +181,7 @@ class ActionPlanEvaluationLedger:
             plan_id, plan["owner_id"], plan["goal_id"], expected_actions,
             terminal_status, expected_facts, observed_goal_facts, missing_goal_facts,
             completed_actions, failed_actions, tuple(sorted(flags)), evidence,
-            min((item.confidence for item in evaluations), default=0.0),
+            min((item.confidence for item in evaluations), default=0.0) if observation_available else 0.0,
         )
         self.events.append(WorldEventLedger.make_event(
             evaluation_id, records[-1].tick, "npc_plan_evaluated",
@@ -408,7 +412,8 @@ class ActionPlanEvaluationLedger:
                     or dict(event.attributes).get("terminal_status") != item.terminal_status
                     or tuple(record.action_id for record in records if record.status == "completed") != item.completed_actions
                     or tuple(record.action_id for record in records if record.status != "completed") != item.failed_actions
-                    or set(item.observed_goal_facts) | set(item.missing_goal_facts) != set(item.expected_goal_facts)
+                    or (set(item.observed_goal_facts) | set(item.missing_goal_facts) != set(item.expected_goal_facts)
+                        and "goal_observation_unavailable" not in item.deviation_flags)
                     or set(item.observed_goal_facts) & set(item.missing_goal_facts)
                     or not 0.0 <= item.confidence <= 1.0):
                 raise ValueError("aggregate plan evaluation lacks matching plan, records, or event provenance")
