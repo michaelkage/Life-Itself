@@ -94,21 +94,6 @@ class RoutineArrivalAdapter:
                 (item for item in supplied if item.owner_id == block.owner_id),
                 key=lambda item: item.disruption_id,
             ))
-            if previous is not None:
-                if (previous.routine_id != block.routine_id
-                        or previous.minute_of_day != minute_of_day
-                        or previous.disruptions != relevant
-                        or previous.outcome_sample != float(sample)
-                        or previous.resolution.owner_id != block.owner_id
-                        or previous.resolution.intended_activity != block.activity
-                        or previous.resolution.intended_location_id != block.location_id):
-                    raise ValueError(f"conflicting routine arrival execution: {execution_id}")
-                results.append(RoutineArrivalResult(
-                    journey.journey_id, block.routine_id, block.owner_id,
-                    "already_executed", previous,
-                ))
-                materialized.append(previous)
-                continue
             base = book.resolve(block, minute_of_day, relevant, outcome_sample=float(sample))
             late_by = max(0, minute_of_day - block.start_minute)
             after_end = minute_of_day >= block.end_minute
@@ -117,6 +102,15 @@ class RoutineArrivalAdapter:
                 execution_id, block.routine_id, minute_of_day, relevant,
                 float(sample), resolution,
             )
+            if previous is not None:
+                if previous != record:
+                    raise ValueError(f"conflicting routine arrival execution: {execution_id}")
+                results.append(RoutineArrivalResult(
+                    journey.journey_id, block.routine_id, block.owner_id,
+                    "already_executed", previous,
+                ))
+                materialized.append(previous)
+                continue
             self.executions._restore_record(record)
             status = "missed" if resolution.outcome is RoutineOutcome.MISSED else "executed"
             results.append(RoutineArrivalResult(
