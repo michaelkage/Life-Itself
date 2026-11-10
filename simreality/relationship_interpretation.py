@@ -146,11 +146,10 @@ class NPCRelationshipInterpreter:
         for (facet, source), amount in sorted(contributions.items()):
             facet_totals[facet] += amount
             trace.append((facet, source, amount))
-        touched_facets = {facet for facet, _source in contributions}
+        # Persist a complete facet vector, including zeroes. This makes a
+        # conflicting replay detectable even after the interpreter is rebuilt.
         changes = []
         for facet in RELATIONSHIP_FACETS:
-            if facet not in touched_facets:
-                continue
             delta = min(1.0, max(-1.0, facet_totals[facet]))
             changes.append(RelationshipChange(
                 change_id=f"relationship:{event_id}:{observer_id}:{target_id}:{facet}",
