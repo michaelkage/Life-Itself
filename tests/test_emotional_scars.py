@@ -198,3 +198,40 @@ def test_decision_snapshot_restores_rejections_scars_and_recovery_history():
     assert restored.decisions() == ledger.decisions()
     assert restored.scars.scars() == ledger.scars.scars()
     assert restored.scars.recoveries() == ledger.scars.recoveries()
+
+
+def test_decision_snapshot_preserves_recovery_before_later_scar_creation():
+    history = NPCLifeHistory()
+    history.record(AutobiographicalMemory(
+        "memory-1", "alice", "event-1", 2, ("bob",),
+        "The event was frightening", 0.9, -0.2, turning_point=True,
+    ))
+    history.record(AutobiographicalMemory(
+        "memory-2", "alice", "event-2", 5, ("bob",),
+        "A later event was frightening", 0.8, -0.1, turning_point=True,
+    ))
+    profile = EmotionalMemoryProfile("alice", (
+        EmotionalMemoryAssociation("association-1", "memory-1", "smoke", "fear"),
+        EmotionalMemoryAssociation("association-2", "memory-2", "fire", "fear"),
+    ))
+    response = EmotionalMemoryAdapter.evaluate(
+        history, profile, {"smoke": 1.0, "fire": 1.0}, 5,
+    )
+    proposals = EmotionalScarFormationAdapter.propose(
+        history, response, EmotionalScarFormationPolicy("policy"),
+    )
+    ledger = EmotionalScarDecisionLedger()
+    for proposal in proposals:
+        ledger.add_proposal(proposal)
+    first, second = sorted(proposals, key=lambda p: p.proposed_tick)
+    ledger.decide(EmotionalScarDecision("decision-1", first.proposal_id, "alice", 3, True, "accepted"))
+    first_scar = ledger.scars.scars()[0]
+    ledger.scars.recover(
+        recovery_id="recovery-1", scar_id=first_scar.scar_id, owner_id="alice",
+        tick=4, amount=0.1, method="support",
+    )
+    ledger.decide(EmotionalScarDecision("decision-2", second.proposal_id, "alice", 5, True, "accepted"))
+    restored = EmotionalScarDecisionSnapshot.capture(ledger).restore()
+    assert restored.snapshot() == ledger.snapshot()
+    assert restored.scars.recoveries() == ledger.scars.recoveries()
+    assert len(restored.scars.scars()) == 2
