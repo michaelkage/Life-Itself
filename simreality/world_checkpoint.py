@@ -499,6 +499,7 @@ class SimulationWorldCheckpoint:
             emotional_snapshot.to_json() if emotional_snapshot is not None else None,
             stress_snapshot.to_json() if stress_snapshot is not None else None,
             conditioning_snapshot.to_json() if conditioning_snapshot is not None else None,
+            learning_decision_snapshot.to_json() if learning_decision_snapshot is not None else None,
         )
 
     def _components(self):
@@ -534,6 +535,7 @@ class SimulationWorldCheckpoint:
             EmotionalEventSnapshot.from_json(self.emotions_json) if self.emotions_json is not None else None,
             NPCStressSnapshot.from_json(self.stress_json) if self.stress_json is not None else None,
             NPCConditioningSnapshot.from_json(self.conditioning_json) if self.conditioning_json is not None else None,
+            PsychologicalLearningDecisionSnapshot.from_json(self.psychological_learning_decisions_json) if self.psychological_learning_decisions_json is not None else None,
         )
         goals_snapshot, goal_replay, goal_review_decisions = components[14], components[15], components[16]
         identity_decisions = components[17]
@@ -547,6 +549,7 @@ class SimulationWorldCheckpoint:
         emotional_snapshot = components[25]
         stress_snapshot = components[26]
         conditioning_snapshot = components[27]
+        learning_decisions_snapshot = components[28]
         if presence_snapshot is not None:
             if any(record.updated_tick > self.current_tick for record in presence_snapshot.records):
                 raise ValueError("NPC presence cannot be updated after the checkpoint tick")
@@ -811,6 +814,8 @@ class SimulationWorldCheckpoint:
             payload["stress"] = json.loads(stress.to_json())
         if conditioning is not None:
             payload["conditioning"] = json.loads(conditioning.to_json())
+        if self.psychological_learning_decisions_json is not None:
+            payload["psychological_learning_decisions"] = json.loads(self.psychological_learning_decisions_json)
         return json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False)
 
     @classmethod
@@ -894,6 +899,7 @@ class SimulationWorldCheckpoint:
         emotions = emotional_snapshot.restore() if emotional_snapshot is not None else None
         stress = stress_snapshot.restore() if stress_snapshot is not None else None
         conditioning = conditioning_snapshot.restore() if conditioning_snapshot is not None else None
+        psychological_learning_decisions = learning_decisions_snapshot.restore() if learning_decisions_snapshot is not None else None
         return RestoredSimulation(self.current_tick, events, npcs, trust, beliefs,
                                   memory, conversations, coordinator, self.metadata,
                                   consequence_recorder, campaign, misconduct, routines, routine_executions,
