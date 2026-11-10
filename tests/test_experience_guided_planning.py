@@ -53,7 +53,9 @@ def test_personal_failure_outweighs_reported_failure_in_action_choice():
     assert personal_result.action_id == "a-safe-route"
     assert reported_result.action_id == "z-repair-route"
     assert personal_result.decision.experience_evidence_ids == ("alice-repair-memory",)
+    assert personal_result.decision.experience_evidence_sources == (("alice-repair-memory", "personal"),)
     assert reported_result.decision.experience_evidence_ids == ("repair-report",)
+    assert reported_result.decision.experience_evidence_sources == (("repair-report", "reported"),)
 
 
 def test_unmatched_or_unclassified_memory_does_not_change_action_choice():
@@ -89,3 +91,4 @@ def test_replanning_snapshot_preserves_experience_attribution():
                              {"goal": {"done"}}, reason="persist experience")
     assert replay == result
     assert replay.decision.experience_evidence_ids == ("repair-report",)
+    assert replay.decision.experience_evidence_sources == (("repair-report", "reported"),)
