@@ -184,10 +184,14 @@ class PresenceSocialAdapter:
         if trust_directions is not None:
             if not isinstance(trust, SocialTrustLedger):
                 raise TypeError("trust directions require a SocialTrustLedger")
-            if not isinstance(trust_directions, tuple) or len(trust_directions) != 2 or any(x not in (-1, 1) for x in trust_directions):
+            if not isinstance(trust_directions, tuple) or len(trust_directions) != 2 or any(isinstance(x, bool) or x not in (-1, 1) for x in trust_directions):
                 raise ValueError("trust_directions must contain two values of +1 or -1")
             if isinstance(trust_strength, bool) or not isinstance(trust_strength, (int, float)) or not 0 <= trust_strength <= 1:
                 raise ValueError("trust_strength must be in [0, 1]")
+            if not isinstance(trust_context, str) or not trust_context.strip():
+                raise ValueError("trust_context must be a non-empty string")
+            if conversation and trust is not conversation_adapter.trust:
+                raise ValueError("conversation and encounter trust effects must share one trust ledger")
         elif trust is not None and trust_strength != 0.0:
             raise ValueError("trust effects require explicit trust_directions")
 
