@@ -240,6 +240,7 @@ class ActionPlanEvaluationLedger:
         missing = tuple(sorted(set(expected_added) - set(observed_added)))
         unexpected = tuple(sorted(set(observed_added) - set(expected_added)))
         before_resources, after_resources = dict(record.resources_before), dict(record.resources_after)
+        resource_observation_available = bool(record.resources_before or record.resources_after)
         observed_costs = tuple(sorted(
             (key, max(0.0, value - after_resources.get(key, 0.0)))
             for key, value in before_resources.items()
@@ -254,7 +255,7 @@ class ActionPlanEvaluationLedger:
             flags.append("expected_effect_absent")
         if unexpected:
             flags.append("unexpected_side_effect")
-        if observed_costs != expected_costs:
+        if resource_observation_available and observed_costs != expected_costs:
             flags.append("resource_variance")
         if observed_duration != expected_duration:
             flags.append("duration_variance")
