@@ -459,3 +459,6 @@ Action evaluation history and its bounded reliability projection are also persis
 
 
 Multi-step NPC plans now receive aggregate outcome assessments in addition to per-action evaluations. The aggregate records the goal facts expected by the selected plan, which were actually observed at its terminal step, incomplete goal facts, completed/failed steps, and evidence-linked action deviations. Access the result through `NPCActionProgression.plan_evaluation`; the append-only history is available from `ActionPlanEvaluationLedger.plan_history` and is included in evaluation snapshots and world checkpoints.
+
+
+NPC replanning now incorporates evidence-bounded learning. Once enough terminal observations exist, action reliability adjusts proposal costs without changing declared action costs. Aggregate plan reliability is learned separately for each goal and ordered action sequence, allowing previously unreliable routes to receive a bounded risk premium. Unobserved interruptions do not become fabricated plan outcome samples. Both projections persist with action-evaluation snapshots and world checkpoints.
