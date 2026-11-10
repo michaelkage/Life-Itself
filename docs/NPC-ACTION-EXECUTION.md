@@ -59,3 +59,27 @@ exist in that book. The caller remains responsible for choosing meaningful,
 evidence-based action-to-goal mappings.
 
 Tests: `tests/test_action_execution.py`.
+## Explicit autonomous replanning
+
+`NPCActionReplanningCoordinator` joins an `NPCDecisionCycle` to the same
+`ActionExecutionLedger` and `WorldEventLedger`. The world driver calls
+`replan(owner_id, tick, facts, resources, goal_facts, reason=...)` after a
+precondition failure, interruption, resource change, or goal-priority change.
+If an active execution ID is supplied, the coordinator verifies ownership and
+cancels that action first, releasing its reservation while retaining its
+terminal journal record.
+
+The coordinator reruns goal ranking against current state, validates the full
+plan's cumulative declared resource costs (including active reservations), and
+starts the first action of a feasible plan. It does not invent costs or silently
+change goal mappings. Because the symbolic planner is resource-agnostic, an
+infeasible selected plan is reported as blocked; finding a different
+resource-feasible route requires resource constraints to be modeled in the
+authored planning actions. Empty plans are reported as already satisfied.
+Stable request hashes make identical replan calls idempotent. Every decision is
+recorded as `npc_action_replanned` in the shared event journal.
+
+The coordinator itself is a runtime service; the durable action and event
+histories remain in the existing composite checkpoint. Recreate the coordinator
+after restore using the restored event journal, GoalBook, planner, and
+execution ledger. Tests: `tests/test_npc_action_replanning.py`.
