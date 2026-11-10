@@ -712,3 +712,10 @@ from .cognitive_dissonance import (
     DissonanceDecision, DissonanceInput,
 )
 __all__ += ["CognitiveDissonanceLedger", "CognitiveDissonanceSnapshot", "DissonanceDecision", "DissonanceInput"]
+
+
+# Repeated unresolved dissonance can propose gradual identity change; acceptance stays explicit.
+from .dissonance_identity import (
+    DissonanceIdentityAssessment, DissonanceIdentityBridge, DissonanceIdentityRule,
+)
+__all__ += ["DissonanceIdentityAssessment", "DissonanceIdentityBridge", "DissonanceIdentityRule"]
