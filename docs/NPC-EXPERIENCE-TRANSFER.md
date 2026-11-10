@@ -8,7 +8,7 @@ The recipient receives a reported-experience record, not an autobiographical mem
 
 Transfer IDs are idempotent; conflicting reuse is rejected. The same source memory cannot be resent to the same recipient in the same communication under another ID. Canonical component snapshots preserve the records, and restoration revalidates the full source and communication chain.
 
-This first stage deliberately does not mutate recipient beliefs, personal memories, plans, or action evaluations. A later decision adapter can consume reported accounts with a lower evidence weight than direct experience while retaining attribution.
+The retrieval helper is read-only and does not mutate recipient beliefs, personal memories, plans, or historical action evaluations. It is an evidence interface for decision policies; planner-specific automatic injection remains a separate integration step.
 
 
 ## Strategic retrieval
@@ -23,3 +23,22 @@ returns a stable, bounded decision-time view of evidence available to an NPC. It
 | Reported account | 0.35 × transfer confidence |
 
 These are conservative evidence weights, not truth probabilities. Report confidence remains separately visible. Retrieval is read-only: it does not rewrite memories, beliefs, or historical plan evaluations. The helper is an evidence interface; automatic injection into a particular planner policy remains a separate integration step.
+
+
+## Composite world checkpoint
+
+Pass the same autobiographical history and event-journal-backed transfer ledger to checkpoint capture:
+
+```python
+checkpoint = SimulationWorldCheckpoint.capture(
+    current_tick, coordinator, npcs,
+    life_history=history,
+    experience_transfers=transfers,
+)
+restored = SimulationWorldCheckpoint.from_json(
+    checkpoint.to_json()
+).restore()
+restored_transfers = restored.experience_transfers
+```
+
+The checkpoint stores the transfer snapshot as an optional component, preserving compatibility with older payloads that omit it. Capture and restore both revalidate the source memory, original event, source/recipient identities, communication event, chronology, and NPC membership. Experience transfers require the same life-history instance and world-event journal as the checkpoint. Restore reconstructs the transfer ledger only after restoring the event journal and autobiographical history.
