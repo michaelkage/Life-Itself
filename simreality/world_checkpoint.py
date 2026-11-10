@@ -757,7 +757,7 @@ class SimulationWorldCheckpoint:
                 for evidence_id in evidence_ids:
                     evidence = journal.get(evidence_id)
                     if (evidence is None or evidence.tick > current_tick
-                            or record["owner_id"] not in evidence.participants
+                            or record.owner_id not in evidence.participants
                             or dict(evidence.attributes).get("execution_id") != execution_id):
                         raise ValueError("action evaluation references missing or mismatched evidence")
         if action_replanning is not None:
