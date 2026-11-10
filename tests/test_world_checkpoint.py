@@ -1216,6 +1216,62 @@ class SimulationWorldCheckpointTests(unittest.TestCase):
                 emotional_scar_decisions=decisions,
             )
 
+
+    def test_checkpoint_round_trips_scar_identity_proposals_and_decision_chain(self):
+        from simreality import (
+            EmotionalScarIdentityAdapter, ScarIdentityPolicy,
+            ScarIdentityProposalLedger,
+        )
+        coordinator, npcs, _ = self.make_simulation()
+        history = NPCLifeHistory()
+        history.record(AutobiographicalMemory(
+            "identity-scar-memory", "speaker", "event-1", 3, ("listener",),
+            "The incident left a lasting fear", 0.9, -0.2,
+            turning_point=True, tags=("fear",),
+        ))
+        scars = NPCEmotionalScarLedger()
+        scars.add_scar(EmotionalScar(
+            "identity-scar-1", "speaker", "event-1", "identity-scar-memory",
+            4, "fear", "crowded-room", 0.8,
+        ))
+        identities = IdentityDecisionLedger((
+            NPCIdentityProfile("speaker", {"trust": 0.1}),
+            NPCIdentityProfile("listener", {"trust": 0.0}),
+        ))
+        policy = ScarIdentityPolicy(
+            "fear-to-trust", "fear", "crowded-room", "trust",
+            delta_per_severity=-0.05, maximum_delta=0.05,
+        )
+        evidence = EmotionalScarIdentityAdapter.propose_evidence(
+            scars, identities, coordinator.events, (policy,), 4,
+        )
+        self.assertEqual(len(evidence), 1)
+        proposals = ScarIdentityProposalLedger()
+        proposals.record_many(evidence)
+        identities.decide(
+            "identity-scar-decision-1", evidence[0].proposal,
+            accepted=True, decision_tick=4,
+            rationale="I choose to become more cautious",
+        )
+        payload = SimulationWorldCheckpoint.capture(
+            4, coordinator, npcs, life_history=history, emotional_scars=scars,
+            identity_decisions=identities, scar_identity_proposals=proposals,
+        ).to_json()
+        restored = SimulationWorldCheckpoint.from_json(payload).restore()
+        self.assertEqual(restored.scar_identity_proposals.entries(), evidence)
+        self.assertEqual(restored.identity_decisions.traits_for("speaker")["trust"],
+                         evidence[0].proposal.after)
+        self.assertEqual(
+            SimulationWorldCheckpoint.capture(
+                4, restored.coordinator, restored.npcs,
+                life_history=restored.life_history,
+                emotional_scars=restored.emotional_scars,
+                identity_decisions=restored.identity_decisions,
+                scar_identity_proposals=restored.scar_identity_proposals,
+            ).to_json(),
+            payload,
+        )
+
     def test_emotional_scars_remain_optional_in_legacy_checkpoints(self):
         coordinator, npcs, _ = self.make_simulation()
         payload = SimulationWorldCheckpoint.capture(4, coordinator, npcs).to_json()
