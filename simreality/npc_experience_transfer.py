@@ -155,3 +155,79 @@ class NPCExperienceTransferLedger:
 
     def snapshot(self):
         return ExperienceTransferSnapshot(tuple(self._records[k] for k in sorted(self._records)))
+
+
+@dataclass(frozen=True)
+class StrategicExperienceEvidence:
+    """A decision-time view; it never changes the underlying historical record."""
+    owner_id: str
+    evidence_id: str
+    event_id: str
+    tick: int
+    account: str
+    source_class: str
+    confidence: float
+    influence: float
+
+    def __post_init__(self):
+        for name in ("owner_id", "evidence_id", "event_id", "account", "source_class"):
+            value = getattr(self, name)
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError(f"{name} must be a non-empty string")
+        if self.source_class not in ("personal", "witnessed", "reported"):
+            raise ValueError("invalid strategic evidence source class")
+        if isinstance(self.tick, bool) or not isinstance(self.tick, int) or self.tick < 0:
+            raise ValueError("tick must be a non-negative integer")
+        for name in ("confidence", "influence"):
+            value = getattr(self, name)
+            if (isinstance(value, bool) or not isinstance(value, (int, float))
+                    or not math.isfinite(value) or not 0 <= value <= 1):
+                raise ValueError(f"{name} must be finite and in [0, 1]")
+
+
+def strategic_experience_evidence(history: NPCLifeHistory,
+                                  transfers: NPCExperienceTransferLedger,
+                                  owner_id: str, current_tick: int,
+                                  *, limit: int = 100) -> tuple[StrategicExperienceEvidence, ...]:
+    """Retrieve grounded past experiences with conservative source-class weights.
+
+    Personal participation has weight 1.0, witnessed events 0.6, and reported
+    accounts 0.35 multiplied by the confidence assigned at transfer. Future
+    memories and reports are excluded. Results are stable and bounded.
+    """
+    if not isinstance(history, NPCLifeHistory) or not isinstance(transfers, NPCExperienceTransferLedger):
+        raise TypeError("history and transfers must be their corresponding ledgers")
+    if transfers.history is not history:
+        raise ValueError("experience transfer and retrieval must share one life history")
+    if not isinstance(owner_id, str) or not owner_id.strip():
+        raise ValueError("owner_id must be a non-empty string")
+    if isinstance(current_tick, bool) or not isinstance(current_tick, int) or current_tick < 0:
+        raise ValueError("current_tick must be a non-negative integer")
+    if isinstance(limit, bool) or not isinstance(limit, int) or limit < 1:
+        raise ValueError("limit must be a positive integer")
+
+    evidence = []
+    for memory in history.memories(owner_id):
+        if memory.tick > current_tick:
+            continue
+        event = transfers.events.get(memory.event_id)
+        if owner_id in event.participants:
+            source_class, weight = "personal", 1.0
+        elif owner_id in event.witnesses:
+            source_class, weight = "witnessed", 0.6
+        else:
+            continue
+        evidence.append(StrategicExperienceEvidence(
+            owner_id, memory.memory_id, memory.event_id, memory.tick,
+            memory.interpretation, source_class, 1.0, weight))
+
+    for report in transfers.received_by(owner_id):
+        if report.transfer_tick > current_tick:
+            continue
+        evidence.append(StrategicExperienceEvidence(
+            owner_id, report.transfer_id, report.source_event_id,
+            report.transfer_tick, report.account, "reported",
+            report.confidence, 0.35 * report.confidence))
+
+    evidence.sort(key=lambda x: (-x.tick, -x.influence, x.evidence_id))
+    return tuple(evidence[:limit])
