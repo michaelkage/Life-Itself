@@ -685,3 +685,14 @@ __all__ += [
     "ConditionedChoiceResult", "ConditionedDecisionProfile",
     "ConditionedDecisionResult", "PsychologicalDecisionAdapter",
 ]
+
+
+# Explicit acceptance or rejection of observer-specific psychological learning.
+from .psychological_learning_decisions import (
+    PsychologicalLearningDecision, PsychologicalLearningDecisionLedger,
+    PsychologicalLearningDecisionSnapshot,
+)
+__all__ += [
+    "PsychologicalLearningDecision", "PsychologicalLearningDecisionLedger",
+    "PsychologicalLearningDecisionSnapshot",
+]
