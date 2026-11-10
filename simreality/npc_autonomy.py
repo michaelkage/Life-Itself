@@ -71,11 +71,16 @@ class NPCDecisionCycle:
                     "selected goal has no desired-facts mapping",
                 )
             else:
+                goal_plan_reliability = {
+                    actions: confidence
+                    for (candidate_goal, actions), confidence in (plan_reliability or {}).items()
+                    if candidate_goal == goal.goal_id
+                }
                 plan = self.planner.plan(
                     world_facts, goal_facts[goal.goal_id],
                     max_expansions=max_expansions,
                     action_reliability=action_reliability,
-                    plan_reliability=plan_reliability,
+                    plan_reliability=goal_plan_reliability,
                 )
                 reason = plan.reason if plan.success else f"planning failed: {plan.reason}"
                 candidate = NPCDecision(
