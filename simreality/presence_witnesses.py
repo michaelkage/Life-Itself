@@ -55,6 +55,8 @@ class PresenceWitnessAdapter:
         location_id = attributes.get(location_attribute)
         if not isinstance(location_id, str) or not location_id.strip():
             raise ValueError(f"event must provide a non-empty {location_attribute!r} attribute")
+        if isinstance(candidate_ids, (str, bytes)):
+            raise TypeError("candidate_ids must be an iterable of NPC IDs, not one string")
         candidates = tuple(candidate_ids)
         if any(not isinstance(owner, str) or not owner.strip() for owner in candidates):
             raise ValueError("candidate IDs must be non-empty strings")
@@ -72,6 +74,8 @@ class PresenceWitnessAdapter:
             record = self.presence.get(owner)
             if record is None:
                 eligible, reason = False, "no_recorded_presence"
+            elif record.updated_tick > event.tick:
+                eligible, reason = False, "presence_updated_after_event"
             elif record.status != "at_location":
                 eligible, reason = False, "not_at_location"
             elif record.location_id != location_id:
