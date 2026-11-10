@@ -34,14 +34,17 @@ def test_forgiveness_preserves_memory_and_does_not_imply_reconciliation():
     assert ledger.memories("alice")[0].interpretation == "Bob betrayed my trust"
 
 
-def test_reconciliation_requires_prior_forgiveness_and_is_separate():
+def test_reconciliation_and_forgiveness_are_independent_choices():
     ledger = NPCLifeHistory()
     ledger.record(memory())
-    with pytest.raises(ValueError):
-        ledger.act("a1", "alice", "bob", "e1", action="reconcile", tick=7)
+    ledger.act("a1", "alice", "bob", "e1", action="reconcile", tick=7)
+    state = ledger.relationship_history("alice", "bob", "e1")
+    assert state["reconciled"] is True
+    assert state["forgiven"] is False
     ledger.act("a2", "alice", "bob", "e1", action="forgive", tick=8)
-    ledger.act("a3", "alice", "bob", "e1", action="reconcile", tick=12)
-    assert ledger.relationship_history("alice", "bob", "e1")["reconciled"]
+    state = ledger.relationship_history("alice", "bob", "e1")
+    assert state["reconciled"] is True
+    assert state["forgiven"] is True
 
 
 def test_turning_point_recall_salience_does_not_decay_and_ordinary_memory_is_retained():
