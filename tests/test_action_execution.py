@@ -116,6 +116,7 @@ class ActionExecutionLedgerTests(unittest.TestCase):
         self.assertEqual(ledger._reserved("cash"), 5.0)
         progressed = ledger.advance("multi-1", 2, facts, resources)
         self.assertEqual(progressed.progress_ticks, 1)
+        self.assertEqual(ledger.advance("multi-1", 2, facts, resources), progressed)
         self.assertEqual(resources["cash"], 8.0)
         completed = ledger.advance("multi-1", 3, facts, resources)
         self.assertEqual(completed.status, "completed")
@@ -164,9 +165,20 @@ class ActionExecutionLedgerTests(unittest.TestCase):
             self.planner, (policy,), self.events, ledger.to_json()
         )
         self.assertEqual(restored.active("restore-1").progress_ticks, 1)
+        self.assertEqual(restored.to_json(), ledger.to_json())
         result = restored.advance("restore-1", 3, facts, resources)
         self.assertEqual(result.status, "completed")
         self.assertEqual(resources["cash"], 3.0)
+
+    def test_snapshot_roundtrips_completed_execution_history(self):
+        facts, resources = {"at-shop"}, {"cash": 8.0}
+        self.ledger.execute("snapshot-done", "npc-1", 1, "buy-tools",
+                            facts, resources, plan_actions=("buy-tools",))
+        restored = ActionExecutionLedger.from_json(
+            self.planner, (ActionExecutionPolicy("buy-tools", (("cash", 5.0),)),),
+            self.events, self.ledger.to_json()
+        )
+        self.assertEqual(restored.snapshot(), self.ledger.snapshot())
 
     def test_completion_advances_linked_goal_progress_once(self):
         from simreality.goals import GoalBook, NPCGoal
