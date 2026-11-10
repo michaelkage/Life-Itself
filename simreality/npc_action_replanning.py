@@ -193,8 +193,16 @@ class NPCActionReplanningCoordinator:
             raise ValueError("reason must be non-empty")
         facts = sorted(self.executions._canonical_facts(world_facts))
         balances = sorted(self.executions._canonical_resources(resources).items())
+        action_reliability = {}
+        if self.evaluations is not None:
+            action_reliability = {
+                action_id: reliability
+                for action_id in sorted(self.decisions.planner.actions)
+                if (reliability := self.evaluations.reliability(action_id)) is not None
+            }
         request = {
             "owner": owner_id, "tick": tick, "facts": facts, "resources": balances,
+            "action_reliability": sorted(action_reliability.items()),
             "goal_facts": {key: sorted(value) for key, value in sorted(goal_facts.items())},
             "reason": reason, "active_execution_id": active_execution_id,
             "max_expansions": max_expansions,
@@ -222,6 +230,7 @@ class NPCActionReplanningCoordinator:
         decision = self.decisions.decide(
             owner_id, tick, set(facts), goal_facts,
             max_expansions=max_expansions,
+            action_reliability=action_reliability,
         )
         execution_id = None
         action_id = None
