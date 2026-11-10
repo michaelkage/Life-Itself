@@ -92,3 +92,66 @@ def test_replanning_snapshot_preserves_experience_attribution():
     assert replay == result
     assert replay.decision.experience_evidence_ids == ("repair-report",)
     assert replay.decision.experience_evidence_sources == (("repair-report", "reported"),)
+
+
+def test_reported_goal_outcome_adjusts_future_goal_ranking_without_mutating_priority():
+    from simreality.npc_experience_transfer import experience_goal_guidance
+
+    events = WorldEventLedger((
+        WorldEventLedger.make_event("rescue-event", 1, "goal_outcome",
+                                    participants=("alice",)),
+        WorldEventLedger.make_event("goal-conversation", 2, "conversation",
+                                    participants=("alice", "bob")),
+    ))
+    history = NPCLifeHistory((AutobiographicalMemory(
+        "rescue-memory", "alice", "rescue-event", 1, (),
+        "The rescue goal succeeded", 0.8, 0.1,
+        tags=("rescue", "goal:success")),))
+    transfers = NPCExperienceTransferLedger(events, history)
+    transfers.transfer("rescue-report", "bob", "alice", "rescue-memory",
+                       "goal-conversation", confidence=1.0)
+
+    goals = GoalBook()
+    goals.add(NPCGoal("rescue-goal", "bob", "rescue", 3.9,
+                      metadata={"experience_tags": "rescue"}))
+    goals.add(NPCGoal("routine-goal", "bob", "routine", 4.0))
+    base_priority = goals.goals["rescue-goal"].priority
+
+    adjustments, evidence_ids, sources = experience_goal_guidance(
+        history, transfers, "bob", 2, goals)
+    assert adjustments["rescue-goal"] > 0
+    assert evidence_ids["rescue-goal"] == ("rescue-report",)
+    assert sources["rescue-report"] == "reported"
+
+    planner = DeterministicPlanner((
+        PlanningAction("complete-either", frozenset({"start"}),
+                       frozenset({"rescue-done", "routine-done"})),
+    ))
+    decision = NPCDecisionCycle(goals, planner).decide(
+        "bob", 2, {"start"},
+        {"rescue-goal": {"rescue-done"}, "routine-goal": {"routine-done"}},
+        goal_experience_adjustments=adjustments,
+    )
+    assert decision.goal_id == "rescue-goal"
+    assert goals.goals["rescue-goal"].priority == base_priority
+
+
+def test_action_outcome_memory_does_not_change_goal_priority():
+    from simreality.npc_experience_transfer import experience_goal_guidance
+
+    events = WorldEventLedger((
+        WorldEventLedger.make_event("action-event", 1, "action_outcome",
+                                    participants=("npc",)),
+    ))
+    history = NPCLifeHistory((AutobiographicalMemory(
+        "action-memory", "npc", "action-event", 1, (),
+        "A repair action succeeded", 0.8, 0.1,
+        tags=("repair", "outcome:success")),))
+    transfers = NPCExperienceTransferLedger(events, history)
+    goals = GoalBook()
+    goals.add(NPCGoal("repair-goal", "npc", "repair", 5.0,
+                      metadata={"experience_tags": "repair"}))
+    adjustments, evidence_ids, _ = experience_goal_guidance(
+        history, transfers, "npc", 1, goals)
+    assert adjustments == {}
+    assert evidence_ids == {}
