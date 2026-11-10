@@ -895,11 +895,6 @@ class SimulationWorldCheckpoint:
         action_evaluation_snapshot = components[39]
         if action_evaluation_snapshot is not None and action_execution_snapshot is None:
             raise ValueError("action evaluations require checkpointed action execution state")
-        if action_replanning_snapshot is not None and action_evaluation_snapshot is not None:
-            replanning_raw = json.loads(action_replanning_snapshot.to_json())
-            evaluation_ids = {item["execution_id"] for item in json.loads(action_evaluation_snapshot.to_json())["evaluations"]}
-            if not isinstance(replanning_raw.get("requests"), list):
-                raise ValueError("invalid replanning snapshot")
         if (action_world_facts is None) != (action_resources is None):
             raise ValueError("action world facts and resources must be checkpointed together")
         if action_execution_snapshot is not None and (action_world_facts is None or action_resources is None):
