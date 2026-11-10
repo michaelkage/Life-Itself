@@ -114,8 +114,9 @@ class IntegratedPsychologicalDecisionTests(unittest.TestCase):
         )
         self.assertEqual(result.preferred.choice_id, "stay_home")
         enter = next(item for item in result.ranked if item.choice_id == "enter_crowd")
-        self.assertEqual(enter.memory_contributions, (("m1", -0.72),))
-        self.assertEqual(enter.final_score, -0.72)
+        self.assertEqual(tuple(key for key, _ in enter.memory_contributions), ("m1",))
+        self.assertAlmostEqual(enter.memory_contributions[0][1], -0.72)
+        self.assertAlmostEqual(enter.final_score, -0.72)
 
     def test_memory_influence_from_another_npc_is_rejected(self):
         from simreality.memory_decisions import MemoryDecisionInfluence
