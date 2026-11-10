@@ -46,6 +46,7 @@ class NPCActionProgression:
     next_active: ActiveActionExecution | None
     replanning: NPCReplanningResult | None
     evaluation: NPCActionEvaluation | None = None
+    plan_evaluation: object | None = None
 
 
 @dataclass(frozen=True)
@@ -220,6 +221,12 @@ class NPCActionReplanningCoordinator:
         execution_id = None
         action_id = None
         rejected_reason = None
+        plan_id = f"replan:{request_id[:24]}"
+        if decision.plan is not None and self.evaluations is not None and decision.goal_id is not None:
+            self.evaluations.register_plan(
+                plan_id, owner_id, decision.goal_id, tuple(decision.plan.actions),
+                set(goal_facts.get(decision.goal_id, set())),
+            )
         if not decision.actionable:
             status = "unplanned"
             rejected_reason = decision.reason
@@ -273,16 +280,22 @@ class NPCActionReplanningCoordinator:
             return NPCActionProgression(terminal_or_active, terminal_or_active, None)
         evaluation = self.evaluations.evaluate(execution_id) if self.evaluations is not None else None
         if terminal_or_active.status != "completed":
+            plan_evaluation = (self.evaluations.evaluate_plan(
+                execution_id.rsplit(":step:", 1)[0], "failed"
+            ) if self.evaluations is not None else None)
             replanning = self.replan(
                 active.owner_id, tick, world_facts, resources, goal_facts,
                 reason=terminal_or_active.reason,
                 max_expansions=max_expansions,
             )
-            return NPCActionProgression(terminal_or_active, None, replanning, evaluation)
+            return NPCActionProgression(terminal_or_active, None, replanning, evaluation, plan_evaluation)
 
         next_index = active.action_index + 1
         if next_index >= len(active.plan_actions):
-            return NPCActionProgression(terminal_or_active, None, None, evaluation)
+            plan_evaluation = (self.evaluations.evaluate_plan(
+                execution_id.rsplit(":step:", 1)[0], "completed"
+            ) if self.evaluations is not None else None)
+            return NPCActionProgression(terminal_or_active, None, None, evaluation, plan_evaluation)
 
         remaining = active.plan_actions[next_index:]
         failure = self._resource_failure(remaining, resources)
@@ -298,9 +311,12 @@ class NPCActionReplanningCoordinator:
             except ValueError as exc:
                 failure = str(exc)
 
+        plan_evaluation = (self.evaluations.evaluate_plan(
+            execution_id.rsplit(":step:", 1)[0], "replanned"
+        ) if self.evaluations is not None else None)
         replanning = self.replan(
             active.owner_id, tick, world_facts, resources, goal_facts,
             reason=f"remaining plan is no longer feasible: {failure}",
             max_expansions=max_expansions,
         )
-        return NPCActionProgression(terminal_or_active, None, replanning, evaluation)
+        return NPCActionProgression(terminal_or_active, None, replanning, evaluation, plan_evaluation)
