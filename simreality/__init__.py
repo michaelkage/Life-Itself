@@ -869,3 +869,10 @@ __all__ += ["ActionExecution", "ActionExecutionLedger", "ActionExecutionPolicy",
 # Explicit goal-aware action replanning over the persistent execution ledger.
 from .npc_action_replanning import (NPCActionProgression, NPCActionReplanningCoordinator, NPCReplanningResult, NPCReplanningSnapshot)
 __all__ += ["NPCActionProgression", "NPCActionReplanningCoordinator", "NPCReplanningResult", "NPCReplanningSnapshot"]
+
+
+# Evidence-grounded NPC action outcome evaluation and bounded reliability learning.
+from .action_evaluation import (
+    ActionEvaluationSnapshot, ActionPlanEvaluationLedger, NPCActionEvaluation,
+)
+__all__ += ["ActionEvaluationSnapshot", "ActionPlanEvaluationLedger", "NPCActionEvaluation"]
