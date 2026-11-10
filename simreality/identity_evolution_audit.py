@@ -71,8 +71,8 @@ class IdentityEvolutionAuditTrail:
                     or scar.cue_id != evidence.cue_id
                     or event.tick > scar.created_tick
                     or scar.created_tick > evidence.evaluated_tick
-                    or evidence.evaluated_tick > scars.current_tick
-                    or event.tick > evidence.evaluated_tick):
+                    or event.tick > evidence.evaluated_tick
+                    or not abs(scars.severity_for(scar.scar_id, evidence.evaluated_tick) - evidence.severity) <= 1e-12):
                 raise ValueError("identity audit provenance does not match its source event and scar")
             if proposal.role == "participant":
                 role_matches = proposal.npc_id in event.participants
