@@ -347,11 +347,18 @@ class ActionPlanEvaluationLedger:
             for key in ("expected_resource_costs", "observed_resource_costs"):
                 values[key] = tuple((x[0], x[1]) for x in values[key])
             evaluation = NPCActionEvaluation(**values)
+            if (record.event_id not in evaluation.evidence_event_ids
+                    or not math.isfinite(evaluation.confidence)
+                    or not 0.0 <= evaluation.confidence <= 1.0):
+                raise ValueError("action evaluation omits terminal evidence or has invalid confidence")
             for evidence_id in evaluation.evidence_event_ids:
                 try:
-                    self.events.get(evidence_id)
+                    evidence_event = self.events.get(evidence_id)
                 except KeyError as exc:
                     raise ValueError("evaluation references missing evidence event") from exc
+                if (record.owner_id not in evidence_event.participants
+                        or dict(evidence_event.attributes).get("execution_id") != execution_id):
+                    raise ValueError("action evaluation evidence does not belong to its execution")
             restored[execution_id] = evaluation
         learning = raw["learning"]
         if not isinstance(learning, dict):
