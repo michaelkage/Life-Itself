@@ -19,6 +19,7 @@ from simreality import (
     TravelTickAdapter, PresenceLedger,
 )
 from simreality.presence_encounters import PresenceEncounter, PresenceEncounterLedger, PresenceSocialAdapter
+from simreality.social_familiarity import PresenceFamiliarityAdapter, SocialFamiliarityLedger
 
 
 class SimulationWorldCheckpointTests(unittest.TestCase):
@@ -731,18 +732,28 @@ class SimulationWorldCheckpointTests(unittest.TestCase):
             trust=coordinator.conversation_adapter.trust,
             trust_directions=(1, -1), trust_strength=0.25,
         )
+        familiarity_adapter = PresenceFamiliarityAdapter(adapter.ledger)
+        familiarity_adapter.observe_encounter(
+            "encounter-checkpoint",
+            {("speaker", "listener"): 0.8, ("listener", "speaker"): 0.3},
+        )
         payload = SimulationWorldCheckpoint.capture(
             4, coordinator, npcs, presence=presence,
             presence_encounters=adapter.ledger,
+            familiarity=familiarity_adapter.ledger,
         ).to_json()
         restored = SimulationWorldCheckpoint.from_json(payload).restore()
         self.assertIsNotNone(restored.presence_encounters)
         self.assertEqual(restored.presence_encounters.snapshot(), adapter.ledger.snapshot())
         self.assertEqual(restored.presence_encounters.tick_snapshot(), adapter.ledger.tick_snapshot())
+        self.assertIsNotNone(restored.familiarity)
+        self.assertEqual(restored.familiarity.snapshot(), familiarity_adapter.ledger.snapshot())
+        self.assertAlmostEqual(restored.familiarity.familiarity("speaker", "listener"), 0.8)
         self.assertEqual(
             SimulationWorldCheckpoint.capture(
                 4, restored.coordinator, restored.npcs, presence=restored.presence,
                 presence_encounters=restored.presence_encounters,
+                familiarity=restored.familiarity,
             ).to_json(),
             payload,
         )
