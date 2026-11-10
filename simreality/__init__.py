@@ -757,3 +757,13 @@ from .npc_memory_reflection import (
 __all__ += [
     "MemoryReflectionLedger", "MemoryReflectionSnapshot", "MemoryReinterpretation",
 ]
+
+# Bounded, owner-specific influence of recalled autobiographical memories on choices.
+from .memory_decisions import (
+    MemoryChoiceAssociation, MemoryDecisionInfluence,
+    MemoryDecisionInfluenceAdapter, MemoryDecisionProfile,
+)
+__all__ += [
+    "MemoryChoiceAssociation", "MemoryDecisionInfluence",
+    "MemoryDecisionInfluenceAdapter", "MemoryDecisionProfile",
+]
