@@ -98,6 +98,7 @@ class ActionPlanEvaluationLedger:
         self._learning: dict[str, dict[str, float | int]] = {}
         self._plans: dict[str, dict] = {}
         self._plan_evaluations: dict[str, NPCPlanEvaluation] = {}
+        self._plan_learning: dict[str, dict[str, float | int]] = {}
 
     @property
     def history(self) -> tuple[NPCActionEvaluation, ...]:
@@ -108,6 +109,15 @@ class ActionPlanEvaluationLedger:
         if item is None or item["samples"] < self.learning_min_samples:
             return None
         return float(item["reliability"])
+
+    def plan_reliabilities(self) -> dict[tuple[str, tuple[str, ...]], float]:
+        result = {}
+        for key, item in self._plan_learning.items():
+            if item["samples"] < self.learning_min_samples:
+                continue
+            goal_id, actions = json.loads(key)
+            result[(goal_id, tuple(actions))] = float(item["reliability"])
+        return result
 
     @property
     def plan_history(self) -> tuple[NPCPlanEvaluation, ...]:
@@ -191,6 +201,14 @@ class ActionPlanEvaluationLedger:
                         "missing_goal_facts": len(missing_goal_facts)},
         ))
         self._plan_evaluations[plan_id] = result
+        if observation_available:
+            key = json.dumps([plan["goal_id"], list(expected_actions)], separators=(",", ":"))
+            state = self._plan_learning.setdefault(key, {"samples": 0, "reliability": 0.5})
+            success = terminal_status == "completed" and not missing_goal_facts
+            samples = int(state["samples"]) + 1
+            prior = float(state["reliability"])
+            reliability = prior + self.learning_rate * ((1.0 if success else 0.0) - prior)
+            self._plan_learning[key] = {"samples": samples, "reliability": reliability}
         return result
 
     def evaluate(self, execution_id: str) -> NPCActionEvaluation:
@@ -319,7 +337,8 @@ class ActionPlanEvaluationLedger:
         payload = {"schema_version": 1, "learning_min_samples": self.learning_min_samples,
                    "learning_rate": self.learning_rate, "evaluations": evaluations,
                    "learning": self._learning, "plans": plans,
-                   "plan_evaluations": plan_evaluations}
+                   "plan_evaluations": plan_evaluations,
+                   "plan_learning": self._plan_learning}
         return ActionEvaluationSnapshot(json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False))
 
     def restore_snapshot(self, snapshot: ActionEvaluationSnapshot) -> None:
@@ -436,7 +455,30 @@ class ActionPlanEvaluationLedger:
         self._evaluations = restored
         self._learning = {key: dict(value) for key, value in learning.items()}
         self._plans = plans
+        plan_learning_raw = raw.get("plan_learning", {})
+        if not isinstance(plan_learning_raw, dict):
+            raise ValueError("invalid aggregate plan learning projection")
+        plan_learning = {}
+        for key, item in plan_learning_raw.items():
+            try:
+                goal_id, actions = json.loads(key)
+            except (TypeError, ValueError) as exc:
+                raise ValueError("invalid aggregate plan learning key") from exc
+            if (not isinstance(goal_id, str) or not goal_id
+                    or not isinstance(actions, list) or not actions
+                    or any(action not in self.executions.planner.actions for action in actions)
+                    or not isinstance(item, dict)
+                    or isinstance(item.get("samples"), bool)
+                    or not isinstance(item.get("samples"), int) or item["samples"] < 0
+                    or isinstance(item.get("reliability"), bool)
+                    or not isinstance(item.get("reliability"), (int, float))
+                    or not math.isfinite(item["reliability"])
+                    or not 0.0 <= item["reliability"] <= 1.0):
+                raise ValueError("invalid aggregate plan learning values")
+            plan_learning[key] = {"samples": item["samples"],
+                                  "reliability": float(item["reliability"])}
         self._plan_evaluations = plan_evaluations
+        self._plan_learning = plan_learning
 
     @classmethod
     def from_snapshot(cls, executions: ActionExecutionLedger, events: WorldEventLedger,
