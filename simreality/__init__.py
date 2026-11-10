@@ -654,3 +654,12 @@ __all__ += [
     "ConditionedResponse", "ConditioningProfile", "ConditioningRecord",
     "NPCConditioningLedger", "NPCConditioningSnapshot",
 ]
+
+
+# Explicit, context-sensitive activation of owner-specific learned associations.
+from .psychological_triggers import (
+    PsychologicalTrigger, PsychologicalTriggerAdapter, TriggerActivation,
+)
+__all__ += [
+    "PsychologicalTrigger", "PsychologicalTriggerAdapter", "TriggerActivation",
+]
