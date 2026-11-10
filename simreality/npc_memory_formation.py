@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Iterable, Mapping
+import math
 
 from .npc_life_history import AutobiographicalMemory, NPCLifeHistory
 from .world_events import WorldEvent
@@ -35,10 +36,12 @@ class AutobiographicalMemoryRule:
             raise ValueError("role must be participant or witness")
         if (isinstance(self.emotional_impact, bool)
                 or not isinstance(self.emotional_impact, (int, float))
+                or not math.isfinite(self.emotional_impact)
                 or not 0 <= self.emotional_impact <= 1):
             raise ValueError("emotional_impact must be in [0, 1]")
         if (isinstance(self.identity_impact, bool)
                 or not isinstance(self.identity_impact, (int, float))
+                or not math.isfinite(self.identity_impact)
                 or not -1 <= self.identity_impact <= 1):
             raise ValueError("identity_impact must be in [-1, 1]")
         if not isinstance(self.turning_point, bool):
@@ -114,6 +117,8 @@ class NPCAutobiographicalMemoryAdapter:
                     key = (event.event_id, owner)
                     conflict_ids = conflicts.get(key, ())
                     decision_ids = decisions.get(key, ())
+                    if not isinstance(conflict_ids, tuple) or not isinstance(decision_ids, tuple):
+                        raise TypeError("linked conflict and decision IDs must be tuples")
                     memory = AutobiographicalMemory(
                         memory_id=f"autobio:{event.event_id}:{owner}:{rule.rule_id}",
                         owner_id=owner,
