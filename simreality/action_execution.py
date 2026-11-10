@@ -356,7 +356,12 @@ class ActionExecutionLedger:
         raw = json.loads(snapshot.to_json())
         records = {}
         for item in raw["records"]:
-            record = ActionExecution(**item["record"])
+            record_data = dict(item["record"])
+            for field in ("facts_before", "facts_after"):
+                record_data[field] = tuple(record_data[field])
+            for field in ("resources_before", "resources_after"):
+                record_data[field] = tuple(tuple(pair) for pair in record_data[field])
+            record = ActionExecution(**record_data)
             if record.action_id not in self.planner.actions:
                 raise ValueError("snapshot references an unknown action")
             if self.events.get(record.event_id) is None:
@@ -372,8 +377,9 @@ class ActionExecutionLedger:
             self._validate_plan(record.action_id, record.plan_actions, record.action_index)
             if record.execution_id in records or record.execution_id in active:
                 raise ValueError("duplicate execution ID in snapshot")
-            if record.action_id not in self.policies and record.duration_ticks != 1:
-                raise ValueError("active action policy is unavailable during restore")
+            policy = self.policies.get(record.action_id, ActionExecutionPolicy(record.action_id))
+            if record.duration_ticks != policy.duration_ticks or record.reserved_resources != tuple(sorted(policy.resource_costs)):
+                raise ValueError("active action policy differs from the saved execution")
             if record.progress_ticks < 0 or record.progress_ticks >= record.duration_ticks or record.last_tick < record.started_tick:
                 raise ValueError("invalid active execution progress")
             if self.events.get(f"action-execution:{record.execution_id}:started") is None:
