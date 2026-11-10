@@ -382,3 +382,6 @@ NPC psychological conditioning records owner-specific associations between expli
 
 
 NPC psychological conditioning is also integrated into `SimulationWorldCheckpoint`: pass `conditioning=...` when capturing and retrieve `RestoredSimulation.conditioning` after loading. Learning records are validated against the authoritative event journal and NPC roster; the section remains optional for older checkpoints. See `tests/test_emotional_stress_checkpoint.py`.
+
+
+Context-sensitive psychological triggers now activate an NPC's learned associations only when explicitly observed cues and authored context requirements match. NPC-specific context exclusions allow similar situations to be interpreted differently. Trigger evaluation is read-only and never forces a reaction. See [docs/NPC-PSYCHOLOGICAL-TRIGGERS.md](docs/NPC-PSYCHOLOGICAL-TRIGGERS.md) and `tests/test_psychological_triggers.py`.
