@@ -200,9 +200,13 @@ class NPCActionReplanningCoordinator:
                 for action_id in sorted(self.decisions.planner.actions)
                 if (reliability := self.evaluations.reliability(action_id)) is not None
             }
+        plan_reliability = (self.evaluations.plan_reliabilities()
+                            if self.evaluations is not None else {})
         request = {
             "owner": owner_id, "tick": tick, "facts": facts, "resources": balances,
             "action_reliability": sorted(action_reliability.items()),
+            "plan_reliability": [[goal_id, list(actions), value]
+                                 for (goal_id, actions), value in sorted(plan_reliability.items())],
             "goal_facts": {key: sorted(value) for key, value in sorted(goal_facts.items())},
             "reason": reason, "active_execution_id": active_execution_id,
             "max_expansions": max_expansions,
@@ -231,6 +235,7 @@ class NPCActionReplanningCoordinator:
             owner_id, tick, set(facts), goal_facts,
             max_expansions=max_expansions,
             action_reliability=action_reliability,
+            plan_reliability=plan_reliability,
         )
         execution_id = None
         action_id = None
