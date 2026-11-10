@@ -85,6 +85,18 @@ class PresenceSocialTests(unittest.TestCase):
         restored = PresenceEncounterSnapshot.from_json(payload).restore()
         self.assertEqual(restored.snapshot(), adapter.ledger.snapshot())
         self.assertEqual(restored.tick_snapshot(), adapter.ledger.tick_snapshot())
+        replayed = PresenceSocialAdapter(adapter.presence, restored).encounter(
+            "e5", "a", "b", 2, opportunity=True
+        )
+        self.assertEqual(replayed.encounter, adapter.ledger.get("e5"))
+
+    def test_in_transit_npc_cannot_join_a_location_encounter(self):
+        presence, _, _, adapter = self.setup_world()
+        presence._records["b"] = presence.get("b").__class__(
+            "b", "travelling", "cafe", "journey-b", "road-b", 0.2, 2
+        )
+        with self.assertRaisesRegex(ValueError, "physically at a location"):
+            adapter.encounter("e6", "a", "b", 3, opportunity=True)
 
 
 if __name__ == "__main__":
