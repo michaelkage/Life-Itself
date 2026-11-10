@@ -135,15 +135,16 @@ class PresenceFamiliarityAdapter:
         expected = {(a, b), (b, a)}
         if set(strengths) != expected:
             raise ValueError("both directional exposure strengths must be supplied exactly once")
-        created = []
-        for observer, target in sorted(expected):
-            strength = strengths[(observer, target)]
-            observation = FamiliarityObservation(
+        # Construct and validate both directions before mutating either one.
+        proposed = tuple(
+            FamiliarityObservation(
                 f"familiarity:{encounter_id}:{observer}:{target}",
-                encounter_id, observer, target, encounter.tick, strength,
+                encounter_id, observer, target, encounter.tick,
+                strengths[(observer, target)],
             )
-            created.append(self.ledger.add(observation))
-        return tuple(created)
+            for observer, target in sorted(expected)
+        )
+        return tuple(self.ledger.add(item) for item in proposed)
 
 
 @dataclass(frozen=True)
