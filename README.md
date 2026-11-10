@@ -64,7 +64,9 @@ Engine-independent Python reference systems:
 | `simreality/routine_travel.py` | Routine-to-travel bridge | Starts journeys toward active scheduled routine destinations and carries routine IDs through arrival events |
 | `simreality/routine_arrival.py` | Arrival-gated routine execution | Executes scheduled activities only after arrival, accounts for lateness and missed appointments, and prevents duplicate journey execution |
 | `simreality/presence.py` | Physical NPC presence | Tracks NPC location, active road edge, and partial movement; provides authoritative location-occupancy queries |
-| `simreality/presence_save_state.py` | Physical presence persistence | Saves current locations, edge progress, and replay history; integrated with composite world checkpoints |
+| `simreality/presence_save_state.py` | Physical presence persistence |
+| `simreality/presence_encounters.py` | Presence-gated social encounters | Requires two NPCs to be physically co-located and an explicit interaction opportunity; optionally invokes actual conversation and caller-defined asymmetric trust effects |
+| `simreality/presence_encounter_save_state.py` | Social encounter persistence | Saves encounter history and per-tick replay signatures; integrated into composite world checkpoints | Saves current locations, edge progress, and replay history; integrated with composite world checkpoints |
 | `simreality/routine_tick.py` | Routine tick adapter | Selects active routines for an explicit tick, scopes supplied disruptions per NPC, and records replay-safe executions using explicit samples; called by the coordinator's named routine phase |
 | `simreality/npc_autonomy.py` | NPC autonomy | Read-only decision cycle that connects selected goals to explicit desired facts and bounded plans |
 | `simreality/appraisal.py` | NPC values and bias | Transparent value-weighted choice appraisal; different NPCs can rank the same hard choice differently |
@@ -341,3 +343,6 @@ A unified `interpret_comprehensively` pass now combines belief, explicitly linke
 
 
 The unified NPC identity appraisal now also accepts individual value priorities through `NPCIdentityValues` and `IdentityValueRule`, keeping value influence explicit, inspectable, and policy-specific.
+
+
+Presence-gated social encounters now connect physical location to social life. Co-location alone never forces NPCs to notice, approach, or talk to each other: the world driver must confirm an interaction opportunity. Actual conversation is opt-in and uses the existing memory-transfer/belief pipeline; trust effects require explicit per-person directions and strength. Encounter history and replay state can be included in the composite world checkpoint.
