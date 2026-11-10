@@ -658,6 +658,22 @@ class SimulationWorldCheckpoint:
                     raise ValueError("emotional replay owner does not belong to its source event")
             if any(event.tick > self.current_tick for event in emotional_ledger._events.values()):
                 raise ValueError("emotional events cannot occur after the checkpoint tick")
+        if stress_snapshot is not None:
+            stress_ledger = stress_snapshot.restore()
+            if stress_ledger.current_tick > self.current_tick:
+                raise ValueError("NPC stress cannot be sampled after the checkpoint tick")
+            npc_ids = {npc.entity_id for npc in NPCCollectionSnapshot.from_json(self.npcs_json).restore().values()}
+            if any(owner_id not in npc_ids for owner_id in stress_ledger.snapshot()["stress"]):
+                raise ValueError("stress records reference NPCs missing from checkpoint")
+            journal = envelope.restore_event_ledger()
+            for record in stress_ledger.records():
+                try:
+                    source_event = journal.get(record.event_id)
+                except KeyError:
+                    raise ValueError(f"stress record references missing world event: {record.event_id}") from None
+                if (record.tick > self.current_tick or source_event.tick > record.tick
+                        or record.owner_id not in source_event.participants + source_event.witnesses):
+                    raise ValueError("stress record does not match its source world event")
         if relationship_snapshot is not None:
             if any(item.tick > self.current_tick for item in relationship_snapshot.changes):
                 raise ValueError("relationship changes cannot occur after the checkpoint tick")
