@@ -559,7 +559,9 @@ class SimulationWorldCheckpoint:
                         or scar.emotion_axis != evidence.emotion_axis or scar.cue_id != evidence.cue_id
                         or source is None or source.tick > evidence.evaluated_tick
                         or evidence.evaluated_tick > current_tick or evidence.evaluated_tick < scar.created_tick
-                        or proposal.evidence_strength != evidence.severity):
+                        or proposal.evidence_strength != evidence.severity
+                        or (proposal.role == "participant" and proposal.npc_id not in source.participants)
+                        or (proposal.role == "witness" and proposal.npc_id not in source.witnesses)):
                     raise ValueError("scar identity proposal provenance does not match saved scar and event history")
                 if proposal.npc_id not in {profile[0] for profile in identity_snapshot.profiles}:
                     raise ValueError("scar identity proposal references an unknown identity profile")
@@ -713,7 +715,7 @@ class SimulationWorldCheckpoint:
                 if len(matches) > 1 or (matches and (
                         matches[0][4] != proposal.axis or matches[0][8] != proposal.before
                         or matches[0][9] != proposal.after or matches[0][10] != proposal.delta
-                        or matches[0][12] != proposal.role)):
+                        or matches[0][12] != proposal.role or matches[0][6] < evidence.evaluated_tick)):
                     raise ValueError("identity decision disagrees with its scar-informed proposal")
         if emotional_scar_decisions_snapshot is not None:
             if life_history_snapshot is None or emotional_scars_snapshot is None:
