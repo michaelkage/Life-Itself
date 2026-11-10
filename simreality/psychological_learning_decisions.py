@@ -151,7 +151,10 @@ class PsychologicalLearningDecisionSnapshot:
     def from_json(cls, payload):
         try:
             raw = json.loads(payload)
-            if not isinstance(raw, dict) or raw.get("schema_version") != cls.SCHEMA_VERSION:
+            schema_version = raw.get("schema_version") if isinstance(raw, dict) else None
+            if (not isinstance(raw, dict) or isinstance(schema_version, bool)
+                    or not isinstance(schema_version, int)
+                    or schema_version != cls.SCHEMA_VERSION):
                 raise ValueError("unsupported psychological learning decision schema")
             result = cls(tuple(tuple(d) for d in raw["decisions"]))
             if result.to_json() != payload:
