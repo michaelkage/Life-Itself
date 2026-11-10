@@ -77,6 +77,58 @@ class ActionEvaluationTests(unittest.TestCase):
         self.assertIsNotNone(progression.evaluation)
         self.assertEqual(progression.evaluation.execution_id, planned.execution_id)
 
+
+    def test_multi_step_plan_evaluation_checks_final_goal(self):
+        planner = DeterministicPlanner((
+            PlanningAction("gather", frozenset({"at-site"}), frozenset({"materials"})),
+            PlanningAction("build", frozenset({"materials"}), frozenset({"shelter"})),
+        ))
+        events = WorldEventLedger()
+        executions = ActionExecutionLedger(planner, (), events)
+        evaluations = ActionPlanEvaluationLedger(executions, learning_min_samples=1)
+        goals = GoalBook()
+        goals.add(NPCGoal("shelter-goal", "npc", "survival", 9.0))
+        coordinator = NPCActionReplanningCoordinator(
+            NPCDecisionCycle(goals, planner), executions, events, evaluations,
+        )
+        facts, resources = {"at-site"}, {}
+        goal_facts = {"shelter-goal": {"shelter"}}
+        plan = coordinator.replan(
+            "npc", 1, facts, resources, goal_facts, reason="needs shelter",
+        )
+        first = coordinator.advance(plan.execution_id, 2, facts, resources, goal_facts)
+        self.assertIsNotNone(first.next_active)
+        second = coordinator.advance(first.next_active.execution_id, 3, facts, resources, goal_facts)
+        self.assertEqual(second.plan_evaluation.terminal_status, "completed")
+        self.assertEqual(second.plan_evaluation.expected_goal_facts, ("shelter",))
+        self.assertEqual(second.plan_evaluation.observed_goal_facts, ("shelter",))
+        self.assertEqual(second.plan_evaluation.missing_goal_facts, ())
+        self.assertEqual(second.plan_evaluation.completed_actions, ("gather", "build"))
+
+    def test_plan_evaluation_records_goal_failure_after_interruption(self):
+        planner = DeterministicPlanner((
+            PlanningAction("gather", frozenset({"at-site"}), frozenset({"materials"})),
+            PlanningAction("build", frozenset({"materials"}), frozenset({"shelter"})),
+        ))
+        events = WorldEventLedger()
+        executions = ActionExecutionLedger(planner, (), events)
+        evaluations = ActionPlanEvaluationLedger(executions)
+        goals = GoalBook()
+        goals.add(NPCGoal("shelter-goal", "npc", "survival", 9.0))
+        coordinator = NPCActionReplanningCoordinator(
+            NPCDecisionCycle(goals, planner), executions, events, evaluations,
+        )
+        facts, resources = {"at-site"}, {}
+        goal_facts = {"shelter-goal": {"shelter"}}
+        plan = coordinator.replan("npc", 1, facts, resources, goal_facts, reason="build shelter")
+        progression = coordinator.advance(
+            plan.execution_id, 2, facts, resources, goal_facts,
+            interruption="storm stopped work",
+        )
+        self.assertEqual(progression.plan_evaluation.terminal_status, "failed")
+        self.assertEqual(progression.plan_evaluation.missing_goal_facts, ("shelter",))
+        self.assertIn("goal_not_achieved", progression.plan_evaluation.deviation_flags)
+
     def test_cancelled_action_is_recorded_as_non_success(self):
         facts, resources = {"broken"}, {"parts": 5.0}
         self.executions.start("cancel-me", "npc", 1, "repair", facts, resources,
