@@ -68,6 +68,20 @@ class EmotionalStressTests(unittest.TestCase):
                 **{**kwargs, "intensity": 0.2},
             )
 
+    def test_one_world_event_can_stress_multiple_npcs(self):
+        first = CopingProfile("npc-a")
+        second = CopingProfile("npc-b", reappraisal=0.5)
+        self.ledger.apply_stressor(
+            record_id="stress-a", event_id="shared-event", owner_id="npc-a",
+            tick=0, intensity=0.6, profile=first,
+        )
+        self.ledger.apply_stressor(
+            record_id="stress-b", event_id="shared-event", owner_id="npc-b",
+            tick=0, intensity=0.6, profile=second,
+        )
+        self.assertAlmostEqual(self.ledger.stress_for("npc-a"), 0.6)
+        self.assertAlmostEqual(self.ledger.stress_for("npc-b"), 0.3)
+
     def test_invalid_profile_and_future_record_rejected(self):
         with self.assertRaises(ValueError):
             CopingProfile("npc-a", exhaustion_threshold=0.9, breaking_point=0.8)
