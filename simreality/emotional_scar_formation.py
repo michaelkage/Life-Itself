@@ -225,16 +225,16 @@ class EmotionalScarDecisionLedger:
         if not isinstance(data, dict) or data.get("version") != 1:
             raise ValueError("unsupported emotional scar decision snapshot")
         raw_scars = NPCEmotionalScarLedger.from_snapshot(data["scars"])
-        result = cls(
-            NPCEmotionalScarLedger(),
-            tuple(EmotionalScarProposal(**p) for p in data.get("proposals", ())),
-            tuple(),
-        )
-        for decision in sorted(
-            (EmotionalScarDecision(**d) for d in data.get("decisions", ())),
-            key=lambda d: (d.decision_tick, d.decision_id),
-        ):
-            result.decide(decision)
+        result = cls(NPCEmotionalScarLedger())
+        proposal_items = [EmotionalScarProposal(**p) for p in data.get("proposals", ())]
+        decision_items = [EmotionalScarDecision(**d) for d in data.get("decisions", ())]
+        actions = [(p.proposed_tick, 0, p.proposal_id, p) for p in proposal_items]
+        actions.extend((d.decision_tick, 1, d.decision_id, d) for d in decision_items)
+        for _tick, _kind, _identifier, item in sorted(actions, key=lambda x: (x[0], x[1], x[2])):
+            if isinstance(item, EmotionalScarProposal):
+                result.add_proposal(item)
+            else:
+                result.decide(item)
         # The accepted decisions must reproduce the scar records exactly.
         # Restore the authoritative scar ledger afterward so recovery actions
         # interleaved between later scar creations retain their original order.
