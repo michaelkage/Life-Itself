@@ -643,3 +643,14 @@ from .stress_adaptation import (
     StressBehaviorAdapter, StressBehaviorSignal,
 )
 __all__ += ["STRESS_ADAPTATION_CHANNELS", "StressAdaptationProfile", "StressBehaviorAdapter", "StressBehaviorSignal"]
+
+
+# Event-sourced, owner-specific associative learning and conditioning persistence.
+from .psychological_conditioning import (
+    ConditionedResponse, ConditioningProfile, ConditioningRecord,
+    NPCConditioningLedger, NPCConditioningSnapshot,
+)
+__all__ += [
+    "ConditionedResponse", "ConditioningProfile", "ConditioningRecord",
+    "NPCConditioningLedger", "NPCConditioningSnapshot",
+]
