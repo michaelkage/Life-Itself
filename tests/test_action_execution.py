@@ -60,7 +60,7 @@ class ActionExecutionLedgerTests(unittest.TestCase):
         facts = {"at-shop"}
         resources = {"cash": 8.0}
         result = self.ledger.execute(
-            "tick-1:buy-tools", "npc-1", 1, "buy-tools", facts, resources,
+            "tick-1:buy-tools", "npc-1", 1, "buy-tools", facts, resources, plan_actions=("buy-tools",),
             interruption="shop closed unexpectedly",
         )
         self.assertEqual(result.status, "interrupted")
@@ -97,7 +97,7 @@ class ActionExecutionLedgerTests(unittest.TestCase):
         )
         second = self.ledger.execute(
             "tick-2:repair-bike", "npc-1", 2, "repair-bike", facts, resources,
-            plan_actions=("buy-tools",),
+            plan_actions=("buy-tools", "repair-bike"), action_index=1,
         )
         self.assertEqual(first.status, "completed")
         self.assertEqual(second.status, "completed")
