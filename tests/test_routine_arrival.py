@@ -61,7 +61,7 @@ class RoutineArrivalAdapterTests(unittest.TestCase):
         result = self.process(610)
         self.assertEqual(result[0].execution.resolution.outcome, RoutineOutcome.REDIRECTED)
         no_fallback = RoutineBook((RoutineBlock("shift", "npc", "work", "office", 540, 600),))
-        result = self.adapter.process(
+        result = RoutineArrivalAdapter(RoutineExecutionLedger()).process(
             4, 610, no_fallback, self.travel,
             outcome_samples={"shift": 0.25},
         )
