@@ -84,6 +84,7 @@ class EmotionalStressTests(unittest.TestCase):
         restored = NPCStressSnapshot.from_json(payload).restore()
         self.assertEqual(restored.snapshot()["version"], 2)
         self.assertEqual(restored.snapshot()["owner_ticks"], {"npc-a": 4})
+
     def test_replay_and_persistence(self):
         kwargs = dict(record_id="stress-1", event_id="event-1",
                       owner_id="npc-a", tick=0, intensity=0.7,
