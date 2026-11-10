@@ -132,6 +132,8 @@ class ActionPlanEvaluationLedger:
         self._plans[plan_id] = data
 
     def evaluate_plan(self, plan_id: str, terminal_status: str) -> NPCPlanEvaluation:
+        if terminal_status not in {"completed", "failed", "replanned"}:
+            raise ValueError("terminal_status must be completed, failed, or replanned")
         existing = self._plan_evaluations.get(plan_id)
         if existing is not None:
             if existing.terminal_status != terminal_status:
@@ -149,6 +151,9 @@ class ActionPlanEvaluationLedger:
         if not evaluations:
             raise ValueError("plan evaluation requires at least one evaluated terminal action")
         expected_actions = plan["planned_actions"]
+        actual_actions = tuple(record.action_id for record in records)
+        if actual_actions != expected_actions[:len(actual_actions)]:
+            raise ValueError("terminal action records do not follow the registered plan order")
         completed_actions = tuple(record.action_id for record in records if record.status == "completed")
         failed_actions = tuple(record.action_id for record in records if record.status != "completed")
         final_facts = set(records[-1].facts_after)
@@ -387,10 +392,12 @@ class ActionPlanEvaluationLedger:
             if (plan is None or plan["owner_id"] != item.owner_id
                     or plan["goal_id"] != item.goal_id
                     or plan["planned_actions"] != item.planned_actions
+                    or tuple(record.action_id for record in records) != item.planned_actions[:len(records)]
                     or event is None or event.event_type != "npc_plan_evaluated"
                     or event.participants != (item.owner_id,)
                     or not records or event.tick != records[-1].tick
                     or dict(event.attributes).get("plan_id") != item.plan_id
+                    or dict(event.attributes).get("terminal_status") != item.terminal_status
                     or tuple(record.action_id for record in records if record.status == "completed") != item.completed_actions
                     or tuple(record.action_id for record in records if record.status != "completed") != item.failed_actions
                     or set(item.observed_goal_facts) | set(item.missing_goal_facts) != set(item.expected_goal_facts)
