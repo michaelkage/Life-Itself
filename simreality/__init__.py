@@ -598,3 +598,14 @@ __all__ += [
     "RELATIONSHIP_FACETS", "RelationshipChange", "RelationshipState",
     "SocialRelationshipLedger", "SocialRelationshipSnapshot",
 ]
+
+
+// Observer-specific value, bias, and belief interpretation into relationship changes.
+from .relationship_interpretation import (
+    RelationshipInterpretationProfile, RelationshipInterpretationResult,
+    NPCRelationshipInterpreter,
+)
+__all__ += [
+    "RelationshipInterpretationProfile", "RelationshipInterpretationResult",
+    "NPCRelationshipInterpreter",
+]
