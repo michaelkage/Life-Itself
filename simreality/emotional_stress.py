@@ -109,7 +109,9 @@ class NPCStressLedger:
             if actual != expected:
                 raise ValueError("stress record ID reused with conflicting content")
             return prior
-        event_key = (event_id, owner_id)\n        if event_key in self._events and self._events[event_key] != tick:
+        event_key = (event_id, owner_id)
+        if event_key in self._events:
+            raise ValueError("world event already applied to this NPC's stress ledger")
             raise ValueError("stress event ID reused with conflicting owner or tick")
         # Advance passive recovery before applying a later stressor.
         self.advance(tick, {owner_id: profile})
@@ -181,7 +183,8 @@ class NPCStressLedger:
         ledger = cls(current_tick=data["current_tick"], initial_stress=data["stress"])
         for item in data["records"]:
             record = StressRecord(**item)
-            event_key = (record.event_id, record.owner_id)\n            if record.record_id in ledger._records or event_key in ledger._events:
+            event_key = (record.event_id, record.owner_id)
+            if record.record_id in ledger._records or event_key in ledger._events:
                 raise ValueError("duplicate stress replay identity")
             if record.tick > ledger.current_tick:
                 raise ValueError("stress record cannot occur after current_tick")
