@@ -23,6 +23,7 @@ class NPCDecision:
     plan: PlanResult | None
     reason: str
     experience_evidence_ids: tuple[str, ...] = ()
+    experience_evidence_sources: tuple[tuple[str, str], ...] = ()
 
     @property
     def actionable(self) -> bool:
