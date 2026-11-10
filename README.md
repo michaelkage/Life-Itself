@@ -379,3 +379,6 @@ Stress-driven behavioral adaptation now projects individual stress and exhaustio
 
 
 NPC psychological conditioning records owner-specific associations between explicit cues and experienced outcomes. Reinforcement, extinction, gradual weakening, replay protection, and canonical persistence are available through `NPCConditioningLedger`; the system returns approach/avoidance signals without forcing actions. See [docs/NPC-PSYCHOLOGICAL-CONDITIONING.md](docs/NPC-PSYCHOLOGICAL-CONDITIONING.md) and `tests/test_npc_conditioning.py`.
+
+
+NPC psychological conditioning is also integrated into `SimulationWorldCheckpoint`: pass `conditioning=...` when capturing and retrieve `RestoredSimulation.conditioning` after loading. Learning records are validated against the authoritative event journal and NPC roster; the section remains optional for older checkpoints. See `tests/test_emotional_stress_checkpoint.py`.
