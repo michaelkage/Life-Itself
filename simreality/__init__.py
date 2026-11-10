@@ -864,3 +864,8 @@ __all__ += [
 # Replay-safe execution of one planned NPC action against live facts and resources.
 from .action_execution import (ActionExecution, ActionExecutionLedger, ActionExecutionPolicy, ActionExecutionSnapshot, ActiveActionExecution)
 __all__ += ["ActionExecution", "ActionExecutionLedger", "ActionExecutionPolicy", "ActionExecutionSnapshot", "ActiveActionExecution"]
+
+
+# Explicit goal-aware action replanning over the persistent execution ledger.
+from .npc_action_replanning import NPCActionReplanningCoordinator, NPCReplanningResult
+__all__ += ["NPCActionReplanningCoordinator", "NPCReplanningResult"]
