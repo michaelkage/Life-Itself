@@ -9,3 +9,17 @@ The recipient receives a reported-experience record, not an autobiographical mem
 Transfer IDs are idempotent; conflicting reuse is rejected. The same source memory cannot be resent to the same recipient in the same communication under another ID. Canonical component snapshots preserve the records, and restoration revalidates the full source and communication chain.
 
 This first stage deliberately does not mutate recipient beliefs, personal memories, plans, or action evaluations. A later decision adapter can consume reported accounts with a lower evidence weight than direct experience while retaining attribution.
+
+
+## Strategic retrieval
+
+`strategic_experience_evidence(history, transfers, owner_id, current_tick, limit=100)`
+returns a stable, bounded decision-time view of evidence available to an NPC. It excludes future-dated memories and reports and preserves the source class:
+
+| Source class | Base influence |
+| --- | ---: |
+| Personal participation | 1.00 |
+| Witnessed event | 0.60 |
+| Reported account | 0.35 × transfer confidence |
+
+These are conservative evidence weights, not truth probabilities. Report confidence remains separately visible. Retrieval is read-only: it does not rewrite memories, beliefs, or historical plan evaluations. The helper is an evidence interface; automatic injection into a particular planner policy remains a separate integration step.
