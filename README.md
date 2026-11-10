@@ -447,3 +447,6 @@ after interruptions or changed priorities cancels obsolete active work,
 preserves execution history, and starts the first action of a feasible
 replacement plan. Replan requests are replay-safe and journaled. Tests:
 `tests/test_npc_action_replanning.py`.
+
+
+Autonomous NPC replanning history is now part of the composite world checkpoint. The saved request signatures, selected goals, plan results, outcomes, and journal references restore alongside action execution state. Reconstruct the execution ledger first, then rebind the NPCActionReplanningCoordinator to the restored GoalBook and shared event journal; replaying an identical request will not duplicate an action. See the action execution and replanning guide (docs/NPC-ACTION-EXECUTION.md).
