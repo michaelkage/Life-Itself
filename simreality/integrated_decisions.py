@@ -16,6 +16,7 @@ from .psychological_conditioning import NPCConditioningLedger
 from .psychological_decisions import ConditionedDecisionProfile
 from .social_beliefs import SocialBeliefSystem
 from .social_decisions import SocialBeliefDecisionAdapter
+from .memory_decisions import MemoryDecisionInfluence
 
 
 @dataclass(frozen=True)
@@ -23,6 +24,7 @@ class IntegratedChoiceResult:
     choice_id: str
     belief_appraisal: BeliefAwareResult
     conditioned_contributions: tuple[tuple[str, float], ...]
+    memory_contributions: tuple[tuple[str, float], ...]
     final_score: float
 
 
@@ -51,6 +53,7 @@ class IntegratedPsychologicalDecisionAdapter:
         cue_exposures: Mapping[str, Mapping[str, float]],
         value_effects: Mapping[str, Mapping[str, float]] | None = None,
         bias_effects: Mapping[str, Mapping[str, float]] | None = None,
+        memory_influence: MemoryDecisionInfluence | None = None,
     ) -> IntegratedDecisionResult:
         if not isinstance(observer_id, str) or not observer_id.strip():
             raise ValueError("observer_id must be a non-empty string")
@@ -60,6 +63,9 @@ class IntegratedPsychologicalDecisionAdapter:
             raise ValueError("conditioning profile must belong to observer")
         if not isinstance(cue_exposures, Mapping):
             raise ValueError("cue_exposures must be a mapping")
+        if memory_influence is not None:
+            if not isinstance(memory_influence, MemoryDecisionInfluence) or memory_influence.owner_id != observer_id:
+                raise ValueError("memory influence must belong to observer_id")
         belief_results = SocialBeliefDecisionAdapter.rank(
             observer_id, beliefs, value_profile, options,
             value_effects=value_effects, bias_effects=bias_effects,
@@ -81,10 +87,17 @@ class IntegratedPsychologicalDecisionAdapter:
                 association = conditioning.association_for(observer_id, cue)
                 contribution = association * exposure * conditioning_profile.cue_sensitivities[cue]
                 contributions.append((cue, contribution))
+            memory_contributions = memory_influence.contributions_for(choice_id) if memory_influence is not None else ()
+            if any(not isinstance(memory_id, str) or not memory_id.strip()
+                   or isinstance(value, bool) or not isinstance(value, (int, float))
+                   or not math.isfinite(value) or not -1.0 <= value <= 1.0
+                   for memory_id, value in memory_contributions):
+                raise ValueError("memory contributions must contain IDs and finite values in [-1, 1]")
             base = by_id[choice_id]
-            total = base.score + sum(value for _, value in contributions)
+            total = (base.score + sum(value for _, value in contributions)
+                     + sum(value for _, value in memory_contributions))
             results.append(IntegratedChoiceResult(
-                choice_id, base, tuple(contributions), total,
+                choice_id, base, tuple(contributions), tuple(memory_contributions), total,
             ))
         return IntegratedDecisionResult(
             observer_id,
