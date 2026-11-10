@@ -76,6 +76,21 @@ class NPCRelationshipInterpreterTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "different profile or evidence"):
             self.interpreter.interpret(*args, value_impacts={"protective": -0.5})
 
+
+    def test_conflicting_replay_is_rejected_after_interpreter_recreation(self):
+        profile = self.profile("observer-a", 0.6, 0.1)
+        self.interpreter.interpret(
+            "court-event", "observer-a", "defendant", profile,
+            value_impacts={"protective": 0.5},
+        )
+        rebuilt = NPCRelationshipInterpreter(self.events, self.relationships)
+        with self.assertRaisesRegex(ValueError, "change ID reused"):
+            rebuilt.interpret(
+                "court-event", "observer-a", "defendant",
+                self.profile("observer-a", -0.6, 0.1),
+                value_impacts={"protective": 0.5},
+            )
+
     def test_profile_must_belong_to_observer_and_witness_must_be_recorded(self):
         with self.assertRaisesRegex(ValueError, "different observer"):
             self.interpreter.interpret(
