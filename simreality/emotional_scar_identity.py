@@ -56,7 +56,7 @@ class EmotionalScarIdentityAdapter:
             raise TypeError("identities must be IdentityDecisionLedger")
         if not isinstance(events, WorldEventLedger):
             raise TypeError("events must be WorldEventLedger")
-        if isinstance(tick, bool) or not isinstance(tick, int) or tick < max(scars.current_tick, events.current_tick):
+        if isinstance(tick, bool) or not isinstance(tick, int) or tick < scars.current_tick or tick < max((event.tick for event in events.snapshot()), default=0):
             raise ValueError("tick cannot precede scar or event history")
         policies = tuple(policies)
         if any(not isinstance(p, ScarIdentityPolicy) for p in policies):
