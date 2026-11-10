@@ -21,6 +21,9 @@ from simreality import (
 from simreality.presence_encounters import PresenceEncounter, PresenceEncounterLedger, PresenceSocialAdapter
 from simreality.social_familiarity import PresenceFamiliarityAdapter, SocialFamiliarityLedger
 from simreality.emotional_events import EmotionalEventRule, NPCEmotionalEventLedger
+from simreality.psychological_conditioning import ConditioningProfile, NPCConditioningLedger
+from simreality.psychological_interpretation import LearningProposal
+from simreality.psychological_learning_decisions import PsychologicalLearningDecisionLedger
 
 
 class SimulationWorldCheckpointTests(unittest.TestCase):
@@ -73,6 +76,32 @@ class SimulationWorldCheckpointTests(unittest.TestCase):
             SimulationWorldCheckpoint.capture(
                 4, coordinator, npcs, presence=presence,
             )
+
+    def test_checkpoint_round_trip_persists_psychological_learning_decisions(self):
+        coordinator, npcs, _ = self.make_simulation()
+        conditioning = NPCConditioningLedger()
+        profile = ConditioningProfile("speaker", learning_rate=0.5)
+        proposal = LearningProposal("speaker", "event-1", 3, "rule-trust",
+                                    "authority", 1.0, 1.0, "reinforce", "trusted authority")
+        decisions = PsychologicalLearningDecisionLedger()
+        decisions.decide("learning-1", proposal, accepted=True, decision_tick=4,
+                         conditioning=conditioning, profile=profile,
+                         rationale="This authority helped me")
+        checkpoint = SimulationWorldCheckpoint.capture(
+            4, coordinator, npcs, conditioning=conditioning,
+            psychological_learning_decisions=decisions,
+        )
+        restored = SimulationWorldCheckpoint.from_json(checkpoint.to_json()).restore()
+        self.assertIsNotNone(restored.psychological_learning_decisions)
+        self.assertEqual(restored.psychological_learning_decisions.entries(), decisions.entries())
+        self.assertEqual(restored.conditioning.association_for("speaker", "authority"), 0.5)
+        replay = restored.psychological_learning_decisions.decide(
+            "learning-1", proposal, accepted=True, decision_tick=4,
+            conditioning=restored.conditioning, profile=profile,
+            rationale="This authority helped me",
+        )
+        self.assertEqual(replay.decision_id, "learning-1")
+        self.assertEqual(len(restored.conditioning.records()), 1)
 
     def test_round_trip_restores_dependencies_and_idempotent_tick_replay(self):
         coordinator, npcs, consequences = self.make_simulation()
