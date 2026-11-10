@@ -72,6 +72,8 @@ class PresenceSocialTests(unittest.TestCase):
         adapter.encounter("same-tick-1", "a", "b", 2, opportunity=True)
         adapter.encounter("same-tick-2", "c", "d", 2, opportunity=True)
         self.assertEqual(len(adapter.ledger.snapshot()), 2)
+        self.assertEqual(adapter.ledger.count_between("a", "b"), 1)
+        self.assertEqual(len(adapter.ledger.encounters_for("a")), 1)
         restored = PresenceEncounterSnapshot.from_json(
             PresenceEncounterSnapshot.capture(adapter.ledger).to_json()
         ).restore()
