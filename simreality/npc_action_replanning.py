@@ -15,7 +15,7 @@ from .action_evaluation import ActionPlanEvaluationLedger, NPCActionEvaluation, 
 from .npc_autonomy import NPCDecision, NPCDecisionCycle
 from .npc_life_history import NPCLifeHistory
 from .npc_experience_transfer import (NPCExperienceTransferLedger, experience_action_guidance,
-                                     strategic_experience_evidence)
+                                     strategic_experience_evidence, experience_goal_guidance)
 from .planning import PlanResult
 from .world_events import WorldEventLedger
 
@@ -228,7 +228,12 @@ class NPCActionReplanningCoordinator:
                             if self.evaluations is not None else {})
         experience_ids: set[str] = set()
         experience_sources: dict[str, str] = {}
+        goal_adjustments = {}
+        goal_evidence_ids = {}
         if self.experience_transfers is not None:
+            goal_adjustments, goal_evidence_ids, goal_sources = experience_goal_guidance(
+                self.life_history, self.experience_transfers, owner_id, tick,
+                self.decisions.goals)
             experience_reliability, evidence_by_action = experience_action_guidance(
                 self.life_history, self.experience_transfers, owner_id, tick,
                 self.decisions.planner.actions)
@@ -238,10 +243,15 @@ class NPCActionReplanningCoordinator:
                 prior = action_reliability.get(action_id)
                 action_reliability[action_id] = value if prior is None else 0.75 * prior + 0.25 * value
                 experience_ids.update(evidence_by_action[action_id])
+            for ids in goal_evidence_ids.values():
+                experience_ids.update(ids)
+            experience_sources.update(goal_sources)
         request = {
             "owner": owner_id, "tick": tick, "facts": facts, "resources": balances,
             "action_reliability": sorted(action_reliability.items()),
             "experience_evidence_ids": sorted(experience_ids),
+            "goal_experience_adjustments": sorted(goal_adjustments.items()),
+            "goal_experience_evidence_ids": sorted((key, list(value)) for key, value in goal_evidence_ids.items()),
             "experience_evidence_sources": sorted((key, experience_sources[key]) for key in experience_ids),
             "plan_reliability": [[goal_id, list(actions), value]
                                  for (goal_id, actions), value in sorted(plan_reliability.items())],
@@ -274,6 +284,7 @@ class NPCActionReplanningCoordinator:
             max_expansions=max_expansions,
             action_reliability=action_reliability,
             plan_reliability=plan_reliability,
+            goal_experience_adjustments=goal_adjustments,
         )
         if experience_ids:
             decision = NPCDecision(decision.owner_id, decision.tick, decision.goal_id,
