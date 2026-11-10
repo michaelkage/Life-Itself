@@ -18,6 +18,7 @@ from simreality import (
     InquiryInvestigationPipeline, RouteEdge, PersonalRoutePlanner,
     TravelTickAdapter, PresenceLedger,
 )
+from simreality.presence_encounters import PresenceEncounter, PresenceEncounterLedger, PresenceSocialAdapter
 
 
 class SimulationWorldCheckpointTests(unittest.TestCase):
