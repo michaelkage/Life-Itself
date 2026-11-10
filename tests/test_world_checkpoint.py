@@ -1336,6 +1336,14 @@ class SimulationWorldCheckpointTests(unittest.TestCase):
         self.assertEqual(restored.action_resources, {"energy": 5.0})
         resumed = restored.restore_action_execution_ledger(planner, policies)
         self.assertEqual(resumed.active("collect-1").progress_ticks, 1)
+        self.assertEqual(
+            SimulationWorldCheckpoint.capture(
+                5, restored.coordinator, restored.npcs, action_executions=resumed,
+                action_world_facts=restored.action_world_facts,
+                action_resources=restored.action_resources,
+            ).to_json(),
+            payload,
+        )
         result = resumed.advance("collect-1", 6, restored.action_world_facts,
                                  restored.action_resources)
         self.assertEqual(result.status, "completed")
