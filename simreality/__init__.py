@@ -589,7 +589,7 @@ __all__ += ["FamiliarityObservation", "RecognitionAssessment", "SocialFamiliarit
             "PresenceFamiliarityAdapter", "SocialFamiliaritySnapshot"]
 
 
-// Directional relationship facets with event-linked evidence and independent persistence.
+# Directional relationship facets with event-linked evidence and independent persistence.
 from .social_relationships import (
     RELATIONSHIP_FACETS, RelationshipChange, RelationshipState,
     SocialRelationshipLedger, SocialRelationshipSnapshot,
@@ -600,7 +600,7 @@ __all__ += [
 ]
 
 
-// Observer-specific value, bias, and belief interpretation into relationship changes.
+# Observer-specific value, bias, and belief interpretation into relationship changes.
 from .relationship_interpretation import (
     RelationshipInterpretationProfile, RelationshipInterpretationResult,
     NPCRelationshipInterpreter,
