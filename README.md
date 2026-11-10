@@ -67,6 +67,7 @@ Engine-independent Python reference systems:
 | `simreality/presence_save_state.py` | Physical presence persistence | Saves current locations, edge progress, and replay history; integrated with composite world checkpoints |
 | `simreality/presence_encounters.py` | Presence-gated social encounters | Requires two NPCs to be physically co-located and an explicit interaction opportunity; optionally invokes actual conversation and caller-defined asymmetric trust effects |
 | `simreality/presence_encounter_save_state.py` | Social encounter persistence | Saves encounter history and per-tick replay signatures; integrated into composite world checkpoints |
+| `simreality/presence_witnesses.py` | Witness eligibility | Requires recorded co-location and an explicit observation opportunity before a candidate can be named as a witness |
 | `simreality/routine_tick.py` | Routine tick adapter | Selects active routines for an explicit tick, scopes supplied disruptions per NPC, and records replay-safe executions using explicit samples; called by the coordinator's named routine phase |
 | `simreality/npc_autonomy.py` | NPC autonomy | Read-only decision cycle that connects selected goals to explicit desired facts and bounded plans |
 | `simreality/appraisal.py` | NPC values and bias | Transparent value-weighted choice appraisal; different NPCs can rank the same hard choice differently |
@@ -346,3 +347,6 @@ The unified NPC identity appraisal now also accepts individual value priorities 
 
 
 Presence-gated social encounters now connect physical location to social life. Co-location alone never forces NPCs to notice, approach, or talk to each other: the world driver must confirm an interaction opportunity. Actual conversation is opt-in and uses the existing memory-transfer/belief pipeline; trust effects require explicit per-person directions and strength. Encounter history and replay state can be included in the composite world checkpoint.
+
+
+Witness eligibility now has a physical-presence gate. A candidate must be at the event's explicit location and the world driver must confirm an observation opportunity. This prevents NPCs who are elsewhere or travelling from becoming witnesses merely because they exist in the simulation. The adapter returns assessments without mutating the objective event; the world driver uses the eligible list when creating the event's witness record.
