@@ -115,6 +115,10 @@ class ActionExecutionLedger:
         self.policies = {p.action_id: p for p in items}
         self.events = events if events is not None else WorldEventLedger()
         self.goals = goals
+        if goals is not None:
+            missing_goals = {goal_id for policy in items for goal_id, _ in policy.goal_progress} - set(goals.goals)
+            if missing_goals:
+                raise ValueError(f"action policy references unknown goal: {sorted(missing_goals)[0]}")
         self._records: dict[str, tuple[str, ActionExecution]] = {}
         self._active: dict[str, ActiveActionExecution] = {}
         self._tick_requests: dict[str, dict[int, str]] = {}
