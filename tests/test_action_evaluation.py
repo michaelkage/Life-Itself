@@ -104,6 +104,13 @@ class ActionEvaluationTests(unittest.TestCase):
         self.assertEqual(second.plan_evaluation.observed_goal_facts, ("shelter",))
         self.assertEqual(second.plan_evaluation.missing_goal_facts, ())
         self.assertEqual(second.plan_evaluation.completed_actions, ("gather", "build"))
+        self.assertEqual(second.plan_evaluation, evaluations.evaluate_plan(
+            plan.execution_id.rsplit(":step:", 1)[0], "completed",
+        ))
+        restored = ActionPlanEvaluationLedger.from_snapshot(
+            executions, events, evaluations.to_snapshot(),
+        )
+        self.assertEqual(restored.plan_history, (second.plan_evaluation,))
 
     def test_plan_evaluation_records_goal_failure_after_interruption(self):
         planner = DeterministicPlanner((
