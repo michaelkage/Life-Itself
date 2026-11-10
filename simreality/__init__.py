@@ -614,3 +614,14 @@ __all__ += [
 # Canonical component persistence for transient NPC emotional event state.
 from .emotional_events_save_state import EmotionalEventSnapshot
 __all__ += ["EmotionalEventSnapshot"]
+
+
+# Separate felt emotion, outward expression, and explicit decision influence.
+from .emotional_regulation import (
+    EmotionalDecisionAdapter, EmotionalDecisionInfluence, EmotionalDecisionRule,
+    EmotionalExpression, EmotionalExpressionAdapter, EmotionalRegulationProfile,
+)
+__all__ += [
+    "EmotionalDecisionAdapter", "EmotionalDecisionInfluence", "EmotionalDecisionRule",
+    "EmotionalExpression", "EmotionalExpressionAdapter", "EmotionalRegulationProfile",
+]
