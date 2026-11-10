@@ -6,7 +6,7 @@ Each MemoryReinterpretation identifies the owner, memory, tick, previous interpr
 
 The original AutobiographicalMemory remains unchanged. current_interpretation returns the latest reflection when one exists, otherwise the original interpretation. This allows dialogue and decision systems to explicitly choose whether to consult the original account or the owner's current understanding.
 
-MemoryReflectionSnapshot provides a canonical, versioned component-level JSON codec. It is not yet included in SimulationWorldCheckpoint; callers must persist and restore it alongside the matching NPCLifeHistory snapshot.
+MemoryReflectionSnapshot provides a canonical, versioned component-level JSON codec. It is integrated into SimulationWorldCheckpoint through `memory_reflections=...` and restored as `RestoredSimulation.memory_reflections`. Capture requires the reflection ledger to share the exact `NPCLifeHistory` instance being checkpointed. Every reflection owner and tick is checked against the saved NPC roster and checkpoint clock; a checkpoint containing reflections without the matching life history is rejected. Older checkpoints without a `memory_reflections` section remain valid.
 
 The ledger does not infer why an NPC changed their mind, alter identity or trust, forgive another person, or force a behavior. Those outcomes require separate explicit systems.
 
