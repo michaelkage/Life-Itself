@@ -126,6 +126,20 @@ class NPCActionReplanningTests(unittest.TestCase):
         self.assertEqual(progression.replanning.action_id, "repair-with-kit")
         self.assertEqual(self.ledger.get(first.execution_id).status, "interrupted")
 
+
+    def test_replanning_snapshot_restores_idempotency_cache(self):
+        args = ("npc-1", 1, {"has-kit"}, {"cash": 10.0},
+                {"repair": {"machine-fixed"}, "rest": {"rested"}})
+        first = self.coordinator.replan(*args, reason="persist cache")
+        snapshot = self.coordinator.to_snapshot()
+        restored = NPCActionReplanningCoordinator.from_snapshot(
+            self.cycle, self.ledger, self.events, snapshot,
+        )
+        second = restored.replan(*args, reason="persist cache")
+        self.assertEqual(first, second)
+        self.assertEqual(len(self.ledger.active()), 1)
+        self.assertEqual(restored.to_snapshot(), snapshot)
+
     def test_identical_replan_request_is_replay_safe(self):
         args = ("npc-1", 1, {"has-kit"}, {"cash": 10.0},
                 {"repair": {"machine-fixed"}, "rest": {"rested"}})
