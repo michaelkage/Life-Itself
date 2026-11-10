@@ -19,6 +19,7 @@ from simreality import (
     TravelTickAdapter, PresenceLedger, AutobiographicalMemory, NPCLifeHistory,
     MemoryReinterpretation, MemoryReflectionLedger,
     EmotionalScar, NPCEmotionalScarLedger,
+    EmotionalScarProposal, EmotionalScarDecision, EmotionalScarDecisionLedger,
 )
 from simreality.presence_encounters import PresenceEncounter, PresenceEncounterLedger, PresenceSocialAdapter
 from simreality.social_familiarity import PresenceFamiliarityAdapter, SocialFamiliarityLedger
@@ -1145,6 +1146,74 @@ class SimulationWorldCheckpointTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "autobiographical source memory"):
             SimulationWorldCheckpoint.capture(
                 4, coordinator, npcs, life_history=history, emotional_scars=scars,
+            )
+
+    def test_emotional_scar_acceptance_and_rejection_survive_world_checkpoint(self):
+        coordinator, npcs, _ = self.make_simulation()
+        history = NPCLifeHistory()
+        history.record(AutobiographicalMemory(
+            "scar-decision-memory", "speaker", "event-1", 3, ("listener",),
+            "The incident was frightening", 0.9, -0.2,
+            turning_point=True, tags=("fear",),
+        ))
+        decisions = EmotionalScarDecisionLedger()
+        accepted = EmotionalScarProposal(
+            "proposal-accepted", "speaker", "event-1", "scar-decision-memory",
+            4, "fear", "crowded-room", 0.8, 0.999,
+        )
+        rejected = EmotionalScarProposal(
+            "proposal-rejected", "speaker", "event-1", "scar-decision-memory",
+            4, "anger", "raised-voice", 0.6, 0.999,
+        )
+        decisions.add_proposal(accepted)
+        decisions.add_proposal(rejected)
+        decisions.decide(EmotionalScarDecision(
+            "decision-accepted", accepted.proposal_id, "speaker", 4, True,
+            "This experience still affects me",
+        ))
+        decisions.decide(EmotionalScarDecision(
+            "decision-rejected", rejected.proposal_id, "speaker", 4, False,
+            "I do not identify with this reaction",
+        ))
+        payload = SimulationWorldCheckpoint.capture(
+            4, coordinator, npcs, life_history=history,
+            emotional_scar_decisions=decisions,
+        ).to_json()
+        restored = SimulationWorldCheckpoint.from_json(payload).restore()
+        self.assertEqual(restored.emotional_scar_decisions.proposals(), decisions.proposals())
+        self.assertEqual(restored.emotional_scar_decisions.decisions(), decisions.decisions())
+        self.assertEqual(restored.emotional_scar_decisions.scars.snapshot(), decisions.scars.snapshot())
+        self.assertEqual(len(restored.emotional_scar_decisions.scars.scars()), 1)
+        self.assertEqual(
+            SimulationWorldCheckpoint.capture(
+                4, restored.coordinator, restored.npcs,
+                life_history=restored.life_history,
+                emotional_scar_decisions=restored.emotional_scar_decisions,
+            ).to_json(),
+            payload,
+        )
+
+    def test_checkpoint_rejects_rejected_scar_proposal_without_matching_memory(self):
+        coordinator, npcs, _ = self.make_simulation()
+        history = NPCLifeHistory()
+        history.record(AutobiographicalMemory(
+            "other-owner-memory", "listener", "event-1", 3, ("speaker",),
+            "Only the listener remembers this", 0.7, 0.0,
+        ))
+        decisions = EmotionalScarDecisionLedger()
+        proposal = EmotionalScarProposal(
+            "proposal-invalid", "speaker", "event-1", "other-owner-memory",
+            4, "fear", "crowded-room", 0.5,
+        )
+        decisions.add_proposal(proposal)
+        decisions.decide(EmotionalScarDecision(
+            "decision-invalid", proposal.proposal_id, "speaker", 4, False,
+            "Rejected",
+        ))
+        with self.assertRaisesRegex(ValueError, "autobiographical source memory"):
+            SimulationWorldCheckpoint.capture(
+                4, coordinator, npcs, life_history=history,
+                emotional_scar_decisions=decisions,
             )
 
     def test_emotional_scars_remain_optional_in_legacy_checkpoints(self):
