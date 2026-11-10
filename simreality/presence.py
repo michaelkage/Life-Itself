@@ -56,9 +56,9 @@ class PresenceLedger:
         self._records: dict[str, NPCPresence] = {}
         self._ticks: dict[int, tuple[str, tuple[NPCPresence, ...]]] = {}
         for record in records:
-            self.place(record.owner_id, record.location_id, record.updated_tick)
-            if record.status != "at_location":
-                self._records[record.owner_id] = record
+            if not isinstance(record, NPCPresence):
+                raise TypeError("records must contain NPCPresence values")
+            self._records[record.owner_id] = record
 
     def get(self, owner_id: str) -> NPCPresence | None:
         return self._records.get(owner_id)
@@ -84,7 +84,8 @@ class PresenceLedger:
             raise ValueError("existing NPCs must move through an explicit travel journey")
         if previous is not None and tick < previous.updated_tick:
             raise ValueError("presence updates must be monotonic")
-        record = NPCPresence(owner_id, "at_location", location_id, None, None, 0.0, tick)
+        last_journey_id = previous.journey_id if previous is not None else None
+        record = NPCPresence(owner_id, "at_location", location_id, last_journey_id, None, 0.0, tick)
         self._records[owner_id] = record
         return record
 
@@ -147,7 +148,7 @@ class PresenceTickAdapter:
         for journey in sorted(latest_by_owner.values(), key=lambda item: item.owner_id):
             if journey.status == "arrived":
                 record = NPCPresence(journey.owner_id, "at_location", journey.destination,
-                                     None, None, 0.0, tick)
+                                     journey.journey_id, None, 0.0, tick)
             elif journey.status in ("travelling", "blocked", "unreachable"):
                 edge_id = journey.edge_ids[journey.edge_index] if journey.edge_index < len(journey.edge_ids) else None
                 record = NPCPresence(journey.owner_id, journey.status, journey.path[journey.edge_index],
@@ -156,12 +157,18 @@ class PresenceTickAdapter:
                 continue
             previous = self.ledger.get(journey.owner_id)
             if previous is not None:
+                if previous.updated_tick > tick:
+                    raise ValueError(f"journey would rewind recorded NPC presence: {journey.owner_id}")
                 if previous.status != "at_location" and previous.journey_id != journey.journey_id:
                     raise ValueError(f"NPC already has presence on another journey: {journey.owner_id}")
-                if (previous.status == "at_location"
-                        and previous.updated_tick <= journey.started_tick
-                        and previous.location_id != journey.origin):
-                    raise ValueError(f"journey origin conflicts with recorded NPC presence: {journey.owner_id}")
+                if previous.status == "at_location":
+                    if previous.journey_id == journey.journey_id:
+                        if journey.status != "arrived":
+                            raise ValueError(f"arrived journey conflicts with active travel state: {journey.owner_id}")
+                    elif previous.updated_tick > journey.started_tick:
+                        raise ValueError(f"journey predates the latest recorded NPC presence: {journey.owner_id}")
+                    elif previous.location_id != journey.origin:
+                        raise ValueError(f"journey origin conflicts with recorded NPC presence: {journey.owner_id}")
             updates.append(record)
         result = self.ledger._sync(tick, signature, tuple(sorted(updates, key=lambda item: item.owner_id)))
         if events is not None:
