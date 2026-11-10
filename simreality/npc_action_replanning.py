@@ -11,6 +11,7 @@ import hashlib
 import json
 
 from .action_execution import ActionExecution, ActionExecutionLedger, ActiveActionExecution
+from .action_evaluation import ActionPlanEvaluationLedger, NPCActionEvaluation
 from .npc_autonomy import NPCDecision, NPCDecisionCycle
 from .planning import PlanResult
 from .world_events import WorldEventLedger
@@ -44,6 +45,7 @@ class NPCActionProgression:
     execution: ActionExecution | ActiveActionExecution
     next_active: ActiveActionExecution | None
     replanning: NPCReplanningResult | None
+    evaluation: NPCActionEvaluation | None = None
 
 
 @dataclass(frozen=True)
@@ -71,7 +73,8 @@ class NPCActionReplanningCoordinator:
 
     def __init__(self, decisions: NPCDecisionCycle,
                  executions: ActionExecutionLedger,
-                 events: WorldEventLedger | None = None) -> None:
+                 events: WorldEventLedger | None = None,
+                 evaluations: ActionPlanEvaluationLedger | None = None) -> None:
         if not isinstance(decisions, NPCDecisionCycle):
             raise TypeError("decisions must be an NPCDecisionCycle")
         if not isinstance(executions, ActionExecutionLedger):
@@ -81,6 +84,9 @@ class NPCActionReplanningCoordinator:
         self.events = events if events is not None else executions.events
         if self.events is not executions.events:
             raise ValueError("replanning and execution must share one event journal")
+        if evaluations is not None and (evaluations.executions is not executions or evaluations.events is not self.events):
+            raise ValueError("evaluation ledger must share the coordinator execution ledger and event journal")
+        self.evaluations = evaluations
         self._requests: dict[str, tuple[str, NPCReplanningResult]] = {}
 
     def to_snapshot(self) -> NPCReplanningSnapshot:
@@ -264,17 +270,18 @@ class NPCActionReplanningCoordinator:
         )
         if not hasattr(terminal_or_active, "status"):
             return NPCActionProgression(terminal_or_active, terminal_or_active, None)
+        evaluation = self.evaluations.evaluate(execution_id) if self.evaluations is not None else None
         if terminal_or_active.status != "completed":
             replanning = self.replan(
                 active.owner_id, tick, world_facts, resources, goal_facts,
                 reason=terminal_or_active.reason,
                 max_expansions=max_expansions,
             )
-            return NPCActionProgression(terminal_or_active, None, replanning)
+            return NPCActionProgression(terminal_or_active, None, replanning, evaluation)
 
         next_index = active.action_index + 1
         if next_index >= len(active.plan_actions):
-            return NPCActionProgression(terminal_or_active, None, None)
+            return NPCActionProgression(terminal_or_active, None, None, evaluation)
 
         remaining = active.plan_actions[next_index:]
         failure = self._resource_failure(remaining, resources)
@@ -286,7 +293,7 @@ class NPCActionReplanningCoordinator:
                     world_facts, resources, plan_actions=active.plan_actions,
                     action_index=next_index,
                 )
-                return NPCActionProgression(terminal_or_active, next_active, None)
+                return NPCActionProgression(terminal_or_active, next_active, None, evaluation)
             except ValueError as exc:
                 failure = str(exc)
 
