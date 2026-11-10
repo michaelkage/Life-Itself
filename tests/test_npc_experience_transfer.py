@@ -74,3 +74,44 @@ def test_same_source_memory_cannot_be_resent_in_one_communication():
     ledger.transfer("share-1", "bob", "alice", "memory-alice", "conversation", confidence=0.65)
     with pytest.raises(ValueError, match="already been transferred"):
         ledger.transfer("share-2", "bob", "alice", "memory-alice", "conversation", confidence=0.65)
+
+
+def test_strategic_retrieval_weights_personal_witnessed_and_reported_evidence():
+    from simreality.npc_life_history import AutobiographicalMemory
+    from simreality.npc_experience_transfer import strategic_experience_evidence
+
+    events = WorldEventLedger((
+        WorldEventLedger.make_event("direct", 2, "work", participants=("bob",)),
+        WorldEventLedger.make_event("witnessed", 3, "accident", witnesses=("bob",)),
+        WorldEventLedger.make_event("conversation", 9, "conversation",
+                                    participants=("alice", "bob")),
+    ))
+    history = NPCLifeHistory((
+        AutobiographicalMemory("direct-memory", "bob", "direct", 2, (),
+                               "I performed the repair", 0.2, 0.1),
+        AutobiographicalMemory("witness-memory", "bob", "witnessed", 3, (),
+                               "I watched a repair fail", 0.3, 0.1),
+        AutobiographicalMemory("alice-memory", "alice", "direct", 2, (),
+                               "I performed the repair", 0.2, 0.1),
+    ))
+    transfers = NPCExperienceTransferLedger(events, history)
+    transfers.transfer("reported-share", "bob", "alice", "alice-memory",
+                       "conversation", confidence=0.8)
+    evidence = strategic_experience_evidence(history, transfers, "bob", 9)
+    by_class = {item.source_class: item for item in evidence}
+    assert by_class["personal"].influence == 1.0
+    assert by_class["witnessed"].influence == 0.6
+    assert by_class["reported"].influence == 0.28
+    assert by_class["reported"].confidence == 0.8
+
+
+def test_strategic_retrieval_excludes_future_and_is_bounded_and_stable():
+    from simreality.npc_experience_transfer import strategic_experience_evidence
+    events, history = setup()
+    transfers = NPCExperienceTransferLedger(events, history)
+    first = strategic_experience_evidence(history, transfers, "alice", 4, limit=1)
+    second = strategic_experience_evidence(history, transfers, "alice", 4, limit=1)
+    assert first == second
+    assert len(first) == 1
+    assert first[0].evidence_id == "memory-alice"
+    assert strategic_experience_evidence(history, transfers, "alice", 3) == ()
