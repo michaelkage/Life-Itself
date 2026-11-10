@@ -50,6 +50,7 @@ from .emotional_events import NPCEmotionalEventLedger
 from .emotional_events_save_state import EmotionalEventSnapshot
 from .emotional_stress import NPCStressLedger
 from .emotional_stress_save_state import NPCStressSnapshot
+from .psychological_conditioning import NPCConditioningLedger, NPCConditioningSnapshot
 
 
 @dataclass(frozen=True)
@@ -83,6 +84,7 @@ class RestoredSimulation:
     relationships: SocialRelationshipLedger | None = None
     emotions: NPCEmotionalEventLedger | None = None
     stress: NPCStressLedger | None = None
+    conditioning: NPCConditioningLedger | None = None
 
 
 @dataclass(frozen=True)
@@ -123,6 +125,7 @@ class SimulationWorldCheckpoint:
     relationships_json: str | None = None
     emotions_json: str | None = None
     stress_json: str | None = None
+    conditioning_json: str | None = None
 
     SCHEMA_VERSION = 1
 
@@ -154,7 +157,7 @@ class SimulationWorldCheckpoint:
                 consequence_recorder=None, campaign=None, misconduct=None, routines=None,
                 routine_executions=None, routine_institutions=None, institutional_politics=None,
                 goal_book=None, goal_event_adapter=None, goal_review_decisions=None, identity_decisions=None,
-                testimony_inquiries=None, testimony=None, travel=None, presence=None, presence_encounters=None, familiarity=None, relationships=None, emotions=None, stress=None):
+                testimony_inquiries=None, testimony=None, travel=None, presence=None, presence_encounters=None, familiarity=None, relationships=None, emotions=None, stress=None, conditioning=None):
         if not isinstance(coordinator, SimulationTickCoordinator):
             raise TypeError("coordinator must be a SimulationTickCoordinator")
         if not isinstance(npcs, dict):
@@ -393,6 +396,26 @@ class SimulationWorldCheckpoint:
                     raise ValueError("stress record does not match its source world event")
                 if record.tick > current_tick:
                     raise ValueError("stress records cannot occur after the checkpoint tick")
+        if conditioning is not None and not isinstance(conditioning, NPCConditioningLedger):
+            raise TypeError("conditioning must be an NPCConditioningLedger or None")
+        conditioning_snapshot = NPCConditioningSnapshot.capture(conditioning) if conditioning is not None else None
+        if conditioning_snapshot is not None:
+            conditioning_ledger = conditioning_snapshot.restore()
+            if conditioning_ledger.current_tick > current_tick:
+                raise ValueError("NPC conditioning cannot be sampled after the checkpoint tick")
+            for (owner_id, _cue), _value in conditioning_ledger._associations.items():
+                if owner_id not in npcs:
+                    raise ValueError("conditioning associations reference NPCs missing from checkpoint")
+            journal_events = {event.event_id: event for event in coordinator.events.snapshot()}
+            for record in conditioning_ledger.records():
+                source_event = journal_events.get(record.source_event_id)
+                if source_event is None:
+                    raise ValueError(f"conditioning record references missing world event: {record.source_event_id}")
+                if (record.owner_id not in source_event.participants + source_event.witnesses
+                        or source_event.tick > record.tick):
+                    raise ValueError("conditioning record does not match its source world event")
+                if record.tick > current_tick:
+                    raise ValueError("conditioning records cannot occur after the checkpoint tick")
         if relationships is not None and not isinstance(relationships, SocialRelationshipLedger):
             raise TypeError("relationships must be a SocialRelationshipLedger or None")
         relationship_snapshot = SocialRelationshipSnapshot.capture(relationships) if relationships is not None else None
@@ -451,6 +474,7 @@ class SimulationWorldCheckpoint:
             relationship_snapshot.to_json() if relationship_snapshot is not None else None,
             emotional_snapshot.to_json() if emotional_snapshot is not None else None,
             stress_snapshot.to_json() if stress_snapshot is not None else None,
+            conditioning_snapshot.to_json() if conditioning_snapshot is not None else None,
         )
 
     def _components(self):
@@ -485,6 +509,7 @@ class SimulationWorldCheckpoint:
             SocialRelationshipSnapshot.from_json(self.relationships_json) if self.relationships_json is not None else None,
             EmotionalEventSnapshot.from_json(self.emotions_json) if self.emotions_json is not None else None,
             NPCStressSnapshot.from_json(self.stress_json) if self.stress_json is not None else None,
+            NPCConditioningSnapshot.from_json(self.conditioning_json) if self.conditioning_json is not None else None,
         )
         goals_snapshot, goal_replay, goal_review_decisions = components[14], components[15], components[16]
         identity_decisions = components[17]
@@ -497,6 +522,7 @@ class SimulationWorldCheckpoint:
         relationship_snapshot = components[24]
         emotional_snapshot = components[25]
         stress_snapshot = components[26]
+        conditioning_snapshot = components[27]
         if presence_snapshot is not None:
             if any(record.updated_tick > self.current_tick for record in presence_snapshot.records):
                 raise ValueError("NPC presence cannot be updated after the checkpoint tick")
@@ -690,10 +716,25 @@ class SimulationWorldCheckpoint:
                         or item.observer_id not in source_event.participants + source_event.witnesses
                         or item.target_id not in source_event.participants + source_event.witnesses):
                     raise ValueError("relationship change does not match its source world event")
+        if conditioning_snapshot is not None:
+            conditioning_ledger = conditioning_snapshot.restore()
+            if conditioning_ledger.current_tick > self.current_tick:
+                raise ValueError("NPC conditioning cannot be sampled after the checkpoint tick")
+            known_npcs = {npc.entity_id for npc in NPCCollectionSnapshot.from_json(self.npcs_json).restore().values()}
+            if any(owner not in known_npcs for owner, _cue in conditioning_ledger._associations):
+                raise ValueError("conditioning associations reference unknown NPCs")
+            journal = {event.event_id: event for event in envelope.restore_event_ledger().snapshot()}
+            for record in conditioning_ledger.records():
+                source = journal.get(record.source_event_id)
+                if source is None:
+                    raise ValueError(f"conditioning record references missing world event: {record.source_event_id}")
+                if (record.owner_id not in source.participants + source.witnesses
+                        or source.tick > record.tick or record.tick > self.current_tick):
+                    raise ValueError("conditioning record does not match its source world event")
         return components
 
     def to_json(self):
-        envelope, npcs, trust, beliefs, memory, conversations, ticks, consequence, campaign, misconduct, routines, routine_executions, routine_institutions, institutional_politics, goals, goal_event_replay, goal_review_decisions, identity_decisions, testimony_inquiries, testimony, travel, presence, presence_encounters, familiarity, relationships, emotions, stress = self._components()
+        envelope, npcs, trust, beliefs, memory, conversations, ticks, consequence, campaign, misconduct, routines, routine_executions, routine_institutions, institutional_politics, goals, goal_event_replay, goal_review_decisions, identity_decisions, testimony_inquiries, testimony, travel, presence, presence_encounters, familiarity, relationships, emotions, stress, conditioning = self._components()
         payload = {
             "schema_version": self.SCHEMA_VERSION, "current_tick": self.current_tick,
             "events": json.loads(envelope.to_json()), "npcs": json.loads(npcs.to_json()),
@@ -744,6 +785,8 @@ class SimulationWorldCheckpoint:
             payload["emotions"] = json.loads(emotions.to_json())
         if stress is not None:
             payload["stress"] = json.loads(stress.to_json())
+        if conditioning is not None:
+            payload["conditioning"] = json.loads(conditioning.to_json())
         return json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False)
 
     @classmethod
@@ -776,14 +819,15 @@ class SimulationWorldCheckpoint:
                        json.dumps(raw["familiarity"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("familiarity") is not None else None,
                        json.dumps(raw["relationships"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("relationships") is not None else None,
                        json.dumps(raw["emotions"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("emotions") is not None else None,
-                       json.dumps(raw["stress"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("stress") is not None else None)
+                       json.dumps(raw["stress"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("stress") is not None else None,
+                       json.dumps(raw["conditioning"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("conditioning") is not None else None)
         except ValueError:
             raise
         except (TypeError, KeyError, IndexError, json.JSONDecodeError) as exc:
             raise ValueError("invalid simulation world checkpoint") from exc
 
     def restore(self):
-        envelope, npc_snapshot, trust_snapshot, belief_snapshot, memory_snapshot, conversation_snapshot, tick_snapshot, consequence_snapshot, campaign, misconduct_snapshot, routine_snapshot, execution_snapshot, institution_snapshot, institutional_politics, goals_snapshot, goal_event_replay, goal_review_decisions_snapshot, identity_decisions_snapshot, testimony_inquiries_snapshot, testimony_snapshot, travel_snapshot, presence_snapshot, encounter_snapshot, familiarity_snapshot, relationship_snapshot, emotional_snapshot, stress_snapshot = self._components()
+        envelope, npc_snapshot, trust_snapshot, belief_snapshot, memory_snapshot, conversation_snapshot, tick_snapshot, consequence_snapshot, campaign, misconduct_snapshot, routine_snapshot, execution_snapshot, institution_snapshot, institutional_politics, goals_snapshot, goal_event_replay, goal_review_decisions_snapshot, identity_decisions_snapshot, testimony_inquiries_snapshot, testimony_snapshot, travel_snapshot, presence_snapshot, encounter_snapshot, familiarity_snapshot, relationship_snapshot, emotional_snapshot, stress_snapshot, conditioning_snapshot = self._components()
         events = envelope.restore_event_ledger()
         npcs = npc_snapshot.restore()
         trust = trust_snapshot.restore()
@@ -825,8 +869,9 @@ class SimulationWorldCheckpoint:
         relationships = relationship_snapshot.restore() if relationship_snapshot is not None else None
         emotions = emotional_snapshot.restore() if emotional_snapshot is not None else None
         stress = stress_snapshot.restore() if stress_snapshot is not None else None
+        conditioning = conditioning_snapshot.restore() if conditioning_snapshot is not None else None
         return RestoredSimulation(self.current_tick, events, npcs, trust, beliefs,
                                   memory, conversations, coordinator, self.metadata,
                                   consequence_recorder, campaign, misconduct, routines, routine_executions,
                                   routine_institutions, institutional_politics, goals, goal_event_replay,
-                                  goal_review_decisions, identity_decisions, testimony_inquiries, testimony, travel, presence, presence_encounters, familiarity, relationships, emotions, stress)
+                                  goal_review_decisions, identity_decisions, testimony_inquiries, testimony, travel, presence, presence_encounters, familiarity, relationships, emotions, stress, conditioning)
