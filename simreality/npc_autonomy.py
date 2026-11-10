@@ -47,6 +47,7 @@ class NPCDecisionCycle:
         max_expansions: int = 10_000,
         action_reliability: Mapping[str, float] | None = None,
         plan_reliability: Mapping[tuple[str, tuple[str, ...]], float] | None = None,
+        goal_experience_adjustments: Mapping[str, float] | None = None,
     ) -> NPCDecision:
         """Propose a plan for the highest-ranked goal that can currently be planned.
 
@@ -59,7 +60,7 @@ class NPCDecisionCycle:
         if current_tick < 0:
             raise ValueError("current_tick must be non-negative")
 
-        ranked_goals = self.goals.ranked(owner_id, current_tick)
+        ranked_goals = self.goals.ranked(owner_id, current_tick, dict(goal_experience_adjustments or {}))
         if not ranked_goals:
             return NPCDecision(owner_id, current_tick, None, None, None,
                                "no actionable goal")
