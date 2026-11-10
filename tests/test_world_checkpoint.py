@@ -23,6 +23,7 @@ from simreality import (
     IdentityGoalAction, IdentityGoalAlignmentAdapter, IdentityGoalAlignmentPolicy,
     IdentityGoalReviewDecision, IdentityGoalReviewDecisionLedger,
     ActionExecutionLedger, ActionExecutionPolicy,
+    ActionPlanEvaluationLedger,
 )
 from simreality.presence_encounters import PresenceEncounter, PresenceEncounterLedger, PresenceSocialAdapter
 from simreality.social_familiarity import PresenceFamiliarityAdapter, SocialFamiliarityLedger
@@ -1395,6 +1396,63 @@ class SimulationWorldCheckpointTests(unittest.TestCase):
                 4, restored.coordinator, restored.npcs, goal_book=restored.goals,
                 action_executions=restored_ledger, action_world_facts=restored.action_world_facts,
                 action_resources=restored.action_resources, action_replanning=restored_replanning,
+            ).to_json(),
+            payload,
+        )
+
+
+    def test_action_evaluation_history_and_learning_restore_atomically(self):
+        from simreality.npc_action_replanning import NPCActionReplanningCoordinator
+        from simreality.npc_autonomy import NPCDecisionCycle
+
+        coordinator, npcs, _ = self.make_simulation()
+        goals = GoalBook()
+        goals.add(NPCGoal("food-goal", "speaker", "survival", 8.0))
+        planner = DeterministicPlanner((
+            PlanningAction("get-food", frozenset({"at-market"}), frozenset({"has-food"})),
+        ))
+        policies = (ActionExecutionPolicy("get-food"),)
+        executions = ActionExecutionLedger(planner, policies, coordinator.events, goals)
+        evaluations = ActionPlanEvaluationLedger(executions, learning_min_samples=1)
+        decisions = NPCDecisionCycle(goals, planner)
+        replanning = NPCActionReplanningCoordinator(
+            decisions, executions, coordinator.events, evaluations,
+        )
+        facts, resources = {"at-market"}, {"cash": 3.0}
+        goal_facts = {"food-goal": {"has-food"}}
+        planned = replanning.replan(
+            "speaker", 4, facts, resources, goal_facts, reason="food needed",
+        )
+        replanning.advance(planned.execution_id, 5, facts, resources, goal_facts)
+        progression = replanning.advance(
+            planned.execution_id, 6, facts, resources, goal_facts,
+        )
+        self.assertIsNotNone(progression.evaluation)
+        payload = SimulationWorldCheckpoint.capture(
+            6, coordinator, npcs, goal_book=goals,
+            action_executions=executions, action_world_facts=facts,
+            action_resources=resources, action_replanning=replanning,
+            action_evaluations=evaluations,
+        ).to_json()
+
+        restored = SimulationWorldCheckpoint.from_json(payload).restore()
+        restored_executions = restored.restore_action_execution_ledger(planner, policies)
+        restored_evaluations = restored.restore_action_evaluation_ledger(restored_executions)
+        restored_decisions = NPCDecisionCycle(restored.goals, planner)
+        restored_replanning = restored.restore_action_replanning_coordinator(
+            restored_decisions, restored_executions, restored_evaluations,
+        )
+        self.assertEqual(restored_evaluations.to_snapshot(), evaluations.to_snapshot())
+        self.assertEqual(restored_evaluations.reliability("get-food"), evaluations.reliability("get-food"))
+        self.assertIs(restored_replanning.evaluations, restored_evaluations)
+        self.assertEqual(
+            SimulationWorldCheckpoint.capture(
+                6, restored.coordinator, restored.npcs, goal_book=restored.goals,
+                action_executions=restored_executions,
+                action_world_facts=restored.action_world_facts,
+                action_resources=restored.action_resources,
+                action_replanning=restored_replanning,
+                action_evaluations=restored_evaluations,
             ).to_json(),
             payload,
         )
