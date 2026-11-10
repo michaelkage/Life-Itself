@@ -743,6 +743,7 @@ class SimulationWorldCheckpoint:
             EmotionalScarDecisionSnapshot.from_json(self.emotional_scar_decisions_json) if self.emotional_scar_decisions_json is not None else None,
             ScarIdentityProposalSnapshot.from_json(self.scar_identity_proposals_json) if self.scar_identity_proposals_json is not None else None,
             IdentityGoalReviewSnapshot.from_json(self.identity_goal_reviews_json) if self.identity_goal_reviews_json is not None else None,
+            ActionExecutionSnapshot.from_json(self.action_executions_json) if self.action_executions_json is not None else None,
         )
         goals_snapshot, goal_replay, goal_review_decisions = components[14], components[15], components[16]
         identity_decisions = components[17]
@@ -763,6 +764,32 @@ class SimulationWorldCheckpoint:
         emotional_scar_decisions_snapshot = components[32]
         scar_identity_proposal_snapshot = components[33]
         identity_goal_review_snapshot = components[34]
+        action_execution_snapshot = components[35]
+        if action_execution_snapshot is not None:
+            journal = {event.event_id: event for event in envelope.restore_event_ledger().snapshot()}
+            npc_ids = {npc.entity_id for npc in NPCCollectionSnapshot.from_json(self.npcs_json).restore().values()}
+            raw_action_state = json.loads(action_execution_snapshot.to_json())
+            for item in raw_action_state["records"]:
+                record = item["record"]
+                event = journal.get(record["event_id"])
+                if (record["owner_id"] not in npc_ids or record["tick"] > self.current_tick
+                        or event is None or event.tick != record["tick"]
+                        or record["owner_id"] not in event.participants
+                        or event.event_type != "npc_action_execution"):
+                    raise ValueError("action execution record does not match checkpoint NPCs and event history")
+            for active in raw_action_state["active"]:
+                event_id = "action-execution:" + active["execution_id"] + ":started"
+                event = journal.get(event_id)
+                if (active["owner_id"] not in npc_ids or active["started_tick"] > self.current_tick
+                        or active["last_tick"] > self.current_tick or event is None
+                        or event.tick != active["started_tick"]
+                        or active["owner_id"] not in event.participants
+                        or event.event_type != "npc_action_started"):
+                    raise ValueError("active action execution does not match checkpoint NPCs and event history")
+                for progress_id, progress_event in journal.items():
+                    if progress_id.startswith("action-execution:" + active["execution_id"] + ":tick:"):
+                        if progress_event.tick > self.current_tick or progress_event.event_type != "npc_action_progress":
+                            raise ValueError("action execution progress event is invalid for checkpoint")
         if identity_goal_review_snapshot is not None:
             if goals_snapshot is None or identity_decisions is None:
                 raise ValueError("identity-goal reviews require the corresponding GoalBook and identity decisions")
