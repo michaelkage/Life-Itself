@@ -206,7 +206,8 @@ class NPCActionReplanningCoordinator:
     def replan(self, owner_id: str, tick: int, world_facts: set[str],
                resources: dict[str, float], goal_facts, *, reason: str,
                active_execution_id: str | None = None,
-               max_expansions: int = 10_000,\n               goal_motivational_adjustments: dict[str, float] | None = None) -> NPCReplanningResult:
+               max_expansions: int = 10_000,
+               goal_motivational_adjustments: dict[str, float] | None = None) -> NPCReplanningResult:
         if not isinstance(owner_id, str) or not owner_id.strip():
             raise ValueError("owner_id must be non-empty")
         if isinstance(tick, bool) or not isinstance(tick, int) or tick < 0:
@@ -251,7 +252,8 @@ class NPCActionReplanningCoordinator:
             "action_reliability": sorted(action_reliability.items()),
             "experience_evidence_ids": sorted(experience_ids),
             "goal_experience_adjustments": sorted(goal_adjustments.items()),
-            "goal_experience_evidence_ids": sorted((key, list(value)) for key, value in goal_evidence_ids.items()),\n            "goal_motivational_adjustments": sorted((goal_motivational_adjustments or {}).items()),
+            "goal_experience_evidence_ids": sorted((key, list(value)) for key, value in goal_evidence_ids.items()),
+            "goal_motivational_adjustments": sorted((goal_motivational_adjustments or {}).items()),
             "experience_evidence_sources": sorted((key, experience_sources[key]) for key in experience_ids),
             "plan_reliability": [[goal_id, list(actions), value]
                                  for (goal_id, actions), value in sorted(plan_reliability.items())],
