@@ -450,6 +450,7 @@ class SimulationWorldCheckpoint:
             familiarity_snapshot.to_json() if familiarity_snapshot is not None else None,
             relationship_snapshot.to_json() if relationship_snapshot is not None else None,
             emotional_snapshot.to_json() if emotional_snapshot is not None else None,
+            stress_snapshot.to_json() if stress_snapshot is not None else None,
         )
 
     def _components(self):
@@ -483,6 +484,7 @@ class SimulationWorldCheckpoint:
             SocialFamiliaritySnapshot.from_json(self.familiarity_json) if self.familiarity_json is not None else None,
             SocialRelationshipSnapshot.from_json(self.relationships_json) if self.relationships_json is not None else None,
             EmotionalEventSnapshot.from_json(self.emotions_json) if self.emotions_json is not None else None,
+            NPCStressSnapshot.from_json(self.stress_json) if self.stress_json is not None else None,
         )
         goals_snapshot, goal_replay, goal_review_decisions = components[14], components[15], components[16]
         identity_decisions = components[17]
@@ -724,6 +726,8 @@ class SimulationWorldCheckpoint:
             payload["relationships"] = json.loads(relationships.to_json())
         if emotions is not None:
             payload["emotions"] = json.loads(emotions.to_json())
+        if stress is not None:
+            payload["stress"] = json.loads(stress.to_json())
         return json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False)
 
     @classmethod
