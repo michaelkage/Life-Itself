@@ -139,7 +139,10 @@ class NPCActionReplanningCoordinator:
             if request_id != item["request_id"] or request_id in restored:
                 raise ValueError("replanning request identity is invalid or duplicated")
             request_data = json.loads(signature)
-            if request_data.get("owner") != item["owner_id"] or request_data.get("tick") != item["tick"]:
+            if (request_data.get("owner") != item["owner_id"]
+                    or request_data.get("tick") != item["tick"]
+                    or request_data.get("experience_evidence_ids", []) != item.get("experience_evidence_ids", [])
+                    or request_data.get("experience_evidence_sources", []) != item.get("experience_evidence_sources", [])):
                 raise ValueError("replanning request metadata does not match its signature")
             event = self.events.get(item["event_id"])
             attributes = dict(event.attributes)
