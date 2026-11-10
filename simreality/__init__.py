@@ -574,3 +574,8 @@ __all__ += ["NPCPresence", "PresenceLedger", "PresenceTickAdapter", "PresenceSna
 from .presence_encounters import PresenceEncounter, PresenceEncounterResult, PresenceEncounterLedger, PresenceSocialAdapter
 from .presence_encounter_save_state import PresenceEncounterSnapshot
 __all__ += ["PresenceEncounter", "PresenceEncounterResult", "PresenceEncounterLedger", "PresenceSocialAdapter", "PresenceEncounterSnapshot"]
+
+
+# Physical presence and explicit observation opportunities gate witness eligibility.
+from .presence_witnesses import PresenceWitnessAssessment, PresenceWitnessResolution, PresenceWitnessAdapter
+__all__ += ["PresenceWitnessAssessment", "PresenceWitnessResolution", "PresenceWitnessAdapter"]
