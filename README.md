@@ -471,3 +471,6 @@ Experience-aware NPC replanning can now optionally use autobiographical and tran
 
 
 NPC goal selection can also consume explicit goal-outcome memories. Goals opt in with `metadata["experience_tags"]`; only matching memories tagged `goal:success` or `goal:failure` adjust their evaluated score, within a ±25% bound. Stored goal priority and progress remain unchanged. See [the experience-transfer guide](docs/NPC-EXPERIENCE-TRANSFER.md) and the goal-priority regression tests.
+
+
+The unified [NPC motivational projection](docs/NPC-MOTIVATIONAL-SYSTEM.md) combines explicit emotional-axis rules, stress-adaptation channels, and optional strategic experience into bounded, temporary goal-ranking modifiers. It is read-only and can be supplied to both the decision cycle and adaptive replanning. Tests: `tests/test_npc_motivation.py`.
