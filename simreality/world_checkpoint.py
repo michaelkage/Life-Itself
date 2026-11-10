@@ -54,6 +54,8 @@ from .psychological_conditioning import NPCConditioningLedger, NPCConditioningSn
 from .psychological_learning_decisions import PsychologicalLearningDecisionSnapshot, PsychologicalLearningDecisionLedger
 from .npc_life_history import NPCLifeHistory, LifeHistorySnapshot
 from .npc_memory_reflection import MemoryReflectionLedger, MemoryReflectionSnapshot
+from .emotional_scars import NPCEmotionalScarLedger
+from .emotional_scars_save_state import EmotionalScarSnapshot
 
 
 @dataclass(frozen=True)
@@ -91,6 +93,7 @@ class RestoredSimulation:
     psychological_learning_decisions: PsychologicalLearningDecisionLedger | None = None
     life_history: NPCLifeHistory | None = None
     memory_reflections: MemoryReflectionLedger | None = None
+    emotional_scars: NPCEmotionalScarLedger | None = None
 
 
 @dataclass(frozen=True)
@@ -135,6 +138,7 @@ class SimulationWorldCheckpoint:
     psychological_learning_decisions_json: str | None = None
     life_history_json: str | None = None
     memory_reflections_json: str | None = None
+    emotional_scars_json: str | None = None
 
     SCHEMA_VERSION = 1
 
@@ -166,7 +170,7 @@ class SimulationWorldCheckpoint:
                 consequence_recorder=None, campaign=None, misconduct=None, routines=None,
                 routine_executions=None, routine_institutions=None, institutional_politics=None,
                 goal_book=None, goal_event_adapter=None, goal_review_decisions=None, identity_decisions=None,
-                testimony_inquiries=None, testimony=None, travel=None, presence=None, presence_encounters=None, familiarity=None, relationships=None, emotions=None, stress=None, conditioning=None, psychological_learning_decisions=None, life_history=None, memory_reflections=None):
+                testimony_inquiries=None, testimony=None, travel=None, presence=None, presence_encounters=None, familiarity=None, relationships=None, emotions=None, stress=None, conditioning=None, psychological_learning_decisions=None, life_history=None, memory_reflections=None, emotional_scars=None):
         if not isinstance(coordinator, SimulationTickCoordinator):
             raise TypeError("coordinator must be a SimulationTickCoordinator")
         if not isinstance(npcs, dict):
@@ -483,6 +487,29 @@ class SimulationWorldCheckpoint:
         if memory_reflections is not None and memory_reflections.history is not life_history:
             raise ValueError("memory reflections must share the checkpoint life history")
         reflection_snapshot = memory_reflections.snapshot() if memory_reflections is not None else None
+        if emotional_scars is not None and not isinstance(emotional_scars, NPCEmotionalScarLedger):
+            raise TypeError("emotional_scars must be an NPCEmotionalScarLedger or None")
+        scar_snapshot = EmotionalScarSnapshot.capture(emotional_scars) if emotional_scars is not None else None
+        if scar_snapshot is not None:
+            scar_ledger = scar_snapshot.restore()
+            if scar_ledger.current_tick > current_tick:
+                raise ValueError("emotional scars cannot be sampled after the checkpoint tick")
+            known_npcs = set(npcs)
+            journal_events = {event.event_id: event for event in coordinator.events.snapshot()}
+            known_memories = {memory.memory_id: memory for memory in life_history.memories()} if life_history is not None else {}
+            for scar in scar_ledger.scars():
+                source = journal_events.get(scar.source_event_id)
+                memory = known_memories.get(scar.source_memory_id)
+                if scar.owner_id not in known_npcs:
+                    raise ValueError("emotional scar references an NPC missing from checkpoint")
+                if source is None or source.tick > scar.created_tick or scar.created_tick > current_tick:
+                    raise ValueError("emotional scar does not match its source world event")
+                if scar.owner_id not in source.participants + source.witnesses:
+                    raise ValueError("emotional scar owner does not belong to its source world event")
+                if memory is None or memory.owner_id != scar.owner_id or memory.event_id != scar.source_event_id:
+                    raise ValueError("emotional scar requires its owner's autobiographical source memory")
+            if any(recovery.tick > current_tick for recovery in scar_ledger.recoveries()):
+                raise ValueError("emotional scar recovery cannot occur after the checkpoint tick")
         if reflection_snapshot is not None:
             reflection_ledger = reflection_snapshot.restore(life_history)
             if any(entry.tick > current_tick or entry.owner_id not in npcs for entry in reflection_ledger.entries()):
@@ -541,6 +568,7 @@ class SimulationWorldCheckpoint:
             learning_decision_snapshot.to_json() if learning_decision_snapshot is not None else None,
             life_history_snapshot.to_json() if life_history_snapshot is not None else None,
             reflection_snapshot.to_json() if reflection_snapshot is not None else None,
+            scar_snapshot.to_json() if scar_snapshot is not None else None,
         )
 
     def _components(self):
@@ -579,6 +607,7 @@ class SimulationWorldCheckpoint:
             PsychologicalLearningDecisionSnapshot.from_json(self.psychological_learning_decisions_json) if self.psychological_learning_decisions_json is not None else None,
             LifeHistorySnapshot.from_json(self.life_history_json) if self.life_history_json is not None else None,
             MemoryReflectionSnapshot.from_json(self.memory_reflections_json) if self.memory_reflections_json is not None else None,
+            EmotionalScarSnapshot.from_json(self.emotional_scars_json) if self.emotional_scars_json is not None else None,
         )
         goals_snapshot, goal_replay, goal_review_decisions = components[14], components[15], components[16]
         identity_decisions = components[17]
@@ -595,6 +624,29 @@ class SimulationWorldCheckpoint:
         learning_decisions_snapshot = components[28]
         life_history_snapshot = components[29]
         memory_reflections_snapshot = components[30]
+        emotional_scars_snapshot = components[31]
+        if emotional_scars_snapshot is not None:
+            if life_history_snapshot is None:
+                raise ValueError("emotional scars require the corresponding autobiographical life history")
+            scars = emotional_scars_snapshot.restore()
+            if scars.current_tick > self.current_tick:
+                raise ValueError("emotional scars cannot be sampled after the checkpoint tick")
+            npc_ids = {npc.entity_id for npc in NPCCollectionSnapshot.from_json(self.npcs_json).restore().values()}
+            journal = {event.event_id: event for event in envelope.restore_event_ledger().snapshot()}
+            memories = {memory.memory_id: memory for memory in life_history_snapshot.restore().memories()}
+            for scar in scars.scars():
+                source = journal.get(scar.source_event_id)
+                memory = memories.get(scar.source_memory_id)
+                if scar.owner_id not in npc_ids:
+                    raise ValueError("emotional scar references an NPC missing from checkpoint")
+                if source is None or source.tick > scar.created_tick or scar.created_tick > self.current_tick:
+                    raise ValueError("emotional scar does not match its source world event")
+                if scar.owner_id not in source.participants + source.witnesses:
+                    raise ValueError("emotional scar owner does not belong to its source world event")
+                if memory is None or memory.owner_id != scar.owner_id or memory.event_id != scar.source_event_id:
+                    raise ValueError("emotional scar requires its owner's autobiographical source memory")
+            if any(item.tick > self.current_tick for item in scars.recoveries()):
+                raise ValueError("emotional scar recovery cannot occur after the checkpoint tick")
         if memory_reflections_snapshot is not None:
             if life_history_snapshot is None:
                 raise ValueError("memory reflections require the corresponding autobiographical life history")
@@ -912,6 +964,8 @@ class SimulationWorldCheckpoint:
             payload["life_history"] = json.loads(life_history.to_json())
         if memory_reflections is not None:
             payload["memory_reflections"] = json.loads(memory_reflections.to_json())
+        if self.emotional_scars_json is not None:
+            payload["emotional_scars"] = json.loads(self.emotional_scars_json)
         return json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False)
 
     @classmethod
@@ -948,14 +1002,15 @@ class SimulationWorldCheckpoint:
                        json.dumps(raw["conditioning"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("conditioning") is not None else None,
                        json.dumps(raw["psychological_learning_decisions"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("psychological_learning_decisions") is not None else None,
                        json.dumps(raw["life_history"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("life_history") is not None else None,
-                       json.dumps(raw["memory_reflections"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("memory_reflections") is not None else None)
+                       json.dumps(raw["memory_reflections"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("memory_reflections") is not None else None,
+                       json.dumps(raw["emotional_scars"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("emotional_scars") is not None else None)
         except ValueError:
             raise
         except (TypeError, KeyError, IndexError, json.JSONDecodeError) as exc:
             raise ValueError("invalid simulation world checkpoint") from exc
 
     def restore(self):
-        envelope, npc_snapshot, trust_snapshot, belief_snapshot, memory_snapshot, conversation_snapshot, tick_snapshot, consequence_snapshot, campaign, misconduct_snapshot, routine_snapshot, execution_snapshot, institution_snapshot, institutional_politics, goals_snapshot, goal_event_replay, goal_review_decisions_snapshot, identity_decisions_snapshot, testimony_inquiries_snapshot, testimony_snapshot, travel_snapshot, presence_snapshot, encounter_snapshot, familiarity_snapshot, relationship_snapshot, emotional_snapshot, stress_snapshot, conditioning_snapshot, learning_decisions_snapshot, life_history_snapshot, memory_reflections_snapshot = self._components()
+        envelope, npc_snapshot, trust_snapshot, belief_snapshot, memory_snapshot, conversation_snapshot, tick_snapshot, consequence_snapshot, campaign, misconduct_snapshot, routine_snapshot, execution_snapshot, institution_snapshot, institutional_politics, goals_snapshot, goal_event_replay, goal_review_decisions_snapshot, identity_decisions_snapshot, testimony_inquiries_snapshot, testimony_snapshot, travel_snapshot, presence_snapshot, encounter_snapshot, familiarity_snapshot, relationship_snapshot, emotional_snapshot, stress_snapshot, conditioning_snapshot, learning_decisions_snapshot, life_history_snapshot, memory_reflections_snapshot, emotional_scars_snapshot = self._components()
         events = envelope.restore_event_ledger()
         npcs = npc_snapshot.restore()
         trust = trust_snapshot.restore()
@@ -1001,8 +1056,9 @@ class SimulationWorldCheckpoint:
         psychological_learning_decisions = learning_decisions_snapshot.restore() if learning_decisions_snapshot is not None else None
         life_history = life_history_snapshot.restore() if life_history_snapshot is not None else None
         memory_reflections = memory_reflections_snapshot.restore(life_history) if memory_reflections_snapshot is not None else None
+        emotional_scars = emotional_scars_snapshot.restore() if emotional_scars_snapshot is not None else None
         return RestoredSimulation(self.current_tick, events, npcs, trust, beliefs,
                                   memory, conversations, coordinator, self.metadata,
                                   consequence_recorder, campaign, misconduct, routines, routine_executions,
                                   routine_institutions, institutional_politics, goals, goal_event_replay,
-                                  goal_review_decisions, identity_decisions, testimony_inquiries, testimony, travel, presence, presence_encounters, familiarity, relationships, emotions, stress, conditioning, psychological_learning_decisions, life_history, memory_reflections)
+                                  goal_review_decisions, identity_decisions, testimony_inquiries, testimony, travel, presence, presence_encounters, familiarity, relationships, emotions, stress, conditioning, psychological_learning_decisions, life_history, memory_reflections, emotional_scars)
