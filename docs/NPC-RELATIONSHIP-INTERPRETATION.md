@@ -22,7 +22,9 @@ approval score, and it does not change the authoritative event, trust, or
 another observer's interpretation.
 
 Interpretations require a recorded witness, an event participant as target,
-and a profile owned by the observer. Stable event/observer/target/facet IDs make
-replay idempotent; conflicting replay is rejected. The resulting
+and a profile owned by the observer. Stable event/observer/target/facet IDs store a complete facet vector, including
+zero-valued facets. This makes replay idempotent and lets a restored relationship
+ledger reject a conflicting interpretation even after the interpreter itself is
+recreated. The resulting
 `SocialRelationshipLedger` is already supported by composite world checkpoint
 persistence and source-event validation.
