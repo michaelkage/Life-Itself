@@ -1104,7 +1104,7 @@ class SimulationWorldCheckpointTests(unittest.TestCase):
         self.assertIsNotNone(restored.emotional_scars)
         self.assertEqual(restored.emotional_scars.scars(), scars.scars())
         self.assertEqual(restored.emotional_scars.recoveries(), scars.recoveries())
-        self.assertEqual(restored.emotional_scars.severity_for("scar-1", 4), 0.7)
+        self.assertAlmostEqual(restored.emotional_scars.severity_for("scar-1", 4), 0.7)
         response = restored.emotional_scars.evaluate(
             "speaker", {"crowded-room": 1.0}, 4,
         )
