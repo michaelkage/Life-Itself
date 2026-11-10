@@ -45,6 +45,7 @@ from .presence_save_state import PresenceSnapshot
 from .presence_encounters import PresenceEncounterLedger
 from .presence_encounter_save_state import PresenceEncounterSnapshot
 from .social_familiarity import SocialFamiliarityLedger, SocialFamiliaritySnapshot
+from .social_relationships import SocialRelationshipLedger, SocialRelationshipSnapshot
 
 
 @dataclass(frozen=True)
@@ -75,6 +76,7 @@ class RestoredSimulation:
     presence: PresenceLedger | None = None
     presence_encounters: PresenceEncounterLedger | None = None
     familiarity: SocialFamiliarityLedger | None = None
+    relationships: SocialRelationshipLedger | None = None
 
 
 @dataclass(frozen=True)
@@ -112,6 +114,7 @@ class SimulationWorldCheckpoint:
     presence_json: str | None = None
     presence_encounters_json: str | None = None
     familiarity_json: str | None = None
+    relationships_json: str | None = None
 
     SCHEMA_VERSION = 1
 
@@ -143,7 +146,7 @@ class SimulationWorldCheckpoint:
                 consequence_recorder=None, campaign=None, misconduct=None, routines=None,
                 routine_executions=None, routine_institutions=None, institutional_politics=None,
                 goal_book=None, goal_event_adapter=None, goal_review_decisions=None, identity_decisions=None,
-                testimony_inquiries=None, testimony=None, travel=None, presence=None, presence_encounters=None, familiarity=None):
+                testimony_inquiries=None, testimony=None, travel=None, presence=None, presence_encounters=None, familiarity=None, relationships=None):
         if not isinstance(coordinator, SimulationTickCoordinator):
             raise TypeError("coordinator must be a SimulationTickCoordinator")
         if not isinstance(npcs, dict):
@@ -334,6 +337,23 @@ class SimulationWorldCheckpoint:
                 if (source is None or source.tick != item.tick
                         or {item.observer_id, item.target_id} != set(source.participants)):
                     raise ValueError("familiarity observation does not match its source encounter")
+        if relationships is not None and not isinstance(relationships, SocialRelationshipLedger):
+            raise TypeError("relationships must be a SocialRelationshipLedger or None")
+        relationship_snapshot = SocialRelationshipSnapshot.capture(relationships) if relationships is not None else None
+        if relationship_snapshot is not None:
+            if any(item.tick > current_tick for item in relationship_snapshot.changes):
+                raise ValueError("relationship changes cannot occur after the checkpoint tick")
+            if any(item.observer_id not in npcs or item.target_id not in npcs for item in relationship_snapshot.changes):
+                raise ValueError("relationship changes reference NPCs missing from checkpoint")
+            for item in relationship_snapshot.changes:
+                try:
+                    source_event = coordinator.events.get(item.source_event_id)
+                except KeyError:
+                    raise ValueError(f"relationship change references missing world event: {item.source_event_id}") from None
+                if (source_event.tick > item.tick
+                        or item.observer_id not in source_event.participants + source_event.witnesses
+                        or item.target_id not in source_event.participants + source_event.witnesses):
+                    raise ValueError("relationship change does not match its source world event")
         misconduct_snapshot = None
         if misconduct is not None:
             if not isinstance(misconduct, MisconductReportingSystem):
@@ -372,6 +392,7 @@ class SimulationWorldCheckpoint:
             presence_snapshot.to_json() if presence_snapshot is not None else None,
             encounter_snapshot.to_json() if encounter_snapshot is not None else None,
             familiarity_snapshot.to_json() if familiarity_snapshot is not None else None,
+            relationship_snapshot.to_json() if relationship_snapshot is not None else None,
         )
 
     def _components(self):
@@ -403,6 +424,7 @@ class SimulationWorldCheckpoint:
             PresenceSnapshot.from_json(self.presence_json) if self.presence_json is not None else None,
             PresenceEncounterSnapshot.from_json(self.presence_encounters_json) if self.presence_encounters_json is not None else None,
             SocialFamiliaritySnapshot.from_json(self.familiarity_json) if self.familiarity_json is not None else None,
+            SocialRelationshipSnapshot.from_json(self.relationships_json) if self.relationships_json is not None else None,
         )
         goals_snapshot, goal_replay, goal_review_decisions = components[14], components[15], components[16]
         identity_decisions = components[17]
@@ -412,6 +434,7 @@ class SimulationWorldCheckpoint:
         presence_snapshot = components[21]
         encounter_snapshot = components[22]
         familiarity_snapshot = components[23]
+        relationship_snapshot = components[24]
         if presence_snapshot is not None:
             if any(record.updated_tick > self.current_tick for record in presence_snapshot.records):
                 raise ValueError("NPC presence cannot be updated after the checkpoint tick")
@@ -545,10 +568,26 @@ class SimulationWorldCheckpoint:
                 if (source is None or source.tick != item.tick
                         or {item.observer_id, item.target_id} != set(source.participants)):
                     raise ValueError("familiarity observation does not match its source encounter")
+        if relationship_snapshot is not None:
+            if any(item.tick > self.current_tick for item in relationship_snapshot.changes):
+                raise ValueError("relationship changes cannot occur after the checkpoint tick")
+            npc_ids = {npc.entity_id for npc in NPCCollectionSnapshot.from_json(self.npcs_json).restore().values()}
+            if any(item.observer_id not in npc_ids or item.target_id not in npc_ids for item in relationship_snapshot.changes):
+                raise ValueError("relationship changes reference NPCs missing from checkpoint")
+            journal = envelope.restore_event_ledger()
+            for item in relationship_snapshot.changes:
+                try:
+                    source_event = journal.get(item.source_event_id)
+                except KeyError:
+                    raise ValueError(f"relationship change references missing world event: {item.source_event_id}") from None
+                if (source_event.tick > item.tick
+                        or item.observer_id not in source_event.participants + source_event.witnesses
+                        or item.target_id not in source_event.participants + source_event.witnesses):
+                    raise ValueError("relationship change does not match its source world event")
         return components
 
     def to_json(self):
-        envelope, npcs, trust, beliefs, memory, conversations, ticks, consequence, campaign, misconduct, routines, routine_executions, routine_institutions, institutional_politics, goals, goal_event_replay, goal_review_decisions, identity_decisions, testimony_inquiries, testimony, travel, presence, presence_encounters, familiarity = self._components()
+        envelope, npcs, trust, beliefs, memory, conversations, ticks, consequence, campaign, misconduct, routines, routine_executions, routine_institutions, institutional_politics, goals, goal_event_replay, goal_review_decisions, identity_decisions, testimony_inquiries, testimony, travel, presence, presence_encounters, familiarity, relationships = self._components()
         payload = {
             "schema_version": self.SCHEMA_VERSION, "current_tick": self.current_tick,
             "events": json.loads(envelope.to_json()), "npcs": json.loads(npcs.to_json()),
@@ -593,6 +632,8 @@ class SimulationWorldCheckpoint:
             payload["presence_encounters"] = json.loads(presence_encounters.to_json())
         if familiarity is not None:
             payload["familiarity"] = json.loads(familiarity.to_json())
+        if relationships is not None:
+            payload["relationships"] = json.loads(relationships.to_json())
         return json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False)
 
     @classmethod
@@ -622,7 +663,8 @@ class SimulationWorldCheckpoint:
                        json.dumps(raw["travel"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("travel") is not None else None,
                        json.dumps(raw["presence"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("presence") is not None else None,
                        json.dumps(raw["presence_encounters"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("presence_encounters") is not None else None,
-                       json.dumps(raw["familiarity"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("familiarity") is not None else None)
+                       json.dumps(raw["familiarity"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("familiarity") is not None else None,
+                       json.dumps(raw["relationships"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("relationships") is not None else None)
         except ValueError:
             raise
         except (TypeError, KeyError, IndexError, json.JSONDecodeError) as exc:
@@ -667,8 +709,10 @@ class SimulationWorldCheckpoint:
         presence = presence_snapshot.restore() if presence_snapshot is not None else None
         presence_encounters = encounter_snapshot.restore() if encounter_snapshot is not None else None
         familiarity = familiarity_snapshot.restore() if familiarity_snapshot is not None else None
+        relationship_snapshot = SocialRelationshipSnapshot.from_json(self.relationships_json) if self.relationships_json is not None else None
+        relationships = relationship_snapshot.restore() if relationship_snapshot is not None else None
         return RestoredSimulation(self.current_tick, events, npcs, trust, beliefs,
                                   memory, conversations, coordinator, self.metadata,
                                   consequence_recorder, campaign, misconduct, routines, routine_executions,
                                   routine_institutions, institutional_politics, goals, goal_event_replay,
-                                  goal_review_decisions, identity_decisions, testimony_inquiries, testimony, travel, presence, presence_encounters, familiarity)
+                                  goal_review_decisions, identity_decisions, testimony_inquiries, testimony, travel, presence, presence_encounters, familiarity, relationships)
