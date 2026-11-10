@@ -177,7 +177,7 @@ class NPCConditioningLedger:
 
     @classmethod
     def from_snapshot(cls, data):
-        if not isinstance(data, dict) or data.get("version") not in (1, 2):
+        if not isinstance(data, dict) or data.get("version") != 2:
             raise ValueError("unsupported conditioning snapshot")
         associations = {}
         for item in data["associations"]:
