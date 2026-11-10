@@ -1297,7 +1297,10 @@ class SimulationWorldCheckpoint:
                        json.dumps(raw["emotional_scars"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("emotional_scars") is not None else None,
                        json.dumps(raw["emotional_scar_decisions"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("emotional_scar_decisions") is not None else None,
                        json.dumps(raw["scar_identity_proposals"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("scar_identity_proposals") is not None else None,
-                       json.dumps(raw["identity_goal_reviews"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("identity_goal_reviews") is not None else None)
+                       json.dumps(raw["identity_goal_reviews"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("identity_goal_reviews") is not None else None,
+                       json.dumps(raw["action_executions"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("action_executions") is not None else None,
+                       json.dumps(raw["action_world_facts"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("action_world_facts") is not None else None,
+                       json.dumps(raw["action_resources"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("action_resources") is not None else None)
         except ValueError:
             raise
         except (TypeError, KeyError, IndexError, json.JSONDecodeError) as exc:
