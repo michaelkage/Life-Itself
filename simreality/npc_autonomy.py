@@ -44,7 +44,7 @@ class NPCDecisionCycle:
         *,
         max_expansions: int = 10_000,
         action_reliability: Mapping[str, float] | None = None,
-        plan_reliability: Mapping[tuple[str, ...], float] | None = None,
+        plan_reliability: Mapping[tuple[str, tuple[str, ...]], float] | None = None,
     ) -> NPCDecision:
         """Propose a plan for the highest-ranked goal that can currently be planned.
 
