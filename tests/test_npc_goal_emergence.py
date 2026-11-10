@@ -75,3 +75,20 @@ def test_future_memories_are_excluded_and_lifecycle_is_append_only():
     assert retired.from_status == "active" and retired.to_status == "abandoned"
     assert ledger.status_for("g") == "abandoned"
     assert len(ledger.snapshot()) == 2
+
+def test_reported_experience_keeps_reported_provenance_separate():
+    from simreality.npc_experience_transfer import StrategicExperienceEvidence
+
+    goals = GoalBook()
+    evidence = StrategicExperienceEvidence(
+        "npc", "report-1", "source-event", 6, "A trusted account",
+        "reported", 0.8, 0.28, ("migration",),
+    )
+    rule = GoalEmergenceRule(
+        "migration", GoalTemplate("relocate", "safety", 4),
+        experience_tag="migration",
+    )
+    proposal, = NPCGoalEmergence.propose(
+        goals, "npc", 7, rules=(rule,), experience_evidence=(evidence,))
+    assert proposal.evidence_ids == ("report-1",)
+    assert proposal.source_classes == ("reported",)
