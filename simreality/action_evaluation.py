@@ -37,6 +37,23 @@ class NPCActionEvaluation:
 
 
 @dataclass(frozen=True)
+class NPCPlanEvaluation:
+    plan_id: str
+    owner_id: str
+    goal_id: str
+    planned_actions: tuple[str, ...]
+    terminal_status: str
+    expected_goal_facts: tuple[str, ...]
+    observed_goal_facts: tuple[str, ...]
+    missing_goal_facts: tuple[str, ...]
+    completed_actions: tuple[str, ...]
+    failed_actions: tuple[str, ...]
+    deviation_flags: tuple[str, ...]
+    evidence_event_ids: tuple[str, ...]
+    confidence: float
+
+
+@dataclass(frozen=True)
 class ActionEvaluationSnapshot:
     payload_json: str
 
@@ -79,6 +96,8 @@ class ActionPlanEvaluationLedger:
         self.learning_rate = float(learning_rate)
         self._evaluations: dict[str, NPCActionEvaluation] = {}
         self._learning: dict[str, dict[str, float | int]] = {}
+        self._plans: dict[str, dict] = {}
+        self._plan_evaluations: dict[str, NPCPlanEvaluation] = {}
 
     @property
     def history(self) -> tuple[NPCActionEvaluation, ...]:
@@ -89,6 +108,79 @@ class ActionPlanEvaluationLedger:
         if item is None or item["samples"] < self.learning_min_samples:
             return None
         return float(item["reliability"])
+
+    @property
+    def plan_history(self) -> tuple[NPCPlanEvaluation, ...]:
+        return tuple(self._plan_evaluations[key] for key in sorted(self._plan_evaluations))
+
+    def register_plan(self, plan_id: str, owner_id: str, goal_id: str,
+                      planned_actions: tuple[str, ...], expected_goal_facts: set[str]) -> None:
+        if not all(isinstance(value, str) and value.strip() for value in (plan_id, owner_id, goal_id)):
+            raise ValueError("plan, owner, and goal IDs must be non-empty")
+        if not isinstance(planned_actions, tuple) or any(action not in self.executions.planner.actions for action in planned_actions):
+            raise ValueError("planned_actions must contain known action IDs")
+        if not isinstance(expected_goal_facts, set) or any(not isinstance(fact, str) or not fact for fact in expected_goal_facts):
+            raise ValueError("expected_goal_facts must be a set of non-empty strings")
+        data = {"owner_id": owner_id, "goal_id": goal_id,
+                "planned_actions": tuple(planned_actions),
+                "expected_goal_facts": tuple(sorted(expected_goal_facts))}
+        existing = self._plans.get(plan_id)
+        if existing is not None and existing != data:
+            raise ValueError("plan ID reused with different expectations")
+        if plan_id in self._plan_evaluations:
+            raise ValueError("cannot register an already evaluated plan")
+        self._plans[plan_id] = data
+
+    def evaluate_plan(self, plan_id: str, terminal_status: str) -> NPCPlanEvaluation:
+        existing = self._plan_evaluations.get(plan_id)
+        if existing is not None:
+            if existing.terminal_status != terminal_status:
+                raise ValueError("plan already evaluated with a different terminal status")
+            return existing
+        plan = self._plans.get(plan_id)
+        if plan is None:
+            raise ValueError("unknown plan evaluation ID")
+        prefix = plan_id + ":step:"
+        records = [record for record in self.executions.snapshot()
+                   if record.execution_id.startswith(prefix) and record.owner_id == plan["owner_id"]]
+        records.sort(key=lambda record: int(record.execution_id.rsplit(":step:", 1)[1]))
+        evaluations = [self._evaluations[record.execution_id] for record in records
+                       if record.execution_id in self._evaluations]
+        if not evaluations:
+            raise ValueError("plan evaluation requires at least one evaluated terminal action")
+        expected_actions = plan["planned_actions"]
+        completed_actions = tuple(record.action_id for record in records if record.status == "completed")
+        failed_actions = tuple(record.action_id for record in records if record.status != "completed")
+        final_facts = set(records[-1].facts_after)
+        expected_facts = plan["expected_goal_facts"]
+        observed_goal_facts = tuple(sorted(set(expected_facts) & final_facts))
+        missing_goal_facts = tuple(sorted(set(expected_facts) - final_facts))
+        flags = set()
+        if terminal_status != "completed":
+            flags.add(terminal_status)
+        if missing_goal_facts:
+            flags.add("goal_not_achieved")
+        if len(records) < len(expected_actions) and terminal_status == "completed":
+            flags.add("plan_steps_incomplete")
+        evidence = tuple(dict.fromkeys(
+            event_id for evaluation in evaluations for event_id in evaluation.evidence_event_ids
+        ))
+        evaluation_id = f"npc-plan-evaluation:{plan_id}"
+        result = NPCPlanEvaluation(
+            plan_id, plan["owner_id"], plan["goal_id"], expected_actions,
+            terminal_status, expected_facts, observed_goal_facts, missing_goal_facts,
+            completed_actions, failed_actions, tuple(sorted(flags)), evidence,
+            min((item.confidence for item in evaluations), default=0.0),
+        )
+        self.events.append(WorldEventLedger.make_event(
+            evaluation_id, records[-1].tick, "npc_plan_evaluated",
+            participants=(plan["owner_id"],),
+            attributes={"plan_id": plan_id, "goal_id": plan["goal_id"],
+                        "terminal_status": terminal_status,
+                        "missing_goal_facts": len(missing_goal_facts)},
+        ))
+        self._plan_evaluations[plan_id] = result
+        return result
 
     def evaluate(self, execution_id: str) -> NPCActionEvaluation:
         record = self.executions.get(execution_id)
@@ -200,9 +292,21 @@ class ActionPlanEvaluationLedger:
                         "observed_deleted_facts", "deviation_flags", "evidence_event_ids"):
                 data[key] = list(data[key])
             evaluations.append(data)
+        plans = {key: {**value, "planned_actions": list(value["planned_actions"]),
+                       "expected_goal_facts": list(value["expected_goal_facts"])}
+                 for key, value in sorted(self._plans.items())}
+        plan_evaluations = []
+        for item in self.plan_history:
+            data = {key: getattr(item, key) for key in item.__dataclass_fields__}
+            for key in ("planned_actions", "expected_goal_facts", "observed_goal_facts",
+                        "missing_goal_facts", "completed_actions", "failed_actions",
+                        "deviation_flags", "evidence_event_ids"):
+                data[key] = list(data[key])
+            plan_evaluations.append(data)
         payload = {"schema_version": 1, "learning_min_samples": self.learning_min_samples,
                    "learning_rate": self.learning_rate, "evaluations": evaluations,
-                   "learning": self._learning}
+                   "learning": self._learning, "plans": plans,
+                   "plan_evaluations": plan_evaluations}
         return ActionEvaluationSnapshot(json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False))
 
     def restore_snapshot(self, snapshot: ActionEvaluationSnapshot) -> None:
@@ -246,8 +350,40 @@ class ActionPlanEvaluationLedger:
                     or not isinstance(item, dict) or item.get("samples", -1) < 0
                     or not 0 <= item.get("reliability", -1) <= 1):
                 raise ValueError("invalid action learning state")
+        plans_raw = raw.get("plans", {})
+        plan_evaluations_raw = raw.get("plan_evaluations", [])
+        if not isinstance(plans_raw, dict) or not isinstance(plan_evaluations_raw, list):
+            raise ValueError("invalid aggregate plan evaluation state")
+        plans = {}
+        for plan_id, item in plans_raw.items():
+            if (not isinstance(item, dict) or item.get("owner_id") is None
+                    or item.get("goal_id") is None
+                    or any(action not in self.executions.planner.actions for action in item.get("planned_actions", []))):
+                raise ValueError("invalid aggregate plan expectation")
+            plans[plan_id] = {"owner_id": item["owner_id"], "goal_id": item["goal_id"],
+                              "planned_actions": tuple(item["planned_actions"]),
+                              "expected_goal_facts": tuple(item["expected_goal_facts"])}
+        plan_evaluations = {}
+        for data in plan_evaluations_raw:
+            values = dict(data)
+            for key in ("planned_actions", "expected_goal_facts", "observed_goal_facts",
+                        "missing_goal_facts", "completed_actions", "failed_actions",
+                        "deviation_flags", "evidence_event_ids"):
+                values[key] = tuple(values[key])
+            item = NPCPlanEvaluation(**values)
+            plan = plans.get(item.plan_id)
+            event = self.events.get(f"npc-plan-evaluation:{item.plan_id}")
+            if (plan is None or event is None or event.event_type != "npc_plan_evaluated"
+                    or event.participants != (item.owner_id,)
+                    or dict(event.attributes).get("plan_id") != item.plan_id):
+                raise ValueError("aggregate plan evaluation lacks matching plan or event provenance")
+            if any(self.events.get(event_id) is None for event_id in item.evidence_event_ids):
+                raise ValueError("aggregate plan evaluation references missing evidence")
+            plan_evaluations[item.plan_id] = item
         self._evaluations = restored
         self._learning = {key: dict(value) for key, value in learning.items()}
+        self._plans = plans
+        self._plan_evaluations = plan_evaluations
 
     @classmethod
     def from_snapshot(cls, executions: ActionExecutionLedger, events: WorldEventLedger,
