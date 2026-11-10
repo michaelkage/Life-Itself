@@ -758,6 +758,16 @@ __all__ += [
     "MemoryReflectionLedger", "MemoryReflectionSnapshot", "MemoryReinterpretation",
 ]
 
+# Memory-grounded personality adaptation proposals; explicit identity decisions remain required.
+from .personality_adaptation import (
+    PersonalityAdaptationAdapter, PersonalityAdaptationAssessment,
+    PersonalityAdaptationRule, PersonalityMemoryContribution,
+)
+__all__ += [
+    "PersonalityAdaptationAdapter", "PersonalityAdaptationAssessment",
+    "PersonalityAdaptationRule", "PersonalityMemoryContribution",
+]
+
 # Cue-triggered, memory-grounded emotional responses with explicit provenance.
 from .emotional_memory import (
     EmotionalMemoryAdapter, EmotionalMemoryAssociation,
