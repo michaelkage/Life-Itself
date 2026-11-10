@@ -83,3 +83,14 @@ The coordinator itself is a runtime service; the durable action and event
 histories remain in the existing composite checkpoint. Recreate the coordinator
 after restore using the restored event journal, GoalBook, planner, and
 execution ledger. Tests: `tests/test_npc_action_replanning.py`.
+
+
+
+Plan progression is handled by `coordinator.advance(execution_id, tick,
+facts, resources, goal_facts)`. A completed step starts the next approved step
+with a stable per-step execution ID. If the remaining steps no longer satisfy
+live preconditions or declared resource costs, the coordinator replans from
+the post-action world state. Interrupted actions also trigger a fresh decision
+against current goal priorities and facts. The returned
+`NPCActionProgression` keeps the terminal result, any newly active step, and
+any replacement-plan result distinct.
