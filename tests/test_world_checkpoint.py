@@ -723,8 +723,14 @@ class SimulationWorldCheckpointTests(unittest.TestCase):
         presence.place("speaker", "cafe", 4)
         presence.place("listener", "cafe", 4)
         adapter = PresenceSocialAdapter(presence)
-        adapter.encounter("encounter-checkpoint", "speaker", "listener", 4,
-                          opportunity=True, events=coordinator.events)
+        adapter.encounter(
+            "encounter-checkpoint", "speaker", "listener", 4,
+            opportunity=True, events=coordinator.events, conversation=True,
+            conversation_id="conversation-checkpoint", listener=npcs["listener"],
+            speaker=npcs["speaker"], conversation_adapter=coordinator.conversation_adapter,
+            trust=coordinator.conversation_adapter.trust,
+            trust_directions=(1, -1), trust_strength=0.25,
+        )
         payload = SimulationWorldCheckpoint.capture(
             4, coordinator, npcs, presence=presence,
             presence_encounters=adapter.ledger,
