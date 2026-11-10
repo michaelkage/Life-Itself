@@ -119,12 +119,6 @@ class NPCLifeHistory:
         if any(m.owner_id == item.owner_id and m.event_id == item.event_id and m.tick > item.tick
                for m in self._memories.values()):
             raise ValueError("action cannot precede its memory")
-        if item.action == "reconcile" and not any(
-            a.owner_id == item.owner_id and a.target_id == item.target_id
-            and a.event_id == item.event_id and a.action == "forgive"
-            and a.tick <= item.tick for a in self._actions.values()
-        ):
-            raise ValueError("reconciliation requires an earlier forgiveness action")
         self._actions[item.action_id] = item
         self._action_keys.add(key)
         return item
