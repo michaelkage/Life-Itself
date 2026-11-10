@@ -772,6 +772,8 @@ class SimulationWorldCheckpoint:
             ScarIdentityProposalSnapshot.from_json(self.scar_identity_proposals_json) if self.scar_identity_proposals_json is not None else None,
             IdentityGoalReviewSnapshot.from_json(self.identity_goal_reviews_json) if self.identity_goal_reviews_json is not None else None,
             ActionExecutionSnapshot.from_json(self.action_executions_json) if self.action_executions_json is not None else None,
+            json.loads(self.action_world_facts_json) if self.action_world_facts_json is not None else None,
+            json.loads(self.action_resources_json) if self.action_resources_json is not None else None,
         )
         goals_snapshot, goal_replay, goal_review_decisions = components[14], components[15], components[16]
         identity_decisions = components[17]
@@ -793,6 +795,15 @@ class SimulationWorldCheckpoint:
         scar_identity_proposal_snapshot = components[33]
         identity_goal_review_snapshot = components[34]
         action_execution_snapshot = components[35]
+        action_world_facts = components[36]
+        action_resources = components[37]
+        if (action_world_facts is None) != (action_resources is None):
+            raise ValueError("action world facts and resources must be checkpointed together")
+        if action_execution_snapshot is not None and (action_world_facts is None or action_resources is None):
+            raise ValueError("action execution state requires checkpointed world facts and resources")
+        if action_world_facts is not None:
+            ActionExecutionLedger._canonical_facts(action_world_facts)
+            ActionExecutionLedger._canonical_resources(action_resources)
         if action_execution_snapshot is not None:
             journal = {event.event_id: event for event in envelope.restore_event_ledger().snapshot()}
             npc_ids = {npc.entity_id for npc in NPCCollectionSnapshot.from_json(self.npcs_json).restore().values()}
@@ -1172,7 +1183,7 @@ class SimulationWorldCheckpoint:
         return components
 
     def to_json(self):
-        envelope, npcs, trust, beliefs, memory, conversations, ticks, consequence, campaign, misconduct, routines, routine_executions, routine_institutions, institutional_politics, goals, goal_event_replay, goal_review_decisions, identity_decisions, testimony_inquiries, testimony, travel, presence, presence_encounters, familiarity, relationships, emotions, stress, conditioning, learning_decisions, life_history, memory_reflections, emotional_scars, emotional_scar_decisions, scar_identity_proposals, identity_goal_reviews, action_execution_snapshot = self._components()
+        envelope, npcs, trust, beliefs, memory, conversations, ticks, consequence, campaign, misconduct, routines, routine_executions, routine_institutions, institutional_politics, goals, goal_event_replay, goal_review_decisions, identity_decisions, testimony_inquiries, testimony, travel, presence, presence_encounters, familiarity, relationships, emotions, stress, conditioning, learning_decisions, life_history, memory_reflections, emotional_scars, emotional_scar_decisions, scar_identity_proposals, identity_goal_reviews, action_execution_snapshot, action_world_facts, action_resources = self._components()
         payload = {
             "schema_version": self.SCHEMA_VERSION, "current_tick": self.current_tick,
             "events": json.loads(envelope.to_json()), "npcs": json.loads(npcs.to_json()),
