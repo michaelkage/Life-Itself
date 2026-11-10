@@ -609,3 +609,8 @@ __all__ += [
     "RelationshipInterpretationProfile", "RelationshipInterpretationResult",
     "NPCRelationshipInterpreter",
 ]
+
+
+# Canonical component persistence for transient NPC emotional event state.
+from .emotional_events_save_state import EmotionalEventSnapshot
+__all__ += ["EmotionalEventSnapshot"]
