@@ -211,10 +211,28 @@ class EmotionalScarDecisionLedger:
     def from_snapshot(cls, data):
         if not isinstance(data, dict) or data.get("version") != 1:
             raise ValueError("unsupported emotional scar decision snapshot")
-        ledger = NPCEmotionalScarLedger.from_snapshot(data["scars"])
-        result = cls(ledger,
-                     tuple(EmotionalScarProposal(**p) for p in data.get("proposals", ())),
-                     tuple(EmotionalScarDecision(**d) for d in data.get("decisions", ())))
+        raw_scars = NPCEmotionalScarLedger.from_snapshot(data["scars"])
+        result = cls(
+            NPCEmotionalScarLedger(),
+            tuple(EmotionalScarProposal(**p) for p in data.get("proposals", ())),
+            tuple(),
+        )
+        for decision in sorted(
+            (EmotionalScarDecision(**d) for d in data.get("decisions", ())),
+            key=lambda d: (d.decision_tick, d.decision_id),
+        ):
+            result.decide(decision)
+        # Reapply recovery history only after accepted decisions have recreated
+        # the exact scar set. This preserves chronology and replay validation.
+        for recovery in raw_scars.recoveries():
+            result.scars.recover(
+                recovery_id=recovery.recovery_id, scar_id=recovery.scar_id,
+                owner_id=recovery.owner_id, tick=recovery.tick,
+                amount=recovery.amount, method=recovery.method,
+            )
+        result.scars.current_tick = raw_scars.current_tick
+        if result.scars.snapshot() != raw_scars.snapshot():
+            raise ValueError("accepted decisions do not reproduce the scar ledger")
         if result.snapshot() != data:
             raise ValueError("emotional scar decision snapshot is not canonical")
         return result
