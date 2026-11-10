@@ -29,3 +29,9 @@ and trust components before replaying later ticks. The world checkpoint can
 store this snapshot as an optional `presence_encounters` section.
 
 Regression coverage: `tests/test_presence_encounters.py`.
+
+The encounter ledger also exposes `encounters_for(owner_id)`, `between(a, b)`,
+and `count_between(a, b)`. These give later relationship/familiarity systems
+an auditable history of repeated contact without forcing a trust change or
+assuming that every meeting was friendly. Encounter records are bilateral, but
+trust effects remain directional and independently configurable.
