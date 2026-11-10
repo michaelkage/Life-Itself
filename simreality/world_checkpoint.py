@@ -281,7 +281,9 @@ class SimulationWorldCheckpoint:
                 raise ValueError("NPC presence cannot be updated after the checkpoint tick")
             if any(tick > current_tick for tick, _signature, _records in presence_snapshot.ticks):
                 raise ValueError("presence tick history cannot occur after the checkpoint tick")
-            if any(record.owner_id not in npcs for record in presence_snapshot.records):
+            presence_owners = {record.owner_id for record in presence_snapshot.records}
+            presence_owners.update(record.owner_id for _tick, _signature, records in presence_snapshot.ticks for record in records)
+            if any(owner_id not in npcs for owner_id in presence_owners):
                 raise ValueError("presence records reference NPCs missing from checkpoint")
         misconduct_snapshot = None
         if misconduct is not None:
@@ -361,7 +363,9 @@ class SimulationWorldCheckpoint:
             if any(tick > self.current_tick for tick, _signature, _records in presence_snapshot.ticks):
                 raise ValueError("presence tick history cannot occur after the checkpoint tick")
             npc_ids = {npc.entity_id for npc in NPCCollectionSnapshot.from_json(self.npcs_json).restore().values()}
-            if any(record.owner_id not in npc_ids for record in presence_snapshot.records):
+            presence_owners = {record.owner_id for record in presence_snapshot.records}
+            presence_owners.update(record.owner_id for _tick, _signature, records in presence_snapshot.ticks for record in records)
+            if any(owner_id not in npc_ids for owner_id in presence_owners):
                 raise ValueError("presence records reference NPCs missing from checkpoint")
         if travel_snapshot is not None:
             if any(journey.started_tick > self.current_tick or (journey.arrived_tick is not None and journey.arrived_tick > self.current_tick) for journey in travel_snapshot.journeys):
