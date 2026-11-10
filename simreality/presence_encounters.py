@@ -73,6 +73,23 @@ class PresenceEncounterLedger:
     def snapshot(self) -> tuple[PresenceEncounter, ...]:
         return tuple(sorted(self._records.values(), key=lambda x: (x.tick, x.encounter_id)))
 
+    def encounters_for(self, owner_id: str) -> tuple[PresenceEncounter, ...]:
+        if not isinstance(owner_id, str) or not owner_id.strip():
+            raise ValueError("owner_id must be a non-empty string")
+        return tuple(record for record in self.snapshot() if owner_id in record.participants)
+
+    def between(self, first_id: str, second_id: str) -> tuple[PresenceEncounter, ...]:
+        for name, value in (("first_id", first_id), ("second_id", second_id)):
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError(f"{name} must be a non-empty string")
+        if first_id == second_id:
+            raise ValueError("encounter partners must be different NPCs")
+        pair = {first_id, second_id}
+        return tuple(record for record in self.snapshot() if set(record.participants) == pair)
+
+    def count_between(self, first_id: str, second_id: str) -> int:
+        return len(self.between(first_id, second_id))
+
     def tick_snapshot(self):
         return tuple(
             (tick, json.dumps({key: value[0] for key, value in sorted(entries.items())},
