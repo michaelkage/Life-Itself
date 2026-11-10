@@ -16,7 +16,7 @@ from simreality import (
     TestimonyInquiry, TestimonyInquiryLedger, TestimonyResponse,
     TestimonyLedger, TestimonyRecord, TestimonyDetail,
     InquiryInvestigationPipeline, RouteEdge, PersonalRoutePlanner,
-    TravelTickAdapter, PresenceLedger,
+    TravelTickAdapter, PresenceLedger, AutobiographicalMemory, NPCLifeHistory,
 )
 from simreality.presence_encounters import PresenceEncounter, PresenceEncounterLedger, PresenceSocialAdapter
 from simreality.social_familiarity import PresenceFamiliarityAdapter, SocialFamiliarityLedger
@@ -102,6 +102,38 @@ class SimulationWorldCheckpointTests(unittest.TestCase):
         )
         self.assertEqual(replay.decision_id, "learning-1")
         self.assertEqual(len(restored.conditioning.records()), 1)
+
+    def test_checkpoint_round_trip_persists_autobiographical_history_and_repair_choices(self):
+        coordinator, npcs, _ = self.make_simulation()
+        history = NPCLifeHistory()
+        history.record(AutobiographicalMemory(
+            "memory-1", "speaker", "event-1", 3, ("listener",),
+            "The witness refused to help me", 0.8, -0.1,
+            turning_point=True, tags=("betrayal",),
+        ))
+        history.act("forgive-1", "speaker", "listener", "event-1",
+                    action="forgive", tick=4, rationale="I choose to let go")
+        checkpoint = SimulationWorldCheckpoint.capture(
+            4, coordinator, npcs, life_history=history,
+        )
+        restored = SimulationWorldCheckpoint.from_json(checkpoint.to_json()).restore()
+        self.assertIsNotNone(restored.life_history)
+        self.assertEqual(restored.life_history.snapshot().to_json(), history.snapshot().to_json())
+        state = restored.life_history.relationship_history("speaker", "listener", "event-1")
+        self.assertTrue(state["forgiven"])
+        self.assertFalse(state["reconciled"])
+        self.assertEqual(restored.life_history.memories("speaker")[0].interpretation,
+                         "The witness refused to help me")
+
+    def test_checkpoint_rejects_autobiographical_history_with_unknown_source_event(self):
+        coordinator, npcs, _ = self.make_simulation()
+        history = NPCLifeHistory()
+        history.record(AutobiographicalMemory(
+            "memory-1", "speaker", "missing-event", 3, ("listener",),
+            "An event I remember", 0.5, 0.0,
+        ))
+        with self.assertRaisesRegex(ValueError, "source world event"):
+            SimulationWorldCheckpoint.capture(4, coordinator, npcs, life_history=history)
 
     def test_round_trip_restores_dependencies_and_idempotent_tick_replay(self):
         coordinator, npcs, consequences = self.make_simulation()
