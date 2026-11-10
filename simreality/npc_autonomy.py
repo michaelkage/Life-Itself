@@ -63,7 +63,7 @@ class NPCDecisionCycle:
 
         combined_adjustments = dict(goal_experience_adjustments or {})
         for goal_id, value in (goal_motivational_adjustments or {}).items():
-            combined_adjustments[goal_id] = combined_adjustments.get(goal_id, 0.0) + value
+            combined_adjustments[goal_id] = max(-0.25, min(0.25, combined_adjustments.get(goal_id, 0.0) + value))
         ranked_goals = self.goals.ranked(owner_id, current_tick, combined_adjustments)
         if not ranked_goals:
             return NPCDecision(owner_id, current_tick, None, None, None,
