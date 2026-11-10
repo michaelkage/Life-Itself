@@ -579,3 +579,11 @@ __all__ += ["PresenceEncounter", "PresenceEncounterResult", "PresenceEncounterLe
 # Physical presence and explicit observation opportunities gate witness eligibility.
 from .presence_witnesses import PresenceWitnessAssessment, PresenceWitnessResolution, PresenceWitnessAdapter
 __all__ += ["PresenceWitnessAssessment", "PresenceWitnessResolution", "PresenceWitnessAdapter"]
+
+
+# Directional familiarity is derived from explicit exposure during confirmed encounters.
+from .social_familiarity import (FamiliarityObservation, RecognitionAssessment,
+                                 SocialFamiliarityLedger, PresenceFamiliarityAdapter,
+                                 SocialFamiliaritySnapshot)
+__all__ += ["FamiliarityObservation", "RecognitionAssessment", "SocialFamiliarityLedger",
+            "PresenceFamiliarityAdapter", "SocialFamiliaritySnapshot"]
