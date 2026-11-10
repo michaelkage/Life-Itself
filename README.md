@@ -427,3 +427,6 @@ The [long-term emotional scar ledger](docs/NPC-EMOTIONAL-SCARS.md) stores persis
 
 
 Scar-informed identity proposals now retain their exact source scar, authored policy, cue, severity, and evaluation tick in `ScarIdentityProposalLedger`. Include `scar_identity_proposals=...` with the scar and identity decision ledgers in `SimulationWorldCheckpoint.capture` to preserve proposal provenance and validate any later accepted or rejected decision on restore. See `docs/NPC-IDENTITY-EVOLUTION.md` and `tests/test_scar_identity_proposals.py`.
+
+
+`IdentityEvolutionAuditTrail` provides a read-only join from authoritative experience and owner-specific autobiographical memory through accepted scar, exact identity proposal, NPC consent decision, and resulting trait value. Rebuild it from the restored event, life-history, scar, proposal, and identity-decision ledgers. See `docs/NPC-IDENTITY-EVOLUTION.md` and `tests/test_identity_evolution_audit.py`.
