@@ -18,6 +18,7 @@ from simreality import (
     InquiryInvestigationPipeline, RouteEdge, PersonalRoutePlanner,
     TravelTickAdapter, PresenceLedger, AutobiographicalMemory, NPCLifeHistory,
     MemoryReinterpretation, MemoryReflectionLedger,
+    EmotionalScar, NPCEmotionalScarLedger,
 )
 from simreality.presence_encounters import PresenceEncounter, PresenceEncounterLedger, PresenceSocialAdapter
 from simreality.social_familiarity import PresenceFamiliarityAdapter, SocialFamiliarityLedger
@@ -1078,6 +1079,79 @@ class SimulationWorldCheckpointTests(unittest.TestCase):
                 4, coordinator, npcs, life_history=history,
                 memory_reflections=reflections,
             )
+
+    def test_checkpoint_round_trip_persists_emotional_scars_and_recovery(self):
+        coordinator, npcs, _ = self.make_simulation()
+        history = NPCLifeHistory()
+        history.record(AutobiographicalMemory(
+            "scar-memory-1", "speaker", "event-1", 3, ("listener",),
+            "The incident left a lasting fear", 0.9, -0.2,
+            turning_point=True, tags=("fear",),
+        ))
+        scars = NPCEmotionalScarLedger()
+        scars.add_scar(EmotionalScar(
+            "scar-1", "speaker", "event-1", "scar-memory-1",
+            4, "fear", "crowded-room", 0.8, 0.999,
+        ))
+        scars.recover(
+            recovery_id="recovery-1", scar_id="scar-1", owner_id="speaker",
+            tick=4, amount=0.1, method="supportive_contact",
+        )
+        payload = SimulationWorldCheckpoint.capture(
+            4, coordinator, npcs, life_history=history, emotional_scars=scars,
+        ).to_json()
+        restored = SimulationWorldCheckpoint.from_json(payload).restore()
+        self.assertIsNotNone(restored.emotional_scars)
+        self.assertEqual(restored.emotional_scars.scars(), scars.scars())
+        self.assertEqual(restored.emotional_scars.recoveries(), scars.recoveries())
+        self.assertEqual(restored.emotional_scars.severity_for("scar-1", 4), 0.7)
+        response = restored.emotional_scars.evaluate(
+            "speaker", {"crowded-room": 1.0}, 4,
+        )
+        self.assertAlmostEqual(dict(response.intensities)["fear"], 0.7)
+        self.assertEqual(
+            SimulationWorldCheckpoint.capture(
+                4, restored.coordinator, restored.npcs,
+                life_history=restored.life_history,
+                emotional_scars=restored.emotional_scars,
+            ).to_json(),
+            payload,
+        )
+
+    def test_checkpoint_rejects_emotional_scars_without_source_history(self):
+        coordinator, npcs, _ = self.make_simulation()
+        scars = NPCEmotionalScarLedger()
+        scars.add_scar(EmotionalScar(
+            "scar-no-history", "speaker", "event-1", "missing-memory",
+            4, "fear", "crowded-room", 0.8,
+        ))
+        with self.assertRaisesRegex(ValueError, "autobiographical life history"):
+            SimulationWorldCheckpoint.capture(
+                4, coordinator, npcs, emotional_scars=scars,
+            )
+
+    def test_checkpoint_rejects_emotional_scar_with_mismatched_memory(self):
+        coordinator, npcs, _ = self.make_simulation()
+        history = NPCLifeHistory()
+        history.record(AutobiographicalMemory(
+            "memory-other", "listener", "event-1", 3, ("speaker",),
+            "A different observer's memory", 0.5, 0.0,
+        ))
+        scars = NPCEmotionalScarLedger()
+        scars.add_scar(EmotionalScar(
+            "scar-wrong-owner", "speaker", "event-1", "memory-other",
+            4, "fear", "crowded-room", 0.8,
+        ))
+        with self.assertRaisesRegex(ValueError, "autobiographical source memory"):
+            SimulationWorldCheckpoint.capture(
+                4, coordinator, npcs, life_history=history, emotional_scars=scars,
+            )
+
+    def test_emotional_scars_remain_optional_in_legacy_checkpoints(self):
+        coordinator, npcs, _ = self.make_simulation()
+        payload = SimulationWorldCheckpoint.capture(4, coordinator, npcs).to_json()
+        self.assertNotIn('"emotional_scars"', payload)
+        self.assertIsNone(SimulationWorldCheckpoint.from_json(payload).restore().emotional_scars)
 
 
 if __name__ == "__main__":
