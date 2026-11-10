@@ -103,6 +103,10 @@ class ActionExecutionLedger:
             raise ValueError(f"unknown action: {action_id}")
         if interruption is not None and (not isinstance(interruption, str) or not interruption.strip()):
             raise ValueError("interruption must be non-empty text or None")
+        if not isinstance(world_facts, set):
+            raise TypeError("world_facts must be a mutable set")
+        if not isinstance(resources, dict):
+            raise TypeError("resources must be a mutable dict")
         facts = self._canonical_facts(world_facts)
         balances = self._canonical_resources(resources)
         policy = self.policies.get(action_id, ActionExecutionPolicy(action_id))
