@@ -48,7 +48,7 @@ class GoalIntentionRecallRule:
             if not isinstance(item, tuple) or len(item) != 2:
                 raise ValueError("memory weights must be (memory_type, weight) pairs")
             kind, raw_weight = item
-            if kind not in _MEMORY_TYPES:
+            if not isinstance(kind, str) or kind not in _MEMORY_TYPES:
                 raise ValueError(f"unsupported intention memory type: {kind}")
             if kind in seen:
                 raise ValueError("memory types must not repeat")
@@ -84,8 +84,10 @@ class GoalIntentionRecallEvidence:
                 raise ValueError(f"{name} must be non-empty")
         if isinstance(self.age_ticks, bool) or not isinstance(self.age_ticks, int) or self.age_ticks < 0:
             raise ValueError("age_ticks must be non-negative")
-        for name in ("authored_weight", "decayed_contribution"):
-            _finite(getattr(self, name), name)
+        authored = _finite(self.authored_weight, "authored_weight")
+        contribution = _finite(self.decayed_contribution, "decayed_contribution")
+        if not -0.25 <= authored <= 0.25 or not -0.25 <= contribution <= 0.25:
+            raise ValueError("recall evidence weights must be in [-0.25, 0.25]")
 
 
 @dataclass(frozen=True)
@@ -105,7 +107,11 @@ class GoalIntentionRecall:
             raise TypeError("adjustments and evidence must be tuples")
         if any(not isinstance(item, GoalIntentionRecallEvidence) for item in self.evidence):
             raise TypeError("evidence must contain GoalIntentionRecallEvidence values")
+        if any(not isinstance(item, tuple) or len(item) != 2 for item in self.adjustments):
+            raise ValueError("recall adjustments must be (goal_id, value) pairs")
         goal_ids = [item[0] for item in self.adjustments]
+        if any(not isinstance(goal_id, str) or not goal_id.strip() for goal_id in goal_ids):
+            raise ValueError("adjustment goal IDs must be non-empty")
         if goal_ids != sorted(set(goal_ids)):
             raise ValueError("recall adjustments must have unique sorted goal IDs")
         for goal_id, value in self.adjustments:
