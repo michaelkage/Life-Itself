@@ -4,6 +4,9 @@ import unittest
 from simreality.action_execution import ActionExecutionLedger, ActionExecutionPolicy
 from simreality.action_evaluation import ActionPlanEvaluationLedger
 from simreality.goals import GoalBook, NPCGoal
+from simreality.goal_arbitration import (
+    GoalArbitrationEvaluator, GoalCommitmentAdapter, GoalCommitmentLedger,
+)
 from simreality.npc_action_replanning import NPCActionReplanningCoordinator
 from simreality.npc_autonomy import NPCDecisionCycle
 from simreality.planning import DeterministicPlanner, PlanningAction
@@ -31,6 +34,39 @@ class NPCActionReplanningTests(unittest.TestCase):
         self.cycle = NPCDecisionCycle(self.goals, self.planner)
         self.coordinator = NPCActionReplanningCoordinator(self.cycle, self.ledger)
 
+
+
+    def test_explicit_commitment_is_honored_by_action_replanning(self):
+        assessment = GoalArbitrationEvaluator.assess(
+            self.goals, "npc-1", 1, resources={"cash": 10.0}
+        )
+        commitments = GoalCommitmentLedger()
+        commitment = GoalCommitmentAdapter.commit(
+            assessment, self.goals, commitments, rationale="finish urgent repair"
+        )
+        result = self.coordinator.replan(
+            "npc-1", 1, {"safe-place"}, {"cash": 10.0},
+            {"repair": {"machine-fixed"}, "rest": {"rested"}},
+            reason="honor current commitment", goal_commitment=commitment,
+        )
+        self.assertEqual(result.decision.goal_id, "repair")
+        self.assertFalse(result.decision.actionable)
+        self.assertEqual(result.status, "unplanned")
+        self.assertEqual(self.ledger.active(), ())
+
+    def test_replan_rejects_commitment_from_another_tick_or_owner(self):
+        assessment = GoalArbitrationEvaluator.assess(
+            self.goals, "npc-1", 1, resources={"cash": 10.0}
+        )
+        commitment = GoalCommitmentAdapter.commit(
+            assessment, self.goals, GoalCommitmentLedger(), rationale="focus"
+        )
+        with self.assertRaisesRegex(ValueError, "owner and tick"):
+            self.coordinator.replan(
+                "npc-1", 2, {"safe-place"}, {"cash": 10.0},
+                {"repair": {"machine-fixed"}, "rest": {"rested"}},
+                reason="stale commitment", goal_commitment=commitment,
+            )
 
     def test_replanning_prefers_actions_with_better_observed_reliability(self):
         goals = GoalBook()
