@@ -132,7 +132,8 @@ class GoalArbitrationAssessment:
             raise ValueError("selected goal must be resource-feasible")
         if tuple(x for x in ids if x != self.selected_goal_id) != self.deferred_goal_ids:
             raise ValueError("deferred goals must preserve candidate order")
-        if not isinstance(self.assessment_id, str) or len(self.assessment_id) != 64:
+        if (not isinstance(self.assessment_id, str) or len(self.assessment_id) != 64
+                or any(char not in "0123456789abcdef" for char in self.assessment_id)):
             raise ValueError("assessment_id must be a SHA-256 hex digest")
 
     @property
@@ -309,6 +310,11 @@ class GoalCommitment:
             raise ValueError("assessment_id must be a SHA-256 hex digest")
         if len(self.commitment_id) != 64 or any(c not in "0123456789abcdef" for c in self.commitment_id):
             raise ValueError("commitment_id must be a SHA-256 hex digest")
+        expected_id = hashlib.sha256(
+            f"{self.assessment_id}:commit".encode("utf-8")
+        ).hexdigest()
+        if self.commitment_id != expected_id:
+            raise ValueError("commitment_id does not match its arbitration assessment")
         if self.selected_goal_id in self.deferred_goal_ids:
             raise ValueError("selected goal cannot also be deferred")
 
