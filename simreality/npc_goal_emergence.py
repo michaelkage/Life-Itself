@@ -230,6 +230,7 @@ class GoalLifecycleLedger:
         self._owners: dict[str, str] = {}
         self._last_tick: dict[str, int] = {}
         self._goal_event_counts: dict[str, int] = {}
+        self._last_event_by_goal: dict[str, GoalLifecycleEvent] = {}
         for event in events:
             self.append(event)
 
@@ -264,19 +265,27 @@ class GoalLifecycleLedger:
         self._owners[event.goal_id] = event.owner_id
         self._last_tick[event.goal_id] = event.tick
         self._goal_event_counts[event.goal_id] = self._goal_event_counts.get(event.goal_id, 0) + 1
+        self._last_event_by_goal[event.goal_id] = event
 
     def record(self, goal: NPCGoal, tick: int, reason: str, *,
                evidence_ids: tuple[str, ...] = ()) -> GoalLifecycleEvent:
         prior = self._status.get(goal.goal_id)
+        normalized_evidence = tuple(sorted(set(evidence_ids)))
+        previous = self._last_event_by_goal.get(goal.goal_id)
+        if (previous is not None and previous.owner_id == goal.owner_id
+                and previous.to_status == goal.status.value
+                and previous.tick == tick and previous.reason == reason
+                and previous.evidence_ids == normalized_evidence):
+            return previous
         sequence = self._goal_event_counts.get(goal.goal_id, 0)
         payload = (goal.goal_id, prior or "new", goal.status.value, tick, reason,
-                   tuple(sorted(evidence_ids)), sequence)
+                   normalized_evidence, sequence)
         event_id = "goal-life-" + hashlib.sha256(
             json.dumps(payload, separators=(",", ":"), sort_keys=True).encode()
         ).hexdigest()[:20]
         event = GoalLifecycleEvent(event_id, goal.goal_id, goal.owner_id, prior,
                                    goal.status.value, tick, reason,
-                                   tuple(sorted(evidence_ids)))
+                                   normalized_evidence)
         self.append(event)
         return event
 
