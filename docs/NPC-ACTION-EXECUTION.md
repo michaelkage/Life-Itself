@@ -115,3 +115,8 @@ owner, tick, and authoritative `npc_action_replanned` event.
 ## Goal recovery hand-off
 
 When an abandoned intention becomes viable again, `GoalRecoveryReplanningAdapter.recover_and_replan` performs the lifecycle reopening and calls the same coordinator described above with current world facts, resources, and goal mappings. Pass the superseded active execution ID when applicable so its reservation is released before the replacement plan starts. The planner creates a fresh route; it never resumes the old plan cursor. Completed, interrupted, and cancelled execution records remain in the shared ledger. The lifecycle and replanning snapshots can be checkpointed with the existing world checkpoint so recovery survives restart without duplicate action starts.
+
+
+## Interrupted plan continuation
+
+An interrupted action remains a terminal historical record; it is never reopened or overwritten. NPCActionReplanningCoordinator.resume_interrupted(execution_id, tick, world_facts, resources, goal_facts) uses the persisted originating replan request to recover the exact plan cursor, then starts a new execution identity for the interrupted action and only the remaining suffix. It requires the interruption tick to have passed, rechecks live action preconditions and cumulative resource feasibility, and refuses to create parallel active work for the same NPC. The deterministic resume identity makes same-tick retries idempotent. Subsequent calls to coordinator.advance continue from the suffix, so previously completed actions are not repeated. If the original replan history is unavailable, the adapter refuses to guess the missing plan cursor and callers must perform a fresh replan instead.
