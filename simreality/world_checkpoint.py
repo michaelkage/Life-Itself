@@ -832,6 +832,8 @@ class SimulationWorldCheckpoint:
                 raise ValueError('goal lifecycle history references an unknown goal, owner, or future tick')
             if life_history is not None:
                 known_evidence = {memory.memory_id for memory in life_history.memories()}
+                if experience_transfer_snapshot is not None:
+                    known_evidence.update(item.transfer_id for item in experience_transfer_snapshot.records)
                 if any(evidence_id not in known_evidence for record in goal_lifecycle_snapshot.records for evidence_id in record[7]):
                     raise ValueError('goal lifecycle evidence references an unknown autobiographical memory')
         envelope = SimulationSaveEnvelope.capture(current_tick, coordinator.events)
@@ -1418,6 +1420,8 @@ class SimulationWorldCheckpoint:
                 raise ValueError('goal lifecycle history references an unknown goal, owner, or future tick')
             if life_history_snapshot is not None:
                 known_memory_ids = {record[0] for record in life_history_snapshot.memories}
+                if experience_transfer_snapshot is not None:
+                    known_memory_ids.update(item.transfer_id for item in experience_transfer_snapshot.records)
                 if any(evidence_id not in known_memory_ids for record in goal_lifecycle_snapshot.records for evidence_id in record[7]):
                     raise ValueError('goal lifecycle evidence references an unknown autobiographical memory')
         return components
