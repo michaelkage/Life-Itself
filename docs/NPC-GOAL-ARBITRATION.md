@@ -40,3 +40,10 @@ recall_rules=...)`. Rules explicitly map memory categories to signed influence;
 the recall adapter applies half-life decay and a hard cap. The recall evidence
 digest participates in the assessment identity, preserving same-tick replay
 integrity. See [NPC Goal Intention Memory](NPC-GOAL-INTENTION-MEMORY.md).
+
+
+Reflective reconsideration can additionally receive `life_history` and
+`experience_transfers`. Goal-tagged evidence is projected with the established
+personal, witnessed, and confidence-discounted reported source classes, and the
+full source-class map is retained in the recall result. Reuse of an identical
+first-hand memory through both recall paths is deduplicated per goal.
