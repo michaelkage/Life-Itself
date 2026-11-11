@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+from dataclasses import replace
 
 from simreality.goal_arbitration import (
     GoalArbitrationEvaluator, GoalArbitrationRule, GoalCommitmentAdapter,
@@ -90,6 +91,15 @@ class GoalArbitrationTests(unittest.TestCase):
             )
 
 
+
+
+    def test_commitment_identity_must_match_assessment_digest(self):
+        assessment = GoalArbitrationEvaluator.assess(self.goals, "npc-1", 5)
+        commitment = GoalCommitmentAdapter.commit(
+            assessment, self.goals, GoalCommitmentLedger(), rationale="focus",
+        )
+        with self.assertRaisesRegex(ValueError, "does not match"):
+            replace(commitment, commitment_id="0" * 64)
 
     def test_commitment_ledger_batch_restore_is_atomic_on_tick_conflict(self):
         first_assessment = GoalArbitrationEvaluator.assess(
