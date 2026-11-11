@@ -193,6 +193,9 @@ class GoalIntentionRecallAdapter:
         totals = {goal_id: 0.0 for goal_id in rule_map}
         evidence = []
         for memory in ledger.entries(owner_id=owner_id):
+            goal = goals.goals.get(memory.goal_id)
+            if goal is None or goal.owner_id != owner_id:
+                raise ValueError("intention memory references an unknown goal or foreign owner")
             if memory.tick > current_tick:
                 raise ValueError("intention memory cannot be recalled before it occurred")
             rule = rule_map.get(memory.goal_id)
