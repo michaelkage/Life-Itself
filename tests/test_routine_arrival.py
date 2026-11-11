@@ -71,7 +71,7 @@ class RoutineArrivalAdapterTests(unittest.TestCase):
     def test_replay_is_idempotent_and_conflicting_minute_rejected(self):
         first = self.process(550)[0]
         second = self.process(550)[0]
-        self.assertEqual(first, second)
+        self.assertEqual(first.execution, second.execution)
         self.assertEqual(second.status, "already_executed")
         with self.assertRaisesRegex(ValueError, "conflicting"):
             self.process(551)
