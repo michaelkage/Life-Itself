@@ -25,6 +25,7 @@ from simreality import (
     ActionExecutionLedger, ActionExecutionPolicy,
     ActionPlanEvaluationLedger,
 )
+from simreality.npc_goal_emergence import GoalLifecycleLedger
 from simreality.presence_encounters import PresenceEncounter, PresenceEncounterLedger, PresenceSocialAdapter
 from simreality.social_familiarity import PresenceFamiliarityAdapter, SocialFamiliarityLedger
 from simreality.emotional_events import EmotionalEventRule, NPCEmotionalEventLedger
@@ -1538,4 +1539,43 @@ if __name__ == "__main__":
         with self.assertRaisesRegex(ValueError, "require the checkpoint autobiographical life history"):
             SimulationWorldCheckpoint.capture(
                 4, coordinator, npcs, experience_transfers=transfers,
+            )
+
+    def test_goal_lifecycle_round_trips_with_goal_book_and_preserves_reopen_history(self):
+        coordinator, npcs, _ = self.make_simulation()
+        goals = GoalBook()
+        goal = NPCGoal("goal-1", "speaker", "safety", 4.0)
+        goals.add(goal)
+        lifecycle = GoalLifecycleLedger()
+        lifecycle.record(goal, 3, "adopted")
+        goal.status = __import__("simreality.goals", fromlist=["GoalStatus"]).GoalStatus.ABANDONED
+        lifecycle.record(goal, 4, "immediate danger passed")
+        goals.reopen("goal-1", 5)
+        lifecycle.record(goal, 5, "new threat emerged")
+        payload = SimulationWorldCheckpoint.capture(
+            5, coordinator, npcs, goal_book=goals, goal_lifecycle=lifecycle,
+        ).to_json()
+        restored = SimulationWorldCheckpoint.from_json(payload).restore()
+        self.assertIsNotNone(restored.goal_lifecycle)
+        self.assertEqual(restored.goal_lifecycle.snapshot(), lifecycle.snapshot())
+        self.assertEqual(restored.goals.goals["goal-1"].status.value, "active")
+        self.assertEqual(
+            SimulationWorldCheckpoint.capture(
+                5, restored.coordinator, restored.npcs,
+                goal_book=restored.goals, goal_lifecycle=restored.goal_lifecycle,
+            ).to_json(),
+            payload,
+        )
+
+    def test_goal_lifecycle_checkpoint_rejects_unknown_goal(self):
+        coordinator, npcs, _ = self.make_simulation()
+        goals = GoalBook()
+        from simreality.npc_goal_emergence import GoalLifecycleEvent
+        lifecycle = GoalLifecycleLedger((
+            GoalLifecycleEvent("life-1", "missing", "speaker", None,
+                               "active", 3, "adopted"),
+        ))
+        with self.assertRaisesRegex(ValueError, "unknown goal"):
+            SimulationWorldCheckpoint.capture(
+                4, coordinator, npcs, goal_book=goals, goal_lifecycle=lifecycle,
             )
