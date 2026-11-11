@@ -283,5 +283,95 @@ class NPCActionReplanningTests(unittest.TestCase):
         self.assertEqual(self.ledger.get("completed-before-replan").status, "completed")
 
 
+    def test_interrupted_plan_resumes_at_original_action_and_continues_suffix(self):
+        facts, resources = {"at-market"}, {"cash": 10.0}
+        first = self.coordinator.replan(
+            "npc-1", 1, facts, resources,
+            {"repair": {"machine-fixed"}, "rest": {"rested"}},
+            reason="repair required",
+        )
+        self.assertEqual(first.decision.plan.actions, ("buy-parts", "repair-machine"))
+        interrupted = self.ledger.advance(
+            first.execution_id, 2, facts, resources,
+            interruption="temporary market closure",
+        )
+        self.assertEqual(interrupted.status, "interrupted")
+
+        resumed = self.coordinator.resume_interrupted(
+            first.execution_id, 3, facts, resources,
+            {"repair": {"machine-fixed"}, "rest": {"rested"}},
+        )
+        self.assertEqual(resumed.original_action_index, 0)
+        self.assertEqual(resumed.continuation_plan, ("buy-parts", "repair-machine"))
+        self.assertEqual(resumed.execution.action_id, "buy-parts")
+        self.assertEqual(resumed.execution.plan_actions, ("buy-parts", "repair-machine"))
+        self.assertEqual(self.ledger.get(first.execution_id).status, "interrupted")
+
+        progression = self.coordinator.advance(
+            resumed.execution.execution_id, 4, facts, resources,
+            {"repair": {"machine-fixed"}, "rest": {"rested"}},
+        )
+        self.assertEqual(progression.execution.status, "completed")
+        self.assertEqual(progression.next_active.action_id, "repair-machine")
+        self.assertEqual(progression.next_active.action_index, 1)
+
+    def test_interrupted_later_plan_step_resumes_without_repeating_completed_work(self):
+        facts, resources = {"at-market"}, {"cash": 10.0}
+        first = self.coordinator.replan(
+            "npc-1", 1, facts, resources,
+            {"repair": {"machine-fixed"}, "rest": {"rested"}},
+            reason="repair required",
+        )
+        first_step = self.coordinator.advance(
+            first.execution_id, 2, facts, resources,
+            {"repair": {"machine-fixed"}, "rest": {"rested"}},
+        )
+        self.assertEqual(first_step.execution.status, "completed")
+        second_id = first_step.next_active.execution_id
+        interrupted = self.ledger.advance(
+            second_id, 3, facts, resources, interruption="repair tool jammed",
+        )
+        self.assertEqual(interrupted.status, "interrupted")
+
+        resumed = self.coordinator.resume_interrupted(
+            second_id, 4, facts, resources,
+            {"repair": {"machine-fixed"}, "rest": {"rested"}},
+        )
+        self.assertEqual(resumed.original_action_index, 1)
+        self.assertEqual(resumed.continuation_plan, ("repair-machine",))
+        self.assertEqual(resumed.execution.action_id, "repair-machine")
+        self.assertEqual(resumed.execution.action_index, 0)
+        self.assertEqual(self.ledger.get(first.execution_id).status, "completed")
+
+    def test_resume_is_idempotent_and_rechecks_live_preconditions(self):
+        facts, resources = {"at-market"}, {"cash": 10.0}
+        first = self.coordinator.replan(
+            "npc-1", 1, facts, resources,
+            {"repair": {"machine-fixed"}, "rest": {"rested"}},
+            reason="repair required",
+        )
+        self.ledger.advance(
+            first.execution_id, 2, facts, resources,
+            interruption="temporary interruption",
+        )
+        with self.assertRaisesRegex(ValueError, "preconditions"):
+            self.coordinator.resume_interrupted(
+                first.execution_id, 3, {"safe-place"}, resources,
+                {"repair": {"machine-fixed"}, "rest": {"rested"}},
+            )
+        resumed = self.coordinator.resume_interrupted(
+            first.execution_id, 3, facts, resources,
+            {"repair": {"machine-fixed"}, "rest": {"rested"}},
+        )
+        replay = self.coordinator.resume_interrupted(
+            first.execution_id, 3, facts, resources,
+            {"repair": {"machine-fixed"}, "rest": {"rested"}},
+        )
+        self.assertEqual(replay, resumed)
+        self.assertEqual(len(self.ledger.active()), 1)
+        self.assertEqual(self.events.get("npc-action-resume:" +
+                         resumed.execution.execution_id.split(":")[1]), None)
+
+
 if __name__ == "__main__":
     unittest.main()
