@@ -190,6 +190,10 @@ class GoalIntentionRecall:
             raise ValueError("adjustment goal IDs must be non-empty")
         if goal_ids != sorted(set(goal_ids)):
             raise ValueError("recall adjustments must have unique sorted goal IDs")
+        if any(item.goal_id not in goal_ids for item in self.evidence):
+            raise ValueError("memory recall evidence must have a corresponding goal adjustment")
+        if any(item.goal_id not in goal_ids for item in self.strategic_evidence):
+            raise ValueError("strategic recall evidence must have a corresponding goal adjustment")
         for goal_id, value in self.adjustments:
             if not isinstance(goal_id, str) or not goal_id.strip():
                 raise ValueError("adjustment goal IDs must be non-empty")
