@@ -318,6 +318,14 @@ class GoalLifecycleLedger:
         if target_status == GoalStatus.BLOCKED:
             raise ValueError("blocked status is derived from goal dependencies")
         goal = goals.goals[goal_id]
+        if isinstance(tick, bool) or not isinstance(tick, int) or tick < goal.created_tick:
+            raise ValueError("transition tick must be an integer at or after goal creation")
+        if not isinstance(reason, str) or not reason.strip():
+            raise ValueError("reason must be a non-empty string")
+        if not isinstance(evidence_ids, tuple) or any(
+            not isinstance(value, str) or not value.strip() for value in evidence_ids
+        ) or len(evidence_ids) != len(set(evidence_ids)):
+            raise ValueError("evidence_ids must be unique non-empty strings in a tuple")
         previous = self._last_event_by_goal.get(goal_id)
         normalized_evidence = tuple(sorted(evidence_ids))
         if (goal.status == target_status and previous is not None
