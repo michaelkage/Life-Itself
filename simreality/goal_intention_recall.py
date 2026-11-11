@@ -95,6 +95,14 @@ class GoalIntentionRecallEvidence:
             "autobiographical_memory",
         }:
             raise ValueError("unsupported recall evidence source kind")
+        allowed_types = {
+            "goal_lifecycle": {"adopted", "reopened", "completed", "failed", "abandoned", "blocked"},
+            "goal_commitment": {"committed", "deferred"},
+            "plan_evaluation": {"plan_completed", "plan_failed", "plan_replanned"},
+            "autobiographical_memory": {"personal_experience"},
+        }
+        if self.memory_type not in allowed_types[self.source_kind]:
+            raise ValueError("recall memory type does not match its provenance source")
         if (len(self.content_digest) != 64
                 or any(char not in "0123456789abcdef" for char in self.content_digest)):
             raise ValueError("content_digest must be a SHA-256 hex digest")
