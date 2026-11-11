@@ -143,13 +143,13 @@ class WorldEventMemoryReplaySnapshot:
             candidates = [
                 item for item in npc.memories
                 if (item.witness_id, item.target_entity_id, item.initial_impact,
-                    item.timestamp_hour, item.action_tag, item.description)
+                    item.timestamp_hour, item.action_tag)
                 == (memory.witness_id, memory.target_entity_id, memory.initial_impact,
-                    memory.timestamp_hour, memory.action_tag, memory.description)
+                    memory.timestamp_hour, memory.action_tag)
             ]
             if len(candidates) != 1:
                 raise ValueError(
-                    f"saved replay memory does not uniquely match restored NPC {witness_id!r}"
+                    f"saved replay memory is absent from restored NPC or ambiguous for {witness_id!r}"
                 )
             restored[(event_id, witness_id)] = candidates[0]
         adapter._processed.update(restored)
