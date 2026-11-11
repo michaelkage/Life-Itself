@@ -18,7 +18,7 @@ GoalCommitmentLedger is append-only, replay-safe, and enforces at most one commi
 
 ## Persistence
 
-GoalCommitmentSnapshot provides canonical JSON capture/restore and validates IDs, per-owner tick uniqueness, and canonical encoding. It is an independent component snapshot; it does not yet add a field to SimulationWorldCheckpoint. Callers that need world-level atomic saves should persist this component alongside the world checkpoint until integrated checkpoint support is added.
+GoalCommitmentSnapshot provides canonical JSON capture/restore and validates IDs, per-owner tick uniqueness, and canonical encoding. SimulationWorldCheckpoint now includes the optional goal_commitments component in the same atomic payload as the GoalBook. Capture and restore both validate that every selected and deferred goal exists and belongs to the commitment owner, and reject commitments from after the checkpoint tick. Older checkpoint payloads without this optional component remain loadable. The restored ledger is available as RestoredSimulation.goal_commitments.
 
 ## Boundaries
 
