@@ -499,3 +499,6 @@ Alternative NPC intentions are generated read-only from authored goal-emergence 
 
 
 NPC intention arbitration now compares currently actionable ambitions using existing priority and deadline pressure alongside explicitly authored need alignment, emotional importance, personal-value alignment, and resource feasibility. An explicit commitment selects one goal while deferring competing ambitions without abandoning or mutating them. NPCDecisionCycle and NPCActionReplanningCoordinator can enforce that commitment without silently falling back to a deferred goal. The append-only commitment ledger prevents conflicting commitments for one NPC in the same tick and is persisted atomically with the GoalBook by SimulationWorldCheckpoint. See docs/NPC-GOAL-ARBITRATION.md and tests/test_goal_arbitration.py.
+
+
+Interrupted NPC actions can now resume from their persisted plan cursor through `NPCActionReplanningCoordinator.resume_interrupted`. Resumption preserves the original terminal execution record, rechecks live preconditions and resource feasibility, starts a deterministic continuation identity, and skips already completed plan steps. See docs/NPC-ACTION-EXECUTION.md and tests/test_npc_action_replanning.py.
