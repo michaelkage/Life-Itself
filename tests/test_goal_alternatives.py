@@ -2,7 +2,9 @@
 import unittest
 from simreality.goals import GoalBook, GoalStatus, NPCGoal
 from simreality.npc_goal_emergence import GoalEmergenceRule, GoalLifecycleLedger, GoalTemplate
-from simreality.goal_alternatives import GoalAlternativeAdapter, GoalAlternativeEvaluator
+from simreality.goal_alternatives import (GoalAlternativeAdapter, GoalAlternativeEvaluator, GoalIntentionEvaluator)
+from simreality.goal_review import GoalReviewAction, GoalReviewPolicy
+from simreality.world_events import WorldEventLedger
 
 class GoalAlternativeTests(unittest.TestCase):
     def setUp(self):
@@ -54,6 +56,24 @@ class GoalAlternativeTests(unittest.TestCase):
         self.assertEqual(first, second)
         self.assertEqual(len(self.lifecycle.snapshot()), 1)
 
+    def test_combined_assessment_keeps_obsolescence_and_alternatives_separate(self):
+        event = WorldEventLedger.make_event(
+            "career-ended", 9, "career_path_closed",
+            participants=("npc",), attributes={"reason": "permanent"},
+        )
+        assessment = GoalIntentionEvaluator.assess(
+            self.goals, "career-goal", 10, events=(event,),
+            review_policies=(GoalReviewPolicy(
+                "career-obsolete", "career_path_closed", "career",
+                GoalReviewAction.ABANDON,
+                required_attributes=(("reason", "permanent"),),
+            ),), emergence_rules=self.rules,
+            need_deficits={"belonging": 0.9},
+        )
+        self.assertEqual(len(assessment.review_proposals), 1)
+        self.assertEqual(assessment.review_proposals[0].action, GoalReviewAction.ABANDON)
+        self.assertEqual(len(assessment.alternatives), 1)
+        self.assertEqual(self.source.status, GoalStatus.ACTIVE)
     def test_same_category_emergence_is_not_labelled_an_alternative(self):
         same_category = (GoalEmergenceRule("another-career", GoalTemplate("promotion", "career", 3.0),
                           need_key="belonging", need_threshold=0.6),)
