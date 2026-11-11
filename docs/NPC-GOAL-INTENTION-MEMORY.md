@@ -33,6 +33,13 @@ distinguish completed, failed, and replanned outcomes.
 restoration. Entries are immutable, append-only, deterministically identified,
 and chronologically ordered per NPC and goal. The snapshot is a compact
 cross-reference projection; source ledgers remain authoritative and should
-also be persisted.
+also be persisted. Composite saves accept
+`SimulationWorldCheckpoint.capture(..., goal_intention_memories=ledger)`
+and restore the ledger as `RestoredSimulation.goal_intention_memories`.
+Checkpoint validation requires the matching GoalBook and validates each
+entry against its lifecycle, commitment, action-plan evaluation, or
+autobiographical source ledger. The component is optional, so older
+checkpoint payloads remain loadable.
 
-Tests: `tests/test_goal_intention_memory.py`.
+Tests: `tests/test_goal_intention_memory.py` and
+`tests/test_world_checkpoint.py`.
