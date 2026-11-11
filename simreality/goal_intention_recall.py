@@ -13,6 +13,8 @@ import math
 
 from .goal_intention_memory import GoalIntentionMemoryLedger
 from .goals import GoalBook
+from .npc_life_history import NPCLifeHistory
+from .npc_experience_transfer import NPCExperienceTransferLedger, experience_goal_guidance
 
 
 _MEMORY_TYPES = frozenset({
@@ -119,12 +121,49 @@ class GoalIntentionRecallEvidence:
 
 
 @dataclass(frozen=True)
+class GoalIntentionStrategicEvidence:
+    """Exact goal-tag evidence with its personal, witnessed, or reported source."""
+
+    goal_id: str
+    adjustment: float
+    evidence_ids: tuple[str, ...]
+    source_classes: tuple[tuple[str, str], ...]
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.goal_id, str) or not self.goal_id.strip():
+            raise ValueError("goal_id must be non-empty")
+        adjustment = _finite(self.adjustment, "strategic experience adjustment")
+        if not -0.25 <= adjustment <= 0.25:
+            raise ValueError("strategic experience adjustment must be in [-0.25, 0.25]")
+        if not isinstance(self.evidence_ids, tuple) or any(
+            not isinstance(item, str) or not item.strip() for item in self.evidence_ids
+        ):
+            raise ValueError("evidence_ids must be a tuple of non-empty strings")
+        if not self.evidence_ids or len(self.evidence_ids) != len(set(self.evidence_ids)):
+            raise ValueError("strategic evidence IDs must be non-empty and unique")
+        if not isinstance(self.source_classes, tuple) or any(
+            not isinstance(item, tuple) or len(item) != 2 for item in self.source_classes
+        ):
+            raise ValueError("source_classes must contain (evidence_id, source_class) pairs")
+        if tuple(sorted(self.source_classes)) != self.source_classes:
+            raise ValueError("source classes must use canonical order")
+        if {item[0] for item in self.source_classes} != set(self.evidence_ids):
+            raise ValueError("every strategic evidence ID must have exactly one source class")
+        if len(self.source_classes) != len(self.evidence_ids):
+            raise ValueError("strategic source classes must not repeat evidence IDs")
+        if any(source not in {"personal", "witnessed", "reported"}
+               for _, source in self.source_classes):
+            raise ValueError("unsupported strategic experience source class")
+
+
+@dataclass(frozen=True)
 class GoalIntentionRecall:
     owner_id: str
     tick: int
     adjustments: tuple[tuple[str, float], ...]
     evidence: tuple[GoalIntentionRecallEvidence, ...]
     recall_id: str
+    strategic_evidence: tuple[GoalIntentionStrategicEvidence, ...] = ()
 
     def __post_init__(self) -> None:
         if not isinstance(self.owner_id, str) or not self.owner_id.strip():
@@ -135,6 +174,13 @@ class GoalIntentionRecall:
             raise TypeError("adjustments and evidence must be tuples")
         if any(not isinstance(item, GoalIntentionRecallEvidence) for item in self.evidence):
             raise TypeError("evidence must contain GoalIntentionRecallEvidence values")
+        if not isinstance(self.strategic_evidence, tuple) or any(
+            not isinstance(item, GoalIntentionStrategicEvidence) for item in self.strategic_evidence
+        ):
+            raise TypeError("strategic_evidence must contain GoalIntentionStrategicEvidence values")
+        strategic_goal_ids = [item.goal_id for item in self.strategic_evidence]
+        if strategic_goal_ids != sorted(set(strategic_goal_ids)):
+            raise ValueError("strategic evidence must have unique sorted goal IDs")
         if any(not isinstance(item, tuple) or len(item) != 2 for item in self.adjustments):
             raise ValueError("recall adjustments must be (goal_id, value) pairs")
         goal_ids = [item[0] for item in self.adjustments]
@@ -158,6 +204,11 @@ class GoalIntentionRecall:
                  item.age_ticks, item.authored_weight, item.decayed_contribution]
                 for item in self.evidence
             ],
+            "strategic_evidence": [
+                [item.goal_id, item.adjustment, list(item.evidence_ids),
+                 [list(source) for source in item.source_classes]]
+                for item in self.strategic_evidence
+            ],
         }
         expected = hashlib.sha256(json.dumps(
             payload, sort_keys=True, separators=(",", ":"), allow_nan=False,
@@ -177,6 +228,8 @@ class GoalIntentionRecallAdapter:
         current_tick: int,
         *,
         rules: tuple[GoalIntentionRecallRule, ...],
+        life_history: NPCLifeHistory | None = None,
+        experience_transfers: NPCExperienceTransferLedger | None = None,
     ) -> GoalIntentionRecall:
         if not isinstance(ledger, GoalIntentionMemoryLedger):
             raise TypeError("ledger must be GoalIntentionMemoryLedger")
@@ -192,11 +245,40 @@ class GoalIntentionRecallAdapter:
             raise TypeError("rules must be a tuple of GoalIntentionRecallRule values")
         if len({item.goal_id for item in rules}) != len(rules):
             raise ValueError("each goal may have only one recall rule")
+        if (life_history is None) != (experience_transfers is None):
+            raise ValueError("life_history and experience_transfers must be supplied together")
+        if life_history is not None and not isinstance(life_history, NPCLifeHistory):
+            raise TypeError("life_history must be NPCLifeHistory")
+        if experience_transfers is not None and not isinstance(
+            experience_transfers, NPCExperienceTransferLedger
+        ):
+            raise TypeError("experience_transfers must be NPCExperienceTransferLedger")
         rule_map = {item.goal_id: item for item in rules}
         for goal_id in rule_map:
             goal = goals.goals.get(goal_id)
             if goal is None or goal.owner_id != owner_id:
                 raise ValueError("recall rules must reference goals owned by the NPC")
+
+        strategic_records = []
+        strategic_adjustments = {}
+        strategic_memory_ids = set()
+        if life_history is not None and experience_transfers is not None:
+            raw_adjustments, raw_evidence_ids, raw_sources = experience_goal_guidance(
+                life_history, experience_transfers, owner_id, current_tick, goals,
+            )
+            for goal_id in sorted(raw_adjustments):
+                evidence_ids = tuple(sorted(raw_evidence_ids[goal_id]))
+                source_classes = tuple(sorted(
+                    (evidence_id, raw_sources[evidence_id]) for evidence_id in evidence_ids
+                ))
+                strategic_records.append(GoalIntentionStrategicEvidence(
+                    goal_id, raw_adjustments[goal_id], evidence_ids, source_classes,
+                ))
+                strategic_adjustments[goal_id] = raw_adjustments[goal_id]
+                strategic_memory_ids.update(
+                    evidence_id for evidence_id, source_class in source_classes
+                    if source_class in {"personal", "witnessed"}
+                )
 
         totals = {goal_id: 0.0 for goal_id in rule_map}
         evidence = []
@@ -206,6 +288,9 @@ class GoalIntentionRecallAdapter:
                 raise ValueError("intention memory references an unknown goal or foreign owner")
             if memory.tick > current_tick:
                 raise ValueError("intention memory cannot be recalled before it occurred")
+            if (memory.memory_type == "personal_experience"
+                    and memory.source_id in strategic_memory_ids):
+                continue
             rule = rule_map.get(memory.goal_id)
             if rule is None:
                 continue
@@ -222,10 +307,19 @@ class GoalIntentionRecallAdapter:
                 age, weight, contribution,
             ))
 
+        all_goal_ids = set(totals) | set(strategic_adjustments)
         adjustments = tuple(sorted(
-            (goal_id, max(-rule_map[goal_id].max_adjustment,
-                          min(rule_map[goal_id].max_adjustment, total)))
-            for goal_id, total in totals.items()
+            (
+                goal_id,
+                max(
+                    -rule_map[goal_id].max_adjustment if goal_id in rule_map else -0.25,
+                    min(
+                        rule_map[goal_id].max_adjustment if goal_id in rule_map else 0.25,
+                        totals.get(goal_id, 0.0) + strategic_adjustments.get(goal_id, 0.0),
+                    ),
+                ),
+            )
+            for goal_id in all_goal_ids
         ))
         evidence.sort(key=lambda item: (item.goal_id, item.age_ticks, item.memory_id))
         payload = {
@@ -237,10 +331,16 @@ class GoalIntentionRecallAdapter:
                  item.age_ticks, item.authored_weight, item.decayed_contribution]
                 for item in evidence
             ],
+            "strategic_evidence": [
+                [item.goal_id, item.adjustment, list(item.evidence_ids),
+                 [list(source) for source in item.source_classes]]
+                for item in strategic_records
+            ],
         }
         recall_id = hashlib.sha256(json.dumps(
             payload, sort_keys=True, separators=(",", ":"), allow_nan=False,
         ).encode("utf-8")).hexdigest()
         return GoalIntentionRecall(
             owner_id, current_tick, adjustments, tuple(evidence), recall_id,
+            tuple(strategic_records),
         )
