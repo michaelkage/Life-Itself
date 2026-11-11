@@ -178,3 +178,90 @@ class GoalRecoveryAdapter:
             goals, goal.goal_id, GoalStatus.ACTIVE, proposal.sampled_tick,
             reason or proposal.rationale,
         )
+
+
+
+@dataclass(frozen=True)
+class GoalRecoveryProgression:
+    lifecycle_event: object
+    replanning: object
+
+
+class GoalRecoveryReplanningAdapter:
+    """Reopen a recovered intention and immediately replan from current world state.
+
+    The lifecycle transition is committed before planning. If planning is retried
+    after an operational failure, the matching lifecycle event is recognized and
+    the coordinator's own request cache prevents duplicate action starts.
+    """
+
+    @staticmethod
+    def recover_and_replan(
+        proposal: GoalRecoveryProposal,
+        goals: GoalBook,
+        lifecycle: GoalLifecycleLedger,
+        coordinator,
+        *,
+        need_levels: Mapping[str, float],
+        available_facts: frozenset[str],
+        world_facts: set[str],
+        resources: dict[str, float],
+        goal_facts: Mapping[str, set[str] | frozenset[str] | tuple[str, ...]],
+        reason: str | None = None,
+        active_execution_id: str | None = None,
+        max_expansions: int = 10_000,
+    ) -> GoalRecoveryProgression:
+        from .npc_action_replanning import NPCActionReplanningCoordinator
+
+        if not isinstance(coordinator, NPCActionReplanningCoordinator):
+            raise TypeError("coordinator must be an NPCActionReplanningCoordinator")
+        if coordinator.decisions.goals is not goals:
+            raise ValueError("replanning decision cycle must use the recovered GoalBook")
+        if coordinator.executions.goals is not None and coordinator.executions.goals is not goals:
+            raise ValueError("action execution ledger must use the recovered GoalBook")
+        if not isinstance(world_facts, set) or not isinstance(resources, dict):
+            raise TypeError("world_facts and resources must be mutable set/dict values")
+        if not isinstance(goal_facts, Mapping):
+            raise TypeError("goal_facts must be a mapping")
+        recovery_reason = reason or proposal.rationale
+        if not isinstance(recovery_reason, str) or not recovery_reason.strip():
+            raise ValueError("recovery reason must be non-empty")
+        goal = goals.goals.get(proposal.goal_id)
+        if goal is None or goal.owner_id != proposal.owner_id:
+            raise ValueError("recovery proposal references an unknown goal or owner")
+
+        matching_event = next((
+            event for event in reversed(lifecycle.snapshot())
+            if event.goal_id == proposal.goal_id
+            and event.owner_id == proposal.owner_id
+            and event.to_status == GoalStatus.ACTIVE.value
+            and event.tick == proposal.sampled_tick
+            and event.reason == recovery_reason
+        ), None)
+        if matching_event is not None and goal.status == GoalStatus.ACTIVE:
+            # A prior attempt completed the lifecycle transition. Verify that
+            # the original proposal context still holds before replaying planning.
+            needs = dict(need_levels)
+            if not isinstance(available_facts, frozenset):
+                raise TypeError("available_facts must be a frozenset")
+            signature = hashlib.sha256(json.dumps(
+                {"needs": sorted(needs.items()), "facts": sorted(available_facts)},
+                sort_keys=True, separators=(",", ":"), allow_nan=False,
+            ).encode("utf-8")).hexdigest()
+            if signature != proposal.context_signature:
+                raise ValueError("goal recovery proposal is stale: circumstances changed")
+            lifecycle_event = matching_event
+        else:
+            lifecycle_event = GoalRecoveryAdapter.apply(
+                proposal, goals, lifecycle, need_levels=need_levels,
+                available_facts=available_facts, reason=recovery_reason,
+            )
+
+        replanning = coordinator.replan(
+            proposal.owner_id, proposal.sampled_tick, world_facts, resources,
+            goal_facts,
+            reason=f"recovered goal {proposal.goal_id}: {recovery_reason}",
+            active_execution_id=active_execution_id,
+            max_expansions=max_expansions,
+        )
+        return GoalRecoveryProgression(lifecycle_event, replanning)
