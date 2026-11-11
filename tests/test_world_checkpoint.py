@@ -399,7 +399,7 @@ class SimulationWorldCheckpointTests(unittest.TestCase):
 
         invalid = TestimonyLedger((
             TestimonyRecord(
-                "testimony-invalid", "event-1", "listener", 3, 1.5, 0.01, (), (),
+                "testimony-invalid", "event-1", "subject", 3, 1.5, 0.01, (), (),
             ),
         ))
         with self.assertRaises(ValueError):
