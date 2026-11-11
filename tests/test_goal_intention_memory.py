@@ -2,7 +2,6 @@ import hashlib
 
 import pytest
 
-from simreality.action_evaluation import ActionPlanEvaluationLedger
 from simreality.goal_arbitration import GoalCommitment, GoalCommitmentLedger
 from simreality.goals import GoalBook, NPCGoal
 from simreality.npc_goal_emergence import GoalLifecycleEvent, GoalLifecycleLedger
