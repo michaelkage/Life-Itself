@@ -14,7 +14,10 @@ import math
 from .goal_intention_memory import GoalIntentionMemoryLedger
 from .goals import GoalBook
 from .npc_life_history import NPCLifeHistory
-from .npc_experience_transfer import NPCExperienceTransferLedger, experience_goal_guidance
+from .npc_experience_transfer import (
+    NPCExperienceTransferLedger, experience_goal_guidance,
+    strategic_experience_evidence,
+)
 
 
 _MEMORY_TYPES = frozenset({
@@ -128,6 +131,8 @@ class GoalIntentionStrategicEvidence:
     adjustment: float
     evidence_ids: tuple[str, ...]
     source_classes: tuple[tuple[str, str], ...]
+    source_confidences: tuple[tuple[str, float], ...]
+    source_influences: tuple[tuple[str, float], ...]
 
     def __post_init__(self) -> None:
         if not isinstance(self.goal_id, str) or not self.goal_id.strip():
@@ -156,6 +161,20 @@ class GoalIntentionStrategicEvidence:
         if any(source not in {"personal", "witnessed", "reported"}
                for _, source in self.source_classes):
             raise ValueError("unsupported strategic experience source class")
+        for field_name in ("source_confidences", "source_influences"):
+            values = getattr(self, field_name)
+            if not isinstance(values, tuple) or any(
+                not isinstance(item, tuple) or len(item) != 2
+                or not isinstance(item[0], str) or not item[0].strip()
+                for item in values
+            ):
+                raise ValueError(f"{field_name} must contain (evidence_id, value) pairs")
+            if tuple(sorted(values)) != values or {item[0] for item in values} != set(self.evidence_ids):
+                raise ValueError(f"{field_name} must cover evidence IDs in canonical order")
+            if len(values) != len(self.evidence_ids):
+                raise ValueError(f"{field_name} must not repeat evidence IDs")
+            if any(not 0.0 <= _finite(item[1], field_name) <= 1.0 for item in values):
+                raise ValueError(f"{field_name} values must be in [0, 1]")
 
 
 @dataclass(frozen=True)
@@ -212,7 +231,9 @@ class GoalIntentionRecall:
             ],
             "strategic_evidence": [
                 [item.goal_id, item.adjustment, list(item.evidence_ids),
-                 [list(source) for source in item.source_classes]]
+                 [list(source) for source in item.source_classes],
+                 [list(source) for source in item.source_confidences],
+                 [list(source) for source in item.source_influences]]
                 for item in self.strategic_evidence
             ],
         }
@@ -272,13 +293,28 @@ class GoalIntentionRecallAdapter:
             raw_adjustments, raw_evidence_ids, raw_sources = experience_goal_guidance(
                 life_history, experience_transfers, owner_id, current_tick, goals,
             )
+            strategic_sources = {
+                item.evidence_id: item
+                for item in strategic_experience_evidence(
+                    life_history, experience_transfers, owner_id, current_tick,
+                )
+            }
             for goal_id in sorted(raw_adjustments):
                 evidence_ids = tuple(sorted(raw_evidence_ids[goal_id]))
                 source_classes = tuple(sorted(
                     (evidence_id, raw_sources[evidence_id]) for evidence_id in evidence_ids
                 ))
+                source_confidences = tuple(sorted(
+                    (evidence_id, strategic_sources[evidence_id].confidence)
+                    for evidence_id in evidence_ids
+                ))
+                source_influences = tuple(sorted(
+                    (evidence_id, strategic_sources[evidence_id].influence)
+                    for evidence_id in evidence_ids
+                ))
                 strategic_records.append(GoalIntentionStrategicEvidence(
                     goal_id, raw_adjustments[goal_id], evidence_ids, source_classes,
+                    source_confidences, source_influences,
                 ))
                 strategic_adjustments[goal_id] = raw_adjustments[goal_id]
                 strategic_memory_keys.update(
@@ -340,7 +376,9 @@ class GoalIntentionRecallAdapter:
             ],
             "strategic_evidence": [
                 [item.goal_id, item.adjustment, list(item.evidence_ids),
-                 [list(source) for source in item.source_classes]]
+                 [list(source) for source in item.source_classes],
+                 [list(source) for source in item.source_confidences],
+                 [list(source) for source in item.source_influences]]
                 for item in strategic_records
             ],
         }
