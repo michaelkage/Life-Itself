@@ -216,6 +216,8 @@ class GoalLifecycleEvent:
             raise ValueError("tick must be non-negative")
         if not isinstance(self.evidence_ids, tuple) or any(not isinstance(x, str) or not x.strip() for x in self.evidence_ids):
             raise ValueError("evidence_ids must be a tuple of non-empty strings")
+        if len(self.evidence_ids) != len(set(self.evidence_ids)):
+            raise ValueError("evidence_ids must be unique")
 
 
 class GoalLifecycleLedger:
