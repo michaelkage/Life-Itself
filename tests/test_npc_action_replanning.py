@@ -1,5 +1,6 @@
 """Tests for explicit, replay-safe NPC action replanning."""
 import unittest
+import hashlib
 
 from simreality.action_execution import ActionExecutionLedger, ActionExecutionPolicy
 from simreality.action_evaluation import ActionPlanEvaluationLedger
@@ -369,8 +370,13 @@ class NPCActionReplanningTests(unittest.TestCase):
         )
         self.assertEqual(replay, resumed)
         self.assertEqual(len(self.ledger.active()), 1)
-        self.assertEqual(self.events.get("npc-action-resume:" +
-                         resumed.execution.execution_id.split(":")[1]), None)
+        resume_identity = hashlib.sha256(
+            f"{first.execution_id}:3".encode("utf-8")
+        ).hexdigest()[:24]
+        resume_event = self.events.get(f"npc-action-resume:{resume_identity}")
+        self.assertEqual(resume_event.event_type, "npc_action_resumed")
+        self.assertEqual(dict(resume_event.attributes)["original_execution_id"],
+                         first.execution_id)
 
 
 if __name__ == "__main__":
