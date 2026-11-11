@@ -183,6 +183,10 @@ class GoalArbitrationEvaluator:
         for goal_id in rule_map:
             if goal_id not in goals.goals or goals.goals[goal_id].owner_id != owner_id:
                 raise ValueError("arbitration rules must reference goals owned by the NPC")
+        if incumbent_goal_id is not None:
+            incumbent_goal = goals.goals.get(incumbent_goal_id)
+            if incumbent_goal is None or incumbent_goal.owner_id != owner_id:
+                raise ValueError("incumbent goal must exist and belong to the NPC")
         if emotional_state is not None:
             if not isinstance(emotional_state, NPCEmotionalState) or emotional_state.npc_id != owner_id:
                 raise ValueError("emotional state owner must match")
