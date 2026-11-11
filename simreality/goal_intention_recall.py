@@ -139,12 +139,14 @@ class GoalIntentionStrategicEvidence:
             not isinstance(item, str) or not item.strip() for item in self.evidence_ids
         ):
             raise ValueError("evidence_ids must be a tuple of non-empty strings")
-        if not self.evidence_ids or len(self.evidence_ids) != len(set(self.evidence_ids)):
-            raise ValueError("strategic evidence IDs must be non-empty and unique")
+        if (not self.evidence_ids or self.evidence_ids != tuple(sorted(set(self.evidence_ids)))):
+            raise ValueError("strategic evidence IDs must be unique and sorted")
         if not isinstance(self.source_classes, tuple) or any(
-            not isinstance(item, tuple) or len(item) != 2 for item in self.source_classes
+            not isinstance(item, tuple) or len(item) != 2
+            or any(not isinstance(value, str) or not value.strip() for value in item)
+            for item in self.source_classes
         ):
-            raise ValueError("source_classes must contain (evidence_id, source_class) pairs")
+            raise ValueError("source_classes must contain non-empty (evidence_id, source_class) pairs")
         if tuple(sorted(self.source_classes)) != self.source_classes:
             raise ValueError("source classes must use canonical order")
         if {item[0] for item in self.source_classes} != set(self.evidence_ids):
