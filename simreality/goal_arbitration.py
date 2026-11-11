@@ -290,8 +290,17 @@ class GoalCommitment:
             raise ValueError("tick must be non-negative")
         if not math.isfinite(self.selected_score) or not 0.0 <= self.selected_score <= 1.0:
             raise ValueError("selected_score must be finite and in [0, 1]")
+        if not isinstance(self.deferred_goal_ids, tuple) or any(
+            not isinstance(goal_id, str) or not goal_id.strip()
+            for goal_id in self.deferred_goal_ids
+        ):
+            raise ValueError("deferred_goal_ids must be a tuple of non-empty goal IDs")
         if len(set(self.deferred_goal_ids)) != len(self.deferred_goal_ids):
             raise ValueError("deferred goal IDs must be unique")
+        if len(self.assessment_id) != 64 or any(c not in "0123456789abcdef" for c in self.assessment_id):
+            raise ValueError("assessment_id must be a SHA-256 hex digest")
+        if len(self.commitment_id) != 64 or any(c not in "0123456789abcdef" for c in self.commitment_id):
+            raise ValueError("commitment_id must be a SHA-256 hex digest")
         if self.selected_goal_id in self.deferred_goal_ids:
             raise ValueError("selected goal cannot also be deferred")
 
