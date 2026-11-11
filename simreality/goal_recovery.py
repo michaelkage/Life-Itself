@@ -257,6 +257,10 @@ class GoalRecoveryReplanningAdapter:
                 raise ValueError("goal_facts must map non-empty goal IDs to collections of non-empty facts")
         coordinator.executions._canonical_facts(world_facts)
         coordinator.executions._canonical_resources(resources)
+        if active_execution_id is not None:
+            active_execution = coordinator.executions.active(active_execution_id)
+            if active_execution is not None and active_execution.owner_id != proposal.owner_id:
+                raise ValueError("active execution belongs to another NPC")
         recovery_reason = reason or proposal.rationale
         if not isinstance(recovery_reason, str) or not recovery_reason.strip():
             raise ValueError("recovery reason must be non-empty")
