@@ -502,3 +502,6 @@ NPC intention arbitration now compares currently actionable ambitions using exis
 
 
 Interrupted NPC actions can now resume from their persisted plan cursor through `NPCActionReplanningCoordinator.resume_interrupted`. Resumption preserves the original terminal execution record, rechecks live preconditions and resource feasibility, starts a deterministic continuation identity, and skips already completed plan steps. See docs/NPC-ACTION-EXECUTION.md and tests/test_npc_action_replanning.py.
+
+
+NPC long-term intention memory now preserves why an ambition was adopted or reopened, which goal was committed to, which competing intentions were deferred, and the observed outcomes of its plans. `GoalIntentionMemoryAdapter` builds these memories only from exact lifecycle, commitment, plan-evaluation, and autobiographical evidence references; it never fabricates motives or semantically guesses which experiences matter. Canonical snapshots preserve the immutable cross-reference history. See [docs/NPC-GOAL-INTENTION-MEMORY.md](docs/NPC-GOAL-INTENTION-MEMORY.md) and `tests/test_goal_intention_memory.py`.
