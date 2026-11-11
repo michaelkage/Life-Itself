@@ -74,12 +74,14 @@ class GoalAlternativeTests(unittest.TestCase):
         self.assertEqual(assessment.review_proposals[0].action, GoalReviewAction.ABANDON)
         self.assertEqual(len(assessment.alternatives), 1)
         self.assertEqual(self.source.status, GoalStatus.ACTIVE)
-    def test_same_category_emergence_is_not_labelled_an_alternative(self):
-        same_category = (GoalEmergenceRule("another-career", GoalTemplate("promotion", "career", 3.0),
+    def test_distinct_intention_can_share_a_broad_category(self):
+        same_category = (GoalEmergenceRule("career-pivot", GoalTemplate("new-career-path", "career", 3.0),
                           need_key="belonging", need_threshold=0.6),)
-        self.assertEqual(GoalAlternativeEvaluator.assess(
+        proposal, = GoalAlternativeEvaluator.assess(
             self.goals, "career-goal", 10, rules=same_category,
-            need_deficits={"belonging": 0.9}), ())
+            need_deficits={"belonging": 0.9})
+        self.assertEqual(proposal.emergence.template.category, "career")
+        self.assertNotEqual(proposal.proposed_goal_id, "career-goal")
 
 if __name__ == "__main__":
     unittest.main()
