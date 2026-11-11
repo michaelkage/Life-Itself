@@ -125,3 +125,22 @@ Application history is deliberately a separate component: recording a decision
 is not the same operation as applying it, and old decision snapshots remain
 compatible. The simulation owner should checkpoint the application snapshot
 alongside the decision ledger and GoalBook.
+
+
+## Recovering abandoned intentions
+
+`GoalRecoveryEvaluator` handles a different question from event-driven
+review: whether a previously abandoned or dependency-blocked intention has
+become viable again. Authored `GoalRecoveryRule` values bind a goal
+category to explicit need-level thresholds and exact available/forbidden world
+facts. The evaluator is read-only and returns deterministic proposals; it does
+not assume that a need or circumstance has recovered unless the caller supplies
+the corresponding current values.
+
+`GoalRecoveryAdapter.apply` requires the current need map and fact set
+again. A context fingerprint rejects a proposal if circumstances changed after
+assessment, while a goal-state comparison rejects proposals after the intention
+itself changed. Successful application reopens the goal through
+`GoalLifecycleLedger`, preserving the abandonment and reopening
+rationale in the append-only history. Recovery is therefore a new explicit
+decision, not erasure of the NPC's prior choice.
