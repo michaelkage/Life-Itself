@@ -4,6 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import json
 import math
+import hashlib
 
 from .adapter_replay_state import WorldEventMemoryReplaySnapshot
 from .campaign import LifeItselfCampaign
@@ -1078,6 +1079,46 @@ class SimulationWorldCheckpoint:
         goal_commitments_snapshot = components[43]
         goal_intention_memory_snapshot = components[44]
         strategy_belief_snapshot = components[45]
+        if strategy_belief_snapshot is not None:
+            if action_evaluation_snapshot is None:
+                raise ValueError("strategy beliefs require checkpointed action evaluations")
+            strategy_ledger = strategy_belief_snapshot.restore()
+            known_npcs = {npc.entity_id for npc in NPCCollectionSnapshot.from_json(self.npcs_json).restore().values()}
+            journal = {event.event_id: event for event in envelope.restore_event_ledger().snapshot()}
+            plan_evaluations = {
+                item["plan_id"]: item
+                for item in json.loads(action_evaluation_snapshot.to_json()).get("plan_evaluations", [])
+            }
+            for observation in strategy_ledger.observations():
+                evaluation = plan_evaluations.get(observation.plan_id)
+                event = journal.get(f"npc-plan-evaluation:{observation.plan_id}")
+                if (observation.owner_id not in known_npcs or observation.observed_tick > self.current_tick
+                        or evaluation is None or event is None
+                        or evaluation["owner_id"] != observation.owner_id
+                        or evaluation["goal_id"] != observation.goal_id
+                        or tuple(evaluation["planned_actions"]) != observation.action_sequence
+                        or tuple(sorted(set(evaluation["evidence_event_ids"]))) != observation.evidence_event_ids
+                        or event.tick != observation.observed_tick
+                        or event.event_type != "npc_plan_evaluated"
+                        or event.participants != (observation.owner_id,)):
+                    raise ValueError("strategy observation does not match checkpoint plan evaluation provenance")
+                expected_outcome = ("success" if evaluation["terminal_status"] == "completed"
+                                    and not evaluation["missing_goal_facts"] else "failure")
+                if observation.outcome != expected_outcome:
+                    raise ValueError("strategy observation outcome disagrees with terminal plan evaluation")
+                strategy_id = hashlib.sha256(json.dumps(
+                    {"goal": observation.goal_id, "actions": list(observation.action_sequence)},
+                    sort_keys=True, separators=(",", ":"),
+                ).encode("utf-8")).hexdigest()
+                if observation.strategy_id != strategy_id:
+                    raise ValueError("strategy observation identity disagrees with its action sequence")
+                for evidence_id in observation.evidence_event_ids:
+                    evidence = journal.get(evidence_id)
+                    if (evidence is None or evidence.tick > self.current_tick
+                            or observation.owner_id not in evidence.participants):
+                        raise ValueError("strategy observation references invalid world evidence")
+            if any(item.decision_tick > self.current_tick for item in strategy_ledger.decisions()):
+                raise ValueError("strategy belief decision occurs after checkpoint tick")
         if experience_transfer_snapshot is not None:
             if life_history_snapshot is None:
                 raise ValueError("experience transfers require checkpointed autobiographical life history")
@@ -1764,6 +1805,8 @@ class SimulationWorldCheckpoint:
             payload["goal_commitments"] = json.loads(goal_commitments_snapshot.to_json())
         if goal_intention_memory_snapshot is not None:
             payload["goal_intention_memories"] = json.loads(goal_intention_memory_snapshot.to_json())
+        if strategy_belief_snapshot is not None:
+            payload["strategy_beliefs"] = json.loads(strategy_belief_snapshot.to_json())
         return json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False)
 
     @classmethod
