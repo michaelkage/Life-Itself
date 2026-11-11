@@ -21,6 +21,8 @@ from .goal_arbitration import (
 from .goals import GoalBook
 from .identity_context import NPCEmotionalState
 from .goal_intention_memory import GoalIntentionMemoryLedger
+from .npc_life_history import NPCLifeHistory
+from .npc_experience_transfer import NPCExperienceTransferLedger
 from .goal_intention_recall import (
     GoalIntentionRecall, GoalIntentionRecallAdapter, GoalIntentionRecallRule,
 )
@@ -79,6 +81,8 @@ class GoalIntentionContinuityAdapter:
         experience_adjustments: Mapping[str, float] | None = None,
         intention_memories: GoalIntentionMemoryLedger | None = None,
         recall_rules: tuple[GoalIntentionRecallRule, ...] = (),
+        life_history: NPCLifeHistory | None = None,
+        experience_transfers: NPCExperienceTransferLedger | None = None,
     ) -> GoalContinuityResult:
         if not isinstance(goals, GoalBook):
             raise TypeError("goals must be GoalBook")
@@ -100,13 +104,16 @@ class GoalIntentionContinuityAdapter:
             not isinstance(item, GoalIntentionRecallRule) for item in recall_rules
         ):
             raise TypeError("recall_rules must be a tuple of GoalIntentionRecallRule values")
-        recall = None
-        if intention_memories is not None:
-            recall = GoalIntentionRecallAdapter.recall(
-                intention_memories, goals, owner_id, current_tick, rules=recall_rules,
-            )
-        elif recall_rules:
+        has_strategic_inputs = life_history is not None or experience_transfers is not None
+        if intention_memories is None and recall_rules and not has_strategic_inputs:
             raise ValueError("intention_memories are required when recall_rules are supplied")
+        recall = None
+        if intention_memories is not None or has_strategic_inputs:
+            memory_ledger = intention_memories or GoalIntentionMemoryLedger()
+            recall = GoalIntentionRecallAdapter.recall(
+                memory_ledger, goals, owner_id, current_tick, rules=recall_rules,
+                life_history=life_history, experience_transfers=experience_transfers,
+            )
         if experience_adjustments is not None and not isinstance(experience_adjustments, Mapping):
             raise TypeError("experience_adjustments must be a mapping")
         combined_experience = {}
