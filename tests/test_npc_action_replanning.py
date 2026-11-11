@@ -1,9 +1,11 @@
 """Tests for explicit, replay-safe NPC action replanning."""
 import unittest
 import hashlib
+import json
 
 from simreality.action_execution import ActionExecutionLedger, ActionExecutionPolicy
-from simreality.action_evaluation import ActionPlanEvaluationLedger
+from simreality.action_evaluation import ActionPlanEvaluationLedger, NPCPlanEvaluation
+from simreality.npc_strategy_beliefs import NPCStrategyBeliefLedger, StrategyLearningRule
 from simreality.goals import GoalBook, GoalStatus, NPCGoal
 from simreality.goal_arbitration import (
     GoalArbitrationEvaluator, GoalCommitmentAdapter, GoalCommitmentLedger,
@@ -117,6 +119,45 @@ class NPCActionReplanningTests(unittest.TestCase):
         self.assertEqual(replay, first)
         self.assertEqual(replay.decision.goal_id, commitment.selected_goal_id)
         self.assertEqual(restored.to_snapshot(), snapshot)
+
+    def test_replanning_uses_explicit_owner_strategy_belief(self):
+        goals = GoalBook()
+        goals.add(NPCGoal("repair", "npc-1", "maintenance", 8.0))
+        planner = DeterministicPlanner((
+            PlanningAction("a-learned-unreliable", frozenset({"start"}), frozenset({"fixed"})),
+            PlanningAction("z-alternative", frozenset({"start"}), frozenset({"fixed"})),
+        ))
+        events = WorldEventLedger()
+        executions = ActionExecutionLedger(planner, (), events)
+        cycle = NPCDecisionCycle(goals, planner)
+        coordinator = NPCActionReplanningCoordinator(cycle, executions)
+        beliefs = NPCStrategyBeliefLedger()
+        observations = []
+        for index in range(3):
+            evaluation = NPCPlanEvaluation(
+                f"failed-plan-{index}", "npc-1", "repair",
+                ("a-learned-unreliable",), "failed", ("fixed",), (),
+                ("fixed",), (), ("a-learned-unreliable",), (),
+                (), 1.0,
+            )
+            observations.append(beliefs.observe_evaluation(
+                evaluation, "workshop", observed_tick=index + 1,
+            ))
+        proposal = beliefs.assess(
+            "npc-1", observations[0].strategy_id, "workshop",
+            StrategyLearningRule("route-reliability", minimum_observations=3),
+        )
+        beliefs.decide(proposal, accepted=True, decision_tick=4,
+                       rationale="This route repeatedly failed")
+        result = coordinator.replan(
+            "npc-1", 5, {"start"}, {},
+            {"repair": {"fixed"}}, reason="apply accepted strategy learning",
+            strategy_beliefs=beliefs, strategy_context_key="workshop",
+        )
+        self.assertEqual(result.decision.plan.actions, ("z-alternative",))
+        event = events.get(result.event_id)
+        self.assertIn("strategy_belief_sources", dict(event.attributes))
+        self.assertEqual(len(json.loads(dict(event.attributes)["strategy_belief_sources"])), 1)
 
     def test_replanning_prefers_actions_with_better_observed_reliability(self):
         goals = GoalBook()
