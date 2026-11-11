@@ -454,7 +454,7 @@ class SimulationWorldCheckpointTests(unittest.TestCase):
     def test_checkpoint_rejects_memory_replay_for_non_witness(self):
         coordinator, npcs, _ = self.make_simulation()
         payload = json.loads(SimulationWorldCheckpoint.capture(4, coordinator, npcs).to_json())
-        payload["memory_replay"]["entries"][0]["witness_id"] = "listener"
+        payload["memory_replay"]["entries"][0]["witness_id"] = "subject"
         with self.assertRaises(ValueError):
             SimulationWorldCheckpoint.from_json(json.dumps(payload))
 
