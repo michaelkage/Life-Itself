@@ -54,6 +54,14 @@ class NPCActionProgression:
 
 
 @dataclass(frozen=True)
+class NPCActionResumeResult:
+    original_execution_id: str
+    execution: ActionExecution | ActiveActionExecution
+    continuation_plan: tuple[str, ...]
+    original_action_index: int
+
+
+@dataclass(frozen=True)
 class NPCReplanningResult:
     request_id: str
     owner_id: str
@@ -355,6 +363,112 @@ class NPCActionReplanningCoordinator:
         )
         self._requests[request_id] = (signature, result)
         return result
+
+    def resume_interrupted(
+        self,
+        execution_id: str,
+        tick: int,
+        world_facts: set[str],
+        resources: dict[str, float],
+        goal_facts,
+    ) -> NPCActionResumeResult:
+        """Resume an interrupted plan at its interrupted action, not from step zero.
+
+        The original replan request is the authoritative source of the plan
+        cursor. A new execution identity preserves the interrupted record and
+        makes repeated resume requests idempotent.
+        """
+        if not isinstance(execution_id, str) or not execution_id.strip():
+            raise ValueError("execution_id must be non-empty")
+        if isinstance(tick, bool) or not isinstance(tick, int) or tick < 0:
+            raise ValueError("tick must be a non-negative integer")
+        if not isinstance(world_facts, set) or not isinstance(resources, dict):
+            raise TypeError("world_facts and resources must be mutable set/dict values")
+        if not isinstance(goal_facts, dict):
+            raise TypeError("goal_facts must be a mapping of goal IDs to fact sets")
+        interrupted = self.executions.get(execution_id)
+        if interrupted is None or interrupted.status != "interrupted":
+            raise ValueError("only a recorded interrupted action can be resumed")
+        if tick <= interrupted.tick:
+            raise ValueError("resumption must occur after the interruption tick")
+
+        try:
+            base_id, raw_index = execution_id.rsplit(":step:", 1)
+            original_index = int(raw_index)
+        except (ValueError, TypeError) as exc:
+            raise ValueError("interrupted execution has no valid plan-step identity") from exc
+        if original_index < 0:
+            raise ValueError("interrupted execution has an invalid plan-step index")
+
+        source = next((
+            result for _, result in self._requests.values()
+            if result.execution_id == f"{base_id}:step:0"
+        ), None)
+        if source is None or source.decision.plan is None or source.decision.goal_id is None:
+            raise ValueError("interrupted execution has no persisted originating plan")
+        original_plan = tuple(source.decision.plan.actions)
+        if (original_index >= len(original_plan)
+                or original_plan[original_index] != interrupted.action_id):
+            raise ValueError("interrupted execution does not match its originating plan cursor")
+        continuation = original_plan[original_index:]
+        goal_id = source.decision.goal_id
+        expected_facts = goal_facts.get(goal_id, set())
+        if not isinstance(expected_facts, set):
+            raise TypeError("goal fact entries must be sets")
+
+        identity = hashlib.sha256(
+            f"{execution_id}:{tick}".encode("utf-8")
+        ).hexdigest()[:24]
+        resumed_base = f"resume:{identity}"
+        resumed_id = f"{resumed_base}:step:0"
+
+        existing_active = self.executions.active(resumed_id)
+        existing_record = self.executions.get(resumed_id)
+        if existing_active is not None or existing_record is not None:
+            existing = existing_active if existing_active is not None else existing_record
+            if (existing.owner_id != interrupted.owner_id
+                    or existing.action_id != interrupted.action_id):
+                raise ValueError("resume identity conflicts with existing execution history")
+            return NPCActionResumeResult(
+                execution_id, existing, continuation, original_index,
+            )
+
+        if any(active.owner_id == interrupted.owner_id
+               for active in self.executions.active()):
+            raise ValueError("NPC already has active work; resolve it before resuming")
+
+        failure = self._resource_failure(continuation, resources)
+        if failure is not None:
+            raise ValueError(f"interrupted plan is not currently feasible: {failure}")
+        first_action = self.executions.planner.actions[interrupted.action_id]
+        if not first_action.preconditions <= self.executions._canonical_facts(world_facts):
+            raise ValueError("interrupted action preconditions are not currently satisfied")
+
+        resumed = self.executions.start(
+            resumed_id, interrupted.owner_id, tick, interrupted.action_id,
+            world_facts, resources, plan_actions=continuation, action_index=0,
+        )
+        if self.evaluations is not None:
+            if resumed_base not in self.evaluations._plans and resumed_base not in self.evaluations._plan_evaluations:
+                self.evaluations.register_plan(
+                    resumed_base, interrupted.owner_id, goal_id,
+                    continuation, set(expected_facts),
+                )
+        resume_event_id = f"npc-action-resume:{identity}"
+        if self.events.get(resume_event_id) is None:
+            self.events.append(WorldEventLedger.make_event(
+                resume_event_id, tick, "npc_action_resumed",
+                participants=(interrupted.owner_id,),
+                attributes={
+                    "original_execution_id": execution_id,
+                    "resumed_execution_id": resumed_id,
+                    "goal_id": goal_id,
+                    "original_action_index": str(original_index),
+                },
+            ))
+        return NPCActionResumeResult(
+            execution_id, resumed, continuation, original_index,
+        )
 
     def advance(self, execution_id: str, tick: int, world_facts: set[str],
                 resources: dict[str, float], goal_facts, *,
