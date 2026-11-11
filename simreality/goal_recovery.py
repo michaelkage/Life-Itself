@@ -234,6 +234,7 @@ class GoalRecoveryReplanningAdapter:
             event for event in reversed(lifecycle.snapshot())
             if event.goal_id == proposal.goal_id
             and event.owner_id == proposal.owner_id
+            and event.from_status == proposal.current_status.value
             and event.to_status == GoalStatus.ACTIVE.value
             and event.tick == proposal.sampled_tick
             and event.reason == recovery_reason
