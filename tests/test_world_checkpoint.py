@@ -1547,14 +1547,20 @@ if __name__ == "__main__":
         goals = GoalBook()
         goal = NPCGoal("goal-1", "speaker", "safety", 4.0)
         goals.add(goal)
+        history = NPCLifeHistory((AutobiographicalMemory(
+            "goal-memory", "speaker", "event-1", 3, ("listener",),
+            "A turning point", 0.8, 0.2, turning_point=True,
+            tags=("goal:safety",),
+        ),))
         lifecycle = GoalLifecycleLedger()
-        lifecycle.record(goal, 3, "adopted")
+        lifecycle.record(goal, 3, "adopted", evidence_ids=("goal-memory",))
         goal.status = GoalStatus.ABANDONED
         lifecycle.record(goal, 4, "immediate danger passed")
         goals.reopen("goal-1", 5)
         lifecycle.record(goal, 5, "new threat emerged")
         payload = SimulationWorldCheckpoint.capture(
             5, coordinator, npcs, goal_book=goals, goal_lifecycle=lifecycle,
+            life_history=history,
         ).to_json()
         restored = SimulationWorldCheckpoint.from_json(payload).restore()
         self.assertIsNotNone(restored.goal_lifecycle)
@@ -1564,6 +1570,7 @@ if __name__ == "__main__":
             SimulationWorldCheckpoint.capture(
                 5, restored.coordinator, restored.npcs,
                 goal_book=restored.goals, goal_lifecycle=restored.goal_lifecycle,
+                life_history=restored.life_history,
             ).to_json(),
             payload,
         )
