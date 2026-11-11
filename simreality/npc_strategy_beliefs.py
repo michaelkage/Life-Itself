@@ -495,7 +495,7 @@ class StrategyBeliefSnapshot:
             raise ValueError("strategy snapshot collections must be tuples")
         if any(not isinstance(x, tuple) or len(x) != 12 for x in self.observations):
             raise ValueError("invalid strategy observation snapshot")
-        if any(not isinstance(x, tuple) or len(x) != 15 for x in self.decisions):
+        if any(not isinstance(x, tuple) or len(x) != 16 for x in self.decisions):
             raise ValueError("invalid strategy decision snapshot")
         observations = tuple(StrategyObservation(*x) for x in self.observations)
         decisions = tuple(StrategyBeliefDecision(*x) for x in self.decisions)
