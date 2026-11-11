@@ -192,9 +192,10 @@ class GoalArbitrationTests(unittest.TestCase):
             continuity_margin=0.0,
         )
         challenger = "art" if first.commitment.selected_goal_id != "art" else "visit"
+        self.goals.goals[challenger].priority = 100.0
         second = GoalIntentionContinuityAdapter.reconsider(
             self.goals, ledger, "npc-1", 6, rationale="new urgent need",
-            continuity_margin=0.0,
+            continuity_margin=0.05,
             rules=(GoalArbitrationRule(challenger, importance=1.0),),
         )
         self.assertEqual(second.commitment.selected_goal_id, challenger)
@@ -235,6 +236,12 @@ class GoalArbitrationTests(unittest.TestCase):
         )
         self.assertEqual(next_tick.previous_commitment, first.commitment)
         self.assertEqual(next_tick.commitment.tick, 6)
+        replay_next_tick = GoalIntentionContinuityAdapter.reconsider(
+            self.goals, restored, "npc-1", 6, rationale="replayed next tick",
+        )
+        self.assertEqual(replay_next_tick.commitment, next_tick.commitment)
+        self.assertEqual(replay_next_tick.assessment.assessment_id,
+                         next_tick.assessment.assessment_id)
 
     def test_same_tick_reassessment_cannot_fork_committed_decision(self):
         ledger = GoalCommitmentLedger()
