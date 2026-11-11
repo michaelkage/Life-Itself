@@ -81,8 +81,8 @@ Tests: `tests/test_goal_intention_recall.py`.
 When the existing autobiographical and experience-transfer ledgers are supplied,
 recall also consumes exact `goal:success` / `goal:failure` tag matches from
 `NPCGoal.metadata["experience_tags"]`. It preserves source classes as
-`personal`, `witnessed`, and `reported`; reported accounts retain their
-transfer confidence discount. This reuses the engine's existing strategic
+`personal`, `witnessed`, and `reported`; each source retains its confidence and
+influence values, and reported accounts retain their transfer confidence discount. This reuses the engine's existing strategic
 experience projection rather than converting another NPC's report into a
 personal memory. If the same first-hand memory is already linked through the
 intention ledger, it is counted once per goal, not twice.
