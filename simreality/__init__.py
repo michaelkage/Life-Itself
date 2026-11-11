@@ -901,3 +901,13 @@ __all__ += [
     "GoalReviewApplication", "GoalReviewApplicationAdapter",
     "GoalReviewApplicationLedger", "GoalReviewApplicationSnapshot",
 ]
+
+
+# Reconsider abandoned goals only after explicit need and circumstance recovery evidence.
+from .goal_recovery import (
+    GoalRecoveryAdapter, GoalRecoveryEvaluator, GoalRecoveryProposal, GoalRecoveryRule,
+)
+__all__ += [
+    "GoalRecoveryAdapter", "GoalRecoveryEvaluator", "GoalRecoveryProposal",
+    "GoalRecoveryRule",
+]
