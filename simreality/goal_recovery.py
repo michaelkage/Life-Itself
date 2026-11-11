@@ -56,6 +56,26 @@ class GoalRecoveryProposal:
     context_signature: str
     rationale: str
 
+    def __post_init__(self) -> None:
+        for name in ("proposal_id", "rule_id", "goal_id", "owner_id", "current_category", "rationale"):
+            value = getattr(self, name)
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError(f"{name} must be a non-empty string")
+        if isinstance(self.sampled_tick, bool) or not isinstance(self.sampled_tick, int) or self.sampled_tick < 0:
+            raise ValueError("sampled_tick must be a non-negative integer")
+        if not isinstance(self.current_status, GoalStatus) or self.current_status not in {GoalStatus.ABANDONED, GoalStatus.BLOCKED}:
+            raise ValueError("recovery proposals require an abandoned or blocked goal")
+        if isinstance(self.current_priority, bool) or not isinstance(self.current_priority, (int, float)) or not math.isfinite(self.current_priority) or self.current_priority < 0:
+            raise ValueError("current_priority must be finite and non-negative")
+        if isinstance(self.current_confidence, bool) or not isinstance(self.current_confidence, (int, float)) or not math.isfinite(self.current_confidence) or not 0 <= self.current_confidence <= 1:
+            raise ValueError("current_confidence must be finite and in [0, 1]")
+        if not isinstance(self.matched_facts, tuple) or any(not isinstance(x, str) or not x.strip() for x in self.matched_facts):
+            raise ValueError("matched_facts must be a tuple of non-empty strings")
+        if len(self.matched_facts) != len(set(self.matched_facts)):
+            raise ValueError("matched_facts must be unique")
+        if not isinstance(self.context_signature, str) or len(self.context_signature) != 64 or any(x not in "0123456789abcdef" for x in self.context_signature):
+            raise ValueError("context_signature must be a SHA-256 hex digest")
+
 
 class GoalRecoveryEvaluator:
     """Propose, but never silently perform, recovery of abandoned intentions."""
