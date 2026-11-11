@@ -912,3 +912,7 @@ __all__ += [
     "GoalRecoveryAdapter", "GoalRecoveryEvaluator", "GoalRecoveryProgression",
     "GoalRecoveryProposal", "GoalRecoveryReplanningAdapter", "GoalRecoveryRule",
 ]
+
+
+from .goal_execution_health import (GoalExecutionHealthEvaluator, GoalExecutionHealthProposal, GoalExecutionHealthRule)
+__all__ += ["GoalExecutionHealthEvaluator", "GoalExecutionHealthProposal", "GoalExecutionHealthRule"]
