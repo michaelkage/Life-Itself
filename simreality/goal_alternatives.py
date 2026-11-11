@@ -98,8 +98,6 @@ class GoalAlternativeEvaluator:
         for proposal in proposals:
             if proposal.goal_id == source_goal_id:
                 continue
-            if proposal.template.category == source.category:
-                continue
             alternative_id = f"alternative:{source_goal_id}:{proposal.proposal_id}"
             alternatives.append(GoalAlternativeProposal(
                 alternative_id, source.goal_id, source.category, source.priority,
