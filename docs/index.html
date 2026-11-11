@@ -1,0 +1,503 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<meta name="description" content="Technical manual and interactive reference demo for Life Itself / Simulated Reality Engine.">
+<title>Life Itself — Engineering Manual</title>
+<style>
+:root{--paper:#F4F1EA;--ink:#141413;--stone:#57554E;--line:#c9c4b9;--soft:#e9e5dc;--accent:#D9381E;--green:#315c45;--mono:"IBM Plex Mono","SFMono-Regular",Consolas,monospace;--serif:Newsreader,Georgia,"Times New Roman",serif;--measure:1280px}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--mono);font-size:13px;line-height:1.55}
+a{color:inherit;text-decoration-thickness:1px;text-underline-offset:3px}
+a:hover{color:var(--accent)}
+button,input,select{font:inherit}
+button{cursor:pointer}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.shell{max-width:var(--measure);margin:0 auto;padding:0 28px}
+.masthead{border-bottom:1px solid var(--ink);padding:13px 0;display:flex;align-items:center;justify-content:space-between;gap:20px}
+.wordmark{font-weight:700;letter-spacing:-.06em;font-size:15px}
+.wordmark span{color:var(--accent)}
+.mast-meta,.eyebrow,.mono-label,.section-index,.micro{font-family:var(--mono);text-transform:uppercase;letter-spacing:.09em;font-size:10px;color:var(--stone)}
+.mast-meta{display:flex;gap:18px;flex-wrap:wrap}
+main{padding-bottom:70px}
+.intro{padding:24px 0 18px;border-bottom:1px solid var(--ink)}
+h1,h2,h3,p{margin-top:0}
+h1,h2,.serif{font-family:var(--serif);font-weight:500;letter-spacing:-.035em}
+h1{font-size:clamp(36px,5.6vw,70px);line-height:.98;margin:9px 0 12px;max-width:880px}
+.lede{font-family:var(--serif);font-size:19px;line-height:1.32;max-width:760px;margin:0;color:#33312c}
+.state-line{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:17px}
+.status{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--accent);color:var(--accent);padding:4px 7px;font-size:10px;text-transform:uppercase;letter-spacing:.08em}
+.status:before{content:"";width:6px;height:6px;background:var(--accent);border-radius:50%}
+.build-ref{font-size:10px;color:var(--stone)}
+.demo{padding:20px 0 24px;border-bottom:1px solid var(--ink)}
+.section-head{display:flex;align-items:baseline;justify-content:space-between;gap:20px;margin-bottom:13px}
+.section-head h2{font-size:28px;margin:0}
+.section-index{color:var(--accent)}
+.demo-grid{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(320px,.95fr);border:1px solid var(--ink);background:#f8f6f0}
+.demo-input{padding:16px;border-right:1px solid var(--ink)}
+.demo-output{padding:16px;display:flex;flex-direction:column;min-width:0}
+.panel-label{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--stone);margin-bottom:9px}
+.block-spec{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid var(--line);margin-bottom:15px}
+.spec-cell{padding:8px;border-right:1px solid var(--line);min-width:0}
+.spec-cell:last-child{border:0}
+.spec-cell b{display:block;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.spec-cell small{display:block;font-size:9px;color:var(--stone);text-transform:uppercase;letter-spacing:.08em}
+.controls-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:11px 0}
+.controls-row label{font-size:11px;color:var(--stone)}
+select{background:transparent;border:1px solid var(--line);padding:7px 26px 7px 9px;color:var(--ink);border-radius:0;max-width:100%}
+.range-wrap{display:flex;align-items:center;gap:10px;flex:1;max-width:310px}
+input[type=range]{width:100%;accent-color:var(--accent)}
+.value{font-variant-numeric:tabular-nums;min-width:38px;text-align:right}
+.scenario-row{display:flex;flex-wrap:wrap;gap:6px;margin:14px 0}
+.chip,.action-btn{background:transparent;border:1px solid var(--line);padding:6px 9px;font-size:10px;color:var(--ink)}
+.chip:hover,.action-btn:hover{border-color:var(--ink)}
+.chip.active{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.disruption-list{display:grid;gap:6px}
+.disruption{display:grid;grid-template-columns:auto minmax(0,1fr) minmax(100px,150px);align-items:center;gap:10px;border-top:1px solid var(--line);padding:9px 0}
+.disruption input[type=checkbox]{accent-color:var(--accent);width:15px;height:15px}
+.disruption strong{font-size:11px;display:block}
+.disruption small{font-size:9px;color:var(--stone);display:block}
+.disruption .severity{display:flex;align-items:center;gap:7px}
+.disruption .severity input{min-width:40px}
+.result-top{display:flex;justify-content:space-between;align-items:flex-start;gap:15px;border-bottom:1px solid var(--line);padding-bottom:12px}
+.result-state{font-family:var(--serif);font-size:35px;line-height:1;text-transform:capitalize}
+.result-state.accent{color:var(--accent)}
+.result-state.good{color:var(--green)}
+.result-meta{text-align:right;color:var(--stone);font-size:10px}
+.result-meta b{display:block;color:var(--ink);font-size:17px;font-weight:500}
+.route-line{display:grid;grid-template-columns:1fr auto 1fr;gap:9px;align-items:center;padding:14px 0;border-bottom:1px solid var(--line)}
+.route-node small{display:block;color:var(--stone);font-size:9px;text-transform:uppercase;letter-spacing:.08em}
+.route-node b{font-size:12px;overflow-wrap:anywhere}
+.route-arrow{color:var(--accent);font-size:17px}
+.outcome-fields{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;padding:13px 0}
+.outcome-field{border:1px solid var(--line);padding:8px}
+.outcome-field small{display:block;color:var(--stone);font-size:9px;text-transform:uppercase;letter-spacing:.08em}
+.outcome-field b{display:block;font-size:12px;overflow-wrap:anywhere}
+.trace{margin-top:auto;border-top:1px solid var(--ink);padding-top:10px}
+.trace ol{margin:7px 0 0;padding-left:20px;color:var(--stone);font-size:10px}
+.trace li{padding:2px 0}
+.trace li strong{color:var(--ink);font-weight:500}
+.note{font-size:10px;color:var(--stone);margin:12px 0 0}
+.toolbar{display:flex;gap:7px;align-items:center;flex-wrap:wrap}
+.action-btn.primary{background:var(--accent);border-color:var(--accent);color:white}
+.action-btn.primary:hover{background:#b92d18}
+section.manual{padding:22px 0;border-bottom:1px solid var(--ink)}
+.manual-grid{display:grid;grid-template-columns:180px minmax(0,1fr);gap:28px}
+.manual-grid h2{font-size:30px;line-height:1.05;margin:0}
+.section-index{display:block;margin-bottom:8px}
+.copy{max-width:930px}
+.copy p{max-width:820px;color:#33312c;margin:0 0 11px}
+.copy h3{font-family:var(--serif);font-size:21px;font-weight:500;margin:17px 0 6px}
+.copy code,.code{font-family:var(--mono);font-size:11px;background:var(--soft);padding:2px 4px}
+.data-table{width:100%;border-collapse:collapse;margin:12px 0 5px;font-size:11px}
+.data-table th{text-align:left;color:var(--stone);font-size:9px;text-transform:uppercase;letter-spacing:.08em;font-weight:400}
+.data-table th,.data-table td{border-bottom:1px solid var(--line);padding:8px 9px 8px 0;vertical-align:top}
+.data-table td:first-child{white-space:nowrap}
+.tree{border:1px solid var(--line);padding:12px 14px;background:#f8f6f0;max-width:850px;overflow:auto}
+.tree pre{margin:0;font-size:11px;line-height:1.75;white-space:pre}
+.flow{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:0;border:1px solid var(--line);margin:12px 0;max-width:950px}
+.flow-step{padding:10px;border-right:1px solid var(--line);min-height:92px}
+.flow-step:last-child{border:0}
+.flow-step b{display:block;font-size:11px;margin-bottom:5px}
+.flow-step small{display:block;font-size:9px;color:var(--stone)}
+.constraint{border-left:3px solid var(--accent);padding:8px 12px;margin:11px 0;background:#eee9df;max-width:850px}
+.constraint p{margin:0;font-size:11px}
+.command{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:9px 10px;border:1px solid var(--line);margin:7px 0;max-width:850px;background:#f8f6f0}
+.command code{background:none;padding:0;overflow-wrap:anywhere}
+.copy-btn{flex-shrink:0}
+.repo-wire{border:1px solid var(--ink);padding:14px;margin-top:12px;max-width:950px}
+.repo-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap}
+.repo-name{font-family:var(--serif);font-size:24px}
+.api-status{font-size:10px;color:var(--stone)}
+.release-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);border:1px solid var(--line);margin-top:12px}
+.release-item{background:#f8f6f0;padding:10px;min-width:0}
+.release-item small{display:block;color:var(--stone);font-size:9px;text-transform:uppercase;letter-spacing:.08em}
+.release-item b{display:block;font-size:12px;overflow-wrap:anywhere}
+.assets{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}
+.asset-link{border:1px solid var(--line);padding:5px 8px;font-size:10px;text-decoration:none}
+.asset-link:hover{border-color:var(--accent)}
+footer{padding:17px 0 30px;color:var(--stone);font-size:10px;display:flex;justify-content:space-between;gap:15px;flex-wrap:wrap}
+.is-embedded .masthead,.is-embedded .intro .lede,.is-embedded footer{display:none}
+.is-embedded .shell{padding:0 14px}
+.is-embedded .intro{padding-top:12px}
+@media(max-width:850px){.demo-grid{grid-template-columns:1fr}.demo-input{border-right:0;border-bottom:1px solid var(--ink)}.manual-grid{grid-template-columns:1fr;gap:12px}.flow{grid-template-columns:1fr}.flow-step{border-right:0;border-bottom:1px solid var(--line);min-height:0}.flow-step:last-child{border:0}}
+@media(max-width:560px){.shell{padding:0 14px}.masthead{align-items:flex-start}.mast-meta{gap:8px}.block-spec{grid-template-columns:repeat(2,1fr)}.spec-cell:nth-child(2){border-right:0}.spec-cell:nth-child(-n+2){border-bottom:1px solid var(--line)}.disruption{grid-template-columns:auto minmax(0,1fr)}.disruption .severity{grid-column:2}.result-state{font-size:29px}.release-grid{grid-template-columns:1fr}.section-head{align-items:flex-start;flex-direction:column;gap:5px}}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="shell">
+<header class="masthead">
+  <div class="wordmark">LIFE <span>ITSELF</span> / SRE</div>
+  <div class="mast-meta"><span>ENGINEERING MANUAL</span><span>REFERENCE BUILD 0.1</span><a href="#repository">REPOSITORY ↗</a></div>
+</header>
+<main>
+<section class="intro">
+  <div class="eyebrow">PRODUCT / TECHNICAL REFERENCE · 01</div>
+  <h1>Life Itself is a persistent world simulation.</h1>
+  <p class="lede">The Simulated Reality Engine models people, memories, rumours, pressure, decisions and consequences. The present deliverable is a simulation core—not a playable Unreal game.</p>
+  <div class="state-line"><span class="status">Simulation core in progress</span><span class="build-ref">Python reference · portable C++20 core · Unreal integration not implemented</span></div>
+</section>
+
+<section class="demo" id="demo">
+  <div class="section-head"><div><span class="section-index">00 / LIVE MECHANISM</span><h2>Routine resolution bench</h2></div><span class="micro">Deterministic input → resolved intention</span></div>
+  <div class="demo-grid">
+    <div class="demo-input">
+      <div class="panel-label">Registered routine block · work-shift</div>
+      <div class="block-spec">
+        <div class="spec-cell"><small>Owner</small><b>npc-1</b></div>
+        <div class="spec-cell"><small>Activity</small><b>work</b></div>
+        <div class="spec-cell"><small>Location</small><b>shop-1</b></div>
+        <div class="spec-cell"><small>Flex</small><b>20 min</b></div>
+      </div>
+      <div class="controls-row"><label for="minute">Simulation minute</label><select id="minute"><option value="485">08:05 · shift start</option><option value="540">09:00 · mid-shift</option><option value="590">09:50 · near window end</option><option value="650">10:50 · outside disruption window</option></select></div>
+      <div class="controls-row"><label for="sample">Caller-supplied outcome sample</label><div class="range-wrap"><input id="sample" type="range" min="0" max="100" value="50"><output id="sampleValue" class="value">0.50</output></div></div>
+      <div class="panel-label" style="margin-top:16px">Scenario presets</div>
+      <div class="scenario-row">
+        <button class="chip active" data-preset="clear">Clear day</button>
+        <button class="chip" data-preset="traffic">Traffic delay</button>
+        <button class="chip" data-preset="storm">Storm / remote work</button>
+        <button class="chip" data-preset="avoid">Memory avoidance</button>
+        <button class="chip" data-preset="alarm">Failed alarm</button>
+      </div>
+      <div class="panel-label">Explicit disruption inputs · sorted by disruption ID</div>
+      <div class="disruption-list">
+        <div class="disruption">
+          <input id="d-traffic" type="checkbox" aria-label="Enable traffic disruption">
+          <div><strong>01-traffic</strong><small>traffic · 18 min delay · 08:00–10:00</small></div>
+          <div class="severity"><input id="s-traffic" type="range" min="0" max="100" value="80" aria-label="Traffic severity"><output id="v-traffic">0.80</output></div>
+        </div>
+        <div class="disruption">
+          <input id="d-storm" type="checkbox" aria-label="Enable weather disruption">
+          <div><strong>02-storm</strong><small>weather · work-from-home · 08:00–10:00</small></div>
+          <div class="severity"><input id="s-storm" type="range" min="0" max="100" value="60" aria-label="Weather severity"><output id="v-storm">0.60</output></div>
+        </div>
+        <div class="disruption">
+          <input id="d-alarm" type="checkbox" aria-label="Enable alarm failure">
+          <div><strong>03-alarm</strong><small>alarm failure · minimum 30 min delay · 07:00–10:00</small></div>
+          <div class="severity"><input id="s-alarm" type="range" min="0" max="100" value="90" aria-label="Alarm severity"><output id="v-alarm">0.90</output></div>
+        </div>
+        <div class="disruption">
+          <input id="d-avoid" type="checkbox" aria-label="Enable personal location avoidance">
+          <div><strong>04-memory-avoidance</strong><small>location avoidance · side-street · all day</small></div>
+          <div class="severity"><input id="s-avoid" type="range" min="0" max="100" value="100" aria-label="Avoidance severity"><output id="v-avoid">1.00</output></div>
+        </div>
+      </div>
+      <div class="toolbar" style="margin-top:15px"><button class="action-btn primary" id="resolve">Resolve routine ↗</button><button class="action-btn" id="reset">Reset inputs</button></div>
+      <p class="note">The sample is supplied by the simulation caller. This page does not invent random outcomes. The same block, minute, disruption list and sample produce the same resolution.</p>
+    </div>
+    <div class="demo-output" aria-live="polite">
+      <div class="result-top">
+        <div><div class="panel-label">Resolution outcome</div><div id="outcome" class="result-state good">on time</div></div>
+        <div class="result-meta"><span>DELAY</span><b id="delay">0 min</b><span id="matched">No disruption crossed sample</span></div>
+      </div>
+      <div class="route-line">
+        <div class="route-node"><small>Intended</small><b id="intended">work @ shop-1</b></div>
+        <div class="route-arrow">→</div>
+        <div class="route-node"><small>Actual</small><b id="actual">work @ shop-1</b></div>
+      </div>
+      <div class="outcome-fields">
+        <div class="outcome-field"><small>Routine ID</small><b>work-shift</b></div>
+        <div class="outcome-field"><small>Owner</small><b>npc-1</b></div>
+        <div class="outcome-field"><small>Disruptions considered</small><b id="considered">—</b></div>
+        <div class="outcome-field"><small>Sample / threshold</small><b id="threshold">0.50 / —</b></div>
+      </div>
+      <div class="trace"><div class="panel-label">Resolution trace</div><ol id="trace"><li><strong>01</strong> No applicable disruption was enabled.</li><li><strong>02</strong> Routine intention remains unchanged.</li></ol></div>
+    </div>
+  </div>
+  <p class="note">Faithful browser-side model of <code>RoutineBook.resolve</code> in <code>simreality/routines.py</code>; it is an explanatory client-side implementation, not a call into the Python runtime.</p>
+</section>
+
+<section class="manual" id="architecture">
+  <div class="manual-grid">
+    <div><span class="section-index">01 / ARCHITECTURE</span><h2>What is in the repository</h2></div>
+    <div class="copy">
+      <p>The Python package <code>simreality</code> is the engine-independent reference layer. The C++20 library under <code>cpp/</code> contains the portable simulation core. The browser demo above reproduces one documented Python contract so its inputs and outputs can be inspected without installing the project.</p>
+      <div class="tree"><pre>/
+├── simreality/       Python reference systems and adapters
+├── tests/            Python regression suite (unittest)
+├── cpp/
+│   ├── include/simreality/   Public C++20 headers
+│   ├── src/                  Portable core implementation
+│   └── tests/                Dependency-free C++ tests
+├── shaders/          WGSL compute kernels (prototype boundary)
+├── docs/             Engineering contracts and limitations
+└── .github/workflows/ CI and Pages deployment</pre></div>
+      <h3>Selected Python modules</h3>
+      <table class="data-table">
+        <thead><tr><th>Module</th><th>Responsibility / boundary</th></tr></thead>
+        <tbody>
+          <tr><td><code>routines.py</code></td><td>Daily intention blocks and deterministic disruption resolution. Does not move an NPC.</td></tr>
+          <tr><td><code>routine_tick.py</code></td><td>Explicit tick adapter; caller supplies tick, minute, disruptions and samples.</td></tr>
+          <tr><td><code>routine_travel.py</code> / <code>travel.py</code></td><td>Routine-to-travel bridge and tick-based route progression.</td></tr>
+          <tr><td><code>goals.py</code></td><td>Goal ownership, prerequisite checks, progress, deadline urgency and stable ranking.</td></tr>
+          <tr><td><code>planning.py</code></td><td>Bounded least-cost symbolic planner over declared facts and action effects.</td></tr>
+          <tr><td><code>npc_autonomy.py</code></td><td>Read-only goal selection and planning proposal; no action execution.</td></tr>
+          <tr><td><code>beliefs.py</code> / <code>social_beliefs.py</code></td><td>Claim confidence from attributed evidence; each observer's trust is sampled at observation time.</td></tr>
+          <tr><td><code>social_conversations.py</code> / <code>gossip.py</code></td><td>Explicit memory transfer and listener-specific belief updates; rumor attribution can degrade.</td></tr>
+          <tr><td><code>world_events.py</code> / <code>world_checkpoint.py</code></td><td>Append-only event history and composite persistence/replay boundaries.</td></tr>
+          <tr><td><code>fluid.py</code> / <code>fluid_social.py</code></td><td>Packed input contracts and deterministic CPU reference calculations for a future GPU path.</td></tr>
+        </tbody>
+      </table>
+      <h3>Data flow: routine to world consequence</h3>
+      <div class="flow">
+        <div class="flow-step"><b>01 · Intention</b><small><code>RoutineBlock</code><br>Owner, activity, location, time window</small></div>
+        <div class="flow-step"><b>02 · Context</b><small>Caller supplies disruption records and deterministic sample</small></div>
+        <div class="flow-step"><b>03 · Resolution</b><small><code>RoutineBook.resolve</code> returns a separate <code>RoutineResolution</code></small></div>
+        <div class="flow-step"><b>04 · Record</b><small>Execution ledger and routine world-event adapter</small></div>
+        <div class="flow-step"><b>05 · Effects</b><small>Explicit policies may emit lateness or missed-appointment events</small></div>
+      </div>
+      <div class="constraint"><p><strong>Integration boundary:</strong> routine execution is a named, explicit phase after the ordinary simulation tick. It is not automatically run inside <code>SimulationTickCoordinator.step</code>. The caller owns time-of-day, disruption generation and seeded samples.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="manual" id="contracts">
+  <div class="manual-grid">
+    <div><span class="section-index">02 / CONTRACTS</span><h2>How decisions are made</h2></div>
+    <div class="copy">
+      <h3>Goal selection is not action planning</h3>
+      <p><code>GoalBook</code> ranks an NPC's actionable goals. The documented score is <code>priority × (0.5 + 0.5 × confidence) × urgency × (1 − 0.25 × progress)</code>. Dependencies must be completed. A deadline raises urgency up to a 2× multiplier. Equal scores use stable goal-ID ordering.</p>
+      <h3>Planning uses declared facts</h3>
+      <p><code>DeterministicPlanner</code> searches a finite symbolic state space with positive integer action costs, preconditions, add/delete effects, a least-cost priority queue and stable action-ID tie-breaking. Search is bounded by <code>max_expansions</code>. It does not infer facts or execute actions; the caller must revalidate each action against the live world.</p>
+      <h3>Beliefs belong to observers</h3>
+      <p><code>BeliefLedger</code> replays evidence in <code>(observed_tick, evidence_id)</code> order. Each evidence item's influence is <code>strength × source_reliability</code>, moving confidence toward 1 for support or 0 for contradiction. <code>SocialBeliefSystem</code> uses the listener's trust in the source at observation time. Later trust changes do not rewrite earlier evidence.</p>
+      <h3>Reproducibility is explicit</h3>
+      <p>These systems do not read wall-clock time or a hidden global random generator. Where uncertainty is required, callers provide tick values, samples, evidence, or seeded streams. Stable ordering and replay signatures make the same supplied history reproducible; a different history can produce a different outcome.</p>
+    </div>
+  </div>
+</section>
+
+<section class="manual" id="limits">
+  <div class="manual-grid">
+    <div><span class="section-index">03 / CONSTRAINTS</span><h2>What is not finished</h2></div>
+    <div class="copy">
+      <table class="data-table">
+        <thead><tr><th>Area</th><th>Current engineering state</th></tr></thead>
+        <tbody>
+          <tr><td>Unreal Engine</td><td>Presentation, animation, physics and asset integration are not implemented.</td></tr>
+          <tr><td>Python goals/planning</td><td>Engine-independent reference implementation; C++ parity and full world/campaign integration remain future work.</td></tr>
+          <tr><td>Routine execution</td><td>Python reference and persistence/adapters exist. The world driver must explicitly call the routine phase and provide inputs.</td></tr>
+          <tr><td>GPU compute</td><td>WGSL kernels, packed contracts and CPU references exist. No production WebGPU/Vulkan device adapter or GPU runtime is connected.</td></tr>
+          <tr><td>Physical world</td><td>Portable C++ core models selected simulation domains; it is not a rendered, spatially complete open world.</td></tr>
+          <tr><td>External dependencies</td><td>Python reference suite uses the standard library. C++ build requires CMake 3.20+ and a C++20 compiler.</td></tr>
+        </tbody>
+      </table>
+      <div class="constraint"><p><strong>Do not infer:</strong> a routine resolution does not prove physical arrival; a plan does not execute itself; a rumor is not objective truth; a CPU reference is not a live GPU backend.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="manual" id="build">
+  <div class="manual-grid">
+    <div><span class="section-index">04 / BUILD & TEST</span><h2>Run the reference core</h2></div>
+    <div class="copy">
+      <p>Python 3.10+ is required for the reference package. The README's standard-library test command is:</p>
+      <div class="command"><code>python -m unittest discover -s tests -t .</code><button class="action-btn copy-btn" data-copy="python -m unittest discover -s tests -t .">Copy</button></div>
+      <p>The portable C++ core requires C++20 and CMake 3.20+:</p>
+      <div class="command"><code>cmake -S cpp -B build</code><button class="action-btn copy-btn" data-copy="cmake -S cpp -B build">Copy</button></div>
+      <div class="command"><code>cmake --build build</code><button class="action-btn copy-btn" data-copy="cmake --build build">Copy</button></div>
+      <div class="command"><code>ctest --test-dir build --output-on-failure</code><button class="action-btn copy-btn" data-copy="ctest --test-dir build --output-on-failure">Copy</button></div>
+      <p>Python reference regression cases for the mechanisms shown here include <code>tests/test_routines.py</code>, <code>tests/test_planning.py</code>, <code>tests/test_npc_autonomy.py</code>, and checkpoint tests. CI runs the Python suite with pytest on Python 3.11.</p>
+      <div class="toolbar"><a href="https://github.com/michaelkage/Life-Itself/tree/main/tests" target="_blank" rel="noopener">Browse tests ↗</a><a href="https://github.com/michaelkage/Life-Itself/tree/main/docs" target="_blank" rel="noopener">Engineering notes ↗</a></div>
+    </div>
+  </div>
+</section>
+
+<section class="manual" id="repository">
+  <div class="manual-grid">
+    <div><span class="section-index">05 / REPOSITORY WIRE</span><h2>Live GitHub metadata</h2></div>
+    <div class="copy">
+      <p>Repository identity is inferred from the current GitHub or GitHub Pages URL. Metadata, latest release assets and latest commit are fetched from the public GitHub REST API when the page loads.</p>
+      <div class="repo-wire">
+        <div class="repo-head"><div><div class="eyebrow">DETECTED REPOSITORY</div><div id="repoName" class="repo-name">michaelkage/Life-Itself</div><div id="repoDescription" class="api-status">Waiting for GitHub API…</div></div><div class="toolbar"><a id="repoLink" href="https://github.com/michaelkage/Life-Itself" target="_blank" rel="noopener">Open repository ↗</a><button class="action-btn" id="refreshRepo">Refresh</button></div></div>
+        <div class="release-grid">
+          <div class="release-item"><small>Latest release tag</small><b id="releaseTag">Loading…</b></div>
+          <div class="release-item"><small>Latest commit</small><b id="commitDate">Loading…</b></div>
+          <div class="release-item"><small>Default branch / stars</small><b id="repoBranch">Loading…</b></div>
+        </div>
+        <div class="assets" id="releaseAssets"><span class="api-status">Checking release assets…</span></div>
+        <div class="api-status" id="apiStatus" style="margin-top:10px" aria-live="polite">GitHub API status: pending</div>
+      </div>
+    </div>
+  </div>
+</section>
+</main>
+<footer><span>LIFE ITSELF / SIMULATED REALITY ENGINE</span><span>Manual is generated from repository contracts · no build step · no runtime dependency</span></footer>
+</div>
+<script>
+(function(){
+  "use strict";
+  if(window.self!==window.top && /\.github\.io$/i.test(window.location.hostname)){document.body.classList.add("is-embedded");}
+  const $=id=>document.getElementById(id);
+  const clamp=(n,min,max)=>Math.max(min,Math.min(max,n));
+  const disruptions=[
+    {id:"01-traffic",kind:"traffic",severity:0.8,start:480,end:600,location:"shop-1",delay:18},
+    {id:"02-storm",kind:"weather",severity:0.6,start:480,end:600,location:null,delay:0,activity:"work-from-home",altLocation:"home-1"},
+    {id:"03-alarm",kind:"alarm_failure",severity:0.9,start:420,end:600,location:null,delay:45},
+    {id:"04-memory-avoidance",kind:"location_avoidance",severity:1,start:0,end:1440,location:"shop-1",delay:0,activity:"take-another-route",altLocation:"side-street"}
+  ];
+  const checkboxIds={"01-traffic":"d-traffic","02-storm":"d-storm","03-alarm":"d-alarm","04-memory-avoidance":"d-avoid"};
+  const severityIds={"01-traffic":"s-traffic","02-storm":"s-storm","03-alarm":"s-alarm","04-memory-avoidance":"s-avoid"};
+  function selectedDisruptions(){
+    return disruptions.filter(d=>$(checkboxIds[d.id]).checked).map(d=>Object.assign({},d,{severity:Number($(severityIds[d.id]).value)/100})).sort((a,b)=>a.id.localeCompare(b.id));
+  }
+  function resolve(block,minute,items,sample){
+    const relevant=items.filter(d=>d.owner==="npc-1"&&d.start<=minute&&minute<d.end&&(d.location===null||d.location===block.location)).sort((a,b)=>a.id.localeCompare(b.id));
+    const ids=relevant.map(d=>d.id);
+    const matched=relevant.find(d=>sample<d.severity);
+    const base={routineId:block.id,ownerId:block.owner, intendedActivity:block.activity,intendedLocation:block.location,actualActivity:block.activity,actualLocation:block.location,outcome:"on_time",delay:0,ids,matched:null,reason:"routine proceeds; no applicable disruption crossed the supplied outcome sample"};
+    if(!matched)return base;
+    base.matched=matched;
+    if(matched.activity||matched.altLocation){
+      base.actualActivity=matched.activity||block.fallbackActivity||block.activity;
+      base.actualLocation=matched.altLocation||block.fallbackLocation||block.location;
+      base.outcome="redirected";
+      base.reason="redirected by "+matched.kind+": "+matched.id;
+      return base;
+    }
+    let delay=matched.delay;
+    if(matched.kind==="alarm_failure")delay=Math.max(delay,30);
+    if(matched.kind==="low_motivation")delay=Math.max(delay,15);
+    base.delay=delay;
+    if(delay<=block.flex){
+      base.outcome="delayed";
+      base.reason="delayed by "+matched.kind+": within routine flexibility";
+      return base;
+    }
+    if(block.fallbackActivity||block.fallbackLocation){
+      base.actualActivity=block.fallbackActivity||block.activity;
+      base.actualLocation=block.fallbackLocation||block.location;
+      base.outcome="redirected";
+      base.reason="fallback selected after "+matched.kind+": "+matched.id;
+      return base;
+    }
+    base.actualLocation=null;
+    base.outcome="missed";
+    base.reason="routine missed after "+matched.kind+": delay exceeds flexibility";
+    return base;
+  }
+  function render(){
+    const minute=Number($("minute").value);
+    const sample=Number($("sample").value)/100;
+    $("sampleValue").textContent=sample.toFixed(2);
+    Object.keys(severityIds).forEach(id=>$(severityIds[id].replace("s-","v-")).textContent=(Number($(severityIds[id]).value)/100).toFixed(2));
+    const block={id:"work-shift",owner:"npc-1",activity:"work",location:"shop-1",flex:20,fallbackActivity:"call employer",fallbackLocation:"home-1"};
+    const items=selectedDisruptions();
+    const result=resolve(block,minute,items,sample);
+    $("outcome").textContent=result.outcome.replace("_"," ");
+    $("outcome").className="result-state "+(result.outcome==="on_time"?"good":result.outcome==="redirected"?"accent":"");
+    $("delay").textContent=result.delay+" min";
+    $("matched").textContent=result.matched?result.matched.id:"No disruption crossed sample";
+    $("intended").textContent=result.intendedActivity+" @ "+result.intendedLocation;
+    $("actual").textContent=result.actualActivity+" @ "+(result.actualLocation||"—");
+    $("considered").textContent=result.ids.length?result.ids.join(", "):"—";
+    $("threshold").textContent=sample.toFixed(2)+" / "+(result.matched?result.matched.severity.toFixed(2):"—");
+    const lines=[];
+    lines.push("Minute "+minute+" falls "+(minute>=480&&minute<960?"inside":"outside")+" the registered 08:00–16:00 routine window.");
+    lines.push(result.ids.length?"Relevant disruption IDs are sorted: "+result.ids.join(", ")+".":"No disruption applies to this owner, minute and intended location.");
+    if(result.matched){lines.push("First matching ID is "+result.matched.id+"; sample "+sample.toFixed(2)+" < severity "+result.matched.severity.toFixed(2)+".");}
+    else if(result.ids.length){lines.push("No relevant disruption crossed the sample threshold.");}
+    if(result.matched&&result.matched.kind==="alarm_failure")lines.push("Alarm failure enforces a minimum delay of 30 minutes.");
+    if(result.matched&&result.matched.kind==="low_motivation")lines.push("Low motivation enforces a minimum delay of 15 minutes.");
+    if(result.outcome==="delayed")lines.push("Delay "+result.delay+" min is within "+block.flex+" min flexibility; planned activity and location remain.");
+    if(result.outcome==="redirected")lines.push("Alternative activity/location takes precedence; otherwise the registered routine fallback is used.");
+    if(result.outcome==="missed")lines.push("Delay exceeds flexibility and no fallback is registered; actual location is null.");
+    if(result.outcome==="on_time")lines.push("Routine intention remains unchanged; this does not prove physical arrival.");
+    lines.push("Result: "+result.reason+".");
+    $("trace").innerHTML=lines.map((line,i)=>"<li><strong>"+String(i+1).padStart(2,"0")+"</strong> "+escapeHTML(line)+"</li>").join("");
+  }
+  function escapeHTML(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+  const presets={
+    clear:[],
+    traffic:["01-traffic"],
+    storm:["02-storm"],
+    avoid:["04-memory-avoidance"],
+    alarm:["03-alarm"]
+  };
+  function setPreset(name){
+    Object.keys(checkboxIds).forEach(id=>$(checkboxIds[id]).checked=presets[name].includes(id));
+    document.querySelectorAll("[data-preset]").forEach(b=>b.classList.toggle("active",b.dataset.preset===name));
+    if(name==="traffic")$("sample").value=20;
+    else if(name==="storm")$("sample").value=20;
+    else if(name==="avoid")$("sample").value=20;
+    else if(name==="alarm")$("sample").value=20;
+    else $("sample").value=50;
+    render();
+  }
+  document.querySelectorAll("[data-preset]").forEach(b=>b.addEventListener("click",()=>setPreset(b.dataset.preset)));
+  ["minute","sample",...Object.values(checkboxIds),...Object.values(severityIds)].forEach(id=>$(id).addEventListener("input",()=>{
+    document.querySelectorAll("[data-preset]").forEach(b=>b.classList.remove("active"));render();
+  }));
+  $("resolve").addEventListener("click",render);
+  $("reset").addEventListener("click",()=>setPreset("clear"));
+  document.querySelectorAll("[data-copy]").forEach(b=>b.addEventListener("click",async()=>{
+    try{await navigator.clipboard.writeText(b.dataset.copy);const old=b.textContent;b.textContent="Copied";setTimeout(()=>b.textContent=old,1100);}catch(e){b.textContent="Select command";}
+  }));
+  render();
+
+  function inferRepository(){
+    const host=location.hostname.toLowerCase();
+    const parts=location.pathname.split("/").filter(Boolean);
+    if(host==="github.com"||host==="www.github.com"){
+      if(parts.length>=2)return {owner:parts[0],repo:parts[1].replace(/\.git$/,"")};
+    }
+    if(host.endsWith(".github.io")){
+      const owner=host.slice(0,-".github.io".length);
+      return {owner:owner,repo:parts.length?parts[0]:owner+".github.io"};
+    }
+    return {owner:"michaelkage",repo:"Life-Itself"};
+  }
+  function dateLabel(value){
+    if(!value)return "Not published";
+    const d=new Date(value);
+    return Number.isNaN(d.getTime())?"Unknown":new Intl.DateTimeFormat(undefined,{year:"numeric",month:"short",day:"2-digit"}).format(d);
+  }
+  async function loadRepository(){
+    const identity=inferRepository(),full=identity.owner+"/"+identity.repo;
+    $("repoName").textContent=full;
+    $("repoLink").href="https://github.com/"+full;
+    $("repoDescription").textContent="Fetching repository metadata…";
+    $("apiStatus").textContent="GitHub API: requesting repo, latest release and latest commit";
+    $("releaseTag").textContent="Loading…";$("commitDate").textContent="Loading…";$("repoBranch").textContent="Loading…";
+    $("releaseAssets").innerHTML="";
+    const base="https://api.github.com/repos/"+encodeURIComponent(identity.owner)+"/"+encodeURIComponent(identity.repo);
+    const headers={"Accept":"application/vnd.github+json"};
+    const results=await Promise.allSettled([
+      fetch(base,{headers}).then(r=>{if(!r.ok)throw Error("repo "+r.status);return r.json();}),
+      fetch(base+"/releases/latest",{headers}).then(r=>{if(!r.ok)throw Error("release "+r.status);return r.json();}),
+      fetch(base+"/commits?per_page=1",{headers}).then(r=>{if(!r.ok)throw Error("commits "+r.status);return r.json();})
+    ]);
+    const [repo,release,commits]=results.map(x=>x.status==="fulfilled"?x.value:null);
+    if(repo){
+      $("repoDescription").textContent=repo.description||"No repository description published.";
+      $("repoBranch").textContent=(repo.default_branch||"—")+" / "+(repo.stargazers_count??"—")+" stars";
+    }else $("repoDescription").textContent="Repository metadata unavailable; check owner/name and API rate limits.";
+    if(release){
+      $("releaseTag").textContent=release.tag_name||"Untagged";
+      $("releaseTag").title=(release.name||"")+" · "+dateLabel(release.published_at);
+      const assets=Array.isArray(release.assets)?release.assets:[];
+      if(assets.length){
+        $("releaseAssets").innerHTML=assets.map(a=>'<a class="asset-link" href="'+escapeHTML(a.browser_download_url)+'" target="_blank" rel="noopener">'+escapeHTML(a.name)+' · '+Number(a.size||0).toLocaleString()+" B</a>").join("");
+      }else $("releaseAssets").innerHTML='<span class="api-status">Latest release has no attached binary assets.</span>';
+    }else{
+      $("releaseTag").textContent="No published latest release";
+      $("releaseAssets").innerHTML='<span class="api-status">No GitHub latest-release record (or endpoint unavailable); binaries are not assumed.</span>';
+    }
+    if(commits&&commits[0]){
+      const c=commits[0];
+      $("commitDate").textContent=dateLabel(c.commit&&c.commit.committer&&c.commit.committer.date);
+      $("commitDate").title=(c.sha||"").slice(0,12)+" · "+((c.commit&&c.commit.message)||"").split("\n")[0];
+    }else $("commitDate").textContent="Unavailable";
+    const failed=results.map((x,i)=>x.status==="rejected"?["repository","release","commit"][i]+": "+x.reason.message:null).filter(Boolean);
+    $("apiStatus").textContent=failed.length?"Partial API response — "+failed.join(" · "):"Live GitHub API response · checked "+new Date().toLocaleTimeString();
+  }
+  $("refreshRepo").addEventListener("click",loadRepository);
+  loadRepository();
+})();
+</script>
+</body>
+</html>
