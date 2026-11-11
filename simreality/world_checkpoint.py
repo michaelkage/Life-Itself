@@ -654,7 +654,7 @@ class SimulationWorldCheckpoint:
                 if scar.owner_id not in source.participants + source.witnesses:
                     raise ValueError("emotional scar owner does not belong to its source world event")
                 if memory is None or memory.owner_id != scar.owner_id or memory.event_id != scar.source_event_id:
-                    raise ValueError("emotional scar requires autobiographical life history containing its owner's source memory")
+                    raise ValueError("emotional scar requires its owner's autobiographical source memory from checkpointed autobiographical life history")
             if any(recovery.tick > current_tick for recovery in scar_ledger.recoveries()):
                 raise ValueError("emotional scar recovery cannot occur after the checkpoint tick")
         if scar_identity_proposal_snapshot is not None:
@@ -1308,7 +1308,7 @@ class SimulationWorldCheckpoint:
                 if scar.owner_id not in source.participants + source.witnesses:
                     raise ValueError("emotional scar owner does not belong to its source world event")
                 if memory is None or memory.owner_id != scar.owner_id or memory.event_id != scar.source_event_id:
-                    raise ValueError("emotional scar requires autobiographical life history containing its owner's source memory")
+                    raise ValueError("emotional scar requires its owner's autobiographical source memory from checkpointed autobiographical life history")
             if any(item.tick > self.current_tick for item in scars.recoveries()):
                 raise ValueError("emotional scar recovery cannot occur after the checkpoint tick")
         if memory_reflections_snapshot is not None:
