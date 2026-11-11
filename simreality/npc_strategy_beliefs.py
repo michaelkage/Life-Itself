@@ -183,7 +183,12 @@ class StrategyBeliefProposal:
             value = getattr(self, name)
             if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value <= 0:
                 raise ValueError(f"{name} must be positive and finite")
-        for name in ("success_weight", "failure_weight", "posterior_confidence", "prior_confidence"):
+        for name in ("success_weight", "failure_weight"):
+            value = getattr(self, name)
+            if (isinstance(value, bool) or not isinstance(value, (int, float))
+                    or not math.isfinite(value) or value < 0.0):
+                raise ValueError(f"{name} must be finite and non-negative")
+        for name in ("posterior_confidence", "prior_confidence"):
             _unit(getattr(self, name), name)
         if not isinstance(self.confidence_delta, (int, float)) or isinstance(self.confidence_delta, bool) or not math.isfinite(self.confidence_delta) or not -1 <= self.confidence_delta <= 1:
             raise ValueError("confidence_delta must be finite and in [-1, 1]")
