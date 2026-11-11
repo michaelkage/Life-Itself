@@ -38,6 +38,7 @@ from simreality.psychological_interpretation import LearningProposal
 from simreality.psychological_learning_decisions import PsychologicalLearningDecisionLedger
 from simreality.planning import DeterministicPlanner, PlanningAction
 from simreality.npc_experience_transfer import NPCExperienceTransferLedger
+from simreality.npc_strategy_beliefs import NPCStrategyBeliefLedger
 
 
 class SimulationWorldCheckpointTests(unittest.TestCase):
@@ -121,6 +122,17 @@ class SimulationWorldCheckpointTests(unittest.TestCase):
             SimulationWorldCheckpoint.capture(
                 4, coordinator, npcs, presence=presence,
             )
+
+    def test_checkpoint_round_trip_persists_empty_strategy_belief_component(self):
+        coordinator, npcs, _ = self.make_simulation()
+        strategy_beliefs = NPCStrategyBeliefLedger()
+        checkpoint = SimulationWorldCheckpoint.capture(
+            4, coordinator, npcs, strategy_beliefs=strategy_beliefs,
+        )
+        restored = SimulationWorldCheckpoint.from_json(checkpoint.to_json()).restore()
+        self.assertIsNotNone(restored.strategy_beliefs)
+        self.assertEqual(restored.strategy_beliefs.observations(), ())
+        self.assertEqual(restored.strategy_beliefs.decisions(), ())
 
     def test_checkpoint_round_trip_persists_psychological_learning_decisions(self):
         coordinator, npcs, _ = self.make_simulation()
