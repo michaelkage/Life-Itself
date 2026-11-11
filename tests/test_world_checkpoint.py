@@ -323,7 +323,7 @@ class SimulationWorldCheckpointTests(unittest.TestCase):
     def test_testimony_inquiry_checkpoint_rejects_non_witness(self):
         coordinator, npcs, _ = self.make_simulation()
         inquiries = TestimonyInquiryLedger((
-            TestimonyInquiry("not-witness", "event-1", "listener", "observed_action", 3),
+            TestimonyInquiry("not-witness", "event-1", "subject", "observed_action", 3),
         ))
         with self.assertRaises(ValueError):
             SimulationWorldCheckpoint.capture(
