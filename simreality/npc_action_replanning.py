@@ -226,6 +226,10 @@ class NPCActionReplanningCoordinator:
                 raise TypeError("goal_commitment must be GoalCommitment")
             if goal_commitment.owner_id != owner_id or goal_commitment.tick != tick:
                 raise ValueError("goal commitment owner and tick must match the replan request")
+            committed_goal = self.decisions.goals.goals.get(goal_commitment.selected_goal_id)
+            if (committed_goal is None or committed_goal.owner_id != owner_id
+                    or not self.decisions.goals.evaluate(goal_commitment.selected_goal_id, tick).actionable):
+                raise ValueError("goal commitment is stale: selected goal is no longer actionable")
         facts = sorted(self.executions._canonical_facts(world_facts))
         balances = sorted(self.executions._canonical_resources(resources).items())
         action_reliability = {}
