@@ -98,7 +98,7 @@ class IdentityChangeProposal:
             raise ValueError("trait values must be in [-1, 1]")
         if not 0.0 < self.maximum_delta <= 0.1:
             raise ValueError("maximum_delta must be in (0, 0.1]")
-        if not -self.maximum_delta <= self.delta <= self.maximum_delta:
+        if not -self.maximum_delta - 1e-12 <= self.delta <= self.maximum_delta + 1e-12:
             raise ValueError("delta exceeds maximum_delta")
         if not 0.0 <= self.evidence_strength <= 1.0:
             raise ValueError("evidence_strength must be in [0, 1]")
