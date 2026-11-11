@@ -484,3 +484,6 @@ See [NPC goal lifecycle persistence](docs/NPC-GOAL-LIFECYCLE-PERSISTENCE.md) for
 - `simreality/goal_review_application.py` — explicit, stale-state-checked application of accepted goal reviews with replay protection.
 - `simreality/goal_review_application_save_state.py` — canonical persistence for applied review decisions.
 - `docs/GOAL-REASSESSMENT.md` — review proposal, decision, application, and checkpoint lifecycle.
+
+- `simreality/goal_recovery.py` — deterministic, circumstance-fingerprinted proposals to reopen abandoned intentions after explicit need/world-fact recovery.
+- `tests/test_goal_recovery.py` — recovery gating, stale-context rejection, and lifecycle reopening coverage.
