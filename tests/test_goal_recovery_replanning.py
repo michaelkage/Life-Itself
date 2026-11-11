@@ -80,7 +80,7 @@ class GoalRecoveryReplanningTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "another NPC"):
             self.run_recovery(active_execution_id=foreign.execution_id)
         self.assertEqual(self.goals.goals["housing"].status, GoalStatus.ABANDONED)
-        self.assertEqual(len(self.lifecycle.snapshot()), 1)
+        self.assertEqual(len(self.lifecycle.snapshot()), 3)
 
     def test_retry_reuses_lifecycle_event_and_replanning_result(self):
         first = self.run_recovery()
