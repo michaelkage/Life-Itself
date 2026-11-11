@@ -461,7 +461,7 @@ class NPCActionReplanningCoordinator:
                     or (isinstance(existing, ActiveActionExecution)
                         and (existing.plan_actions != continuation or existing.action_index != 0))):
                 raise ValueError("resume identity conflicts with existing execution history")
-            if self.events.get(resume_event_id) is None:
+            if not any(event.event_id == resume_event_id for event in self.events.snapshot()):
                 self.events.append(WorldEventLedger.make_event(
                     resume_event_id, tick, "npc_action_resumed",
                     participants=(interrupted.owner_id,),
@@ -497,7 +497,7 @@ class NPCActionReplanningCoordinator:
                     resumed_base, interrupted.owner_id, goal_id,
                     continuation, set(expected_facts),
                 )
-        if self.events.get(resume_event_id) is None:
+        if not any(event.event_id == resume_event_id for event in self.events.snapshot()):
             self.events.append(WorldEventLedger.make_event(
                 resume_event_id, tick, "npc_action_resumed",
                 participants=(interrupted.owner_id,),
