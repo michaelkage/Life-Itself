@@ -511,3 +511,6 @@ NPC long-term intention memory now preserves why an ambition was adopted or reop
 
 
 Reflective goal reconsideration also integrates the existing strategic experience-transfer ledger: exact goal-tagged memories retain distinct personal, witnessed, and confidence-discounted reported source classes. Reported experiences influence appraisal without becoming autobiographical memories, and overlapping first-hand evidence is deduplicated per goal. See [the intention-memory guide](docs/NPC-GOAL-INTENTION-MEMORY.md).
+
+
+NPCs can now reflect on terminal plan outcomes through exact, authored causal mappings and deterministic counterfactual planning. The read-only reasoner distinguishes candidate causes such as an NPC's own decision, measured resource shortage, another NPC's participation, and changed circumstances only when the corresponding evidence is present. It can compare bounded alternatives by excluding authored actions and rerunning the symbolic planner; hypothetical alternatives never rewrite history or prove causality. See docs/NPC-GOAL-REFLECTION.md and tests/test_npc_goal_reflection.py.
