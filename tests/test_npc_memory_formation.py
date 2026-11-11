@@ -46,7 +46,7 @@ def test_memory_formation_is_idempotent_and_rule_changes_conflict():
     second = NPCAutobiographicalMemoryAdapter.process((event,), profiles, history)
     assert first == second
     assert len(history.memories("alice")) == 1
-    changed = {"alice": profile("alice", "participant", "A different account")}
+    changed = {"alice": profile("alice", "participant", "A different account", event_type="loss")}
     with pytest.raises(ValueError, match="reused with different content"):
         NPCAutobiographicalMemoryAdapter.process((event,), changed, history)
 
