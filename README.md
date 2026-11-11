@@ -514,3 +514,6 @@ Reflective goal reconsideration also integrates the existing strategic experienc
 
 
 NPCs can now reflect on terminal plan outcomes through exact, authored causal mappings and deterministic counterfactual planning. The read-only reasoner distinguishes candidate causes such as an NPC's own decision, measured resource shortage, another NPC's participation, and changed circumstances only when the corresponding evidence is present. It can compare bounded alternatives by excluding authored actions and rerunning the symbolic planner; hypothetical alternatives never rewrite history or prove causality. See docs/NPC-GOAL-REFLECTION.md and tests/test_npc_goal_reflection.py.
+
+
+NPC strategy beliefs now form from repeated, comparable terminal plan outcomes. Reliability is owner-, goal-, strategy-, and context-specific; replanned or unobserved outcomes are neutral. Bayesian-style evidence aggregation emits proposals only after a minimum sample and meaningful confidence shift, and NPCs explicitly accept or reject each proposal. Accepted beliefs can feed the existing planner's bounded risk premium without changing authored action costs. Strategy observations and decisions persist through SimulationWorldCheckpoint with source-plan and event-provenance validation. See docs/NPC-STRATEGY-BELIEFS.md and tests/test_npc_strategy_beliefs.py.
