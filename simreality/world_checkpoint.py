@@ -63,6 +63,8 @@ from .identity_goal_alignment import IdentityGoalReviewDecisionLedger, IdentityG
 from .action_execution import ActionExecutionLedger, ActionExecutionSnapshot
 from .action_evaluation import ActionPlanEvaluationLedger, ActionEvaluationSnapshot
 from .npc_action_replanning import NPCActionReplanningCoordinator, NPCReplanningSnapshot
+from .npc_goal_emergence import GoalLifecycleLedger
+from .goal_lifecycle_save_state import GoalLifecycleSnapshot
 
 
 @dataclass(frozen=True)
@@ -110,6 +112,7 @@ class RestoredSimulation:
     action_replanning_snapshot: NPCReplanningSnapshot | None = None
     action_evaluation_snapshot: ActionEvaluationSnapshot | None = None
     experience_transfers: NPCExperienceTransferLedger | None = None
+    goal_lifecycle: GoalLifecycleLedger | None = None
 
     def restore_action_execution_ledger(self, planner, policies, goals=None):
         """Rebind persisted execution progress to runtime planning and goal definitions."""
@@ -207,6 +210,7 @@ class SimulationWorldCheckpoint:
     action_replanning_json: str | None = None
     action_evaluations_json: str | None = None
     experience_transfers_json: str | None = None
+    goal_lifecycle_json: str | None = None
 
     SCHEMA_VERSION = 1
 
@@ -238,7 +242,7 @@ class SimulationWorldCheckpoint:
                 consequence_recorder=None, campaign=None, misconduct=None, routines=None,
                 routine_executions=None, routine_institutions=None, institutional_politics=None,
                 goal_book=None, goal_event_adapter=None, goal_review_decisions=None, identity_decisions=None,
-                testimony_inquiries=None, testimony=None, travel=None, presence=None, presence_encounters=None, familiarity=None, relationships=None, emotions=None, stress=None, conditioning=None, psychological_learning_decisions=None, life_history=None, memory_reflections=None, emotional_scars=None, emotional_scar_decisions=None, scar_identity_proposals=None, identity_goal_reviews=None, action_executions=None, action_world_facts=None, action_resources=None, action_replanning=None, action_evaluations=None, experience_transfers=None):
+                testimony_inquiries=None, testimony=None, travel=None, presence=None, presence_encounters=None, familiarity=None, relationships=None, emotions=None, stress=None, conditioning=None, psychological_learning_decisions=None, life_history=None, memory_reflections=None, emotional_scars=None, emotional_scar_decisions=None, scar_identity_proposals=None, identity_goal_reviews=None, action_executions=None, action_world_facts=None, action_resources=None, action_replanning=None, action_evaluations=None, experience_transfers=None, goal_lifecycle=None):
         if not isinstance(coordinator, SimulationTickCoordinator):
             raise TypeError("coordinator must be a SimulationTickCoordinator")
         if not isinstance(npcs, dict):
@@ -816,6 +820,20 @@ class SimulationWorldCheckpoint:
             NPCExperienceTransferLedger(coordinator.events, life_history, experience_transfer_snapshot)
             if any(item.transfer_tick > current_tick for item in experience_transfer_snapshot.records):
                 raise ValueError("experience transfers cannot occur after the checkpoint tick")
+        goal_lifecycle_snapshot = None
+        if goal_lifecycle is not None:
+            if not isinstance(goal_lifecycle, GoalLifecycleLedger):
+                raise TypeError('goal_lifecycle must be a GoalLifecycleLedger or None')
+            if goal_book is None:
+                raise ValueError('goal lifecycle history requires the corresponding GoalBook')
+            goal_lifecycle_snapshot = GoalLifecycleSnapshot.capture(goal_lifecycle)
+            known_goals = {goal.goal_id: goal.owner_id for goal in goal_book.goals.values()}
+            if any(record[1] not in known_goals or known_goals[record[1]] != record[2] or record[5] > current_tick for record in goal_lifecycle_snapshot.records):
+                raise ValueError('goal lifecycle history references an unknown goal, owner, or future tick')
+            if life_history is not None:
+                known_evidence = {memory.memory_id for memory in life_history.memories()}
+                if any(evidence_id not in known_evidence for record in goal_lifecycle_snapshot.records for evidence_id in record[7]):
+                    raise ValueError('goal lifecycle evidence references an unknown autobiographical memory')
         envelope = SimulationSaveEnvelope.capture(current_tick, coordinator.events)
         return cls(
             current_tick, envelope.to_json(),
@@ -861,6 +879,7 @@ class SimulationWorldCheckpoint:
             action_replanning_snapshot.to_json() if action_replanning_snapshot is not None else None,
             action_evaluation_snapshot.to_json() if action_evaluation_snapshot is not None else None,
             experience_transfer_snapshot.to_json() if experience_transfer_snapshot is not None else None,
+            goal_lifecycle_snapshot.to_json() if goal_lifecycle_snapshot is not None else None,
         )
 
     def _components(self):
@@ -909,6 +928,7 @@ class SimulationWorldCheckpoint:
             NPCReplanningSnapshot.from_json(self.action_replanning_json) if self.action_replanning_json is not None else None,
             ActionEvaluationSnapshot.from_json(self.action_evaluations_json) if self.action_evaluations_json is not None else None,
             ExperienceTransferSnapshot.from_json(self.experience_transfers_json) if self.experience_transfers_json is not None else None,
+            GoalLifecycleSnapshot.from_json(self.goal_lifecycle_json) if self.goal_lifecycle_json is not None else None,
         )
         goals_snapshot, goal_replay, goal_review_decisions = components[14], components[15], components[16]
         identity_decisions = components[17]
@@ -935,6 +955,7 @@ class SimulationWorldCheckpoint:
         action_replanning_snapshot = components[38]
         action_evaluation_snapshot = components[39]
         experience_transfer_snapshot = components[40]
+        goal_lifecycle_snapshot = components[41]
         if experience_transfer_snapshot is not None:
             if life_history_snapshot is None:
                 raise ValueError("experience transfers require checkpointed autobiographical life history")
@@ -1389,10 +1410,20 @@ class SimulationWorldCheckpoint:
                         or action.owner_id not in source.participants + source.witnesses
                         or action.target_id not in source.participants + source.witnesses):
                     raise ValueError("personal history action does not match saved NPCs and source event")
+        if goal_lifecycle_snapshot is not None:
+            if goals_snapshot is None:
+                raise ValueError('goal lifecycle history requires the corresponding GoalBook')
+            known_goals = {record[0]: record[1] for record in goals_snapshot.records}
+            if any(record[1] not in known_goals or known_goals[record[1]] != record[2] or record[5] > self.current_tick for record in goal_lifecycle_snapshot.records):
+                raise ValueError('goal lifecycle history references an unknown goal, owner, or future tick')
+            if life_history_snapshot is not None:
+                known_memory_ids = {record[0] for record in life_history_snapshot.memories}
+                if any(evidence_id not in known_memory_ids for record in goal_lifecycle_snapshot.records for evidence_id in record[7]):
+                    raise ValueError('goal lifecycle evidence references an unknown autobiographical memory')
         return components
 
     def to_json(self):
-        envelope, npcs, trust, beliefs, memory, conversations, ticks, consequence, campaign, misconduct, routines, routine_executions, routine_institutions, institutional_politics, goals, goal_event_replay, goal_review_decisions, identity_decisions, testimony_inquiries, testimony, travel, presence, presence_encounters, familiarity, relationships, emotions, stress, conditioning, learning_decisions, life_history, memory_reflections, emotional_scars, emotional_scar_decisions, scar_identity_proposals, identity_goal_reviews, action_execution_snapshot, action_world_facts, action_resources, action_replanning_snapshot, action_evaluation_snapshot, experience_transfer_snapshot = self._components()
+        envelope, npcs, trust, beliefs, memory, conversations, ticks, consequence, campaign, misconduct, routines, routine_executions, routine_institutions, institutional_politics, goals, goal_event_replay, goal_review_decisions, identity_decisions, testimony_inquiries, testimony, travel, presence, presence_encounters, familiarity, relationships, emotions, stress, conditioning, learning_decisions, life_history, memory_reflections, emotional_scars, emotional_scar_decisions, scar_identity_proposals, identity_goal_reviews, action_execution_snapshot, action_world_facts, action_resources, action_replanning_snapshot, action_evaluation_snapshot, experience_transfer_snapshot, goal_lifecycle_snapshot = self._components()
         payload = {
             "schema_version": self.SCHEMA_VERSION, "current_tick": self.current_tick,
             "events": json.loads(envelope.to_json()), "npcs": json.loads(npcs.to_json()),
@@ -1472,6 +1503,8 @@ class SimulationWorldCheckpoint:
             payload["action_evaluations"] = json.loads(action_evaluation_snapshot.to_json())
         if experience_transfer_snapshot is not None:
             payload["experience_transfers"] = json.loads(experience_transfer_snapshot.to_json())
+        if goal_lifecycle_snapshot is not None:
+            payload["goal_lifecycle"] = json.loads(goal_lifecycle_snapshot.to_json())
         return json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False)
 
     @classmethod
@@ -1518,7 +1551,8 @@ class SimulationWorldCheckpoint:
                        json.dumps(raw["action_resources"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("action_resources") is not None else None,
                        json.dumps(raw["action_replanning"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("action_replanning") is not None else None,
                        json.dumps(raw["action_evaluations"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("action_evaluations") is not None else None,
-                       json.dumps(raw["experience_transfers"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("experience_transfers") is not None else None)
+                       json.dumps(raw["experience_transfers"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("experience_transfers") is not None else None,
+                       json.dumps(raw["goal_lifecycle"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("goal_lifecycle") is not None else None)
         except ValueError:
             raise
         except (TypeError, KeyError, IndexError, json.JSONDecodeError) as exc:
@@ -1577,8 +1611,10 @@ class SimulationWorldCheckpoint:
         identity_goal_reviews = identity_goal_review_snapshot.restore() if identity_goal_review_snapshot is not None else None
         experience_transfers = (NPCExperienceTransferLedger(events, life_history, experience_transfer_snapshot)
                                 if experience_transfer_snapshot is not None else None)
+        goal_lifecycle = goal_lifecycle_snapshot.restore() if goal_lifecycle_snapshot is not None else None
         return RestoredSimulation(self.current_tick, events, npcs, trust, beliefs,
                                   memory, conversations, coordinator, self.metadata,
                                   consequence_recorder, campaign, misconduct, routines, routine_executions,
                                   routine_institutions, institutional_politics, goals, goal_event_replay,
-                                  goal_review_decisions, identity_decisions, testimony_inquiries, testimony, travel, presence, presence_encounters, familiarity, relationships, emotions, stress, conditioning, psychological_learning_decisions, life_history, memory_reflections, emotional_scars, emotional_scar_decisions, scar_identity_proposals, identity_goal_reviews, action_execution_snapshot, set(action_world_facts) if action_world_facts is not None else None, dict(action_resources) if action_resources is not None else None, action_replanning_snapshot, action_evaluation_snapshot, experience_transfers)
+                                  goal_review_decisions, identity_decisions, testimony_inquiries, testimony, travel, presence, presence_encounters, familiarity, relationships, emotions, stress, conditioning, psychological_learning_decisions, life_history, memory_reflections, emotional_scars, emotional_scar_decisions, scar_identity_proposals, identity_goal_reviews, action_execution_snapshot, set(action_world_facts) if action_world_facts is not None else None, dict(action_resources) if action_resources is not None else None, action_replanning_snapshot, action_evaluation_snapshot, experience_transfers,
+                                  goal_lifecycle)
