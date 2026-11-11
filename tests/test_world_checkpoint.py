@@ -1554,10 +1554,12 @@ if __name__ == "__main__":
         ),))
         lifecycle = GoalLifecycleLedger()
         lifecycle.record(goal, 3, "adopted", evidence_ids=("goal-memory",))
-        goal.status = GoalStatus.ABANDONED
-        lifecycle.record(goal, 4, "immediate danger passed")
-        goals.reopen("goal-1", 5)
-        lifecycle.record(goal, 5, "new threat emerged")
+        lifecycle.transition(
+            goals, "goal-1", GoalStatus.ABANDONED, 4, "immediate danger passed",
+        )
+        lifecycle.transition(
+            goals, "goal-1", GoalStatus.ACTIVE, 5, "new threat emerged",
+        )
         payload = SimulationWorldCheckpoint.capture(
             5, coordinator, npcs, goal_book=goals, goal_lifecycle=lifecycle,
             life_history=history,
