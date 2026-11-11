@@ -251,6 +251,11 @@ class GoalRecoveryReplanningAdapter:
             ).encode("utf-8")).hexdigest()
             if signature != proposal.context_signature:
                 raise ValueError("goal recovery proposal is stale: circumstances changed")
+            if (goal.category != proposal.current_category
+                    or goal.priority != proposal.current_priority
+                    or goal.confidence != proposal.current_confidence
+                    or goal.review_tick != proposal.sampled_tick):
+                raise ValueError("goal recovery proposal is stale: goal state changed")
             lifecycle_event = matching_event
         else:
             lifecycle_event = GoalRecoveryAdapter.apply(
