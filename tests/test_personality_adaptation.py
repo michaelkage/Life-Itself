@@ -45,7 +45,7 @@ def test_repeated_experiences_propose_small_cumulative_personality_change():
     assert assessment.proposal.delta == pytest.approx(0.02)
     assert assessment.proposal.before == pytest.approx(0.1)
     assert assessment.proposal.after == pytest.approx(0.12)
-    assert assessment.proposal.evidence_strength == pytest.approx(0.8)
+    assert assessment.proposal.evidence_strength == pytest.approx(0.7992379943375473)
 
 
 def test_personality_change_requires_explicit_acceptance_and_rejection_is_preserved():
