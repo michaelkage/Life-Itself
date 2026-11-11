@@ -193,6 +193,9 @@ class GoalArbitrationEvaluator:
         values = axis_map(value_alignment, "value alignment", -1.0, 1.0)
         balances = axis_map(resources, "resources", 0.0, float("inf"))
         experience = axis_map(experience_adjustments, "experience adjustments", -0.25, 0.25)
+        if any(goal_id not in goals.goals or goals.goals[goal_id].owner_id != owner_id
+               for goal_id in experience):
+            raise ValueError("experience adjustments must reference goals owned by the NPC")
         emotions = dict(emotional_state.intensities) if emotional_state else {}
         owner_goals = sorted(
             (goal for goal in goals.goals.values() if goal.owner_id == owner_id
@@ -235,6 +238,19 @@ class GoalArbitrationEvaluator:
         canonical = {
             "owner": owner_id, "tick": current_tick,
             "goals": [list(item) for item in snapshot],
+            "inputs": {
+                "need_deficits": sorted(needs.items()),
+                "emotions": sorted(emotions.items()),
+                "value_alignment": sorted(values.items()),
+                "resources": sorted(balances.items()),
+                "experience_adjustments": sorted(experience.items()),
+                "rules": [
+                    [rule.goal_id, rule.need_axis, rule.emotion_axis, rule.value_axis,
+                     rule.need_weight, rule.emotion_weight, rule.value_weight,
+                     rule.importance, [list(cost) for cost in rule.resource_costs]]
+                    for rule in rules
+                ],
+            },
             "candidates": [
                 [x.goal_id, x.score, x.base_priority_score, x.need_contribution,
                  x.emotion_contribution, x.value_contribution,
