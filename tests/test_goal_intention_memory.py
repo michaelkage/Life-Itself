@@ -1,3 +1,5 @@
+import hashlib
+
 import pytest
 
 from simreality.action_evaluation import ActionPlanEvaluationLedger
@@ -29,7 +31,7 @@ def test_lifecycle_commitment_and_personal_evidence_form_provenance_linked_memor
                               "I promised to protect my family", 0.8, 0.2),
     ))
     commitment = GoalCommitment(
-        "commit-1", "a" * 64, "alice", 3, "g1", ("g2",), 0.9,
+        hashlib.sha256(("a" * 64 + ":commit").encode()).hexdigest(), "a" * 64, "alice", 3, "g1", ("g2",), 0.9,
         "Immediate danger outweighs other ambitions",
     )
     commitments = GoalCommitmentLedger((commitment,))
