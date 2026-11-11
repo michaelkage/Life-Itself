@@ -144,3 +144,10 @@ itself changed. Successful application reopens the goal through
 `GoalLifecycleLedger`, preserving the abandonment and reopening
 rationale in the append-only history. Recovery is therefore a new explicit
 decision, not erasure of the NPC's prior choice.
+
+
+## Reopening and action replanning as one operation
+
+`GoalRecoveryReplanningAdapter.recover_and_replan` is the integration boundary between recovered intentions and executable behavior. It requires the decision cycle (and any goal-aware execution ledger) to reference the same `GoalBook` as the recovery operation. The adapter first commits the lifecycle reopening, then asks `NPCActionReplanningCoordinator` to choose and start a plan from the supplied current world facts, resources, and goal-fact mappings. An optional active execution ID is cancelled by the replanning coordinator before replacement work begins.
+
+The action planner is never resumed from an abandoned plan cursor. It recomputes from live facts and current goal rankings, while prior execution records and world events remain in the shared ledgers. A repeated operation recognizes its exact prior lifecycle transition and relies on the replanning request cache to avoid duplicate action starts. If planning fails after the lifecycle transition, the goal remains active and the same operation can be retried safely; the NPC has recovered the intention even if the world currently prevents action.
