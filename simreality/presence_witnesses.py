@@ -13,7 +13,7 @@ from .world_events import WorldEvent
 
 
 @dataclass(frozen=True)
-class WitnessPresenceAssessment:
+class PresenceWitnessAssessment:
     witness_id: str
     eligible: bool
     reason: str
@@ -24,7 +24,7 @@ class PresenceWitnessResolution:
     event_id: str
     tick: int
     location_id: str
-    assessments: tuple[WitnessPresenceAssessment, ...]
+    assessments: tuple[PresenceWitnessAssessment, ...]
 
     @property
     def eligible_witnesses(self) -> tuple[str, ...]:
@@ -84,5 +84,5 @@ class PresenceWitnessAdapter:
                 eligible, reason = False, "no_observation_opportunity"
             else:
                 eligible, reason = True, "eligible"
-            assessments.append(WitnessPresenceAssessment(owner, eligible, reason))
+            assessments.append(PresenceWitnessAssessment(owner, eligible, reason))
         return PresenceWitnessResolution(event.event_id, event.tick, location_id, tuple(assessments))
