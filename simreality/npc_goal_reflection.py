@@ -61,6 +61,21 @@ class GoalCounterfactualPlan:
     plan: PlanResult
     cost_delta: int | None
 
+    def __post_init__(self):
+        if not isinstance(self.alternative_id, str) or not self.alternative_id.strip():
+            raise ValueError("alternative_id must be non-empty")
+        if (not isinstance(self.excluded_action_ids, tuple)
+                or self.excluded_action_ids != tuple(sorted(set(self.excluded_action_ids)))
+                or any(not isinstance(x, str) or not x.strip() for x in self.excluded_action_ids)):
+            raise ValueError("excluded_action_ids must be unique, sorted, non-empty strings")
+        if not isinstance(self.plan, PlanResult):
+            raise TypeError("plan must be PlanResult")
+        if self.plan.success:
+            if isinstance(self.cost_delta, bool) or not isinstance(self.cost_delta, int):
+                raise ValueError("successful counterfactual plans require an integer cost_delta")
+        elif self.cost_delta is not None:
+            raise ValueError("unsuccessful counterfactual plans must not have a cost_delta")
+
 @dataclass(frozen=True)
 class GoalPlanReflection:
     owner_id: str
@@ -72,6 +87,38 @@ class GoalPlanReflection:
     evidence_event_ids: tuple[str, ...]
     counterfactuals: tuple[GoalCounterfactualPlan, ...]
     reflection_id: str
+
+    def __post_init__(self):
+        for name in ("owner_id", "goal_id", "plan_id"):
+            value = getattr(self, name)
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError(f"{name} must be non-empty")
+        if isinstance(self.evaluated_tick, bool) or not isinstance(self.evaluated_tick, int) or self.evaluated_tick < 0:
+            raise ValueError("evaluated_tick must be non-negative")
+        if not isinstance(self.causes, tuple) or self.causes != tuple(sorted(self.causes)):
+            raise ValueError("causes must be a sorted tuple")
+        cause_names = [item[0] for item in self.causes]
+        if len(cause_names) != len(set(cause_names)):
+            raise ValueError("causal categories must be unique")
+        for cause, weight in self.causes:
+            if cause not in _CAUSES or not 0.0 < _number(weight, "cause weight") <= 1.0:
+                raise ValueError("invalid causal category or weight")
+        expected_primary = (sorted(self.causes, key=lambda x: (-x[1], x[0]))[0][0]
+                            if self.causes else "undetermined")
+        if self.primary_cause != expected_primary:
+            raise ValueError("primary_cause must match the highest weighted cause")
+        if not isinstance(self.evidence_event_ids, tuple) or self.evidence_event_ids != tuple(sorted(set(self.evidence_event_ids))):
+            raise ValueError("evidence_event_ids must be unique and sorted")
+        if not isinstance(self.counterfactuals, tuple) or any(
+            not isinstance(item, GoalCounterfactualPlan) for item in self.counterfactuals
+        ):
+            raise TypeError("counterfactuals must contain GoalCounterfactualPlan values")
+        alternative_ids = [item.alternative_id for item in self.counterfactuals]
+        if alternative_ids != sorted(set(alternative_ids)):
+            raise ValueError("counterfactual alternatives must be unique and sorted")
+        if (not isinstance(self.reflection_id, str) or len(self.reflection_id) != 64
+                or any(ch not in "0123456789abcdef" for ch in self.reflection_id)):
+            raise ValueError("reflection_id must be a SHA-256 hex digest")
 
 class NPCGoalReflectiveReasoner:
     """Read-only causal appraisal and deterministic alternative-plan comparison."""
@@ -114,8 +161,9 @@ class NPCGoalReflectiveReasoner:
             if required <= available or available < 0:
                 raise ValueError("a resource shortfall requires required > available >= 0")
             shortfalls.append((name, required, available))
-        if shortfalls != sorted(set(shortfalls)):
-            raise ValueError("resource shortfalls must be unique and sorted")
+        if (shortfalls != sorted(set(shortfalls))
+                or len({item[0] for item in shortfalls}) != len(shortfalls)):
+            raise ValueError("resource shortfalls must have unique resource names and canonical order")
 
         matched = {}
         deviation_map = {key: (cause, weight) for key, cause, weight in rule.deviation_causes}
