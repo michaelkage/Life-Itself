@@ -110,6 +110,8 @@ class StrategyObservation:
             return None
         if evaluation.terminal_status not in ("completed", "failed"):
             raise ValueError("unsupported terminal plan outcome")
+        if not evaluation.planned_actions:
+            return None
         if reflection is not None:
             from .npc_goal_reflection import GoalPlanReflection
             if not isinstance(reflection, GoalPlanReflection):
