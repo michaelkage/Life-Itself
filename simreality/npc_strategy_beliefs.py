@@ -125,6 +125,8 @@ class StrategyObservation:
         strategy_id = _digest({"goal": evaluation.goal_id, "actions": list(evaluation.planned_actions)})
         evidence = tuple(sorted(set(evaluation.evidence_event_ids)))
         confidence = _unit(evaluation.confidence, "evaluation confidence")
+        if confidence == 0.0:
+            return None
         reflection_id = reflection.reflection_id if reflection is not None else None
         payload = {
             "owner": evaluation.owner_id, "goal": evaluation.goal_id, "strategy": strategy_id,
