@@ -1598,7 +1598,7 @@ class SimulationWorldCheckpoint:
                     raise ValueError('goal review application references an unknown or rejected decision')
                 if decision[3] != record[1] or decision[2] != record[2] or decision[7] != record[3] or record[3] > self.current_tick:
                     raise ValueError('goal review application does not match its decision')
-                if (goal[2], goal[3], goal[8], goal[11]) != (record[5], record[6], record[7], record[8].value):
+                if (goal[2], goal[3], goal[8], goal[11]) != (record[5], record[6], record[7], record[8]):
                     raise ValueError('goal review application result does not match the checkpoint GoalBook')
         if goal_commitments_snapshot is not None:
             if goals_snapshot is None:
