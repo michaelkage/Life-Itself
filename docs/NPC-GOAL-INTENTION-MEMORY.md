@@ -43,3 +43,36 @@ checkpoint payloads remain loadable.
 
 Tests: `tests/test_goal_intention_memory.py` and
 `tests/test_world_checkpoint.py`.
+
+
+## Bounded intention recall
+
+`GoalIntentionRecallAdapter` retrieves only memory entries owned by the NPC
+and linked to a goal through the intention-memory ledger. It does not interpret
+the prose in `content`, infer causality, or transfer one NPC's experience to
+another. A caller must supply one `GoalIntentionRecallRule` per goal whose
+remembered experience should affect arbitration.
+
+Each rule explicitly assigns a signed weight to exact memory types, for example
+`plan_failed`, `plan_completed`, or `personal_experience`. Weights are
+bounded to [-0.25, 0.25], decay by a configurable half-life, and aggregate to
+a per-goal adjustment capped by `max_adjustment` (also at most 0.25). The
+result exposes every contributing memory ID, age, authored weight, and decayed
+contribution. Unweighted memories have no influence. No default emotional or
+moral interpretation is applied.
+
+`GoalIntentionContinuityAdapter.reconsider` accepts
+`intention_memories` and `recall_rules`. It combines recalled adjustments
+with explicitly supplied experience adjustments, clamps the combined influence
+to the existing [-0.25, 0.25] evaluator contract, and performs fresh arbitration.
+The recall digest is included in the arbitration assessment identity, so
+changing relevant evidence after a decision cannot silently replay or fork the
+same NPC/tick commitment. The returned `GoalContinuityResult.intention_recall`
+provides the complete evidence trail.
+
+Recall is a bounded appraisal input, not a goal lock. A previously failed
+approach can reduce an ambition's score when its authored rule says so, but
+current needs, deadlines, resources, and stronger competing goals can still
+change the selected intention. Deferred goals remain active.
+
+Tests: `tests/test_goal_intention_recall.py`.
