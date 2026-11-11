@@ -79,10 +79,17 @@ class StrategyObservation:
         _unit(self.confidence, "confidence")
         if isinstance(self.observed_tick, bool) or not isinstance(self.observed_tick, int) or self.observed_tick < 0:
             raise ValueError("observed_tick must be non-negative")
-        if not isinstance(self.evidence_event_ids, tuple) or self.evidence_event_ids != tuple(sorted(set(self.evidence_event_ids))):
-            raise ValueError("evidence_event_ids must be unique and sorted")
+        if (not isinstance(self.evidence_event_ids, tuple)
+                or any(not isinstance(x, str) or not x.strip() for x in self.evidence_event_ids)
+                or self.evidence_event_ids != tuple(sorted(set(self.evidence_event_ids)))):
+            raise ValueError("evidence_event_ids must be unique, sorted, non-empty strings")
         if self.reflection_id is not None:
             _nonempty(self.reflection_id, "reflection_id")
+            if len(self.reflection_id) != 64 or any(ch not in "0123456789abcdef" for ch in self.reflection_id):
+                raise ValueError("reflection_id must be a SHA-256 hex digest")
+        expected_strategy = _digest({"goal": self.goal_id, "actions": list(self.action_sequence)})
+        if self.strategy_id != expected_strategy:
+            raise ValueError("strategy_id does not match goal and ordered action sequence")
         expected = _digest({
             "owner": self.owner_id, "goal": self.goal_id, "strategy": self.strategy_id,
             "context": self.context_key, "plan": self.plan_id,
@@ -221,8 +228,14 @@ class StrategyBeliefDecision:
         if isinstance(self.decision_tick, bool) or not isinstance(self.decision_tick, int) or self.decision_tick < 0:
             raise ValueError("decision_tick must be non-negative")
         _unit(self.confidence, "confidence")
-        if not isinstance(self.observation_ids, tuple) or self.observation_ids != tuple(sorted(set(self.observation_ids))):
-            raise ValueError("observation_ids must be unique and sorted")
+        if (not isinstance(self.observation_ids, tuple)
+                or any(not isinstance(x, str) or not x.strip() for x in self.observation_ids)
+                or self.observation_ids != tuple(sorted(set(self.observation_ids)))):
+            raise ValueError("observation_ids must be unique, sorted, non-empty strings")
+        expected = _digest({"proposal": self.proposal_id, "accepted": self.accepted,
+                            "tick": self.decision_tick, "rationale": self.rationale})
+        if self.decision_id != expected:
+            raise ValueError("decision_id does not match immutable decision content")
 
 
 @dataclass(frozen=True)
@@ -366,8 +379,11 @@ class NPCStrategyBeliefLedger:
             raise ValueError("strategy proposal already has a decision")
         if any(x not in self._observations for x in decision.observation_ids):
             raise ValueError("strategy decision references unknown observations")
-        if any(self._observations[x].owner_id != decision.owner_id for x in decision.observation_ids):
-            raise ValueError("strategy decision references another NPC's observations")
+        if any((self._observations[x].owner_id, self._observations[x].goal_id,
+                self._observations[x].strategy_id, self._observations[x].context_key) !=
+               (decision.owner_id, decision.goal_id, decision.strategy_id, decision.context_key)
+               for x in decision.observation_ids):
+            raise ValueError("strategy decision references another owner, goal, strategy, or context")
         self._decisions[decision.decision_id] = decision
         self._proposal_decisions[decision.proposal_id] = decision.decision_id
         return decision
