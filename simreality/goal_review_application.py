@@ -121,7 +121,9 @@ class GoalReviewApplicationAdapter:
                 goal.category = decision.proposed_category
                 goal.priority = decision.proposed_priority
                 goal.confidence = decision.proposed_confidence
-            elif decision.action in {GoalReviewAction.PERSIST, GoalReviewAction.PAUSE}:
+            elif decision.action == GoalReviewAction.PERSIST:
+                goal.confidence = decision.proposed_confidence
+            elif decision.action == GoalReviewAction.PAUSE:
                 # PAUSE remains advisory: there is no persisted paused status yet.
                 pass
             elif decision.action == GoalReviewAction.ABANDON:
