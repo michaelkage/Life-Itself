@@ -959,8 +959,10 @@ __all__ += [
 from .goal_intention_recall import (
     GoalIntentionRecall, GoalIntentionRecallAdapter,
     GoalIntentionRecallEvidence, GoalIntentionRecallRule,
+    GoalIntentionStrategicEvidence,
 )
 __all__ += [
     "GoalIntentionRecall", "GoalIntentionRecallAdapter",
     "GoalIntentionRecallEvidence", "GoalIntentionRecallRule",
+    "GoalIntentionStrategicEvidence",
 ]
