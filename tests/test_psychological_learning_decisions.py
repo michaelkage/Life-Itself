@@ -39,7 +39,8 @@ class PsychologicalLearningDecisionTests(unittest.TestCase):
     def test_conflicting_replay_and_second_decision_are_rejected(self):
         ledger = PsychologicalLearningDecisionLedger()
         ledger.decide("d1", self.positive, accepted=False, decision_tick=2,
-                      conditioning=self.conditioning, profile=self.profile)
+                      conditioning=self.conditioning, profile=self.profile,
+                      rationale="Reject this conflicting replay")
         with self.assertRaisesRegex(ValueError, "conflicting content"):
             ledger.decide("d1", self.positive, accepted=True, decision_tick=2,
                           conditioning=self.conditioning, profile=self.profile)
@@ -50,11 +51,13 @@ class PsychologicalLearningDecisionTests(unittest.TestCase):
     def test_later_contradictory_learning_can_revise_association(self):
         ledger = PsychologicalLearningDecisionLedger()
         ledger.decide("d1", self.positive, accepted=True, decision_tick=2,
-                      conditioning=self.conditioning, profile=self.profile)
+                      conditioning=self.conditioning, profile=self.profile,
+                      rationale="Initial conditioning")
         negative = LearningProposal("npc-a", "event-2", 3, "rule-2",
                                     "authority", -1.0, 1.0, "reinforce", "authority is dangerous")
         ledger.decide("d2", negative, accepted=True, decision_tick=4,
-                      conditioning=self.conditioning, profile=self.profile)
+                      conditioning=self.conditioning, profile=self.profile,
+                      rationale="Update after contradictory evidence")
         self.assertEqual(self.conditioning.association_for("npc-a", "authority"), -0.25)
 
     def test_snapshot_round_trip_preserves_acceptance_and_rejection(self):
@@ -82,7 +85,8 @@ class PsychologicalLearningDecisionTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "profile owner"):
             ledger.decide("d1", self.positive, accepted=True, decision_tick=2,
                           conditioning=self.conditioning,
-                          profile=ConditioningProfile("another-npc"))
+                          profile=ConditioningProfile("another-npc"),
+                          rationale="Attempt with foreign profile")
         self.assertEqual(ledger.entries(), ())
         self.assertEqual(self.conditioning.records(), ())
 
