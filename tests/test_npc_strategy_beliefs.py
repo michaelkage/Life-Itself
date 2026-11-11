@@ -83,6 +83,17 @@ class NPCStrategyBeliefTests(unittest.TestCase):
         second = self.ledger.observe_evaluation(alternate, "forest", observed_tick=2)
         self.assertNotEqual(first.strategy_id, second.strategy_id)
 
+    def test_accepted_beliefs_export_planner_reliability(self):
+        observations = [self.add("p1", "failed", 1), self.add("p2", "failed", 2), self.add("p3", "failed", 3)]
+        proposal = self.ledger.assess("npc-a", observations[0].strategy_id, "forest", self.rule)
+        self.ledger.decide(proposal, accepted=True, decision_tick=4, rationale="Repeated failures")
+        self.assertEqual(self.ledger.plan_reliabilities("npc-a", "forest"),
+                         {("find-food", ("search", "gather")): proposal.posterior_confidence})
+
+    def test_zero_confidence_evaluation_is_not_a_learning_sample(self):
+        self.assertIsNone(self.add("p1", "failed", 1, confidence=0.0))
+        self.assertEqual(self.ledger.observations(), ())
+
     def test_snapshot_round_trip_preserves_observations_and_decisions(self):
         obs = [self.add("p1", "failed", 1), self.add("p2", "failed", 2), self.add("p3", "failed", 3)]
         proposal = self.ledger.assess("npc-a", obs[0].strategy_id, "forest", self.rule)
@@ -97,7 +108,7 @@ class NPCStrategyBeliefTests(unittest.TestCase):
         item = self.add("p1", "failed", 1)
         altered = StrategyObservation(
             item.observation_id, item.owner_id, item.goal_id, item.strategy_id,
-            item.context_key, "different-plan", item.outcome, item.confidence,
+            item.context_key, "different-plan", item.action_sequence, item.outcome, item.confidence,
             item.observed_tick, item.evidence_event_ids, item.reflection_id)
         with self.assertRaisesRegex(ValueError, "does not match"):
             self.ledger.record(altered)
