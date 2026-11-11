@@ -24,6 +24,16 @@ def _text(name: str, value: str) -> None:
         raise ValueError(f"{name} must be a non-empty string")
 
 
+def _identity_digest(owner_id: str, goal_id: str, tick: int,
+                     memory_type: str, source_kind: str,
+                     source_id: str) -> str:
+    identity = json.dumps(
+        [owner_id, goal_id, tick, memory_type, source_kind, source_id],
+        ensure_ascii=False, separators=(",", ":"), allow_nan=False,
+    )
+    return hashlib.sha256(identity.encode("utf-8")).hexdigest()
+
+
 @dataclass(frozen=True)
 class GoalIntentionMemory:
     memory_id: str
@@ -57,10 +67,10 @@ class GoalIntentionMemory:
             raise ValueError("evidence_ids must be a tuple of non-empty strings")
         if len(self.evidence_ids) != len(set(self.evidence_ids)):
             raise ValueError("evidence_ids must be unique")
-        expected = hashlib.sha256("|".join((
-            self.owner_id, self.goal_id, str(self.tick), self.memory_type,
+        expected = _identity_digest(
+            self.owner_id, self.goal_id, self.tick, self.memory_type,
             self.source_kind, self.source_id,
-        )).encode("utf-8")).hexdigest()
+        )
         if self.memory_id != "goal-memory:" + expected:
             raise ValueError("memory_id does not match its deterministic source identity")
 
@@ -78,9 +88,9 @@ class GoalIntentionMemoryLedger:
     def make(owner_id: str, goal_id: str, tick: int, memory_type: str,
              source_kind: str, source_id: str, content: str,
              evidence_ids: tuple[str, ...] = ()) -> GoalIntentionMemory:
-        digest = hashlib.sha256("|".join((
-            owner_id, goal_id, str(tick), memory_type, source_kind, source_id,
-        )).encode("utf-8")).hexdigest()
+        digest = _identity_digest(
+            owner_id, goal_id, tick, memory_type, source_kind, source_id,
+        )
         return GoalIntentionMemory(
             "goal-memory:" + digest, owner_id, goal_id, tick, memory_type,
             source_kind, source_id, content, tuple(evidence_ids),
