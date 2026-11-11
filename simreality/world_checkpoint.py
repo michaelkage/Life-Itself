@@ -257,7 +257,7 @@ class SimulationWorldCheckpoint:
                 consequence_recorder=None, campaign=None, misconduct=None, routines=None,
                 routine_executions=None, routine_institutions=None, institutional_politics=None,
                 goal_book=None, goal_event_adapter=None, goal_review_decisions=None, identity_decisions=None,
-                testimony_inquiries=None, testimony=None, travel=None, presence=None, presence_encounters=None, familiarity=None, relationships=None, emotions=None, stress=None, conditioning=None, psychological_learning_decisions=None, life_history=None, memory_reflections=None, emotional_scars=None, emotional_scar_decisions=None, scar_identity_proposals=None, identity_goal_reviews=None, action_executions=None, action_world_facts=None, action_resources=None, action_replanning=None, action_evaluations=None, experience_transfers=None, goal_lifecycle=None, goal_review_applications=None, goal_commitments=None, goal_intention_memories=None):
+                testimony_inquiries=None, testimony=None, travel=None, presence=None, presence_encounters=None, familiarity=None, relationships=None, emotions=None, stress=None, conditioning=None, psychological_learning_decisions=None, life_history=None, memory_reflections=None, emotional_scars=None, emotional_scar_decisions=None, scar_identity_proposals=None, identity_goal_reviews=None, action_executions=None, action_world_facts=None, action_resources=None, action_replanning=None, action_evaluations=None, experience_transfers=None, goal_lifecycle=None, goal_review_applications=None, goal_commitments=None, goal_intention_memories=None, strategy_beliefs=None):
         if not isinstance(coordinator, SimulationTickCoordinator):
             raise TypeError("coordinator must be a SimulationTickCoordinator")
         if not isinstance(npcs, dict):
@@ -879,15 +879,6 @@ class SimulationWorldCheckpoint:
                     known_evidence.update(item.transfer_id for item in experience_transfer_snapshot.records)
                 if any(evidence_id not in known_evidence for record in goal_lifecycle_snapshot.records for evidence_id in record[7]):
                     raise ValueError('goal lifecycle evidence references an unknown autobiographical memory')
-        if strategy_belief_snapshot is not None:
-            strategy_ledger = strategy_belief_snapshot.restore()
-            known_npcs = {npc.entity_id for npc in NPCCollectionSnapshot.from_json(self.npcs_json).restore().values()}
-            if any(item.owner_id not in known_npcs or item.observed_tick > self.current_tick
-                   for item in strategy_ledger.observations()):
-                raise ValueError("strategy beliefs reference an unknown NPC or future observation")
-            if any(item.decision_tick > self.current_tick for item in strategy_ledger.decisions()):
-                raise ValueError("strategy belief decision occurs after checkpoint tick")
-
         goal_commitments_snapshot = None
         if goal_commitments is not None:
             if not isinstance(goal_commitments, GoalCommitmentLedger):
