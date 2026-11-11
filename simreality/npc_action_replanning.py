@@ -17,6 +17,7 @@ from .goal_arbitration import GoalCommitment
 from .npc_life_history import NPCLifeHistory
 from .npc_experience_transfer import (NPCExperienceTransferLedger, experience_action_guidance,
                                      strategic_experience_evidence, experience_goal_guidance)
+from .npc_strategy_beliefs import NPCStrategyBeliefLedger
 from .planning import PlanResult
 from .world_events import WorldEventLedger
 
@@ -220,7 +221,9 @@ class NPCActionReplanningCoordinator:
                active_execution_id: str | None = None,
                max_expansions: int = 10_000,
                goal_motivational_adjustments: dict[str, float] | None = None,
-               goal_commitment: GoalCommitment | None = None) -> NPCReplanningResult:
+               goal_commitment: GoalCommitment | None = None,
+               strategy_beliefs: NPCStrategyBeliefLedger | None = None,
+               strategy_context_key: str | None = None) -> NPCReplanningResult:
         if not isinstance(owner_id, str) or not owner_id.strip():
             raise ValueError("owner_id must be non-empty")
         if isinstance(tick, bool) or not isinstance(tick, int) or tick < 0:
@@ -229,6 +232,13 @@ class NPCActionReplanningCoordinator:
             raise TypeError("world_facts and resources must be mutable set/dict values")
         if not isinstance(reason, str) or not reason.strip():
             raise ValueError("reason must be non-empty")
+        if strategy_beliefs is not None:
+            if not isinstance(strategy_beliefs, NPCStrategyBeliefLedger):
+                raise TypeError("strategy_beliefs must be an NPCStrategyBeliefLedger")
+            if not isinstance(strategy_context_key, str) or not strategy_context_key.strip():
+                raise ValueError("strategy_context_key is required with strategy_beliefs")
+        elif strategy_context_key is not None:
+            raise ValueError("strategy_context_key requires strategy_beliefs")
         if goal_commitment is not None:
             if not isinstance(goal_commitment, GoalCommitment):
                 raise TypeError("goal_commitment must be GoalCommitment")
@@ -249,6 +259,17 @@ class NPCActionReplanningCoordinator:
             }
         plan_reliability = (self.evaluations.plan_reliabilities()
                             if self.evaluations is not None else {})
+        strategy_plan_reliability = (
+            strategy_beliefs.plan_reliabilities(owner_id, strategy_context_key)
+            if strategy_beliefs is not None else {}
+        )
+        strategy_belief_sources = (
+            strategy_beliefs.plan_reliability_sources(owner_id, strategy_context_key)
+            if strategy_beliefs is not None else {}
+        )
+        # Explicit owner-specific accepted beliefs take precedence over pooled
+        # aggregate plan reliability for the same goal/action sequence.
+        plan_reliability.update(strategy_plan_reliability)
         experience_ids: set[str] = set()
         experience_sources: dict[str, str] = {}
         goal_adjustments = {}
@@ -279,6 +300,9 @@ class NPCActionReplanningCoordinator:
             "experience_evidence_sources": sorted((key, experience_sources[key]) for key in experience_ids),
             "plan_reliability": [[goal_id, list(actions), value]
                                  for (goal_id, actions), value in sorted(plan_reliability.items())],
+            "strategy_context_key": strategy_context_key,
+            "strategy_belief_sources": [[goal_id, list(actions), decision_id]
+                                        for (goal_id, actions), decision_id in sorted(strategy_belief_sources.items())],
             "goal_facts": {key: sorted(value) for key, value in sorted(goal_facts.items())},
             "reason": reason, "active_execution_id": active_execution_id,
             "max_expansions": max_expansions,
@@ -355,6 +379,11 @@ class NPCActionReplanningCoordinator:
                 "rejected_reason": rejected_reason or "",
                 "experience_evidence_ids": json.dumps(sorted(experience_ids), separators=(",", ":")),
                 "experience_evidence_sources": json.dumps(sorted((key, experience_sources[key]) for key in experience_ids), separators=(",", ":")),
+                "strategy_context_key": strategy_context_key or "",
+                "strategy_belief_sources": json.dumps(
+                    [[goal_id, list(actions), decision_id]
+                     for (goal_id, actions), decision_id in sorted(strategy_belief_sources.items())],
+                    separators=(",", ":")),
             },
         ))
         result = NPCReplanningResult(
