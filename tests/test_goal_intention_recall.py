@@ -115,6 +115,28 @@ class GoalIntentionRecallTests(unittest.TestCase):
         b = GoalIntentionRecallAdapter.recall(second, self.goals, "alice", 2, rules=rule)
         self.assertNotEqual(a.recall_id, b.recall_id)
 
+
+    def test_recall_identity_binds_memory_content_and_source_provenance(self):
+        first_memory = GoalIntentionMemoryLedger.make(
+            "alice", "g1", 0, "plan_failed", "plan_evaluation",
+            "plan-1", "The bridge was unsafe", ("event-1",),
+        )
+        changed_memory = GoalIntentionMemoryLedger.make(
+            "alice", "g1", 0, "plan_failed", "plan_evaluation",
+            "plan-1", "The bridge was safe", ("event-2",),
+        )
+        rule = (GoalIntentionRecallRule("g1", (("plan_failed", -0.1),)),)
+        first = GoalIntentionRecallAdapter.recall(
+            GoalIntentionMemoryLedger((first_memory,)), self.goals, "alice", 1, rules=rule,
+        )
+        changed = GoalIntentionRecallAdapter.recall(
+            GoalIntentionMemoryLedger((changed_memory,)), self.goals, "alice", 1, rules=rule,
+        )
+        self.assertEqual(first.evidence[0].memory_id, changed.evidence[0].memory_id)
+        self.assertNotEqual(first.evidence[0].content_digest, changed.evidence[0].content_digest)
+        self.assertNotEqual(first.recall_id, changed.recall_id)
+
+
     def test_reflection_influences_fresh_arbitration_without_locking_the_goal(self):
         commitments = GoalCommitmentLedger()
         first = GoalIntentionContinuityAdapter.reconsider(
