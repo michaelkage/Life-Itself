@@ -110,3 +110,8 @@ restored GoalBook and runtime planner, then call
 requests after recovery return the original result without starting duplicate
 actions. Checkpoint validation verifies every persisted replan against its
 owner, tick, and authoritative `npc_action_replanned` event.
+
+
+## Goal recovery hand-off
+
+When an abandoned intention becomes viable again, `GoalRecoveryReplanningAdapter.recover_and_replan` performs the lifecycle reopening and calls the same coordinator described above with current world facts, resources, and goal mappings. Pass the superseded active execution ID when applicable so its reservation is released before the replacement plan starts. The planner creates a fresh route; it never resumes the old plan cursor. Completed, interrupted, and cancelled execution records remain in the shared ledger. The lifecycle and replanning snapshots can be checkpointed with the existing world checkpoint so recovery survives restart without duplicate action starts.
