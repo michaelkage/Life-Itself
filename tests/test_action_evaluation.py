@@ -114,7 +114,7 @@ class ActionEvaluationTests(unittest.TestCase):
         self.assertEqual(restored.plan_reliabilities(), evaluations.plan_reliabilities())
         self.assertAlmostEqual(restored.plan_reliabilities()[("shelter-goal", ("gather", "build"))], 0.6)
 
-    def test_plan_evaluation_records_goal_failure_after_interruption(self):
+    def test_plan_evaluation_keeps_interruption_neutral_before_goal_completion(self):
         planner = DeterministicPlanner((
             PlanningAction("gather", frozenset({"at-site"}), frozenset({"materials"})),
             PlanningAction("build", frozenset({"materials"}), frozenset({"shelter"})),
@@ -134,7 +134,7 @@ class ActionEvaluationTests(unittest.TestCase):
             plan.execution_id, 2, facts, resources, goal_facts,
             interruption="storm stopped work",
         )
-        self.assertEqual(progression.plan_evaluation.terminal_status, "failed")
+        self.assertEqual(progression.plan_evaluation.terminal_status, "replanned")
         self.assertEqual(progression.plan_evaluation.missing_goal_facts, ("shelter",))
         self.assertIn("goal_not_achieved", progression.plan_evaluation.deviation_flags)
 
