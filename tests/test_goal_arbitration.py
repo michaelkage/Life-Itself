@@ -71,6 +71,9 @@ class GoalArbitrationTests(unittest.TestCase):
         first = GoalCommitmentAdapter.commit(assessment, self.goals, ledger, rationale="focus")
         second = GoalCommitmentAdapter.commit(assessment, self.goals, ledger, rationale="ignored on replay")
         self.assertEqual(first, second)
+        self.assertEqual(ledger.latest_for_owner("npc-1"), first)
+        self.assertEqual(ledger.at_tick("npc-1", 5), first)
+        self.assertIsNone(ledger.at_tick("npc-1", 6))
         competing = GoalArbitrationEvaluator.assess(
             self.goals, "npc-1", 5,
             rules=(GoalArbitrationRule("art", importance=1),)
