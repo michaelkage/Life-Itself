@@ -15,7 +15,9 @@ class FluidBatchTests(unittest.TestCase):
     def test_gpu_layout_is_three_vec4_values_per_agent(self):
         packed = pack_agents((self.make_agent(),))
         self.assertEqual(len(packed), AGENT_INPUT_STRIDE)
-        self.assertEqual(struct.unpack("<12f", packed)[:4], (12.5, -4.0, 0.8, 0.2))
+        values = struct.unpack("<12f", packed)
+        for actual, expected in zip(values[:4], (12.5, -4.0, 0.8, 0.2)):
+            self.assertAlmostEqual(actual, expected, places=6)
         self.assertEqual(struct.unpack("<12f", packed)[-1], 1.0)
 
     def test_batch_layout_scales_to_target_population(self):
