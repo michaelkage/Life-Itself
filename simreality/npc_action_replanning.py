@@ -421,14 +421,28 @@ class NPCActionReplanningCoordinator:
         ).hexdigest()[:24]
         resumed_base = f"resume:{identity}"
         resumed_id = f"{resumed_base}:step:0"
+        resume_event_id = f"npc-action-resume:{identity}"
 
         existing_active = self.executions.active(resumed_id)
         existing_record = self.executions.get(resumed_id)
         if existing_active is not None or existing_record is not None:
             existing = existing_active if existing_active is not None else existing_record
             if (existing.owner_id != interrupted.owner_id
-                    or existing.action_id != interrupted.action_id):
+                    or existing.action_id != interrupted.action_id
+                    or (isinstance(existing, ActiveActionExecution)
+                        and (existing.plan_actions != continuation or existing.action_index != 0))):
                 raise ValueError("resume identity conflicts with existing execution history")
+            if self.events.get(resume_event_id) is None:
+                self.events.append(WorldEventLedger.make_event(
+                    resume_event_id, tick, "npc_action_resumed",
+                    participants=(interrupted.owner_id,),
+                    attributes={
+                        "original_execution_id": execution_id,
+                        "resumed_execution_id": resumed_id,
+                        "goal_id": goal_id,
+                        "original_action_index": str(original_index),
+                    },
+                ))
             return NPCActionResumeResult(
                 execution_id, existing, continuation, original_index,
             )
@@ -454,7 +468,6 @@ class NPCActionReplanningCoordinator:
                     resumed_base, interrupted.owner_id, goal_id,
                     continuation, set(expected_facts),
                 )
-        resume_event_id = f"npc-action-resume:{identity}"
         if self.events.get(resume_event_id) is None:
             self.events.append(WorldEventLedger.make_event(
                 resume_event_id, tick, "npc_action_resumed",
