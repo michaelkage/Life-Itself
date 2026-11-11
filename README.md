@@ -478,3 +478,9 @@ NPC goal selection can also consume explicit goal-outcome memories. Goals opt in
 The unified [NPC motivational projection](docs/NPC-MOTIVATIONAL-SYSTEM.md) combines explicit emotional-axis rules, stress-adaptation channels, and optional strategic experience into bounded, temporary goal-ranking modifiers. It is read-only and can be supplied to both the decision cycle and adaptive replanning. Tests: `tests/test_npc_motivation.py`.
 
 See [NPC goal lifecycle persistence](docs/NPC-GOAL-LIFECYCLE-PERSISTENCE.md) for adoption, retirement, reopening, and save/load invariants.
+
+## Goal reassessment application
+
+- `simreality/goal_review_application.py` — explicit, stale-state-checked application of accepted goal reviews with replay protection.
+- `simreality/goal_review_application_save_state.py` — canonical persistence for applied review decisions.
+- `docs/GOAL-REASSESSMENT.md` — review proposal, decision, application, and checkpoint lifecycle.
