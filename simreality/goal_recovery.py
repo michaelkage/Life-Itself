@@ -221,7 +221,7 @@ class GoalRecoveryReplanningAdapter:
         proposal: GoalRecoveryProposal,
         goals: GoalBook,
         lifecycle: GoalLifecycleLedger,
-        coordinator,
+        coordinator: NPCActionReplanningCoordinator,
         *,
         need_levels: Mapping[str, float],
         available_facts: frozenset[str],
