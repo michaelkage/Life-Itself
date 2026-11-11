@@ -7,7 +7,7 @@ from simreality.goal_intention_recall import (
     GoalIntentionRecallAdapter, GoalIntentionRecallRule,
 )
 from simreality.goal_intention_continuity import GoalIntentionContinuityAdapter
-from simreality.goal_arbitration import GoalArbitrationRule, GoalCommitmentLedger
+from simreality.goal_arbitration import GoalCommitmentLedger
 from simreality.goals import GoalBook, NPCGoal
 
 
@@ -15,7 +15,7 @@ class GoalIntentionRecallTests(unittest.TestCase):
     def setUp(self):
         self.goals = GoalBook()
         self.goals.add(NPCGoal("g1", "alice", "survival", 0.8))
-        self.goals.add(NPCGoal("g2", "alice", "family", 0.7))
+        self.goals.add(NPCGoal("g2", "alice", "family", 0.72))
         self.goals.add(NPCGoal("foreign", "bob", "survival", 10.0))
 
     def test_recall_is_authored_decayed_and_provenance_linked(self):
