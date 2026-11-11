@@ -116,6 +116,7 @@ class EmotionalStressTests(unittest.TestCase):
     def test_invalid_profile_and_future_record_rejected(self):
         with self.assertRaises(ValueError):
             CopingProfile("npc-a", exhaustion_threshold=0.9, breaking_point=0.8)
+        self.ledger.advance(2, {})
         with self.assertRaises(ValueError):
             self.ledger.apply_stressor(
                 record_id="stress-1", event_id="event-1", owner_id="npc-a",
