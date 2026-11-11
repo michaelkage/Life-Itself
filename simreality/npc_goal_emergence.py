@@ -225,26 +225,28 @@ class GoalLifecycleLedger:
 
     def __init__(self, events: tuple[GoalLifecycleEvent, ...] = ()):
         self._events: list[GoalLifecycleEvent] = []
-        self._ids: set[str] = set()
+        self._event_by_id: dict[str, GoalLifecycleEvent] = {}
         self._status: dict[str, str] = {}
+        self._owners: dict[str, str] = {}
+        self._last_tick: dict[str, int] = {}
+        self._goal_event_counts: dict[str, int] = {}
         for event in events:
             self.append(event)
 
     def append(self, event: GoalLifecycleEvent) -> None:
         if not isinstance(event, GoalLifecycleEvent):
             raise TypeError("event must be GoalLifecycleEvent")
-        if event.event_id in self._ids:
-            prior = next(x for x in self._events if x.event_id == event.event_id)
-            if prior != event:
+        existing = self._event_by_id.get(event.event_id)
+        if existing is not None:
+            if existing != event:
                 raise ValueError("lifecycle event ID reused with conflicting content")
             return
         prior = self._status.get(event.goal_id)
         if event.from_status != prior:
             raise ValueError("lifecycle transition does not match prior status")
-        previous_events = [item for item in self._events if item.goal_id == event.goal_id]
-        if previous_events and event.owner_id != previous_events[-1].owner_id:
+        if event.goal_id in self._owners and event.owner_id != self._owners[event.goal_id]:
             raise ValueError("goal lifecycle owner cannot change")
-        if previous_events and event.tick < previous_events[-1].tick:
+        if event.goal_id in self._last_tick and event.tick < self._last_tick[event.goal_id]:
             raise ValueError("goal lifecycle ticks must be non-decreasing")
         allowed = {
             None: {"active"},
@@ -257,13 +259,16 @@ class GoalLifecycleLedger:
         if event.to_status not in allowed[prior]:
             raise ValueError("invalid goal lifecycle status transition")
         self._events.append(event)
-        self._ids.add(event.event_id)
+        self._event_by_id[event.event_id] = event
         self._status[event.goal_id] = event.to_status
+        self._owners[event.goal_id] = event.owner_id
+        self._last_tick[event.goal_id] = event.tick
+        self._goal_event_counts[event.goal_id] = self._goal_event_counts.get(event.goal_id, 0) + 1
 
     def record(self, goal: NPCGoal, tick: int, reason: str, *,
                evidence_ids: tuple[str, ...] = ()) -> GoalLifecycleEvent:
         prior = self._status.get(goal.goal_id)
-        sequence = sum(1 for item in self._events if item.goal_id == goal.goal_id)
+        sequence = self._goal_event_counts.get(goal.goal_id, 0)
         payload = (goal.goal_id, prior or "new", goal.status.value, tick, reason,
                    tuple(sorted(evidence_ids)), sequence)
         event_id = "goal-life-" + hashlib.sha256(
