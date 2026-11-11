@@ -161,6 +161,7 @@ class GoalArbitrationEvaluator:
         value_alignment: Mapping[str, float] | None = None,
         resources: Mapping[str, float] | None = None,
         experience_adjustments: Mapping[str, float] | None = None,
+        experience_evidence_id: str | None = None,
         incumbent_goal_id: str | None = None,
         continuity_margin: float = 0.0,
     ) -> GoalArbitrationAssessment:
@@ -213,6 +214,11 @@ class GoalArbitrationEvaluator:
         values = axis_map(value_alignment, "value alignment", -1.0, 1.0)
         balances = axis_map(resources, "resources", 0.0, float("inf"))
         experience = axis_map(experience_adjustments, "experience adjustments", -0.25, 0.25)
+        if experience_evidence_id is not None and (
+            not isinstance(experience_evidence_id, str) or len(experience_evidence_id) != 64
+            or any(char not in "0123456789abcdef" for char in experience_evidence_id)
+        ):
+            raise ValueError("experience_evidence_id must be a SHA-256 hex digest")
         if any(goal_id not in goals.goals or goals.goals[goal_id].owner_id != owner_id
                for goal_id in experience):
             raise ValueError("experience adjustments must reference goals owned by the NPC")
@@ -271,6 +277,7 @@ class GoalArbitrationEvaluator:
                 "value_alignment": sorted(values.items()),
                 "resources": sorted(balances.items()),
                 "experience_adjustments": sorted(experience.items()),
+                "experience_evidence_id": experience_evidence_id,
                 "incumbent_goal_id": incumbent_goal_id,
                 "continuity_margin": continuity_margin,
                 "rules": [
