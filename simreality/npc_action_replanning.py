@@ -13,6 +13,7 @@ import json
 from .action_execution import ActionExecution, ActionExecutionLedger, ActiveActionExecution
 from .action_evaluation import ActionPlanEvaluationLedger, NPCActionEvaluation, NPCPlanEvaluation
 from .npc_autonomy import NPCDecision, NPCDecisionCycle
+from .goal_arbitration import GoalCommitment
 from .npc_life_history import NPCLifeHistory
 from .npc_experience_transfer import (NPCExperienceTransferLedger, experience_action_guidance,
                                      strategic_experience_evidence, experience_goal_guidance)
@@ -207,7 +208,8 @@ class NPCActionReplanningCoordinator:
                resources: dict[str, float], goal_facts, *, reason: str,
                active_execution_id: str | None = None,
                max_expansions: int = 10_000,
-               goal_motivational_adjustments: dict[str, float] | None = None) -> NPCReplanningResult:
+               goal_motivational_adjustments: dict[str, float] | None = None,
+               goal_commitment: GoalCommitment | None = None) -> NPCReplanningResult:
         if not isinstance(owner_id, str) or not owner_id.strip():
             raise ValueError("owner_id must be non-empty")
         if isinstance(tick, bool) or not isinstance(tick, int) or tick < 0:
@@ -216,6 +218,11 @@ class NPCActionReplanningCoordinator:
             raise TypeError("world_facts and resources must be mutable set/dict values")
         if not isinstance(reason, str) or not reason.strip():
             raise ValueError("reason must be non-empty")
+        if goal_commitment is not None:
+            if not isinstance(goal_commitment, GoalCommitment):
+                raise TypeError("goal_commitment must be GoalCommitment")
+            if goal_commitment.owner_id != owner_id or goal_commitment.tick != tick:
+                raise ValueError("goal commitment owner and tick must match the replan request")
         facts = sorted(self.executions._canonical_facts(world_facts))
         balances = sorted(self.executions._canonical_resources(resources).items())
         action_reliability = {}
@@ -260,6 +267,7 @@ class NPCActionReplanningCoordinator:
             "goal_facts": {key: sorted(value) for key, value in sorted(goal_facts.items())},
             "reason": reason, "active_execution_id": active_execution_id,
             "max_expansions": max_expansions,
+            "goal_commitment_id": goal_commitment.commitment_id if goal_commitment else None,
         }
         signature = json.dumps(request, sort_keys=True, separators=(",", ":"), allow_nan=False)
         request_id = hashlib.sha256(signature.encode("utf-8")).hexdigest()
@@ -288,6 +296,7 @@ class NPCActionReplanningCoordinator:
             plan_reliability=plan_reliability,
             goal_experience_adjustments=goal_adjustments,
             goal_motivational_adjustments=goal_motivational_adjustments,
+            committed_goal_id=(goal_commitment.selected_goal_id if goal_commitment else None),
         )
         if experience_ids:
             decision = NPCDecision(decision.owner_id, decision.tick, decision.goal_id,
