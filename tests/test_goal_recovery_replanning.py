@@ -80,6 +80,12 @@ class GoalRecoveryReplanningTests(unittest.TestCase):
         self.assertEqual(len(self.executions.active()), 1)
         self.assertEqual(len(self.lifecycle.snapshot()), 2)
 
+    def test_retry_rejects_goal_mutation_after_reopening(self):
+        self.run_recovery()
+        self.goals.goals["housing"].priority += 1.0
+        with self.assertRaisesRegex(ValueError, "goal state changed"):
+            self.run_recovery()
+
     def test_recovery_replans_from_current_facts_not_obsolete_route(self):
         result = self.run_recovery()
         self.assertNotIn("resume-obsolete-search", result.replanning.decision.plan.actions)
