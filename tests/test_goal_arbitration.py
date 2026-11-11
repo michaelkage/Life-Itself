@@ -86,6 +86,40 @@ class GoalArbitrationTests(unittest.TestCase):
                 assessment, self.goals, GoalCommitmentLedger(), rationale="focus"
             )
 
+
+    def test_deferred_ambition_can_win_a_later_arbitration(self):
+        first = GoalArbitrationEvaluator.assess(
+            self.goals, "npc-1", 5, resources={}
+        )
+        ledger = GoalCommitmentLedger()
+        committed = GoalCommitmentAdapter.commit(
+            first, self.goals, ledger, rationale="meet urgent obligation"
+        )
+        self.assertEqual(committed.selected_goal_id, "rent")
+        second = GoalArbitrationEvaluator.assess(
+            self.goals, "npc-1", 6,
+            rules=(GoalArbitrationRule("art", importance=1.0),),
+            resources={},
+        )
+        self.assertEqual(second.selected_goal_id, "art")
+        self.assertEqual(self.goals.goals["rent"].status, GoalStatus.ACTIVE)
+        self.assertEqual(self.goals.goals["art"].status, GoalStatus.ACTIVE)
+
+    def test_no_feasible_goal_cannot_be_committed(self):
+        assessment = GoalArbitrationEvaluator.assess(
+            self.goals, "npc-1", 5,
+            rules=(
+                GoalArbitrationRule("rent", resource_costs=(("money", 100),)),
+                GoalArbitrationRule("art", resource_costs=(("wood", 50),)),
+            ),
+            resources={"money": 1, "wood": 1},
+        )
+        self.assertIsNone(assessment.selected_goal_id)
+        with self.assertRaisesRegex(ValueError, "no resource-feasible"):
+            GoalCommitmentAdapter.commit(
+                assessment, self.goals, GoalCommitmentLedger(), rationale="cannot afford either"
+            )
+
     def test_commitment_snapshot_round_trip_and_canonical_validation(self):
         assessment = GoalArbitrationEvaluator.assess(self.goals, "npc-1", 5)
         ledger = GoalCommitmentLedger()
