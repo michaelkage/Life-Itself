@@ -955,3 +955,12 @@ __all__ += [
     "GoalIntentionMemory", "GoalIntentionMemoryAdapter",
     "GoalIntentionMemoryLedger", "GoalIntentionMemorySnapshot",
 ]
+
+from .goal_intention_recall import (
+    GoalIntentionRecall, GoalIntentionRecallAdapter,
+    GoalIntentionRecallEvidence, GoalIntentionRecallRule,
+)
+__all__ += [
+    "GoalIntentionRecall", "GoalIntentionRecallAdapter",
+    "GoalIntentionRecallEvidence", "GoalIntentionRecallRule",
+]
