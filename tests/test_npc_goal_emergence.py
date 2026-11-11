@@ -149,3 +149,18 @@ def test_repeated_abandon_reopen_cycle_gets_distinct_event_ids():
     second = ledger.record(goal, 4, "conditions improved")
     assert first.event_id != second.event_id
     assert len(ledger.snapshot()) == 4
+
+def test_matching_rules_do_not_emit_duplicate_goal_templates():
+    goals = GoalBook()
+    template = GoalTemplate("safety-plan", "safety", 4.0)
+    rules = (
+        GoalEmergenceRule("rule-a", template, need_key="safety", need_threshold=0.5),
+        GoalEmergenceRule("rule-b", template, emotion_axis="fear", emotion_threshold=0.5),
+    )
+    emotions = NPCEmotionalState("npc", 2, {"fear": 0.8})
+    proposals = NPCGoalEmergence.propose(
+        goals, "npc", 2, rules=rules,
+        need_deficits={"safety": 0.8}, emotional_state=emotions,
+    )
+    assert len(proposals) == 1
+    assert proposals[0].rule_id == "rule-a"
