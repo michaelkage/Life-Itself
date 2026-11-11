@@ -152,7 +152,10 @@ class WorldEventMemoryReplaySnapshot:
                 raise ValueError(
                     f"saved replay memory is absent from restored NPC or ambiguous for {witness_id!r}"
                 )
-            restored[(event_id, witness_id)] = candidates[0]
+            # Preserve the adapter's original pre-evolution memory for exact
+            # replay semantics and canonical save/load. The NPC owns its current
+            # evolved/decayed copy; the adapter index owns the original result.
+            restored[(event_id, witness_id)] = memory
         adapter._processed.update(restored)
 
     def to_json(self) -> str:
