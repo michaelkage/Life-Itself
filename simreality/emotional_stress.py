@@ -105,10 +105,15 @@ class NPCStressLedger:
         effectiveness = profile.effectiveness(strategy)
         prior = self._records.get(record_id)
         if prior is not None:
-            expected = (event_id, owner_id, tick, intensity, strategy, effectiveness)
-            actual = (prior.event_id, prior.owner_id, prior.tick, prior.stressor, prior.strategy,
-                      prior.reduction / intensity if intensity else effectiveness)
-            if actual != expected:
+            expected_reduction = intensity * effectiveness
+            expected_suppression = intensity * profile.suppression_cost if strategy == "suppression" else 0.0
+            if (
+                (prior.event_id, prior.owner_id, prior.tick, prior.strategy)
+                != (event_id, owner_id, tick, strategy)
+                or not math.isclose(prior.stressor, intensity, rel_tol=0.0, abs_tol=1e-12)
+                or not math.isclose(prior.reduction, expected_reduction, rel_tol=0.0, abs_tol=1e-12)
+                or not math.isclose(prior.suppression_load, expected_suppression, rel_tol=0.0, abs_tol=1e-12)
+            ):
                 raise ValueError("stress record ID reused with conflicting content")
             return prior
         event_key = (event_id, owner_id)
