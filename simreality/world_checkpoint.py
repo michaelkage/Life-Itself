@@ -858,8 +858,9 @@ class SimulationWorldCheckpoint:
                 raise ValueError('goal lifecycle event cannot precede goal creation')
             if any(goal_book.goals[goal_id].status.value != status for goal_id, status in latest_status.items()):
                 raise ValueError('goal lifecycle status does not match the checkpoint GoalBook')
-            if any(record[7] for record in goal_lifecycle_snapshot.records) and life_history is None:
-                raise ValueError('goal lifecycle evidence requires checkpointed autobiographical history')
+            journal_ids = {event.event_id for event in coordinator.events.snapshot()}
+            if any(evidence_id not in journal_ids for record in goal_lifecycle_snapshot.records for evidence_id in record[7]) and life_history is None:
+                raise ValueError('autobiographical lifecycle evidence requires checkpointed life history')
             if life_history is not None:
                 known_evidence = {memory.memory_id for memory in life_history.memories()}
                 known_evidence.update(event.event_id for event in coordinator.events.snapshot())
@@ -1458,8 +1459,9 @@ class SimulationWorldCheckpoint:
                 raise ValueError('goal lifecycle event cannot precede goal creation')
             if any(goal_records[goal_id][11] != status for goal_id, status in latest_status.items()):
                 raise ValueError('goal lifecycle status does not match the checkpoint GoalBook')
-            if any(record[7] for record in goal_lifecycle_snapshot.records) and life_history_snapshot is None:
-                raise ValueError('goal lifecycle evidence requires checkpointed autobiographical history')
+            journal_ids = {event.event_id for event in envelope.restore_event_ledger().snapshot()}
+            if any(evidence_id not in journal_ids for record in goal_lifecycle_snapshot.records for evidence_id in record[7]) and life_history_snapshot is None:
+                raise ValueError('autobiographical lifecycle evidence requires checkpointed life history')
             if life_history_snapshot is not None:
                 known_memory_ids = {record[0] for record in life_history_snapshot.memories}
                 known_memory_ids.update(event.event_id for event in envelope.restore_event_ledger().snapshot())
