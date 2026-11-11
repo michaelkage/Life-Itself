@@ -307,6 +307,43 @@ class GoalLifecycleLedger:
         self.append(event)
         return event
 
+    def transition(self, goals: GoalBook, goal_id: str, target_status: GoalStatus,
+                   tick: int, reason: str, *,
+                   evidence_ids: tuple[str, ...] = ()) -> GoalLifecycleEvent:
+        """Apply one explicit status change and record it as one atomic lifecycle step."""
+        if not isinstance(goals, GoalBook):
+            raise TypeError("goals must be GoalBook")
+        if not isinstance(target_status, GoalStatus):
+            raise TypeError("target_status must be GoalStatus")
+        if target_status == GoalStatus.BLOCKED:
+            raise ValueError("blocked status is derived from goal dependencies")
+        goal = goals.goals[goal_id]
+        previous = self._last_event_by_goal.get(goal_id)
+        normalized_evidence = tuple(sorted(evidence_ids))
+        if (goal.status == target_status and previous is not None
+                and previous.to_status == target_status.value
+                and previous.tick == tick and previous.reason == reason
+                and previous.evidence_ids == normalized_evidence):
+            return previous
+        if goal.status == target_status:
+            raise ValueError("goal already has the requested status")
+        recorded_status = self._status.get(goal_id)
+        if recorded_status is not None and recorded_status != goal.status.value:
+            raise ValueError("GoalBook status differs from recorded lifecycle state")
+        if recorded_status is None and goal.status != GoalStatus.ACTIVE:
+            raise ValueError("lifecycle tracking must begin while a goal is active")
+        old_status, old_progress, old_review_tick = goal.status, goal.progress, goal.review_tick
+        try:
+            if target_status == GoalStatus.ACTIVE:
+                goals.reopen(goal_id, tick)
+            else:
+                goals.set_status(goal_id, target_status)
+                goal.review_tick = max(goal.review_tick, tick)
+            return self.record(goal, tick, reason, evidence_ids=evidence_ids)
+        except Exception:
+            goal.status, goal.progress, goal.review_tick = old_status, old_progress, old_review_tick
+            raise
+
     def status_for(self, goal_id: str) -> str | None:
         return self._status.get(goal_id)
 
