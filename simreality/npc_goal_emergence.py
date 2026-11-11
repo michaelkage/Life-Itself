@@ -269,8 +269,16 @@ class GoalLifecycleLedger:
 
     def record(self, goal: NPCGoal, tick: int, reason: str, *,
                evidence_ids: tuple[str, ...] = ()) -> GoalLifecycleEvent:
+        if not isinstance(goal, NPCGoal):
+            raise TypeError("goal must be NPCGoal")
+        if not isinstance(evidence_ids, tuple) or any(
+            not isinstance(value, str) or not value.strip() for value in evidence_ids
+        ):
+            raise ValueError("evidence_ids must be a tuple of non-empty strings")
+        if len(evidence_ids) != len(set(evidence_ids)):
+            raise ValueError("evidence_ids must be unique")
         prior = self._status.get(goal.goal_id)
-        normalized_evidence = tuple(sorted(set(evidence_ids)))
+        normalized_evidence = tuple(sorted(evidence_ids))
         previous = self._last_event_by_goal.get(goal.goal_id)
         if (previous is not None and previous.owner_id == goal.owner_id
                 and previous.to_status == goal.status.value
