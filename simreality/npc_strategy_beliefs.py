@@ -407,6 +407,8 @@ class NPCStrategyBeliefLedger:
             raise ValueError("strategy decision references another owner, goal, strategy, or context")
         if len(evidence) < decision.minimum_observations:
             raise ValueError("strategy decision does not meet its minimum observation count")
+        if any(item.observed_tick > decision.decision_tick for item in evidence):
+            raise ValueError("strategy decision predates its supporting observations")
         success = sum(item.confidence for item in evidence if item.outcome == "success")
         failure = sum(item.confidence for item in evidence if item.outcome == "failure")
         prior = decision.prior_alpha / (decision.prior_alpha + decision.prior_beta)
