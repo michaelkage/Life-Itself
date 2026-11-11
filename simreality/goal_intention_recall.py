@@ -192,6 +192,21 @@ class GoalIntentionStrategicEvidence:
             raise ValueError("source tags must not repeat evidence IDs")
         if any(tags != tuple(sorted(set(tags))) for _, tags in self.source_tags):
             raise ValueError("source tags must be unique and sorted")
+        confidences = dict(self.source_confidences)
+        influences = dict(self.source_influences)
+        classes = dict(self.source_classes)
+        for evidence_id, source_class in classes.items():
+            confidence = confidences[evidence_id]
+            influence = influences[evidence_id]
+            expected = {
+                "personal": 1.0,
+                "witnessed": 0.6,
+                "reported": 0.35 * confidence,
+            }[source_class]
+            if not math.isclose(influence, expected, rel_tol=0.0, abs_tol=1e-12):
+                raise ValueError("strategic source influence does not match its source class and confidence")
+            if source_class != "reported" and confidence != 1.0:
+                raise ValueError("personal and witnessed evidence must retain full source confidence")
 
 
 @dataclass(frozen=True)
