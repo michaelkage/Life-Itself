@@ -52,6 +52,7 @@ Engine-independent Python reference systems:
 | `simreality/reputation.py` | 4.A, 4.B | Local reputation from witness memories and convictions |
 | `simreality/goals.py` | NPC autonomy | Deterministic goal tracking, prerequisite checks, deadline urgency, and stable priority selection |
 | `simreality/npc_goal_emergence.py` | NPC goal evolution | Read-only, deterministic goal proposals from explicit need/emotion/stress/experience rules, plus append-only lifecycle rationale |
+| `simreality/goal_lifecycle_save_state.py` | NPC goal persistence | Canonical lifecycle snapshots, explicit abandoned-goal reopening, and composite world-checkpoint validation |
 | `simreality/identity_evolution.py` | NPC identity evolution | Deterministic, read-only proposals for gradual, individual-specific changes to configurable long-term traits; bounded per-event effects and explicit event policies |
 | `simreality/identity_interpretation.py` | NPC identity interpretation | Applies each NPC’s own belief confidence to an event proposal through explicit, inspectable rules; preserves caps and requires a separate accept/reject decision |
 | `simreality/world_checkpoint.py` | Identity-goal review persistence | Saves goal review decisions with identity and goal state; validates accepted identity provenance, source event role, ownership, and chronology on capture and restore |\n| `simreality/identity_goal_alignment.py` | Identity-to-goal alignment | Accepted identity changes produce read-only goal proposals; each goal adjustment requires separate NPC acceptance, stale-state checks, exactly-once application, and canonical decision snapshots |\n| `simreality/identity_decisions.py` | NPC identity decisions | Append-only acceptance/rejection decisions; accepted changes update durable traits exactly once, rejected changes remain history; canonical snapshots and world-checkpoint integration |
@@ -475,3 +476,5 @@ NPC goal selection can also consume explicit goal-outcome memories. Goals opt in
 
 
 The unified [NPC motivational projection](docs/NPC-MOTIVATIONAL-SYSTEM.md) combines explicit emotional-axis rules, stress-adaptation channels, and optional strategic experience into bounded, temporary goal-ranking modifiers. It is read-only and can be supplied to both the decision cycle and adaptive replanning. Tests: `tests/test_npc_motivation.py`.
+
+See [NPC goal lifecycle persistence](docs/NPC-GOAL-LIFECYCLE-PERSISTENCE.md) for adoption, retirement, reopening, and save/load invariants.
