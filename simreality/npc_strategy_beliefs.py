@@ -395,7 +395,10 @@ class NPCStrategyBeliefLedger:
             raise ValueError("strategy proposal already has a decision")
         if any(x not in self._observations for x in decision.observation_ids):
             raise ValueError("strategy decision references unknown observations")
-        evidence = [self._observations[x] for x in decision.observation_ids]
+        evidence = sorted(
+            (self._observations[x] for x in decision.observation_ids),
+            key=lambda item: (item.observed_tick, item.observation_id),
+        )
         if any((item.owner_id, item.goal_id, item.strategy_id, item.context_key) !=
                (decision.owner_id, decision.goal_id, decision.strategy_id, decision.context_key)
                for item in evidence):
