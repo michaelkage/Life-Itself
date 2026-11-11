@@ -532,8 +532,21 @@ class StrategyBeliefSnapshot:
             version = raw.get("schema_version") if isinstance(raw, dict) else None
             if isinstance(version, bool) or version != cls.SCHEMA_VERSION:
                 raise ValueError("unsupported strategy belief snapshot schema")
-            result = cls(tuple(tuple(x) for x in raw["observations"]),
-                         tuple(tuple(x) for x in raw["decisions"]))
+            observations = tuple(
+                tuple(
+                    tuple(value) if index in (6, 10) else value
+                    for index, value in enumerate(item)
+                )
+                for item in raw["observations"]
+            )
+            decisions = tuple(
+                tuple(
+                    tuple(value) if index == 11 else value
+                    for index, value in enumerate(item)
+                )
+                for item in raw["decisions"]
+            )
+            result = cls(observations, decisions)
             if result.to_json() != payload:
                 raise ValueError("strategy belief snapshot must be canonical JSON")
             return result
