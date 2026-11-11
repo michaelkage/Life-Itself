@@ -133,16 +133,25 @@ class WorldEventMemoryReplaySnapshot:
             npc = npcs.get(witness_id)
             if not isinstance(npc, NPC):
                 raise ValueError(f"restored witness NPC is missing: {witness_id}")
-            if memory not in npc.memories:
-                raise ValueError(
-                    f"saved replay memory is absent from restored NPC {witness_id!r}"
-                )
             event = adapter.events.get(event_id)
             if witness_id not in event.witnesses:
                 raise ValueError(f"saved NPC is not a witness to event {event_id!r}")
-            restored[(event_id, witness_id)] = next(
-                item for item in npc.memories if item == memory
-            )
+            # NPC memory retention decays after formation. The replay index keeps
+            # the original event key, while the NPC snapshot owns the current
+            # decayed memory. Match stable provenance and perceptual content,
+            # deliberately excluding retention.
+            candidates = [
+                item for item in npc.memories
+                if (item.witness_id, item.target_entity_id, item.initial_impact,
+                    item.timestamp_hour, item.action_tag, item.description)
+                == (memory.witness_id, memory.target_entity_id, memory.initial_impact,
+                    memory.timestamp_hour, memory.action_tag, memory.description)
+            ]
+            if len(candidates) != 1:
+                raise ValueError(
+                    f"saved replay memory does not uniquely match restored NPC {witness_id!r}"
+                )
+            restored[(event_id, witness_id)] = candidates[0]
         adapter._processed.update(restored)
 
     def to_json(self) -> str:
