@@ -22,4 +22,6 @@ GoalCommitmentSnapshot provides canonical JSON capture/restore and validates IDs
 
 ## Boundaries
 
-Arbitration does not start actions. Pass the selected goal to the existing decision/replanning pipeline after commitment. Resource checks at arbitration are a snapshot; the action executor must still revalidate live resources and reservations before execution. A commitment is a focus decision, not an irrevocable lock: a later tick may select a different still-active goal.
+Arbitration does not start actions. Pass the GoalCommitment to NPCActionReplanningCoordinator.replan using its goal_commitment argument, or pass its selected_goal_id to NPCDecisionCycle.decide using committed_goal_id. The decision cycle then considers only that goal: it does not silently fall back to a deferred ambition if planning fails. Replanning validates that the commitment owner and tick match the request and includes the commitment identity in its replay signature. A later tick requires a fresh arbitration and may select a different still-active goal.
+
+Resource checks at arbitration are a snapshot; the action executor must still revalidate live resources and reservations before execution. A commitment is a focus decision, not an irrevocable lock.
