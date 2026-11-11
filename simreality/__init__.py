@@ -916,3 +916,8 @@ __all__ += [
 
 from .goal_execution_health import (GoalExecutionHealthEvaluator, GoalExecutionHealthProposal, GoalExecutionHealthRule)
 __all__ += ["GoalExecutionHealthEvaluator", "GoalExecutionHealthProposal", "GoalExecutionHealthRule"]
+
+
+# Explicitly adopt evidence-backed alternative intentions without overwriting the source goal.
+from .goal_alternatives import GoalAlternativeAdapter, GoalAlternativeEvaluator, GoalAlternativeProposal
+__all__ += ["GoalAlternativeAdapter", "GoalAlternativeEvaluator", "GoalAlternativeProposal"]
