@@ -1,7 +1,7 @@
 """Regression tests for the integrated deterministic NPC decision cycle."""
 import unittest
 
-from simreality.goals import GoalBook, NPCGoal
+from simreality.goals import GoalBook, GoalStatus, NPCGoal
 from simreality.npc_autonomy import NPCDecisionCycle
 from simreality.planning import DeterministicPlanner, PlanningAction
 
@@ -86,9 +86,7 @@ class NPCDecisionCycleTests(unittest.TestCase):
                 "npc-1", 4, {"available"}, {}, committed_goal_id="other"
             )
         with self.assertRaisesRegex(ValueError, "no longer actionable"):
-            self.goals.goals["rent"].status = __import__(
-                "simreality.goals", fromlist=["GoalStatus"]
-            ).GoalStatus.ABANDONED
+            self.goals.goals["rent"].status = GoalStatus.ABANDONED
             self.cycle.decide(
                 "npc-1", 4, {"available"}, {}, committed_goal_id="rent"
             )
