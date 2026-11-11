@@ -61,6 +61,14 @@ class GoalIntentionMemory:
         if self.source_kind not in {"goal_lifecycle", "goal_commitment",
                                     "plan_evaluation", "autobiographical_memory"}:
             raise ValueError("unsupported intention memory source kind")
+        allowed_types = {
+            "goal_lifecycle": {"adopted", "reopened", "completed", "failed", "abandoned", "blocked"},
+            "goal_commitment": {"committed", "deferred"},
+            "plan_evaluation": {"plan_completed", "plan_failed", "plan_replanned"},
+            "autobiographical_memory": {"personal_experience"},
+        }
+        if self.memory_type not in allowed_types[self.source_kind]:
+            raise ValueError("intention memory type does not match its provenance source kind")
         if not isinstance(self.evidence_ids, tuple) or any(
             not isinstance(item, str) or not item.strip() for item in self.evidence_ids
         ):
