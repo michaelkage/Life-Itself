@@ -399,6 +399,19 @@ class NPCStrategyBeliefLedger:
                 result[(decision.goal_id, current.action_sequence)] = current.confidence
         return result
 
+    def plan_reliability_sources(self, owner_id, context_key):
+        """Return decision IDs for the accepted reliability values sent to the planner."""
+        _nonempty(owner_id, "owner_id")
+        _nonempty(context_key, "context_key")
+        result = {}
+        for decision in self._decisions.values():
+            if not decision.accepted or (decision.owner_id, decision.context_key) != (owner_id, context_key):
+                continue
+            current = self.belief_for(owner_id, decision.strategy_id, context_key)
+            if current is not None and current.decision_id == decision.decision_id:
+                result[(decision.goal_id, current.action_sequence)] = decision.decision_id
+        return result
+
 
 @dataclass(frozen=True)
 class StrategyBeliefSnapshot:
