@@ -261,8 +261,9 @@ class GoalLifecycleLedger:
     def record(self, goal: NPCGoal, tick: int, reason: str, *,
                evidence_ids: tuple[str, ...] = ()) -> GoalLifecycleEvent:
         prior = self._status.get(goal.goal_id)
+        sequence = sum(1 for item in self._events if item.goal_id == goal.goal_id)
         payload = (goal.goal_id, prior or "new", goal.status.value, tick, reason,
-                   tuple(sorted(evidence_ids)))
+                   tuple(sorted(evidence_ids)), sequence)
         event_id = "goal-life-" + hashlib.sha256(
             json.dumps(payload, separators=(",", ":"), sort_keys=True).encode()
         ).hexdigest()[:20]
