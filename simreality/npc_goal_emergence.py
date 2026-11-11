@@ -330,8 +330,10 @@ class GoalLifecycleLedger:
         recorded_status = self._status.get(goal_id)
         if recorded_status is not None and recorded_status != goal.status.value:
             raise ValueError("GoalBook status differs from recorded lifecycle state")
-        if recorded_status is None and goal.status != GoalStatus.ACTIVE:
-            raise ValueError("lifecycle tracking must begin while a goal is active")
+        if recorded_status is None:
+            if goal.status != GoalStatus.ACTIVE:
+                raise ValueError("lifecycle tracking must begin while a goal is active")
+            self.record(goal, goal.created_tick, "lifecycle tracking initialized")
         old_status, old_progress, old_review_tick = goal.status, goal.progress, goal.review_tick
         try:
             if target_status == GoalStatus.ACTIVE:
