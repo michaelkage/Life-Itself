@@ -890,3 +890,14 @@ __all__ += [
     "GoalLifecycleSnapshot", "GoalTemplate", "NPCGoalEmergence",
     "NPCGoalProposal",
 ]
+
+
+# Accepted goal-review proposals are applied explicitly with stale-state checks and replay protection.
+from .goal_review_application import (
+    GoalReviewApplication, GoalReviewApplicationAdapter, GoalReviewApplicationLedger,
+)
+from .goal_review_application_save_state import GoalReviewApplicationSnapshot
+__all__ += [
+    "GoalReviewApplication", "GoalReviewApplicationAdapter",
+    "GoalReviewApplicationLedger", "GoalReviewApplicationSnapshot",
+]
