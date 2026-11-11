@@ -147,6 +147,7 @@ class GoalArbitrationTests(unittest.TestCase):
             rules=(
                 GoalArbitrationRule("rent", resource_costs=(("money", 100),)),
                 GoalArbitrationRule("art", resource_costs=(("wood", 50),)),
+                GoalArbitrationRule("visit", resource_costs=(("time", 100),)),
             ),
             resources={"money": 1, "wood": 1},
         )
