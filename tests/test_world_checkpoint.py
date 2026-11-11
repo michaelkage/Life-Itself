@@ -26,6 +26,7 @@ from simreality import (
     ActionPlanEvaluationLedger,
 )
 from simreality.npc_goal_emergence import GoalLifecycleLedger
+from simreality.goals import GoalStatus
 from simreality.presence_encounters import PresenceEncounter, PresenceEncounterLedger, PresenceSocialAdapter
 from simreality.goals import GoalStatus
 from simreality.social_familiarity import PresenceFamiliarityAdapter, SocialFamiliarityLedger
