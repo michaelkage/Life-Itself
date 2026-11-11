@@ -18,7 +18,7 @@ def test_cues_recall_only_matching_owner_memories_and_rank_by_salience():
     history = NPCLifeHistory((
         make_memory("old", tick=0),
         make_memory("recent", tick=9),
-        make_memory("other", owner="bob", tick=10),
+        make_memory("other", owner="bob", tick=10, involved=("alice",)),
         make_memory("unmatched", tags=("water",), tick=10),
     ))
     profile = MemoryRecallProfile("alice", (
