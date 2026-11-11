@@ -367,7 +367,7 @@ class GoalIntentionRecallAdapter:
             if goal is None or goal.owner_id != owner_id:
                 raise ValueError("intention memory references an unknown goal or foreign owner")
             if memory.tick > current_tick:
-                raise ValueError("intention memory cannot be recalled before it occurred")
+                raise ValueError("future intention memory cannot be recalled before it occurred")
             if (memory.memory_type == "personal_experience"
                     and (memory.goal_id, memory.source_id) in strategic_memory_keys):
                 continue
