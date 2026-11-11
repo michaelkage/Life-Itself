@@ -68,6 +68,32 @@ class NPCActionReplanningTests(unittest.TestCase):
                 reason="stale commitment", goal_commitment=commitment,
             )
 
+
+    def test_commitment_aware_replan_snapshot_preserves_selected_goal(self):
+        assessment = GoalArbitrationEvaluator.assess(
+            self.goals, "npc-1", 1, resources={"cash": 10.0}
+        )
+        commitment = GoalCommitmentAdapter.commit(
+            assessment, self.goals, GoalCommitmentLedger(), rationale="focus repair"
+        )
+        args = (
+            "npc-1", 1, {"safe-place"}, {"cash": 10.0},
+            {"repair": {"machine-fixed"}, "rest": {"rested"}},
+        )
+        first = self.coordinator.replan(
+            *args, reason="committed plan", goal_commitment=commitment,
+        )
+        snapshot = self.coordinator.to_snapshot()
+        restored = NPCActionReplanningCoordinator.from_snapshot(
+            self.cycle, self.ledger, self.events, snapshot,
+        )
+        replay = restored.replan(
+            *args, reason="committed plan", goal_commitment=commitment,
+        )
+        self.assertEqual(replay, first)
+        self.assertEqual(replay.decision.goal_id, commitment.selected_goal_id)
+        self.assertEqual(restored.to_snapshot(), snapshot)
+
     def test_replanning_prefers_actions_with_better_observed_reliability(self):
         goals = GoalBook()
         goals.add(NPCGoal("goal", "npc-1", "maintenance", 8.0))
