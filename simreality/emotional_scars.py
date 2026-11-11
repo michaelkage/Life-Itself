@@ -225,15 +225,25 @@ class NPCEmotionalScarLedger:
             raise ValueError("unsupported emotional scar snapshot")
         ledger = cls(current_tick=0)
         scars = tuple(EmotionalScar(**item) for item in data.get("scars", ()))
-        for scar in sorted(scars, key=lambda x: (x.created_tick, x.scar_id)):
-            ledger.add_scar(scar)
         recoveries = tuple(ScarRecoveryRecord(**item) for item in data.get("recoveries", ()))
-        for record in sorted(recoveries, key=lambda x: (x.tick, x.recovery_id)):
-            ledger.recover(
-                recovery_id=record.recovery_id, scar_id=record.scar_id,
-                owner_id=record.owner_id, tick=record.tick,
-                amount=record.amount, method=record.method,
-            )
+        # Replay one chronological stream. Restoring all scars first advances
+        # current_tick past older recovery records when a later scar was created.
+        timeline = [
+            (scar.created_tick, 0, scar.scar_id, scar)
+            for scar in scars
+        ] + [
+            (record.tick, 1, record.recovery_id, record)
+            for record in recoveries
+        ]
+        for _, kind, _, item in sorted(timeline, key=lambda entry: entry[:3]):
+            if kind == 0:
+                ledger.add_scar(item)
+            else:
+                ledger.recover(
+                    recovery_id=item.recovery_id, scar_id=item.scar_id,
+                    owner_id=item.owner_id, tick=item.tick,
+                    amount=item.amount, method=item.method,
+                )
         target_tick = data.get("current_tick")
         if isinstance(target_tick, bool) or not isinstance(target_tick, int) or target_tick < ledger.current_tick:
             raise ValueError("scar snapshot current_tick is invalid")
