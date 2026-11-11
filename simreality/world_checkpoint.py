@@ -1538,9 +1538,96 @@ class SimulationWorldCheckpoint:
             if goals_snapshot is None:
                 raise ValueError("goal intention memories require checkpointed GoalBook state")
             known_goals = {record[0]: record[1] for record in goals_snapshot.records}
+            lifecycle_records = {
+                record[0]: record for record in goal_lifecycle_snapshot.records
+            } if goal_lifecycle_snapshot is not None else {}
+            commitment_records = {
+                record[0]: record for record in goal_commitments_snapshot.records
+            } if goal_commitments_snapshot is not None else {}
+            history_records = {
+                record[0]: record for record in life_history_snapshot.memories
+            } if life_history_snapshot is not None else {}
+            raw_evaluations = (
+                json.loads(action_evaluation_snapshot.to_json())
+                if action_evaluation_snapshot is not None else {}
+            )
+            plan_records = {
+                item["plan_id"]: item
+                for item in raw_evaluations.get("plan_evaluations", [])
+            }
+            execution_records = (
+                [item["record"] for item in json.loads(action_execution_snapshot.to_json())["records"]]
+                if action_execution_snapshot is not None else []
+            )
             for record in goal_intention_memory_snapshot.records:
-                if known_goals.get(record[2]) != record[1] or record[3] > self.current_tick:
+                (_memory_id, owner_id, goal_id, tick, memory_type,
+                 source_kind, source_id, content, evidence_ids) = record
+                if known_goals.get(goal_id) != owner_id or tick > self.current_tick:
                     raise ValueError("goal intention memories reference an unknown goal, owner, or future tick")
+                if source_kind == "goal_lifecycle":
+                    source = lifecycle_records.get(source_id)
+                    expected_type = (
+                        "adopted" if source is not None and source[3] is None
+                        else "reopened" if source is not None and source[4] == "active"
+                        else source[4] if source is not None else None
+                    )
+                    if source is None or (source[1], source[2], source[5], source[6], tuple(source[7]), expected_type) != (
+                        goal_id, owner_id, tick, content, tuple(evidence_ids), memory_type
+                    ):
+                        raise ValueError("goal intention memory disagrees with its lifecycle source")
+                elif source_kind == "goal_commitment":
+                    source = commitment_records.get(source_id)
+                    if source is None or source[2] != owner_id or source[3] != tick:
+                        raise ValueError("goal intention memory disagrees with its commitment source")
+                    if goal_id == source[4]:
+                        valid = memory_type == "committed" and content == source[7] and tuple(evidence_ids) == (source[1],)
+                    elif goal_id in source[5]:
+                        valid = (memory_type == "deferred"
+                                 and content == "Deferred while another intention was committed"
+                                 and tuple(evidence_ids) == (source[1],))
+                    else:
+                        valid = False
+                    if not valid:
+                        raise ValueError("goal intention memory disagrees with its selected or deferred commitment")
+                elif source_kind == "autobiographical_memory":
+                    source = history_records.get(source_id)
+                    if source is None or (source[1], source[3], source[5]) != (owner_id, tick, content):
+                        raise ValueError("goal intention memory disagrees with its autobiographical source")
+                    if memory_type != "personal_experience" or tuple(evidence_ids) != (source[2], source[0]):
+                        raise ValueError("autobiographical intention memory has invalid evidence")
+                    if goal_lifecycle_snapshot is None or not any(
+                        item[1] == goal_id and item[2] == owner_id and source_id in item[7]
+                        for item in goal_lifecycle_snapshot.records
+                    ):
+                        raise ValueError("autobiographical intention memory is not linked by goal lifecycle evidence")
+                elif source_kind == "plan_evaluation":
+                    source = plan_records.get(source_id)
+                    if source is None or (source["owner_id"], source["goal_id"]) != (owner_id, goal_id):
+                        raise ValueError("goal intention memory references a missing plan evaluation")
+                    matching_executions = [
+                        item for item in execution_records
+                        if item["execution_id"].startswith(source_id + ":step:")
+                        and item["owner_id"] == owner_id
+                    ]
+                    if not matching_executions or max(item["tick"] for item in matching_executions) != tick:
+                        raise ValueError("plan intention memory tick does not match terminal execution history")
+                    status = source["terminal_status"]
+                    expected_type = {
+                        "completed": "plan_completed",
+                        "failed": "plan_failed",
+                        "replanned": "plan_replanned",
+                    }.get(status)
+                    expected_content = (
+                        f"Plan {status}; completed actions: "
+                        + (", ".join(source["completed_actions"]) or "none")
+                        + "; failed actions: "
+                        + (", ".join(source["failed_actions"]) or "none")
+                    )
+                    if (memory_type != expected_type or content != expected_content
+                            or tuple(evidence_ids) != tuple(source["evidence_event_ids"])):
+                        raise ValueError("plan intention memory content or evidence disagrees with its evaluation")
+                else:
+                    raise ValueError("goal intention memory has an unsupported provenance source")
         return components
 
     def to_json(self):
