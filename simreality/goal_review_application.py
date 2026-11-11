@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import math
 from typing import Iterable
 
 from .goal_review import GoalReviewAction
@@ -33,6 +34,12 @@ class GoalReviewApplication:
             raise TypeError("action must be GoalReviewAction")
         if not isinstance(self.resulting_status, GoalStatus):
             raise TypeError("resulting_status must be GoalStatus")
+        for name in ("resulting_priority", "resulting_confidence"):
+            value = getattr(self, name)
+            if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+                raise ValueError(f"{name} must be finite and numeric")
+        if self.resulting_priority < 0 or not 0 <= self.resulting_confidence <= 1:
+            raise ValueError("resulting priority or confidence is outside its valid range")
 
 
 class GoalReviewApplicationLedger:
