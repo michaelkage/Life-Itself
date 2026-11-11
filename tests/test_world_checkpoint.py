@@ -12,6 +12,7 @@ from simreality import (
     GoalBook, NPCGoal, GoalEventAdapter, GoalProgressPolicy,
     GoalReviewAction, GoalReviewEvaluator, GoalReviewPolicy,
     GoalReviewDecision, GoalReviewDecisionLedger,
+    GoalReviewApplicationAdapter, GoalReviewApplicationLedger,
     NPCIdentityProfile, IdentityChangeProposal, IdentityDecisionLedger,
     TestimonyInquiry, TestimonyInquiryLedger, TestimonyResponse,
     TestimonyLedger, TestimonyRecord, TestimonyDetail,
@@ -66,6 +67,37 @@ class SimulationWorldCheckpointTests(unittest.TestCase):
         coordinator.step(3, npcs, event_ids=("event-1",), conversations=(intent,))
         return coordinator, npcs, consequences
 
+
+    def test_checkpoint_round_trip_persists_goal_review_applications(self):
+        coordinator, npcs, _ = self.make_simulation()
+        goals = GoalBook()
+        goals.add(NPCGoal("career", "speaker", "career", 5.0, confidence=0.7))
+        policy = GoalReviewPolicy(
+            "career-review", "incident", "career",
+            GoalReviewAction.REPRIORITIZE, priority_delta=-1.0,
+            confidence_delta=-0.1,
+        )
+        proposal = GoalReviewEvaluator(goals, (policy,)).assess(
+            (coordinator.events.get("event-1"),)
+        )[0]
+        decisions = GoalReviewDecisionLedger((
+            GoalReviewDecision.from_proposal(
+                "decision-career", proposal, accepted=True, decision_tick=4,
+                rationale="The setback changed my priorities",
+            ),
+        ))
+        applications = GoalReviewApplicationLedger()
+        GoalReviewApplicationAdapter.apply(
+            decisions.get("decision-career"), goals, applications,
+        )
+        checkpoint = SimulationWorldCheckpoint.capture(
+            4, coordinator, npcs, goal_book=goals,
+            goal_review_decisions=decisions,
+            goal_review_applications=applications,
+        )
+        restored = SimulationWorldCheckpoint.from_json(checkpoint.to_json()).restore()
+        self.assertEqual(restored.goal_review_applications.entries(), applications.entries())
+        self.assertEqual(restored.goals.goals["career"].priority, 4.0)
 
     def test_checkpoint_round_trip_persists_physical_presence(self):
         coordinator, npcs, _ = self.make_simulation()
