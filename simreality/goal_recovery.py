@@ -232,8 +232,18 @@ class GoalRecoveryReplanningAdapter:
         active_execution_id: str | None = None,
         max_expansions: int = 10_000,
     ) -> GoalRecoveryProgression:
+        if not isinstance(proposal, GoalRecoveryProposal):
+            raise TypeError("proposal must be GoalRecoveryProposal")
+        if not isinstance(goals, GoalBook):
+            raise TypeError("goals must be GoalBook")
+        if not isinstance(lifecycle, GoalLifecycleLedger):
+            raise TypeError("lifecycle must be GoalLifecycleLedger")
         if not isinstance(coordinator, NPCActionReplanningCoordinator):
             raise TypeError("coordinator must be an NPCActionReplanningCoordinator")
+        if isinstance(max_expansions, bool) or not isinstance(max_expansions, int) or max_expansions < 1:
+            raise ValueError("max_expansions must be a positive integer")
+        if active_execution_id is not None and (not isinstance(active_execution_id, str) or not active_execution_id.strip()):
+            raise ValueError("active_execution_id must be non-empty when supplied")
         if coordinator.decisions.goals is not goals:
             raise ValueError("replanning decision cycle must use the recovered GoalBook")
         if coordinator.executions.goals is not None and coordinator.executions.goals is not goals:
@@ -242,6 +252,11 @@ class GoalRecoveryReplanningAdapter:
             raise TypeError("world_facts and resources must be mutable set/dict values")
         if not isinstance(goal_facts, Mapping):
             raise TypeError("goal_facts must be a mapping")
+        for goal_id, facts in goal_facts.items():
+            if not isinstance(goal_id, str) or not goal_id.strip() or not isinstance(facts, (set, frozenset, tuple)) or any(not isinstance(value, str) or not value.strip() for value in facts):
+                raise ValueError("goal_facts must map non-empty goal IDs to collections of non-empty facts")
+        coordinator.executions._canonical_facts(world_facts)
+        coordinator.executions._canonical_resources(resources)
         recovery_reason = reason or proposal.rationale
         if not isinstance(recovery_reason, str) or not recovery_reason.strip():
             raise ValueError("recovery reason must be non-empty")
@@ -261,9 +276,17 @@ class GoalRecoveryReplanningAdapter:
         if matching_event is not None and goal.status == GoalStatus.ACTIVE:
             # A prior attempt completed the lifecycle transition. Verify that
             # the original proposal context still holds before replaying planning.
+            if not isinstance(need_levels, Mapping):
+                raise TypeError("need_levels must be a mapping")
             needs = dict(need_levels)
-            if not isinstance(available_facts, frozenset):
-                raise TypeError("available_facts must be a frozenset")
+            if any(not isinstance(key, str) or not key.strip() or isinstance(value, bool)
+                   or not isinstance(value, (int, float)) or not math.isfinite(value)
+                   or not 0 <= value <= 1 for key, value in needs.items()):
+                raise ValueError("need levels must be named finite values in [0, 1]")
+            if not isinstance(available_facts, frozenset) or any(
+                not isinstance(value, str) or not value.strip() for value in available_facts
+            ):
+                raise TypeError("available_facts must be a frozenset of non-empty strings")
             signature = hashlib.sha256(json.dumps(
                 {"needs": sorted(needs.items()), "facts": sorted(available_facts)},
                 sort_keys=True, separators=(",", ":"), allow_nan=False,
