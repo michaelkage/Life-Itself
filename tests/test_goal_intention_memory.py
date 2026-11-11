@@ -86,6 +86,14 @@ def test_goal_memory_rejects_bad_identity_and_future_source():
         )
 
 
+
+def test_intention_memory_type_must_match_authoritative_source_kind():
+    with pytest.raises(ValueError, match="does not match its provenance"):
+        GoalIntentionMemoryLedger.make(
+            "alice", "g1", 1, "personal_experience",
+            "goal_lifecycle", "life-1", "Misclassified experience",
+        )
+
 def test_world_checkpoint_round_trips_goal_intention_memory():
     from simreality import (
         NPC, SocialBeliefSystem, SocialTrustLedger, SimulationTickCoordinator,
