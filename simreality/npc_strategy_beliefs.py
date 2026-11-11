@@ -210,6 +210,7 @@ class StrategyBeliefProposal:
 class StrategyBeliefDecision:
     decision_id: str
     proposal_id: str
+    rule_id: str
     owner_id: str
     goal_id: str
     strategy_id: str
@@ -219,9 +220,13 @@ class StrategyBeliefDecision:
     rationale: str
     confidence: float
     observation_ids: tuple[str, ...]
+    minimum_observations: int
+    minimum_confidence_delta: float
+    prior_alpha: float
+    prior_beta: float
 
     def __post_init__(self):
-        for name in ("decision_id", "proposal_id", "owner_id", "goal_id", "strategy_id", "context_key", "rationale"):
+        for name in ("decision_id", "proposal_id", "rule_id", "owner_id", "goal_id", "strategy_id", "context_key", "rationale"):
             _nonempty(getattr(self, name), name)
         if not isinstance(self.accepted, bool):
             raise TypeError("accepted must be bool")
@@ -236,6 +241,15 @@ class StrategyBeliefDecision:
                             "tick": self.decision_tick, "rationale": self.rationale})
         if self.decision_id != expected:
             raise ValueError("decision_id does not match immutable decision content")
+        if isinstance(self.minimum_observations, bool) or not isinstance(self.minimum_observations, int) or self.minimum_observations < 2:
+            raise ValueError("minimum_observations must be at least 2")
+        _unit(self.minimum_confidence_delta, "minimum_confidence_delta")
+        if not 0 < self.minimum_confidence_delta < 0.5:
+            raise ValueError("minimum_confidence_delta must be in (0, 0.5)")
+        for name in ("prior_alpha", "prior_beta"):
+            value = getattr(self, name)
+            if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value <= 0:
+                raise ValueError(f"{name} must be positive and finite")
 
 
 @dataclass(frozen=True)
@@ -354,9 +368,11 @@ class NPCStrategyBeliefLedger:
         decision_id = _digest({"proposal": proposal.proposal_id, "accepted": accepted,
                                "tick": decision_tick, "rationale": rationale})
         decision = StrategyBeliefDecision(
-            decision_id, proposal.proposal_id, proposal.owner_id, proposal.goal_id,
-            proposal.strategy_id, proposal.context_key, accepted, decision_tick,
-            rationale, proposal.posterior_confidence, proposal.observation_ids)
+            decision_id, proposal.proposal_id, proposal.rule_id, proposal.owner_id,
+            proposal.goal_id, proposal.strategy_id, proposal.context_key, accepted,
+            decision_tick, rationale, proposal.posterior_confidence, proposal.observation_ids,
+            proposal.minimum_observations, proposal.minimum_confidence_delta,
+            proposal.prior_alpha, proposal.prior_beta)
         existing = self._decisions.get(decision_id)
         if existing is not None:
             if existing != decision:
@@ -379,11 +395,35 @@ class NPCStrategyBeliefLedger:
             raise ValueError("strategy proposal already has a decision")
         if any(x not in self._observations for x in decision.observation_ids):
             raise ValueError("strategy decision references unknown observations")
-        if any((self._observations[x].owner_id, self._observations[x].goal_id,
-                self._observations[x].strategy_id, self._observations[x].context_key) !=
+        evidence = [self._observations[x] for x in decision.observation_ids]
+        if any((item.owner_id, item.goal_id, item.strategy_id, item.context_key) !=
                (decision.owner_id, decision.goal_id, decision.strategy_id, decision.context_key)
-               for x in decision.observation_ids):
+               for item in evidence):
             raise ValueError("strategy decision references another owner, goal, strategy, or context")
+        if len(evidence) < decision.minimum_observations:
+            raise ValueError("strategy decision does not meet its minimum observation count")
+        success = sum(item.confidence for item in evidence if item.outcome == "success")
+        failure = sum(item.confidence for item in evidence if item.outcome == "failure")
+        prior = decision.prior_alpha / (decision.prior_alpha + decision.prior_beta)
+        posterior = (decision.prior_alpha + success) / (
+            decision.prior_alpha + decision.prior_beta + success + failure)
+        if (abs(posterior - prior) < decision.minimum_confidence_delta
+                or not math.isclose(posterior, decision.confidence, abs_tol=1e-12)):
+            raise ValueError("strategy decision confidence is inconsistent with its evidence")
+        reflections = tuple(sorted({item.reflection_id for item in evidence if item.reflection_id is not None}))
+        proposal_payload = {
+            "owner": decision.owner_id, "goal": decision.goal_id,
+            "strategy": decision.strategy_id, "context": decision.context_key,
+            "rule": decision.rule_id,
+            "minimum_observations": decision.minimum_observations,
+            "minimum_confidence_delta": decision.minimum_confidence_delta,
+            "prior_alpha": decision.prior_alpha, "prior_beta": decision.prior_beta,
+            "observations": list(decision.observation_ids), "reflections": list(reflections),
+            "success": success, "failure": failure, "posterior": posterior,
+            "prior": prior, "delta": posterior - prior, "samples": len(evidence),
+        }
+        if _digest(proposal_payload) != decision.proposal_id:
+            raise ValueError("strategy decision proposal digest does not match its evidence")
         self._decisions[decision.decision_id] = decision
         self._proposal_decisions[decision.proposal_id] = decision.decision_id
         return decision
@@ -444,9 +484,10 @@ class StrategyBeliefSnapshot:
             "plan_id", "action_sequence", "outcome", "confidence", "observed_tick", "evidence_event_ids",
             "reflection_id")) for x in sorted(ledger.observations(), key=lambda x: x.observation_id))
         decisions = tuple(tuple(getattr(x, field) for field in (
-            "decision_id", "proposal_id", "owner_id", "goal_id", "strategy_id",
+            "decision_id", "proposal_id", "rule_id", "owner_id", "goal_id", "strategy_id",
             "context_key", "accepted", "decision_tick", "rationale", "confidence",
-            "observation_ids")) for x in sorted(ledger.decisions(), key=lambda x: x.decision_id))
+            "observation_ids", "minimum_observations", "minimum_confidence_delta",
+            "prior_alpha", "prior_beta")) for x in sorted(ledger.decisions(), key=lambda x: x.decision_id))
         return cls(observations, decisions)
 
     def __post_init__(self):
@@ -454,7 +495,7 @@ class StrategyBeliefSnapshot:
             raise ValueError("strategy snapshot collections must be tuples")
         if any(not isinstance(x, tuple) or len(x) != 12 for x in self.observations):
             raise ValueError("invalid strategy observation snapshot")
-        if any(not isinstance(x, tuple) or len(x) != 11 for x in self.decisions):
+        if any(not isinstance(x, tuple) or len(x) != 15 for x in self.decisions):
             raise ValueError("invalid strategy decision snapshot")
         observations = tuple(StrategyObservation(*x) for x in self.observations)
         decisions = tuple(StrategyBeliefDecision(*x) for x in self.decisions)
