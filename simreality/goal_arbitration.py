@@ -342,10 +342,27 @@ class GoalCommitmentLedger:
             raise TypeError("items must contain GoalCommitment values")
         if len({item.commitment_id for item in batch}) != len(batch):
             raise ValueError("commitment IDs must be unique within a batch")
-        trial = GoalCommitmentLedger()
-        for item in sorted((*self.entries(), *batch), key=lambda x: (x.tick, x.owner_id, x.commitment_id)):
-            trial.record(item)
-        self._entries, self._tick_index = trial._entries, trial._tick_index
+
+        # Build candidate indexes independently so a conflicting batch is atomic.
+        candidate_entries = dict(self._entries)
+        candidate_ticks = dict(self._tick_index)
+        ordered = sorted(
+            (*self._entries.values(), *batch),
+            key=lambda x: (x.tick, x.owner_id, x.commitment_id),
+        )
+        for item in ordered:
+            previous = candidate_entries.get(item.commitment_id)
+            if previous is not None:
+                if previous != item:
+                    raise ValueError("commitment ID reused with conflicting content")
+                continue
+            key = (item.owner_id, item.tick)
+            if key in candidate_ticks:
+                raise ValueError("an NPC already has a commitment for this tick")
+            candidate_entries[item.commitment_id] = item
+            candidate_ticks[key] = item.commitment_id
+
+        self._entries, self._tick_index = candidate_entries, candidate_ticks
         return tuple(sorted(batch, key=lambda x: (x.tick, x.owner_id, x.commitment_id)))
 
     def get(self, commitment_id: str) -> GoalCommitment | None:
