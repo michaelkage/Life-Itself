@@ -261,7 +261,7 @@ class GoalIntentionRecallAdapter:
 
         strategic_records = []
         strategic_adjustments = {}
-        strategic_memory_ids = set()
+        strategic_memory_keys = set()
         if life_history is not None and experience_transfers is not None:
             raw_adjustments, raw_evidence_ids, raw_sources = experience_goal_guidance(
                 life_history, experience_transfers, owner_id, current_tick, goals,
@@ -275,8 +275,9 @@ class GoalIntentionRecallAdapter:
                     goal_id, raw_adjustments[goal_id], evidence_ids, source_classes,
                 ))
                 strategic_adjustments[goal_id] = raw_adjustments[goal_id]
-                strategic_memory_ids.update(
-                    evidence_id for evidence_id, source_class in source_classes
+                strategic_memory_keys.update(
+                    (goal_id, evidence_id)
+                    for evidence_id, source_class in source_classes
                     if source_class in {"personal", "witnessed"}
                 )
 
@@ -289,7 +290,7 @@ class GoalIntentionRecallAdapter:
             if memory.tick > current_tick:
                 raise ValueError("intention memory cannot be recalled before it occurred")
             if (memory.memory_type == "personal_experience"
-                    and memory.source_id in strategic_memory_ids):
+                    and (memory.goal_id, memory.source_id) in strategic_memory_keys):
                 continue
             rule = rule_map.get(memory.goal_id)
             if rule is None:
