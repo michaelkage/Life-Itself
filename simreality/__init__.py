@@ -939,3 +939,8 @@ __all__ += [
 # Fresh goal reassessment with bounded incumbent-focus continuity.
 from .goal_intention_continuity import GoalContinuityResult, GoalIntentionContinuityAdapter
 __all__ += ["GoalContinuityResult", "GoalIntentionContinuityAdapter"]
+
+
+# Resume interrupted NPC plans from their persisted execution cursor.
+from .npc_action_replanning import NPCActionResumeResult
+__all__ += ["NPCActionResumeResult"]
