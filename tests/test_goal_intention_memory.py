@@ -110,14 +110,22 @@ def test_world_checkpoint_round_trips_goal_intention_memory():
         ),
     ))
 
+    from simreality.npc_goal_emergence import GoalLifecycleEvent, GoalLifecycleLedger
+    lifecycle = GoalLifecycleLedger((
+        GoalLifecycleEvent(
+            "lifecycle-1", "g1", "alice", None, "active", 0,
+            "Protecting my home matters",
+        ),
+    ))
     checkpoint = SimulationWorldCheckpoint.capture(
-        0, coordinator, npcs, goal_book=goals,
+        0, coordinator, npcs, goal_book=goals, goal_lifecycle=lifecycle,
         goal_intention_memories=intention_memory,
     )
     restored = SimulationWorldCheckpoint.from_json(checkpoint.to_json()).restore()
     assert restored.goal_intention_memories.snapshot().to_json() == intention_memory.snapshot().to_json()
     assert SimulationWorldCheckpoint.capture(
         0, restored.coordinator, restored.npcs, goal_book=restored.goals,
+        goal_lifecycle=restored.goal_lifecycle,
         goal_intention_memories=restored.goal_intention_memories,
     ).to_json() == checkpoint.to_json()
 
