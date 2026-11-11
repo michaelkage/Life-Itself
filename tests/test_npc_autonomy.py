@@ -69,6 +69,30 @@ class NPCDecisionCycleTests(unittest.TestCase):
             self.cycle.decide("npc-1", -1, set(), {})
 
 
+
+    def test_explicit_commitment_prevents_fallback_to_a_deferred_goal(self):
+        result = self.cycle.decide(
+            "npc-1", 4, {"available"},
+            {"rent": {"impossible"}, "hobby": {"available"}},
+            committed_goal_id="rent",
+        )
+        self.assertFalse(result.actionable)
+        self.assertEqual(result.goal_id, "rent")
+        self.assertIn("no valid plan", result.reason)
+
+    def test_commitment_must_reference_an_actionable_owned_goal(self):
+        with self.assertRaisesRegex(ValueError, "belong to the NPC"):
+            self.cycle.decide(
+                "npc-1", 4, {"available"}, {}, committed_goal_id="other"
+            )
+        with self.assertRaisesRegex(ValueError, "no longer actionable"):
+            self.goals.goals["rent"].status = __import__(
+                "simreality.goals", fromlist=["GoalStatus"]
+            ).GoalStatus.ABANDONED
+            self.cycle.decide(
+                "npc-1", 4, {"available"}, {}, committed_goal_id="rent"
+            )
+
     def test_falls_back_to_lower_ranked_goal_when_top_goal_is_unplannable(self):
         result = self.cycle.decide(
             "npc-1", 4, {"available"},
