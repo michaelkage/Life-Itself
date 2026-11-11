@@ -225,6 +225,8 @@ class GoalIntentionRecallTests(unittest.TestCase):
                 "share-alice": "reported",
             },
         )
+        self.assertEqual(dict(strategic.source_confidences)["share-alice"], 0.8)
+        self.assertAlmostEqual(dict(strategic.source_influences)["share-alice"], 0.28)
         self.assertAlmostEqual(strategic.adjustment, 0.25 * (1.0 - 0.6 - 0.28) / (1.0 + 1.0 + 0.6 + 0.28))
         self.assertEqual(dict(result.intention_recall.adjustments)["bob-rescue"], strategic.adjustment)
 
