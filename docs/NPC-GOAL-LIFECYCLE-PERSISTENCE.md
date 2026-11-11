@@ -17,7 +17,8 @@ ranking. Matching active or otherwise non-terminal template instances suppress
 duplicate proposals. If a prior instance was abandoned or failed, a new
 deterministic incarnation receives a distinct goal ID. An abandoned intention
 can instead be explicitly reactivated with `GoalBook.reopen(goal_id, tick)`;
-completed and failed intentions remain terminal.
+blocked intentions can resume when their prerequisites recover. Completed and
+failed intentions remain terminal.
 
 The caller records every adoption or status transition in
 `GoalLifecycleLedger`, including a reason and evidence IDs. Use
