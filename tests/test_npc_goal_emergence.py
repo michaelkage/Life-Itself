@@ -133,3 +133,19 @@ def test_goal_lifecycle_snapshot_preserves_append_order_and_validates_transition
     assert [event.event_id for event in restored.snapshot()] == [
         "z-first", "a-second", "m-third"
     ]
+
+def test_repeated_abandon_reopen_cycle_gets_distinct_event_ids():
+    from simreality.goals import GoalStatus
+    from simreality.npc_goal_emergence import GoalLifecycleLedger
+
+    goal = NPCGoal("g", "npc", "safety", 2.0)
+    ledger = GoalLifecycleLedger()
+    ledger.record(goal, 1, "adopted")
+    goal.status = GoalStatus.ABANDONED
+    first = ledger.record(goal, 2, "conditions improved")
+    goal.status = GoalStatus.ACTIVE
+    ledger.record(goal, 3, "new danger")
+    goal.status = GoalStatus.ABANDONED
+    second = ledger.record(goal, 4, "conditions improved")
+    assert first.event_id != second.event_id
+    assert len(ledger.snapshot()) == 4
