@@ -490,3 +490,6 @@ See [NPC goal lifecycle persistence](docs/NPC-GOAL-LIFECYCLE-PERSISTENCE.md) for
 
 - `GoalRecoveryReplanningAdapter` — explicit recovery-to-action bridge: reopens a viable intention, cancels superseded active work when requested, and replans from live world state without erasing execution history.
 - `tests/test_goal_recovery_replanning.py` — replacement action selection, cancellation, and replay-safe recovery integration coverage.
+
+
+Persistent goal execution health is assessed by GoalExecutionHealthEvaluator. Consecutive terminal plan failures only generate read-only review proposals after configurable failure-count and observation-window thresholds; successful plans reset the streak, while replanning is not misclassified as failure. Full action-evidence event IDs remain attached to the assessment, and accepted changes still use the established goal-review decision/application pipeline. See docs/GOAL-EXECUTION-HEALTH.md and tests/test_goal_execution_health.py.
