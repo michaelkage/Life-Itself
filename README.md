@@ -508,3 +508,6 @@ NPC long-term intention memory now preserves why an ambition was adopted or reop
 
 
 **Reflective NPC goal arbitration:** NPCs can now recall provenance-linked autobiographical experiences when reconsidering long-term intentions. Authored per-goal memory weights decay over time, are strictly bounded, and are included in deterministic arbitration identity; remembered failures influence priorities without permanently locking goals. See [docs/NPC-GOAL-INTENTION-MEMORY.md](docs/NPC-GOAL-INTENTION-MEMORY.md) and `tests/test_goal_intention_recall.py`.
+
+
+Reflective goal reconsideration also integrates the existing strategic experience-transfer ledger: exact goal-tagged memories retain distinct personal, witnessed, and confidence-discounted reported source classes. Reported experiences influence appraisal without becoming autobiographical memories, and overlapping first-hand evidence is deduplicated per goal. See [the intention-memory guide](docs/NPC-GOAL-INTENTION-MEMORY.md).
