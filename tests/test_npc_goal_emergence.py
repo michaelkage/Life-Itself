@@ -92,3 +92,44 @@ def test_reported_experience_keeps_reported_provenance_separate():
         goals, "npc", 7, rules=(rule,), experience_evidence=(evidence,))
     assert proposal.evidence_ids == ("report-1",)
     assert proposal.source_classes == ("reported",)
+
+def test_abandoned_goal_can_be_reopened_or_replaced_by_new_incarnation():
+    from simreality.goals import GoalStatus
+
+    goals = GoalBook()
+    prior = NPCGoal(
+        "prior", "npc", "safety", 3.0,
+        status=GoalStatus.ABANDONED,
+        metadata={"emergence_template_id": "shelter"},
+    )
+    goals.add(prior)
+    goals.reopen("prior", 12)
+    assert prior.status == GoalStatus.ACTIVE
+    assert prior.review_tick == 12
+    goals.set_status("prior", GoalStatus.ABANDONED)
+    rule = GoalEmergenceRule(
+        "shelter-rule", GoalTemplate("shelter", "safety", 4.0),
+        need_key="safety", need_threshold=0.7,
+    )
+    proposal, = NPCGoalEmergence.propose(
+        goals, "npc", 13, rules=(rule,), need_deficits={"safety": 0.9})
+    assert proposal.goal_id != "prior"
+    assert proposal.to_goal().metadata["emergence_template_id"] == "shelter"
+    goals.add(proposal.to_goal())
+    assert len(goals.goals) == 2
+
+
+def test_goal_lifecycle_snapshot_preserves_append_order_and_validates_transitions():
+    from simreality.npc_goal_emergence import GoalLifecycleEvent, GoalLifecycleLedger
+    from simreality.goal_lifecycle_save_state import GoalLifecycleSnapshot
+
+    ledger = GoalLifecycleLedger()
+    ledger.append(GoalLifecycleEvent("z-first", "g", "npc", None, "active", 2, "adopt"))
+    ledger.append(GoalLifecycleEvent("a-second", "g", "npc", "active", "abandoned", 2, "retire"))
+    ledger.append(GoalLifecycleEvent("m-third", "g", "npc", "abandoned", "active", 3, "return"))
+    payload = GoalLifecycleSnapshot.capture(ledger).to_json()
+    restored = GoalLifecycleSnapshot.from_json(payload).restore()
+    assert restored.snapshot() == ledger.snapshot()
+    assert [event.event_id for event in restored.snapshot()] == [
+        "z-first", "a-second", "m-third"
+    ]
