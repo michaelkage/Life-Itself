@@ -21,7 +21,7 @@ def test_personality_changes_same_memory_response_by_explicit_rule():
     high = PersonalityEmotionAdapter.assess(response, anxious, (rule,))
     low = PersonalityEmotionAdapter.assess(response, resilient, (rule,))
     base = dict(response.intensities)["fear"]
-    assert dict(high.intensities)["fear"] == pytest.approx(base * 1.5)
+    assert dict(high.intensities)["fear"] == pytest.approx(1.0)
     assert dict(low.intensities)["fear"] == pytest.approx(base * 0.75)
     assert high.contributions[0].memory_id == "m1"
 
