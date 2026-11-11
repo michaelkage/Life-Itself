@@ -20,10 +20,14 @@ can instead be explicitly reactivated with `GoalBook.reopen(goal_id, tick)`;
 completed and failed intentions remain terminal.
 
 The caller records every adoption or status transition in
-`GoalLifecycleLedger`, including a reason and evidence IDs. The ledger
-enforces owner continuity, non-decreasing ticks, and legal transitions. It
-retains the sequence of adoption, blocking, abandonment, and reopening events.
-It does not silently mutate GoalBook state.
+`GoalLifecycleLedger`, including a reason and evidence IDs. Use
+`ledger.transition(goal_book, goal_id, target_status, tick, reason, ...)` to
+apply supported status changes atomically with lifecycle recording. The first
+transition bootstraps an active-goal record; identical retries are idempotent.
+The ledger enforces owner continuity, non-decreasing ticks, and legal
+transitions. It retains the sequence of adoption, blocking, abandonment, and
+reopening events. It does not silently mutate GoalBook state outside this
+explicit API.
 
 ## Checkpoint integration
 
