@@ -27,6 +27,7 @@ from simreality import (
 )
 from simreality.npc_goal_emergence import GoalLifecycleLedger
 from simreality.presence_encounters import PresenceEncounter, PresenceEncounterLedger, PresenceSocialAdapter
+from simreality.goals import GoalStatus
 from simreality.social_familiarity import PresenceFamiliarityAdapter, SocialFamiliarityLedger
 from simreality.emotional_events import EmotionalEventRule, NPCEmotionalEventLedger
 from simreality.psychological_conditioning import ConditioningProfile, NPCConditioningLedger
@@ -1548,7 +1549,7 @@ if __name__ == "__main__":
         goals.add(goal)
         lifecycle = GoalLifecycleLedger()
         lifecycle.record(goal, 3, "adopted")
-        goal.status = __import__("simreality.goals", fromlist=["GoalStatus"]).GoalStatus.ABANDONED
+        goal.status = GoalStatus.ABANDONED
         lifecycle.record(goal, 4, "immediate danger passed")
         goals.reopen("goal-1", 5)
         lifecycle.record(goal, 5, "new threat emerged")
