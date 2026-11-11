@@ -161,6 +161,8 @@ class GoalArbitrationEvaluator:
         value_alignment: Mapping[str, float] | None = None,
         resources: Mapping[str, float] | None = None,
         experience_adjustments: Mapping[str, float] | None = None,
+        incumbent_goal_id: str | None = None,
+        continuity_margin: float = 0.0,
     ) -> GoalArbitrationAssessment:
         if not isinstance(goals, GoalBook):
             raise TypeError("goals must be GoalBook")
@@ -168,6 +170,11 @@ class GoalArbitrationEvaluator:
             raise ValueError("owner_id must be non-empty")
         if isinstance(current_tick, bool) or not isinstance(current_tick, int) or current_tick < 0:
             raise ValueError("current_tick must be non-negative")
+        if incumbent_goal_id is not None and (not isinstance(incumbent_goal_id, str) or not incumbent_goal_id.strip()):
+            raise ValueError("incumbent_goal_id must be non-empty when supplied")
+        continuity_margin = _finite(continuity_margin, "continuity_margin")
+        if not 0.0 <= continuity_margin <= 1.0:
+            raise ValueError("continuity_margin must be in [0, 1]")
         if not isinstance(rules, tuple) or any(not isinstance(x, GoalArbitrationRule) for x in rules):
             raise TypeError("rules must be a tuple of GoalArbitrationRule values")
         if len({x.goal_id for x in rules}) != len(rules):
@@ -241,7 +248,14 @@ class GoalArbitrationEvaluator:
         candidates.sort(key=lambda item: (
             not item.feasible, -item.score, -item.base_priority_score, item.goal_id
         ))
-        selected = next((item.goal_id for item in candidates if item.feasible), None)
+        ranked_winner = next((item for item in candidates if item.feasible), None)
+        incumbent = next((item for item in candidates
+                          if item.goal_id == incumbent_goal_id and item.feasible), None)
+        # Preserve an actionable incumbent through small score fluctuations. A
+        # materially stronger challenger still takes focus immediately.
+        selected = (incumbent.goal_id if incumbent is not None and ranked_winner is not None
+                    and ranked_winner.score <= incumbent.score + continuity_margin
+                    else ranked_winner.goal_id if ranked_winner is not None else None)
         deferred = tuple(item.goal_id for item in candidates if item.goal_id != selected)
         snapshot = tuple(item for item in goals.snapshot() if item[1] == owner_id)
         canonical = {
@@ -253,6 +267,8 @@ class GoalArbitrationEvaluator:
                 "value_alignment": sorted(values.items()),
                 "resources": sorted(balances.items()),
                 "experience_adjustments": sorted(experience.items()),
+                "incumbent_goal_id": incumbent_goal_id,
+                "continuity_margin": continuity_margin,
                 "rules": [
                     [rule.goal_id, rule.need_axis, rule.emotion_axis, rule.value_axis,
                      rule.need_weight, rule.emotion_weight, rule.value_weight,
