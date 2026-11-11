@@ -94,8 +94,8 @@ def test_opposing_experiences_can_cancel_and_old_memories_lose_weight():
 
 def test_future_memories_missing_roles_and_invalid_rules_are_rejected():
     history = NPCLifeHistory((
-        AutobiographicalMemory("future-1", "alice", "e1", 9, (), "Future one", 0.5, 0.2, tags=("x",)),
-        AutobiographicalMemory("future-2", "alice", "e2", 10, (), "Future two", 0.5, 0.2, tags=("x",)),
+        AutobiographicalMemory("future-1", "alice", "e1", 9, (), "Future one", 0.5, 0.2, tags=("support",)),
+        AutobiographicalMemory("future-2", "alice", "e2", 10, (), "Future two", 0.5, 0.2, tags=("support",)),
     ))
     profile = NPCIdentityProfile("alice", {"confidence": 0.0})
     rule = PersonalityAdaptationRule("x-confidence", "support", "confidence", 0.05)
