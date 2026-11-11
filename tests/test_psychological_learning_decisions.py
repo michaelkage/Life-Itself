@@ -65,7 +65,8 @@ class PsychologicalLearningDecisionTests(unittest.TestCase):
     def test_snapshot_round_trip_preserves_acceptance_and_rejection(self):
         ledger = PsychologicalLearningDecisionLedger()
         ledger.decide("d1", self.positive, accepted=True, decision_tick=2,
-                      conditioning=self.conditioning, profile=self.profile)
+                      conditioning=self.conditioning, profile=self.profile,
+                      rationale="Accept accumulated evidence")
         rejected = LearningProposal("npc-a", "event-2", 3, "rule-2",
                                     "crowds", -1.0, 0.5, "reinforce", "crowds are unsafe")
         ledger.decide("d2", rejected, accepted=False, decision_tick=4,
