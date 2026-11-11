@@ -22,7 +22,7 @@
 
 `decide(proposal, accepted=..., decision_tick=..., rationale=...)` records an explicit accept or reject choice. Rejection remains in history without changing the effective belief. An accepted later proposal can revise an earlier accepted belief; no historical observation or decision is overwritten.
 
-`plan_reliabilities(owner_id, context_key)` exports only the latest accepted beliefs in the exact `(goal_id, action_sequence) -> confidence` mapping already consumed by `DeterministicPlanner` and `NPCDecisionCycle`. The planner applies its existing bounded risk premium. Strategy learning does not change authored action costs.
+`plan_reliabilities(owner_id, context_key)` exports only the latest accepted beliefs in the exact `(goal_id, action_sequence) -> confidence` mapping already consumed by `DeterministicPlanner` and `NPCDecisionCycle`. The planner applies its existing bounded risk premium. Strategy learning does not change authored action costs. `NPCActionReplanningCoordinator.replan` accepts `strategy_beliefs` and an explicit `strategy_context_key`; accepted owner-specific values override pooled plan reliability for the matching goal/action sequence. The replan request signature includes the context and source decision IDs, and the resulting world event records those source IDs for audit.
 
 ## Persistence
 
