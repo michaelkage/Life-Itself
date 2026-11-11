@@ -905,9 +905,10 @@ __all__ += [
 
 # Reconsider abandoned goals only after explicit need and circumstance recovery evidence.
 from .goal_recovery import (
-    GoalRecoveryAdapter, GoalRecoveryEvaluator, GoalRecoveryProposal, GoalRecoveryRule,
+    GoalRecoveryAdapter, GoalRecoveryEvaluator, GoalRecoveryProgression,
+    GoalRecoveryProposal, GoalRecoveryReplanningAdapter, GoalRecoveryRule,
 )
 __all__ += [
-    "GoalRecoveryAdapter", "GoalRecoveryEvaluator", "GoalRecoveryProposal",
-    "GoalRecoveryRule",
+    "GoalRecoveryAdapter", "GoalRecoveryEvaluator", "GoalRecoveryProgression",
+    "GoalRecoveryProposal", "GoalRecoveryReplanningAdapter", "GoalRecoveryRule",
 ]
