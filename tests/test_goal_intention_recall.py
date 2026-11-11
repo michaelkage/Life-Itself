@@ -150,10 +150,6 @@ class GoalIntentionRecallTests(unittest.TestCase):
             )
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
     def test_changed_recall_evidence_cannot_fork_same_tick_commitment(self):
         commitments = GoalCommitmentLedger()
         memories = GoalIntentionMemoryLedger((
@@ -178,3 +174,7 @@ if __name__ == "__main__":
                 self.goals, commitments, "alice", 1, rationale="reflect again",
                 intention_memories=memories, recall_rules=rules,
             )
+
+
+if __name__ == "__main__":
+    unittest.main()
