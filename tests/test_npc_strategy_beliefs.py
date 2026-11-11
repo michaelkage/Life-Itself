@@ -16,7 +16,7 @@ class NPCStrategyBeliefTests(unittest.TestCase):
     def setUp(self):
         self.ledger = NPCStrategyBeliefLedger()
         self.rule = StrategyLearningRule("reliability-v1", minimum_observations=3,
-                                         minimum_confidence_delta=0.12)
+                                         minimum_confidence_delta=0.08)
 
     def add(self, plan, status, tick, context="forest", confidence=1.0, missing=()):
         return self.ledger.observe_evaluation(
