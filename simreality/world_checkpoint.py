@@ -1080,15 +1080,15 @@ class SimulationWorldCheckpoint:
         goal_intention_memory_snapshot = components[44]
         strategy_belief_snapshot = components[45]
         if strategy_belief_snapshot is not None:
-            if action_evaluation_snapshot is None:
-                raise ValueError("strategy beliefs require checkpointed action evaluations")
             strategy_ledger = strategy_belief_snapshot.restore()
+            if strategy_ledger.observations() and action_evaluation_snapshot is None:
+                raise ValueError("strategy observations require checkpointed action evaluations")
             known_npcs = {npc.entity_id for npc in NPCCollectionSnapshot.from_json(self.npcs_json).restore().values()}
             journal = {event.event_id: event for event in envelope.restore_event_ledger().snapshot()}
-            plan_evaluations = {
+            plan_evaluations = ({
                 item["plan_id"]: item
                 for item in json.loads(action_evaluation_snapshot.to_json()).get("plan_evaluations", [])
-            }
+            } if action_evaluation_snapshot is not None else {})
             for observation in strategy_ledger.observations():
                 evaluation = plan_evaluations.get(observation.plan_id)
                 event = journal.get(f"npc-plan-evaluation:{observation.plan_id}")
