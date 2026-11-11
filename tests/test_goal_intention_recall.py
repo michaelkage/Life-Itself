@@ -199,9 +199,20 @@ class GoalIntentionRecallTests(unittest.TestCase):
             "share-alice", "bob", "alice", "alice-source", "conversation",
             confidence=0.8,
         )
+        intention_memories = GoalIntentionMemoryLedger((
+            GoalIntentionMemoryLedger.make(
+                "bob", "bob-rescue", 1, "personal_experience",
+                "autobiographical_memory", "bob-personal",
+                "I completed a rescue", ("personal-event", "bob-personal"),
+            ),
+        ))
         result = GoalIntentionContinuityAdapter.reconsider(
             goals, GoalCommitmentLedger(), "bob", 4,
             rationale="consider first-hand and reported outcomes",
+            intention_memories=intention_memories,
+            recall_rules=(GoalIntentionRecallRule(
+                "bob-rescue", (("personal_experience", 0.25),),
+            ),),
             life_history=history, experience_transfers=transfers,
         )
         strategic = result.intention_recall.strategic_evidence[0]
