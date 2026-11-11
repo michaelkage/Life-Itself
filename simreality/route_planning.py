@@ -110,17 +110,20 @@ class PersonalRoutePlanner:
             (0.0, (origin,), 0.0, (), ())
         ]
         best: dict[str, tuple[float, tuple[str, ...]]] = {origin: (0.0, (origin,))}
+        considered_avoided: set[str] = set()
         while queue:
             adjusted, path, base, avoided, edge_path = heapq.heappop(queue)
             node = path[-1]
             if best.get(node) != (adjusted, path):
                 continue
             if node == destination:
-                return RoutePlan(owner_id, origin, destination, path, base, adjusted, avoided, edge_path)
+                return RoutePlan(owner_id, origin, destination, path, base, adjusted, tuple(sorted(considered_avoided)), edge_path)
             for neighbour, edge_cost, edge_id in self._adjacency.get(node, ()):
                 if edge_id in closed or neighbour in path:
                     continue
                 strength = strengths.get(neighbour, 0.0)
+                if strength > 0.0:
+                    considered_avoided.add(neighbour)
                 penalty = edge_cost * float(avoidance_penalty_scale) * strength
                 next_adjusted = adjusted + edge_cost + penalty
                 next_path = path + (neighbour,)
