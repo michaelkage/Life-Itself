@@ -90,6 +90,28 @@ class GoalArbitrationTests(unittest.TestCase):
             )
 
 
+
+    def test_commitment_ledger_batch_restore_is_atomic_on_tick_conflict(self):
+        first_assessment = GoalArbitrationEvaluator.assess(
+            self.goals, "npc-1", 5,
+        )
+        second_assessment = GoalArbitrationEvaluator.assess(
+            self.goals, "npc-1", 5,
+            rules=(GoalArbitrationRule("art", importance=1.0),),
+        )
+        first = GoalCommitmentAdapter.commit(
+            first_assessment, self.goals, GoalCommitmentLedger(), rationale="first focus",
+        )
+        second = GoalCommitmentAdapter.commit(
+            second_assessment, self.goals, GoalCommitmentLedger(), rationale="competing focus",
+        )
+        restored = GoalCommitmentLedger((first,))
+        self.assertEqual(restored.entries(), (first,))
+        target = GoalCommitmentLedger()
+        with self.assertRaisesRegex(ValueError, "already has a commitment"):
+            target.record_many((first, second))
+        self.assertEqual(target.entries(), ())
+
     def test_deferred_ambition_can_win_a_later_arbitration(self):
         first = GoalArbitrationEvaluator.assess(
             self.goals, "npc-1", 5, resources={}
