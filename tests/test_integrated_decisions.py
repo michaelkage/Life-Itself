@@ -100,7 +100,7 @@ class IntegratedPsychologicalDecisionTests(unittest.TestCase):
         ))
         influence = MemoryDecisionInfluenceAdapter.evaluate(
             MemoryDecisionProfile("npc", (
-                MemoryChoiceAssociation("a1", "npc", "enter", "enter_crowd", -0.8),
+                MemoryChoiceAssociation("a1", "npc", "m1", "enter_crowd", -0.8),
             )),
             recalled,
         )
