@@ -164,22 +164,25 @@ class NPCGoalEmergence:
                     triggers.append("experience:" + rule.experience_tag)
             if not triggers:
                 continue
-            duplicate = any(
-                g.category == rule.template.category
+            matching = [
+                g for g in existing
+                if g.category == rule.template.category
                 and g.metadata.get("emergence_template_id") == rule.template.template_id
-                and g.status not in {GoalStatus.FAILED, GoalStatus.ABANDONED}
-                for g in existing
-            )
-            if duplicate:
+            ]
+            if any(g.status not in {GoalStatus.FAILED, GoalStatus.ABANDONED}
+                   for g in matching):
                 continue
-            payload = (owner_id, rule.rule_id, rule.template.template_id)
+            incarnation = len(matching)
+            payload = (owner_id, rule.rule_id, rule.template.template_id, str(incarnation))
             digest = hashlib.sha256("|".join(payload).encode("utf-8")).hexdigest()[:20]
             proposal_id = "goal-proposal-" + digest
             goal_id = "goal-" + digest
+            template_metadata = dict(rule.template.metadata)
+            template_metadata["emergence_template_id"] = rule.template.template_id
             template = GoalTemplate(
                 rule.template.template_id, rule.template.category,
                 rule.template.priority, rule.template.confidence,
-                tuple(sorted(dict(rule.template.metadata, emergence_template_id=rule.template.template_id).items())),
+                tuple(sorted(template_metadata.items())),
             )
             results.append(NPCGoalProposal(
                 proposal_id, owner_id, goal_id, rule.rule_id, template,
@@ -236,10 +239,21 @@ class GoalLifecycleLedger:
         prior = self._status.get(event.goal_id)
         if event.from_status != prior:
             raise ValueError("lifecycle transition does not match prior status")
-        if prior in ("completed", "failed") and event.to_status != prior:
-            raise ValueError("completed or failed goals cannot be reopened")
-        if event.to_status == "blocked" and prior not in ("active", "blocked"):
-            raise ValueError("only active goals can become blocked")
+        previous_events = [item for item in self._events if item.goal_id == event.goal_id]
+        if previous_events and event.owner_id != previous_events[-1].owner_id:
+            raise ValueError("goal lifecycle owner cannot change")
+        if previous_events and event.tick < previous_events[-1].tick:
+            raise ValueError("goal lifecycle ticks must be non-decreasing")
+        allowed = {
+            None: {"active"},
+            "active": {"active", "completed", "failed", "abandoned", "blocked"},
+            "blocked": {"active", "abandoned"},
+            "abandoned": {"active"},
+            "completed": set(),
+            "failed": set(),
+        }
+        if event.to_status not in allowed[prior]:
+            raise ValueError("invalid goal lifecycle status transition")
         self._events.append(event)
         self._ids.add(event.event_id)
         self._status[event.goal_id] = event.to_status
