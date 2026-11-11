@@ -25,6 +25,8 @@ class GoalCommitmentSnapshot:
             ))
         if len({item.commitment_id for item in entries}) != len(entries):
             raise ValueError("commitment IDs must be unique")
+        if tuple(sorted(entries, key=lambda x: (x.tick, x.owner_id, x.commitment_id))) != tuple(entries):
+            raise ValueError("commitment records must use canonical chronological order")
         if len({(item.owner_id, item.tick) for item in entries}) != len(entries):
             raise ValueError("an NPC may have only one commitment per tick")
         GoalCommitmentLedger(tuple(entries))
