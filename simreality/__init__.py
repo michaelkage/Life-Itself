@@ -877,3 +877,16 @@ from .action_evaluation import (
     NPCPlanEvaluation,
 )
 __all__ += ["ActionEvaluationSnapshot", "ActionPlanEvaluationLedger", "NPCActionEvaluation", "NPCPlanEvaluation"]
+
+
+# Deterministic, evidence-grounded autonomous goal proposals and append-only lifecycle.
+from .npc_goal_emergence import (
+    GoalEmergenceRule, GoalLifecycleEvent, GoalLifecycleLedger,
+    GoalTemplate, NPCGoalEmergence, NPCGoalProposal,
+)
+from .goal_lifecycle_save_state import GoalLifecycleSnapshot
+__all__ += [
+    "GoalEmergenceRule", "GoalLifecycleEvent", "GoalLifecycleLedger",
+    "GoalLifecycleSnapshot", "GoalTemplate", "NPCGoalEmergence",
+    "NPCGoalProposal",
+]
