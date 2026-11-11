@@ -944,3 +944,14 @@ __all__ += ["GoalContinuityResult", "GoalIntentionContinuityAdapter"]
 # Resume interrupted NPC plans from their persisted execution cursor.
 from .npc_action_replanning import NPCActionResumeResult
 __all__ += ["NPCActionResumeResult"]
+
+
+# Provenance-linked autobiographical memory for persistent NPC intentions.
+from .goal_intention_memory import (
+    GoalIntentionMemory, GoalIntentionMemoryAdapter,
+    GoalIntentionMemoryLedger, GoalIntentionMemorySnapshot,
+)
+__all__ += [
+    "GoalIntentionMemory", "GoalIntentionMemoryAdapter",
+    "GoalIntentionMemoryLedger", "GoalIntentionMemorySnapshot",
+]
