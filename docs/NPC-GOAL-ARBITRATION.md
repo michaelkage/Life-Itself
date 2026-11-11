@@ -30,3 +30,13 @@ Resource checks at arbitration are a snapshot; the action executor must still re
 ## Adaptive continuity
 
 Continuity is hysteresis, not a lock. The previous focus is supplied to the fresh evaluator only as an incumbent candidate; current needs, emotion, values, experience, deadlines, actionability, and resource feasibility are evaluated again. The selected goal is retained only when it remains feasible and no challenger clears the configured switching margin. A stronger challenger can therefore take over immediately, and an unavailable incumbent can never be protected. The commitment ledger remains append-only, and the new tick always receives a new assessment identity.
+
+
+## Remembered intention evidence
+
+Fresh arbitration can incorporate bounded, provenance-linked experience through
+`GoalIntentionContinuityAdapter.reconsider(..., intention_memories=...,
+recall_rules=...)`. Rules explicitly map memory categories to signed influence;
+the recall adapter applies half-life decay and a hard cap. The recall evidence
+digest participates in the assessment identity, preserving same-tick replay
+integrity. See [NPC Goal Intention Memory](NPC-GOAL-INTENTION-MEMORY.md).
