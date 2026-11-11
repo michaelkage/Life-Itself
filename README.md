@@ -493,3 +493,6 @@ See [NPC goal lifecycle persistence](docs/NPC-GOAL-LIFECYCLE-PERSISTENCE.md) for
 
 
 Persistent goal execution health is assessed by GoalExecutionHealthEvaluator. Consecutive terminal plan failures only generate read-only review proposals after configurable failure-count and observation-window thresholds; successful plans reset the streak, while replanning is not misclassified as failure. Full action-evidence event IDs remain attached to the assessment, and accepted changes still use the established goal-review decision/application pipeline. See docs/GOAL-EXECUTION-HEALTH.md and tests/test_goal_execution_health.py.
+
+
+Alternative NPC intentions are generated read-only from authored goal-emergence rules and current need, emotion, stress, or experience evidence. Explicit adoption creates a distinct goal with lifecycle provenance while leaving the source intention unchanged; obsolescence remains governed by authored world-event review policies. See docs/NPC-ALTERNATIVE-INTENTIONS.md and tests/test_goal_alternatives.py.
