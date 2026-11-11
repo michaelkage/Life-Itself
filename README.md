@@ -487,3 +487,6 @@ See [NPC goal lifecycle persistence](docs/NPC-GOAL-LIFECYCLE-PERSISTENCE.md) for
 
 - `simreality/goal_recovery.py` — deterministic, circumstance-fingerprinted proposals to reopen abandoned intentions after explicit need/world-fact recovery.
 - `tests/test_goal_recovery.py` — recovery gating, stale-context rejection, and lifecycle reopening coverage.
+
+- `GoalRecoveryReplanningAdapter` — explicit recovery-to-action bridge: reopens a viable intention, cancels superseded active work when requested, and replans from live world state without erasing execution history.
+- `tests/test_goal_recovery_replanning.py` — replacement action selection, cancellation, and replay-safe recovery integration coverage.
