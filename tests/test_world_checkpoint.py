@@ -24,7 +24,8 @@ from simreality import (
     IdentityGoalAction, IdentityGoalAlignmentAdapter, IdentityGoalAlignmentPolicy,
     IdentityGoalReviewDecision, IdentityGoalReviewDecisionLedger,
     ActionExecutionLedger, ActionExecutionPolicy,
-    ActionPlanEvaluationLedger,
+    ActionPlanEvaluationLedger, GoalArbitrationEvaluator,
+    GoalCommitmentAdapter, GoalCommitmentLedger,
 )
 from simreality.npc_goal_emergence import GoalLifecycleLedger
 from simreality.goals import GoalStatus
@@ -1522,6 +1523,86 @@ class SimulationWorldCheckpointTests(unittest.TestCase):
                 action_world_facts=facts, action_resources=resources,
             )
 
+
+
+    def test_goal_commitments_round_trip_with_checkpoint_and_preserve_deferred_goals(self):
+        coordinator, npcs, _ = self.make_simulation()
+        goals = GoalBook()
+        goals.add(NPCGoal("safety-goal", "speaker", "safety", 8.0))
+        goals.add(NPCGoal("creative-goal", "speaker", "creative", 6.0))
+        assessment = GoalArbitrationEvaluator.assess(goals, "speaker", 4)
+        ledger = GoalCommitmentLedger()
+        commitment = GoalCommitmentAdapter.commit(
+            assessment, goals, ledger, rationale="address immediate safety risk",
+        )
+        checkpoint = SimulationWorldCheckpoint.capture(
+            4, coordinator, npcs, goal_book=goals, goal_commitments=ledger,
+        )
+        payload = checkpoint.to_json()
+        restored = SimulationWorldCheckpoint.from_json(payload).restore()
+        self.assertIsNotNone(restored.goal_commitments)
+        self.assertEqual(restored.goal_commitments.entries(), (commitment,))
+        self.assertEqual(restored.goal_commitments.for_owner("speaker")[0].deferred_goal_ids,
+                         ("creative-goal",))
+        self.assertEqual(restored.goals.goals["creative-goal"].status, GoalStatus.ACTIVE)
+        self.assertEqual(
+            SimulationWorldCheckpoint.capture(
+                4, restored.coordinator, restored.npcs,
+                goal_book=restored.goals, goal_commitments=restored.goal_commitments,
+            ).to_json(),
+            payload,
+        )
+
+    def test_goal_commitment_checkpoint_requires_matching_goal_book(self):
+        coordinator, npcs, _ = self.make_simulation()
+        goals = GoalBook()
+        goals.add(NPCGoal("safety-goal", "speaker", "safety", 8.0))
+        commitment = GoalCommitmentAdapter.commit(
+            GoalArbitrationEvaluator.assess(goals, "speaker", 4),
+            goals, GoalCommitmentLedger(), rationale="safety first",
+        )
+        ledger = GoalCommitmentLedger((commitment,))
+        with self.assertRaisesRegex(ValueError, "require the corresponding GoalBook"):
+            SimulationWorldCheckpoint.capture(
+                4, coordinator, npcs, goal_commitments=ledger,
+            )
+
+    def test_goal_commitment_checkpoint_rejects_future_tick_and_unknown_goal(self):
+        coordinator, npcs, _ = self.make_simulation()
+        goals = GoalBook()
+        goals.add(NPCGoal("safety-goal", "speaker", "safety", 8.0))
+        commitment = GoalCommitmentAdapter.commit(
+            GoalArbitrationEvaluator.assess(goals, "speaker", 5),
+            goals, GoalCommitmentLedger(), rationale="safety first",
+        )
+        with self.assertRaisesRegex(ValueError, "after the checkpoint tick"):
+            SimulationWorldCheckpoint.capture(
+                4, coordinator, npcs, goal_book=goals,
+                goal_commitments=GoalCommitmentLedger((commitment,)),
+            )
+        unknown = GoalCommitmentAdapter.commit(
+            GoalArbitrationEvaluator.assess(goals, "speaker", 4),
+            goals, GoalCommitmentLedger(), rationale="safety first",
+        )
+        goals.goals.pop("safety-goal")
+        with self.assertRaisesRegex(ValueError, "unknown selected goal"):
+            SimulationWorldCheckpoint.capture(
+                4, coordinator, npcs, goal_book=goals,
+                goal_commitments=GoalCommitmentLedger((unknown,)),
+            )
+
+    def test_legacy_checkpoint_without_goal_commitments_remains_loadable(self):
+        coordinator, npcs, _ = self.make_simulation()
+        payload = SimulationWorldCheckpoint.capture(4, coordinator, npcs).to_json()
+        self.assertNotIn('"goal_commitments"', payload)
+        restored = SimulationWorldCheckpoint.from_json(payload).restore()
+        self.assertIsNone(restored.goal_commitments)
+        self.assertEqual(
+            SimulationWorldCheckpoint.capture(
+                4, restored.coordinator, restored.npcs,
+            ).to_json(),
+            payload,
+        )
 
 if __name__ == "__main__":
     unittest.main()
