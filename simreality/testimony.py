@@ -30,7 +30,7 @@ class TestimonyRecord:
     def confidence_at(self, detail: TestimonyDetail, current_hour: float) -> float:
         if isinstance(current_hour, bool) or not isinstance(current_hour, (int, float)) or not math.isfinite(current_hour) or current_hour < self.recorded_hour:
             raise ValueError("current_hour must be finite and >= recorded_hour")
-        return detail.initial_confidence * math.exp(-self.decay_rate_per_hour * (current_hour - self.recorded_hour)
+        return detail.initial_confidence * math.exp(-self.decay_rate_per_hour * (current_hour - self.recorded_hour))
 
 
 class TestimonyLedger:
