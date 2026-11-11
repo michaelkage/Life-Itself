@@ -8,6 +8,7 @@ from simreality.goal_arbitration import (
     GoalCommitmentLedger,
 )
 from simreality.goal_arbitration_save_state import GoalCommitmentSnapshot
+from simreality.goal_intention_continuity import GoalIntentionContinuityAdapter
 from simreality.goals import GoalBook, NPCGoal, GoalStatus
 from simreality.identity_context import NPCEmotionalState
 
@@ -165,6 +166,86 @@ class GoalArbitrationTests(unittest.TestCase):
         self.assertEqual(restored.entries(), ledger.entries())
         with self.assertRaises(ValueError):
             GoalCommitmentSnapshot.from_json(payload + " ")
+
+
+    def test_continuity_retains_feasible_incumbent_through_small_score_change(self):
+        ledger = GoalCommitmentLedger()
+        first = GoalIntentionContinuityAdapter.reconsider(
+            self.goals, ledger, "npc-1", 5, rationale="initial focus",
+        )
+        incumbent = first.commitment.selected_goal_id
+        challenger = "art" if incumbent != "art" else "visit"
+        second = GoalIntentionContinuityAdapter.reconsider(
+            self.goals, ledger, "npc-1", 6, rationale="continue current ambition",
+            continuity_margin=1.0,
+            rules=(GoalArbitrationRule(challenger, importance=0.1),),
+        )
+        self.assertEqual(second.commitment.selected_goal_id, incumbent)
+        self.assertTrue(second.retained_previous_focus)
+        self.assertEqual(second.previous_commitment, first.commitment)
+        self.assertEqual(self.goals.goals[incumbent].status, GoalStatus.ACTIVE)
+
+    def test_materially_stronger_challenger_replaces_incumbent(self):
+        ledger = GoalCommitmentLedger()
+        first = GoalIntentionContinuityAdapter.reconsider(
+            self.goals, ledger, "npc-1", 5, rationale="initial focus",
+            continuity_margin=0.0,
+        )
+        challenger = "art" if first.commitment.selected_goal_id != "art" else "visit"
+        second = GoalIntentionContinuityAdapter.reconsider(
+            self.goals, ledger, "npc-1", 6, rationale="new urgent need",
+            continuity_margin=0.0,
+            rules=(GoalArbitrationRule(challenger, importance=1.0),),
+        )
+        self.assertEqual(second.commitment.selected_goal_id, challenger)
+        self.assertFalse(second.retained_previous_focus)
+        self.assertEqual(self.goals.goals[first.commitment.selected_goal_id].status, GoalStatus.ACTIVE)
+
+    def test_infeasible_incumbent_is_never_protected_by_continuity(self):
+        ledger = GoalCommitmentLedger()
+        first = GoalIntentionContinuityAdapter.reconsider(
+            self.goals, ledger, "npc-1", 5, rationale="initial focus",
+            continuity_margin=1.0,
+        )
+        incumbent = first.commitment.selected_goal_id
+        second = GoalIntentionContinuityAdapter.reconsider(
+            self.goals, ledger, "npc-1", 6, rationale="resources changed",
+            continuity_margin=1.0,
+            rules=(GoalArbitrationRule(incumbent, resource_costs=(("money", 10),)),),
+            resources={"money": 0},
+        )
+        self.assertNotEqual(second.commitment.selected_goal_id, incumbent)
+        self.assertFalse(second.retained_previous_focus)
+
+    def test_continuity_restores_from_snapshot_and_replays_same_tick(self):
+        ledger = GoalCommitmentLedger()
+        first = GoalIntentionContinuityAdapter.reconsider(
+            self.goals, ledger, "npc-1", 5, rationale="initial focus",
+        )
+        restored = GoalCommitmentSnapshot.from_json(
+            GoalCommitmentSnapshot.capture(ledger).to_json()
+        ).restore()
+        replay = GoalIntentionContinuityAdapter.reconsider(
+            self.goals, restored, "npc-1", 5, rationale="ignored on replay",
+        )
+        self.assertEqual(replay.commitment, first.commitment)
+        self.assertEqual(replay.assessment.assessment_id, first.assessment.assessment_id)
+        next_tick = GoalIntentionContinuityAdapter.reconsider(
+            self.goals, restored, "npc-1", 6, rationale="fresh next-tick assessment",
+        )
+        self.assertEqual(next_tick.previous_commitment, first.commitment)
+        self.assertEqual(next_tick.commitment.tick, 6)
+
+    def test_same_tick_reassessment_cannot_fork_committed_decision(self):
+        ledger = GoalCommitmentLedger()
+        GoalIntentionContinuityAdapter.reconsider(
+            self.goals, ledger, "npc-1", 5, rationale="initial focus",
+        )
+        with self.assertRaisesRegex(ValueError, "already exists"):
+            GoalIntentionContinuityAdapter.reconsider(
+                self.goals, ledger, "npc-1", 5, rationale="changed inputs",
+                rules=(GoalArbitrationRule("art", importance=1.0),),
+            )
 
 
 if __name__ == "__main__":
