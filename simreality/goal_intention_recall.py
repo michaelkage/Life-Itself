@@ -73,6 +73,10 @@ class GoalIntentionRecallEvidence:
     memory_id: str
     goal_id: str
     memory_type: str
+    source_kind: str
+    source_id: str
+    evidence_ids: tuple[str, ...]
+    content_digest: str
     age_ticks: int
     authored_weight: float
     decayed_contribution: float
@@ -82,6 +86,22 @@ class GoalIntentionRecallEvidence:
             value = getattr(self, name)
             if not isinstance(value, str) or not value.strip():
                 raise ValueError(f"{name} must be non-empty")
+        for name in ("source_kind", "source_id", "content_digest"):
+            value = getattr(self, name)
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError(f"{name} must be non-empty")
+        if self.source_kind not in {
+            "goal_lifecycle", "goal_commitment", "plan_evaluation",
+            "autobiographical_memory",
+        }:
+            raise ValueError("unsupported recall evidence source kind")
+        if (len(self.content_digest) != 64
+                or any(char not in "0123456789abcdef" for char in self.content_digest)):
+            raise ValueError("content_digest must be a SHA-256 hex digest")
+        if not isinstance(self.evidence_ids, tuple) or any(
+            not isinstance(item, str) or not item.strip() for item in self.evidence_ids
+        ):
+            raise ValueError("evidence_ids must be a tuple of non-empty strings")
         if isinstance(self.age_ticks, bool) or not isinstance(self.age_ticks, int) or self.age_ticks < 0:
             raise ValueError("age_ticks must be non-negative")
         authored = _finite(self.authored_weight, "authored_weight")
@@ -125,8 +145,9 @@ class GoalIntentionRecall:
             "owner": self.owner_id, "tick": self.tick,
             "adjustments": [list(item) for item in self.adjustments],
             "evidence": [
-                [item.memory_id, item.goal_id, item.memory_type, item.age_ticks,
-                 item.authored_weight, item.decayed_contribution]
+                [item.memory_id, item.goal_id, item.memory_type, item.source_kind,
+                 item.source_id, list(item.evidence_ids), item.content_digest,
+                 item.age_ticks, item.authored_weight, item.decayed_contribution]
                 for item in self.evidence
             ],
         }
@@ -185,6 +206,8 @@ class GoalIntentionRecallAdapter:
             totals[memory.goal_id] += contribution
             evidence.append(GoalIntentionRecallEvidence(
                 memory.memory_id, memory.goal_id, memory.memory_type,
+                memory.source_kind, memory.source_id, tuple(memory.evidence_ids),
+                hashlib.sha256(memory.content.encode("utf-8")).hexdigest(),
                 age, weight, contribution,
             ))
 
@@ -198,8 +221,9 @@ class GoalIntentionRecallAdapter:
             "owner": owner_id, "tick": current_tick,
             "adjustments": [list(item) for item in adjustments],
             "evidence": [
-                [item.memory_id, item.goal_id, item.memory_type, item.age_ticks,
-                 item.authored_weight, item.decayed_contribution]
+                [item.memory_id, item.goal_id, item.memory_type, item.source_kind,
+                 item.source_id, list(item.evidence_ids), item.content_digest,
+                 item.age_ticks, item.authored_weight, item.decayed_contribution]
                 for item in evidence
             ],
         }
