@@ -3,7 +3,7 @@ import unittest
 
 from simreality.action_execution import ActionExecutionLedger, ActionExecutionPolicy
 from simreality.action_evaluation import ActionPlanEvaluationLedger
-from simreality.goals import GoalBook, NPCGoal
+from simreality.goals import GoalBook, GoalStatus, NPCGoal
 from simreality.goal_arbitration import (
     GoalArbitrationEvaluator, GoalCommitmentAdapter, GoalCommitmentLedger,
 )
@@ -68,6 +68,29 @@ class NPCActionReplanningTests(unittest.TestCase):
                 reason="stale commitment", goal_commitment=commitment,
             )
 
+
+
+    def test_stale_commitment_is_rejected_before_active_execution_is_cancelled(self):
+        self.ledger.start(
+            "preserve-current-work", "npc-1", 1, "buy-parts",
+            {"at-market"}, {"cash": 10.0},
+            plan_actions=("buy-parts", "repair-machine"),
+        )
+        assessment = GoalArbitrationEvaluator.assess(
+            self.goals, "npc-1", 2, resources={"cash": 10.0}
+        )
+        commitment = GoalCommitmentAdapter.commit(
+            assessment, self.goals, GoalCommitmentLedger(), rationale="repair"
+        )
+        self.goals.goals["repair"].status = GoalStatus.ABANDONED
+        with self.assertRaisesRegex(ValueError, "commitment is stale"):
+            self.coordinator.replan(
+                "npc-1", 2, {"at-market"}, {"cash": 10.0},
+                {"repair": {"machine-fixed"}, "rest": {"rested"}},
+                reason="stale focus", active_execution_id="preserve-current-work",
+                goal_commitment=commitment,
+            )
+        self.assertIsNotNone(self.ledger.active("preserve-current-work"))
 
     def test_commitment_aware_replan_snapshot_preserves_selected_goal(self):
         assessment = GoalArbitrationEvaluator.assess(
