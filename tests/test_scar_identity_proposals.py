@@ -30,11 +30,11 @@ class ScarIdentityProposalPersistenceTests(unittest.TestCase):
         ledger.record(self.evidence)
         ledger.record(self.evidence)
         self.assertEqual(len(ledger.entries()), 1)
-        changed = ScarIdentityProposalEvidence(
-            self.evidence.proposal, "scar-other", "fear-response",
-            "fear", "crowded-room", 8, 0.8,
-        )
         with self.assertRaises(ValueError):
+            changed = ScarIdentityProposalEvidence(
+                self.evidence.proposal, "scar-other", "fear-response",
+                "fear", "crowded-room", 8, 0.8,
+            )
             ledger.record(changed)
 
     def test_proposal_policy_key_must_encode_scar_identity(self):
