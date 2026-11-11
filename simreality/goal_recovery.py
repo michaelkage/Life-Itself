@@ -8,7 +8,8 @@ import math
 from typing import Mapping
 
 from .goals import GoalBook, GoalStatus
-from .npc_goal_emergence import GoalLifecycleLedger
+from .npc_goal_emergence import GoalLifecycleEvent, GoalLifecycleLedger
+from .npc_action_replanning import NPCActionReplanningCoordinator, NPCReplanningResult
 
 
 @dataclass(frozen=True)
@@ -203,8 +204,8 @@ class GoalRecoveryAdapter:
 
 @dataclass(frozen=True)
 class GoalRecoveryProgression:
-    lifecycle_event: object
-    replanning: object
+    lifecycle_event: GoalLifecycleEvent
+    replanning: NPCReplanningResult
 
 
 class GoalRecoveryReplanningAdapter:
@@ -231,8 +232,6 @@ class GoalRecoveryReplanningAdapter:
         active_execution_id: str | None = None,
         max_expansions: int = 10_000,
     ) -> GoalRecoveryProgression:
-        from .npc_action_replanning import NPCActionReplanningCoordinator
-
         if not isinstance(coordinator, NPCActionReplanningCoordinator):
             raise TypeError("coordinator must be an NPCActionReplanningCoordinator")
         if coordinator.decisions.goals is not goals:
