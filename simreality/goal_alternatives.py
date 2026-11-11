@@ -7,9 +7,12 @@ and offers alternatives without replacing or mutating the source intention.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Mapping
+import math
+from typing import Iterable, Mapping
 
 from .goals import GoalBook, GoalStatus, NPCGoal
+from .goal_review import GoalReviewEvaluator, GoalReviewPolicy, GoalReviewProposal
+from .world_events import WorldEvent
 from .npc_goal_emergence import (
     GoalEmergenceRule, GoalLifecycleEvent, GoalLifecycleLedger,
     NPCGoalEmergence, NPCGoalProposal,
@@ -39,8 +42,8 @@ class GoalAlternativeProposal:
             raise TypeError("emergence must be NPCGoalProposal")
         for name in ("source_goal_priority", "source_goal_confidence"):
             value = getattr(self, name)
-            if isinstance(value, bool) or not isinstance(value, (int, float)):
-                raise ValueError(f"{name} must be numeric")
+            if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+                raise ValueError(f"{name} must be finite numeric")
         if self.source_goal_priority < 0 or not 0 <= self.source_goal_confidence <= 1:
             raise ValueError("source goal values are outside their valid ranges")
         if self.emergence.goal_id == self.source_goal_id:
@@ -157,3 +160,42 @@ class GoalAlternativeAdapter:
             goals._validate_dependency_graph()
             raise
         return goal, event
+
+
+@dataclass(frozen=True)
+class GoalIntentionAssessment:
+    """One read-only view of event-driven reviews and emerging alternatives."""
+    review_proposals: tuple[GoalReviewProposal, ...]
+    alternatives: tuple[GoalAlternativeProposal, ...]
+
+
+class GoalIntentionEvaluator:
+    """Assess event-based reviews and evidence-based alternatives together.
+
+    The two result collections remain separate: reconsidering an existing
+    intention is a different decision from adopting an additional intention.
+    """
+
+    @staticmethod
+    def assess(
+        goals: GoalBook, source_goal_id: str, current_tick: int, *,
+        events: Iterable[WorldEvent],
+        review_policies: tuple[GoalReviewPolicy, ...],
+        emergence_rules: tuple[GoalEmergenceRule, ...],
+        need_deficits: Mapping[str, float] | None = None,
+        emotional_state: NPCEmotionalState | None = None,
+        stress_signal: StressBehaviorSignal | None = None,
+        history: NPCLifeHistory | None = None,
+        experience_evidence: tuple[StrategicExperienceEvidence, ...] = (),
+    ) -> GoalIntentionAssessment:
+        if not isinstance(review_policies, tuple) or any(not isinstance(item, GoalReviewPolicy) for item in review_policies):
+            raise TypeError("review_policies must be a tuple of GoalReviewPolicy values")
+        event_items = tuple(events)
+        reviews = GoalReviewEvaluator(goals, review_policies).assess(event_items)
+        alternatives = GoalAlternativeEvaluator.assess(
+            goals, source_goal_id, current_tick, rules=emergence_rules,
+            need_deficits=need_deficits, emotional_state=emotional_state,
+            stress_signal=stress_signal, history=history,
+            experience_evidence=experience_evidence,
+        )
+        return GoalIntentionAssessment(reviews, alternatives)
