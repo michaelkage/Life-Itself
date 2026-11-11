@@ -397,6 +397,62 @@ class NPCActionReplanningTests(unittest.TestCase):
         self.assertEqual(progression.execution.status, "interrupted")
         self.assertEqual(progression.plan_evaluation.terminal_status, "replanned")
 
+    def test_interrupted_plan_cursor_survives_execution_and_replanning_restore(self):
+        facts, resources = {"at-market"}, {"cash": 10.0}
+        first = self.coordinator.replan(
+            "npc-1", 1, facts, resources,
+            {"repair": {"machine-fixed"}, "rest": {"rested"}},
+            reason="repair required",
+        )
+        self.ledger.advance(
+            first.execution_id, 2, facts, resources,
+            interruption="temporary interruption before checkpoint",
+        )
+        execution_snapshot = self.ledger.to_snapshot()
+        replanning_snapshot = self.coordinator.to_snapshot()
+        restored_ledger = ActionExecutionLedger.from_snapshot(
+            self.planner, tuple(self.ledger.policies.values()),
+            self.events, execution_snapshot, self.goals,
+        )
+        restored_coordinator = NPCActionReplanningCoordinator.from_snapshot(
+            self.cycle, restored_ledger, self.events, replanning_snapshot,
+        )
+        resumed = restored_coordinator.resume_interrupted(
+            first.execution_id, 3, facts, resources,
+            {"repair": {"machine-fixed"}, "rest": {"rested"}},
+        )
+        self.assertEqual(resumed.continuation_plan,
+                         ("buy-parts", "repair-machine"))
+        self.assertEqual(resumed.execution.action_id, "buy-parts")
+        self.assertEqual(restored_ledger.get(first.execution_id).status,
+                         "interrupted")
+
+    def test_resume_rejects_resource_shortage_and_parallel_owner_work(self):
+        facts, resources = {"at-market"}, {"cash": 10.0}
+        first = self.coordinator.replan(
+            "npc-1", 1, facts, resources,
+            {"repair": {"machine-fixed"}, "rest": {"rested"}},
+            reason="repair required",
+        )
+        self.ledger.advance(
+            first.execution_id, 2, facts, resources,
+            interruption="temporary interruption",
+        )
+        with self.assertRaisesRegex(ValueError, "not currently feasible"):
+            self.coordinator.resume_interrupted(
+                first.execution_id, 3, facts, {"cash": 2.0},
+                {"repair": {"machine-fixed"}, "rest": {"rested"}},
+            )
+        self.ledger.start(
+            "parallel-owner-work", "npc-1", 3, "rest",
+            {"safe-place"}, {"cash": 10.0}, plan_actions=("rest",),
+        )
+        with self.assertRaisesRegex(ValueError, "already has active work"):
+            self.coordinator.resume_interrupted(
+                first.execution_id, 4, facts, resources,
+                {"repair": {"machine-fixed"}, "rest": {"rested"}},
+            )
+
 
 if __name__ == "__main__":
     unittest.main()
