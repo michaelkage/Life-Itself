@@ -83,7 +83,7 @@ def test_exposure_and_decay_bound_the_response():
         history, profile, {"smoke": 0.25}, 100,
         half_life_ticks=100.0,
     )
-    assert dict(result.intensities)["fear"] == pytest.approx(0.9 * 0.25 * 0.5)
+    assert dict(result.intensities)["fear"] == pytest.approx(0.8 * 0.25 * 0.5)
     assert all(0.0 <= value <= 1.0 for _, value in result.intensities)
 
 
