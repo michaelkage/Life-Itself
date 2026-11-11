@@ -81,7 +81,7 @@ def test_strategic_retrieval_weights_personal_witnessed_and_reported_evidence():
     from simreality.npc_experience_transfer import strategic_experience_evidence
 
     events = WorldEventLedger((
-        WorldEventLedger.make_event("direct", 2, "work", participants=("bob",)),
+        WorldEventLedger.make_event("direct", 2, "work", participants=("alice", "bob")),
         WorldEventLedger.make_event("witnessed", 3, "accident", witnesses=("bob",)),
         WorldEventLedger.make_event("conversation", 9, "conversation",
                                     participants=("alice", "bob")),
