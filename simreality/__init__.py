@@ -921,3 +921,16 @@ __all__ += ["GoalExecutionHealthEvaluator", "GoalExecutionHealthProposal", "Goal
 # Explicitly adopt evidence-backed alternative intentions without overwriting the source goal.
 from .goal_alternatives import (GoalAlternativeAdapter, GoalAlternativeEvaluator, GoalAlternativeProposal, GoalIntentionAssessment, GoalIntentionEvaluator)
 __all__ += ["GoalAlternativeAdapter", "GoalAlternativeEvaluator", "GoalAlternativeProposal", "GoalIntentionAssessment", "GoalIntentionEvaluator"]
+
+
+# Deterministic arbitration and explicit temporary commitment between active NPC goals.
+from .goal_arbitration import (
+    GoalArbitrationAssessment, GoalArbitrationCandidate, GoalArbitrationEvaluator,
+    GoalArbitrationRule, GoalCommitment, GoalCommitmentAdapter, GoalCommitmentLedger,
+)
+from .goal_arbitration_save_state import GoalCommitmentSnapshot
+__all__ += [
+    "GoalArbitrationAssessment", "GoalArbitrationCandidate",
+    "GoalArbitrationEvaluator", "GoalArbitrationRule", "GoalCommitment",
+    "GoalCommitmentAdapter", "GoalCommitmentLedger", "GoalCommitmentSnapshot",
+]
