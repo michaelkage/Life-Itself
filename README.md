@@ -505,3 +505,6 @@ Interrupted NPC actions can now resume from their persisted plan cursor through 
 
 
 NPC long-term intention memory now preserves why an ambition was adopted or reopened, which goal was committed to, which competing intentions were deferred, and the observed outcomes of its plans. `GoalIntentionMemoryAdapter` builds these memories only from exact lifecycle, commitment, plan-evaluation, and autobiographical evidence references; it never fabricates motives or semantically guesses which experiences matter. Canonical snapshots preserve the immutable cross-reference history, and the optional component is validated and restored by `SimulationWorldCheckpoint` alongside its source ledgers. See [docs/NPC-GOAL-INTENTION-MEMORY.md](docs/NPC-GOAL-INTENTION-MEMORY.md) and `tests/test_goal_intention_memory.py`.
+
+
+**Reflective NPC goal arbitration:** NPCs can now recall provenance-linked autobiographical experiences when reconsidering long-term intentions. Authored per-goal memory weights decay over time, are strictly bounded, and are included in deterministic arbitration identity; remembered failures influence priorities without permanently locking goals. See [docs/NPC-GOAL-INTENTION-MEMORY.md](docs/NPC-GOAL-INTENTION-MEMORY.md) and `tests/test_goal_intention_recall.py`.
