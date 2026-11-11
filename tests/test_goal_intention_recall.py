@@ -152,3 +152,29 @@ class GoalIntentionRecallTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+    def test_changed_recall_evidence_cannot_fork_same_tick_commitment(self):
+        commitments = GoalCommitmentLedger()
+        memories = GoalIntentionMemoryLedger((
+            GoalIntentionMemoryLedger.make(
+                "alice", "g1", 0, "plan_failed", "plan_evaluation",
+                "plan-1", "First failure",
+            ),
+        ))
+        rules = (GoalIntentionRecallRule(
+            "g1", (("plan_failed", -0.1),), half_life_ticks=10.0,
+        ),)
+        first = GoalIntentionContinuityAdapter.reconsider(
+            self.goals, commitments, "alice", 1, rationale="reflect",
+            intention_memories=memories, recall_rules=rules,
+        )
+        memories.record(GoalIntentionMemoryLedger.make(
+            "alice", "g1", 1, "plan_failed", "plan_evaluation",
+            "plan-2", "Second failure",
+        ))
+        with self.assertRaisesRegex(ValueError, "already exists"):
+            GoalIntentionContinuityAdapter.reconsider(
+                self.goals, commitments, "alice", 1, rationale="reflect again",
+                intention_memories=memories, recall_rules=rules,
+            )
