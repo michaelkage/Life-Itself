@@ -977,3 +977,14 @@ __all__ += [
     "GoalCounterfactualPlan", "GoalPlanReflection", "GoalReflectionAlternative",
     "GoalReflectionRule", "NPCGoalReflectiveReasoner",
 ]
+
+
+# Evidence-bounded causal reflection and deterministic counterfactual goal planning.
+from .npc_goal_reflection import (
+    GoalCounterfactualPlan, GoalPlanReflection, GoalReflectionAlternative,
+    GoalReflectionRule, NPCGoalReflectiveReasoner,
+)
+__all__ += [
+    "GoalCounterfactualPlan", "GoalPlanReflection", "GoalReflectionAlternative",
+    "GoalReflectionRule", "NPCGoalReflectiveReasoner",
+]
