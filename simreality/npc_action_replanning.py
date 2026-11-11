@@ -142,6 +142,8 @@ class NPCActionReplanningCoordinator:
             request_data = json.loads(signature)
             if (request_data.get("owner") != item["owner_id"]
                     or request_data.get("tick") != item["tick"]
+                    or (request_data.get("goal_commitment_id") is not None
+                        and request_data.get("committed_goal_id") != item["goal_id"])
                     or request_data.get("experience_evidence_ids", []) != item.get("experience_evidence_ids", [])
                     or request_data.get("experience_evidence_sources", []) != item.get("experience_evidence_sources", [])):
                 raise ValueError("replanning request metadata does not match its signature")
@@ -152,6 +154,7 @@ class NPCActionReplanningCoordinator:
                     or attributes.get("request_id") != request_id
                     or attributes.get("status") != item["status"]
                     or attributes.get("action_id", "") != (item["action_id"] or "")
+                    or attributes.get("goal_id", "") != (item["goal_id"] or "")
                     or attributes.get("reason") != item["reason"]
                     or attributes.get("experience_evidence_ids", "[]") != json.dumps(item.get("experience_evidence_ids", []), separators=(",", ":"))
                     or attributes.get("experience_evidence_sources", "[]") != json.dumps(item.get("experience_evidence_sources", []), separators=(",", ":"))):
@@ -268,6 +271,7 @@ class NPCActionReplanningCoordinator:
             "reason": reason, "active_execution_id": active_execution_id,
             "max_expansions": max_expansions,
             "goal_commitment_id": goal_commitment.commitment_id if goal_commitment else None,
+            "committed_goal_id": goal_commitment.selected_goal_id if goal_commitment else None,
         }
         signature = json.dumps(request, sort_keys=True, separators=(",", ":"), allow_nan=False)
         request_id = hashlib.sha256(signature.encode("utf-8")).hexdigest()
