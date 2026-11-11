@@ -106,11 +106,11 @@ class NPCStrategyBeliefTests(unittest.TestCase):
 
     def test_observation_id_reuse_with_conflicting_content_is_rejected(self):
         item = self.add("p1", "failed", 1)
-        altered = StrategyObservation(
-            item.observation_id, item.owner_id, item.goal_id, item.strategy_id,
-            item.context_key, "different-plan", item.action_sequence, item.outcome, item.confidence,
-            item.observed_tick, item.evidence_event_ids, item.reflection_id)
         with self.assertRaisesRegex(ValueError, "does not match"):
+            altered = StrategyObservation(
+                item.observation_id, item.owner_id, item.goal_id, item.strategy_id,
+                item.context_key, "different-plan", item.action_sequence, item.outcome, item.confidence,
+                item.observed_tick, item.evidence_event_ids, item.reflection_id)
             self.ledger.record(altered)
 
 if __name__ == "__main__":
