@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import hashlib
+import json
 import math
 from typing import Mapping
 
@@ -52,6 +53,7 @@ class GoalRecoveryProposal:
     current_priority: float
     current_confidence: float
     matched_facts: tuple[str, ...]
+    context_signature: str
     rationale: str
 
 
@@ -114,6 +116,10 @@ class GoalRecoveryEvaluator:
                     "goal-recovery-" + digest, rule.rule_id, goal.goal_id,
                     owner_id, current_tick, goal.status, goal.category,
                     goal.priority, goal.confidence, matched,
+                    hashlib.sha256(json.dumps(
+                        {"needs": sorted(needs.items()), "facts": sorted(available_facts)},
+                        sort_keys=True, separators=(",", ":"), allow_nan=False,
+                    ).encode("utf-8")).hexdigest(),
                     "Recovery rule " + rule.rule_id + " matched " + ", ".join(matched),
                 ))
         return tuple(sorted(proposals, key=lambda item: (
@@ -130,6 +136,8 @@ class GoalRecoveryAdapter:
         goals: GoalBook,
         lifecycle: GoalLifecycleLedger,
         *,
+        need_levels: Mapping[str, float],
+        available_facts: frozenset[str],
         reason: str | None = None,
     ):
         if not isinstance(proposal, GoalRecoveryProposal):
@@ -138,6 +146,19 @@ class GoalRecoveryAdapter:
             raise TypeError("goals must be GoalBook")
         if not isinstance(lifecycle, GoalLifecycleLedger):
             raise TypeError("lifecycle must be GoalLifecycleLedger")
+        if not isinstance(available_facts, frozenset):
+            raise TypeError("available_facts must be a frozenset")
+        needs = dict(need_levels)
+        if any(not isinstance(key, str) or not key.strip() or isinstance(value, bool)
+               or not isinstance(value, (int, float)) or not math.isfinite(value)
+               or not 0 <= value <= 1 for key, value in needs.items()):
+            raise ValueError("need levels must be named finite values in [0, 1]")
+        signature = hashlib.sha256(json.dumps(
+            {"needs": sorted(needs.items()), "facts": sorted(available_facts)},
+            sort_keys=True, separators=(",", ":"), allow_nan=False,
+        ).encode("utf-8")).hexdigest()
+        if signature != proposal.context_signature:
+            raise ValueError("goal recovery proposal is stale: circumstances changed")
         goal = goals.goals.get(proposal.goal_id)
         if goal is None or goal.owner_id != proposal.owner_id:
             raise ValueError("recovery proposal references an unknown goal or owner")
