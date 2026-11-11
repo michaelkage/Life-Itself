@@ -835,6 +835,8 @@ class SimulationWorldCheckpoint:
                 raise ValueError('goal lifecycle event cannot precede goal creation')
             if any(goal_book.goals[goal_id].status.value != status for goal_id, status in latest_status.items()):
                 raise ValueError('goal lifecycle status does not match the checkpoint GoalBook')
+            if any(record[7] for record in goal_lifecycle_snapshot.records) and life_history is None:
+                raise ValueError('goal lifecycle evidence requires checkpointed autobiographical history')
             if life_history is not None:
                 known_evidence = {memory.memory_id for memory in life_history.memories()}
                 if experience_transfer_snapshot is not None:
@@ -1429,6 +1431,8 @@ class SimulationWorldCheckpoint:
                 raise ValueError('goal lifecycle event cannot precede goal creation')
             if any(goal_records[goal_id][11] != status for goal_id, status in latest_status.items()):
                 raise ValueError('goal lifecycle status does not match the checkpoint GoalBook')
+            if any(record[7] for record in goal_lifecycle_snapshot.records) and life_history_snapshot is None:
+                raise ValueError('goal lifecycle evidence requires checkpointed autobiographical history')
             if life_history_snapshot is not None:
                 known_memory_ids = {record[0] for record in life_history_snapshot.memories}
                 if experience_transfer_snapshot is not None:
