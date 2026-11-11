@@ -18,3 +18,8 @@ Event-driven obsolescence remains handled by `GoalReviewEvaluator` and authored 
     )
 
 The alternative proposal retains the underlying emergence proposal, including trigger types, evidence IDs, source classes, authored rule ID, and proposed tick. Adoption is idempotent for the same proposal when its lifecycle record already exists. A stale source goal or conflicting goal ID is rejected.
+
+
+## Combined intention assessment
+
+GoalIntentionEvaluator.assess runs the authored event-review policies and goal-emergence rules against the same current GoalBook and returns separate review_proposals and alternatives. A permanent world event can recommend abandoning an obsolete goal while current needs or experience independently suggest a different goal. Neither proposal accepts itself, and an obsolescence recommendation does not suppress alternative evidence.
