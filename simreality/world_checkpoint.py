@@ -862,6 +862,7 @@ class SimulationWorldCheckpoint:
                 raise ValueError('goal lifecycle evidence requires checkpointed autobiographical history')
             if life_history is not None:
                 known_evidence = {memory.memory_id for memory in life_history.memories()}
+                known_evidence.update(event.event_id for event in coordinator.events.snapshot())
                 if experience_transfer_snapshot is not None:
                     known_evidence.update(item.transfer_id for item in experience_transfer_snapshot.records)
                 if any(evidence_id not in known_evidence for record in goal_lifecycle_snapshot.records for evidence_id in record[7]):
@@ -1461,6 +1462,7 @@ class SimulationWorldCheckpoint:
                 raise ValueError('goal lifecycle evidence requires checkpointed autobiographical history')
             if life_history_snapshot is not None:
                 known_memory_ids = {record[0] for record in life_history_snapshot.memories}
+                known_memory_ids.update(event.event_id for event in envelope.restore_event_ledger().snapshot())
                 if experience_transfer_snapshot is not None:
                     known_memory_ids.update(item.transfer_id for item in experience_transfer_snapshot.records)
                 if any(evidence_id not in known_memory_ids for record in goal_lifecycle_snapshot.records for evidence_id in record[7]):
