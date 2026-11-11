@@ -100,3 +100,28 @@ requires the matching GoalBook, verifies each referenced goal and owner, checks
 the source event exists and names the NPC as a participant, and rejects
 future-dated decisions. Older checkpoints without this optional section remain
 readable.
+
+
+## Applying accepted decisions
+
+`GoalReviewApplicationAdapter` is the explicit mutation boundary. It
+accepts only an accepted `GoalReviewDecision` and checks that the goal
+still belongs to the recorded NPC, remains active, has not been reviewed after
+the decision tick, and still matches the category, priority, and confidence
+captured by the proposal. Stale decisions fail without changing the goal.
+
+- `reprioritize` applies the proposed priority and confidence.
+- `reframe` applies the proposed category, priority, and confidence.
+- `abandon` requires a `GoalLifecycleLedger` and records the
+  source event as lifecycle evidence.
+- `persist` records the reviewed confidence and advances the review tick.
+- `pause` is recorded as an accepted review, but remains non-suspending:
+  the goal model has no paused status, and pause must not be misrepresented as
+  dependency-derived `blocked`.
+
+`GoalReviewApplicationLedger` makes retries idempotent by decision ID.
+`GoalReviewApplicationSnapshot` provides canonical JSON persistence.
+Application history is deliberately a separate component: recording a decision
+is not the same operation as applying it, and old decision snapshots remain
+compatible. The simulation owner should checkpoint the application snapshot
+alongside the decision ledger and GoalBook.
