@@ -132,19 +132,19 @@ class NPCConditioningLedger:
         for owner, profile in profiles.items():
             if not isinstance(profile, ConditioningProfile) or profile.owner_id != owner:
                 raise ValueError("profiles must be keyed by matching owner IDs")
-        if tick > self.current_tick:
-            for owner, profile in sorted(profiles.items()):
-                last_tick = self._owner_ticks.get(owner, self.current_tick)
-                elapsed = tick - last_tick
-                if elapsed:
-                    rate = profile.spontaneous_recovery_rate
-                    if rate:
-                        factor = max(0.0, 1.0 - rate) ** elapsed
-                        for (association_owner, cue), value in tuple(self._associations.items()):
-                            if association_owner == owner:
-                                self._associations[(owner, cue)] = value * factor
-                self._owner_ticks[owner] = tick
-            self.current_tick = tick
+        for owner, profile in sorted(profiles.items()):
+            last_tick = self._owner_ticks.get(owner, self.current_tick)
+            elapsed = tick - last_tick
+            if elapsed:
+                rate = profile.spontaneous_recovery_rate
+                if rate:
+                    factor = max(0.0, 1.0 - rate) ** elapsed
+                    for (association_owner, cue), value in tuple(self._associations.items()):
+                        if association_owner == owner:
+                            self._associations[(owner, cue)] = value * factor
+            # Register the owner clock even when its first sample is at tick 0.
+            self._owner_ticks[owner] = tick
+        self.current_tick = max(self.current_tick, tick)
         return tuple(self.assess(owner, cue) for owner, profile in sorted(profiles.items())
                      for cue in sorted(c for o, c in self._associations if o == owner))
 
