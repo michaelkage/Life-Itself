@@ -85,3 +85,64 @@ def test_goal_memory_rejects_bad_identity_and_future_source():
             GoalIntentionMemoryLedger(), goals=goals, current_tick=3,
             lifecycle=lifecycle,
         )
+
+
+def test_world_checkpoint_round_trips_goal_intention_memory():
+    from simreality import (
+        NPC, SocialBeliefSystem, SocialTrustLedger, SimulationTickCoordinator,
+        SimulationWorldCheckpoint, SocialConversationAdapter, WorldEventLedger,
+        WorldEventMemoryAdapter,
+    )
+
+    events = WorldEventLedger()
+    npcs = {"alice": NPC("alice")}
+    trust = SocialTrustLedger()
+    beliefs = SocialBeliefSystem(trust)
+    memory_adapter = WorldEventMemoryAdapter(events)
+    conversations = SocialConversationAdapter(trust, beliefs)
+    coordinator = SimulationTickCoordinator(events, memory_adapter, conversations)
+    goals = GoalBook()
+    goals.add(NPCGoal("g1", "alice", "safety", 0.8))
+    intention_memory = GoalIntentionMemoryLedger((
+        GoalIntentionMemoryLedger.make(
+            "alice", "g1", 0, "adopted", "goal_lifecycle",
+            "lifecycle-1", "Protecting my home matters",
+        ),
+    ))
+
+    checkpoint = SimulationWorldCheckpoint.capture(
+        0, coordinator, npcs, goal_book=goals,
+        goal_intention_memories=intention_memory,
+    )
+    restored = SimulationWorldCheckpoint.from_json(checkpoint.to_json()).restore()
+    assert restored.goal_intention_memories.snapshot().to_json() == intention_memory.snapshot().to_json()
+    assert SimulationWorldCheckpoint.capture(
+        0, restored.coordinator, restored.npcs, goal_book=restored.goals,
+        goal_intention_memories=restored.goal_intention_memories,
+    ).to_json() == checkpoint.to_json()
+
+
+def test_world_checkpoint_requires_goal_book_for_intention_memory():
+    from simreality import (
+        NPC, SocialBeliefSystem, SocialTrustLedger, SimulationTickCoordinator,
+        SimulationWorldCheckpoint, SocialConversationAdapter, WorldEventLedger,
+        WorldEventMemoryAdapter,
+    )
+
+    events = WorldEventLedger()
+    npcs = {"alice": NPC("alice")}
+    trust = SocialTrustLedger()
+    beliefs = SocialBeliefSystem(trust)
+    coordinator = SimulationTickCoordinator(
+        events, WorldEventMemoryAdapter(events),
+        SocialConversationAdapter(trust, beliefs),
+    )
+    ledger = GoalIntentionMemoryLedger((
+        GoalIntentionMemoryLedger.make(
+            "alice", "g1", 0, "adopted", "goal_lifecycle", "life-1", "Adopted",
+        ),
+    ))
+    with pytest.raises(ValueError, match="require the corresponding GoalBook"):
+        SimulationWorldCheckpoint.capture(
+            0, coordinator, npcs, goal_intention_memories=ledger,
+        )
