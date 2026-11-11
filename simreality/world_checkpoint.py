@@ -830,6 +830,11 @@ class SimulationWorldCheckpoint:
             known_goals = {goal.goal_id: goal.owner_id for goal in goal_book.goals.values()}
             if any(record[1] not in known_goals or known_goals[record[1]] != record[2] or record[5] > current_tick for record in goal_lifecycle_snapshot.records):
                 raise ValueError('goal lifecycle history references an unknown goal, owner, or future tick')
+            latest_status = {record[1]: record[4] for record in goal_lifecycle_snapshot.records}
+            if any(record[5] < goal_book.goals[record[1]].created_tick for record in goal_lifecycle_snapshot.records):
+                raise ValueError('goal lifecycle event cannot precede goal creation')
+            if any(goal_book.goals[goal_id].status.value != status for goal_id, status in latest_status.items()):
+                raise ValueError('goal lifecycle status does not match the checkpoint GoalBook')
             if life_history is not None:
                 known_evidence = {memory.memory_id for memory in life_history.memories()}
                 if experience_transfer_snapshot is not None:
@@ -1418,6 +1423,12 @@ class SimulationWorldCheckpoint:
             known_goals = {record[0]: record[1] for record in goals_snapshot.records}
             if any(record[1] not in known_goals or known_goals[record[1]] != record[2] or record[5] > self.current_tick for record in goal_lifecycle_snapshot.records):
                 raise ValueError('goal lifecycle history references an unknown goal, owner, or future tick')
+            latest_status = {record[1]: record[4] for record in goal_lifecycle_snapshot.records}
+            goal_records = {record[0]: record for record in goals_snapshot.records}
+            if any(record[5] < goal_records[record[1]][4] for record in goal_lifecycle_snapshot.records):
+                raise ValueError('goal lifecycle event cannot precede goal creation')
+            if any(goal_records[goal_id][11] != status for goal_id, status in latest_status.items()):
+                raise ValueError('goal lifecycle status does not match the checkpoint GoalBook')
             if life_history_snapshot is not None:
                 known_memory_ids = {record[0] for record in life_history_snapshot.memories}
                 if experience_transfer_snapshot is not None:
