@@ -163,6 +163,61 @@ class GoalIntentionRecallTests(unittest.TestCase):
         self.assertEqual(second.intention_recall.evidence[0].memory_id, memories.entries()[0].memory_id)
         self.assertEqual(self.goals.goals["g1"].status.value, "active")
 
+
+    def test_strategic_recall_preserves_personal_witnessed_and_reported_sources(self):
+        from simreality.npc_life_history import AutobiographicalMemory, NPCLifeHistory
+        from simreality.npc_experience_transfer import NPCExperienceTransferLedger
+        from simreality.world_events import WorldEventLedger
+
+        goals = GoalBook()
+        goals.add(NPCGoal(
+            "bob-rescue", "bob", "rescue", 0.8,
+            metadata={"experience_tags": "rescue"},
+        ))
+        events = WorldEventLedger((
+            WorldEventLedger.make_event("personal-event", 1, "rescue", participants=("bob",)),
+            WorldEventLedger.make_event("witness-event", 2, "accident", witnesses=("bob",)),
+            WorldEventLedger.make_event("source-event", 1, "rescue", participants=("alice",)),
+            WorldEventLedger.make_event("conversation", 4, "conversation", participants=("alice", "bob")),
+        ))
+        history = NPCLifeHistory((
+            AutobiographicalMemory(
+                "bob-personal", "bob", "personal-event", 1, (),
+                "I completed a rescue", 0.8, 0.2, tags=("rescue", "goal:success"),
+            ),
+            AutobiographicalMemory(
+                "bob-witness", "bob", "witness-event", 2, (),
+                "I witnessed a rescue fail", 0.7, 0.1, tags=("rescue", "goal:failure"),
+            ),
+            AutobiographicalMemory(
+                "alice-source", "alice", "source-event", 1, (),
+                "My rescue attempt failed", 0.7, 0.1, tags=("rescue", "goal:failure"),
+            ),
+        ))
+        transfers = NPCExperienceTransferLedger(events, history)
+        transfers.transfer(
+            "share-alice", "bob", "alice", "alice-source", "conversation",
+            confidence=0.8,
+        )
+        result = GoalIntentionContinuityAdapter.reconsider(
+            goals, GoalCommitmentLedger(), "bob", 4,
+            rationale="consider first-hand and reported outcomes",
+            life_history=history, experience_transfers=transfers,
+        )
+        strategic = result.intention_recall.strategic_evidence[0]
+        self.assertEqual(strategic.goal_id, "bob-rescue")
+        self.assertEqual(
+            dict(strategic.source_classes),
+            {
+                "bob-personal": "personal",
+                "bob-witness": "witnessed",
+                "share-alice": "reported",
+            },
+        )
+        self.assertAlmostEqual(strategic.adjustment, 0.25 * (1.0 - 0.6 - 0.28) / (1.0 + 1.0 + 0.6 + 0.28))
+        self.assertEqual(dict(result.intention_recall.adjustments)["bob-rescue"], strategic.adjustment)
+
+
     def test_recall_rules_require_memory_ledger(self):
         with self.assertRaisesRegex(ValueError, "intention_memories are required"):
             GoalIntentionContinuityAdapter.reconsider(
