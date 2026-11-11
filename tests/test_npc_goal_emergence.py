@@ -164,3 +164,24 @@ def test_matching_rules_do_not_emit_duplicate_goal_templates():
     )
     assert len(proposals) == 1
     assert proposals[0].rule_id == "rule-a"
+
+def test_atomic_goal_lifecycle_transition_updates_goal_and_is_idempotent():
+    from simreality.goals import GoalStatus
+    from simreality.npc_goal_emergence import GoalLifecycleLedger
+
+    goals = GoalBook()
+    goal = NPCGoal("g", "npc", "safety", 2.0)
+    goals.add(goal)
+    ledger = GoalLifecycleLedger()
+    abandoned = ledger.transition(
+        goals, "g", GoalStatus.ABANDONED, 4, "risk passed")
+    assert goal.status == GoalStatus.ABANDONED
+    assert ledger.status_for("g") == "abandoned"
+    assert ledger.transition(
+        goals, "g", GoalStatus.ABANDONED, 4, "risk passed") == abandoned
+    reopened = ledger.transition(
+        goals, "g", GoalStatus.ACTIVE, 5, "risk returned")
+    assert goal.status == GoalStatus.ACTIVE
+    assert goal.review_tick == 5
+    assert reopened.from_status == "abandoned"
+    assert len(ledger.snapshot()) == 3  # initialization, abandonment, reopening
