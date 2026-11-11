@@ -271,6 +271,11 @@ class GoalLifecycleLedger:
                evidence_ids: tuple[str, ...] = ()) -> GoalLifecycleEvent:
         if not isinstance(goal, NPCGoal):
             raise TypeError("goal must be NPCGoal")
+        goal.validate()
+        if isinstance(tick, bool) or not isinstance(tick, int) or tick < goal.created_tick:
+            raise ValueError("lifecycle tick must be an integer at or after goal creation")
+        if not isinstance(reason, str) or not reason.strip():
+            raise ValueError("reason must be a non-empty string")
         if not isinstance(evidence_ids, tuple) or any(
             not isinstance(value, str) or not value.strip() for value in evidence_ids
         ):
