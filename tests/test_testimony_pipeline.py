@@ -44,7 +44,7 @@ class InquiryInvestigationPipelineTests(unittest.TestCase):
             "observer", 4,
         )
         testimony_after_first = testimony.to_json()
-        beliefs_after_first = beliefs.snapshot()
+        beliefs_after_first = beliefs.snapshot().to_json()
 
         replay = pipeline.process(
             inquiries, testimony, beliefs, "q-replay", "t-alice", 3.0,
@@ -54,7 +54,7 @@ class InquiryInvestigationPipelineTests(unittest.TestCase):
         self.assertEqual(replay.materialized, first.materialized)
         self.assertEqual(replay.report, first.report)
         self.assertEqual(testimony.to_json(), testimony_after_first)
-        self.assertEqual(beliefs.to_json(), beliefs_after_first)
+        self.assertEqual(beliefs.snapshot().to_json(), beliefs_after_first)
         self.assertEqual(len(testimony.snapshot()), 2)
         self.assertEqual(len(beliefs.beliefs_for("observer")), 2)
 
