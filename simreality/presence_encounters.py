@@ -192,7 +192,7 @@ class PresenceSocialAdapter:
             raise ValueError("NPCs must share a physical location")
         actual_location = first.location_id
         if location_id is not None and location_id != actual_location:
-            raise ValueError("requested encounter location does not match physical presence")
+            raise ValueError("conflicting requested encounter location does not match physical presence")
         if tick < max(first.updated_tick, second.updated_tick):
             raise ValueError("encounter cannot precede the latest presence update")
         if conversation:
