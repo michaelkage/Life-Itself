@@ -136,6 +136,22 @@ class GoalBook:
         if status == GoalStatus.COMPLETED:
             goal.progress = 1.0
 
+    def reopen(self, goal_id: str, current_tick: int) -> None:
+        """Explicitly reactivate an abandoned intention when circumstances change.
+
+        Completed and failed goals remain terminal. The lifecycle ledger should
+        record the corresponding transition so the reason is retained.
+        """
+        if isinstance(current_tick, bool) or not isinstance(current_tick, int) or current_tick < 0:
+            raise ValueError("current_tick must be a non-negative integer")
+        goal = self.goals[goal_id]
+        if goal.status != GoalStatus.ABANDONED:
+            raise ValueError("only abandoned goals can be reopened")
+        if current_tick < goal.created_tick:
+            raise ValueError("reopen tick cannot precede goal creation")
+        goal.status = GoalStatus.ACTIVE
+        goal.review_tick = current_tick
+
     def evaluate(self, goal_id: str, current_tick: int,
                  experience_adjustments: dict[str, float] | None = None) -> GoalEvaluation:
         if current_tick < 0:
