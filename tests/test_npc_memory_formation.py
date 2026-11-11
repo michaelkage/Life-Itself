@@ -41,7 +41,7 @@ def test_same_event_forms_distinct_observer_interpretations():
 def test_memory_formation_is_idempotent_and_rule_changes_conflict():
     event = WorldEventLedger.make_event("e1", 2, "loss", participants=("alice",))
     history = NPCLifeHistory()
-    profiles = {"alice": profile("alice", "participant", "I lost someone")}
+    profiles = {"alice": profile("alice", "participant", "I lost someone", event_type="loss")}
     first = NPCAutobiographicalMemoryAdapter.process((event,), profiles, history)
     second = NPCAutobiographicalMemoryAdapter.process((event,), profiles, history)
     assert first == second
@@ -55,7 +55,7 @@ def test_linked_conflicts_and_learning_decisions_are_preserved():
     event = WorldEventLedger.make_event("e1", 3, "assault", participants=("alice", "bob"))
     history = NPCLifeHistory()
     formed = NPCAutobiographicalMemoryAdapter.process(
-        (event,), {"alice": profile("alice", "participant", "I was attacked")},
+        (event,), {"alice": profile("alice", "participant", "I was attacked", event_type="assault")},
         history,
         conflict_ids_by_event_observer={("e1", "alice"): ("c1",)},
         learning_decision_ids_by_event_observer={("e1", "alice"): ("d1",)},
@@ -80,6 +80,6 @@ def test_invalid_linked_reference_shape_is_rejected_by_memory_contract():
     history = NPCLifeHistory()
     with pytest.raises(ValueError, match="tuple of non-empty strings"):
         NPCAutobiographicalMemoryAdapter.process(
-            (event,), {"alice": profile("alice", "participant", "I was there")},
+            (event,), {"alice": profile("alice", "participant", "I was there", event_type="argument")},
             history, conflict_ids_by_event_observer={("e1", "alice"): ("",)},
         )
