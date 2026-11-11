@@ -502,8 +502,14 @@ class NPCActionReplanningCoordinator:
             return NPCActionProgression(terminal_or_active, terminal_or_active, None)
         evaluation = self.evaluations.evaluate(execution_id) if self.evaluations is not None else None
         if terminal_or_active.status != "completed":
+            # An interruption is a replanning boundary, not evidence that the
+            # NPC failed its intention. Only an explicit failed terminal state
+            # contributes to persistent execution-health failure streaks.
+            terminal_status = (
+                "failed" if terminal_or_active.status == "failed" else "replanned"
+            )
             plan_evaluation = (self.evaluations.evaluate_plan(
-                execution_id.rsplit(":step:", 1)[0], "failed"
+                execution_id.rsplit(":step:", 1)[0], terminal_status
             ) if self.evaluations is not None else None)
             replanning = self.replan(
                 active.owner_id, tick, world_facts, resources, goal_facts,
