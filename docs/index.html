@@ -335,10 +335,10 @@ footer{padding:17px 0 30px;color:var(--stone);font-size:10px;display:flex;justif
   const $=id=>document.getElementById(id);
   const clamp=(n,min,max)=>Math.max(min,Math.min(max,n));
   const disruptions=[
-    {id:"01-traffic",kind:"traffic",severity:0.8,start:480,end:600,location:"shop-1",delay:18},
-    {id:"02-storm",kind:"weather",severity:0.6,start:480,end:600,location:null,delay:0,activity:"work-from-home",altLocation:"home-1"},
-    {id:"03-alarm",kind:"alarm_failure",severity:0.9,start:420,end:600,location:null,delay:45},
-    {id:"04-memory-avoidance",kind:"location_avoidance",severity:1,start:0,end:1440,location:"shop-1",delay:0,activity:"take-another-route",altLocation:"side-street"}
+    {id:"01-traffic",owner:"npc-1",kind:"traffic",severity:0.8,start:480,end:600,location:"shop-1",delay:18},
+    {id:"02-storm",owner:"npc-1",kind:"weather",severity:0.6,start:480,end:600,location:null,delay:0,activity:"work-from-home",altLocation:"home-1"},
+    {id:"03-alarm",owner:"npc-1",kind:"alarm_failure",severity:0.9,start:420,end:600,location:null,delay:45},
+    {id:"04-memory-avoidance",owner:"npc-1",kind:"location_avoidance",severity:1,start:0,end:1440,location:"shop-1",delay:0,activity:"take-another-route",altLocation:"side-street"}
   ];
   const checkboxIds={"01-traffic":"d-traffic","02-storm":"d-storm","03-alarm":"d-alarm","04-memory-avoidance":"d-avoid"};
   const severityIds={"01-traffic":"s-traffic","02-storm":"s-storm","03-alarm":"s-alarm","04-memory-avoidance":"s-avoid"};
