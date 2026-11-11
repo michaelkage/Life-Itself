@@ -113,6 +113,14 @@ class GoalArbitrationAssessment:
             raise ValueError("owner_id must be non-empty")
         if isinstance(self.tick, bool) or not isinstance(self.tick, int) or self.tick < 0:
             raise ValueError("tick must be non-negative")
+        if not isinstance(self.candidates, tuple) or any(
+            not isinstance(item, GoalArbitrationCandidate) for item in self.candidates
+        ):
+            raise TypeError("candidates must be a tuple of GoalArbitrationCandidate values")
+        if not isinstance(self.deferred_goal_ids, tuple):
+            raise TypeError("deferred_goal_ids must be a tuple")
+        if not isinstance(self.goal_snapshot, tuple):
+            raise TypeError("goal_snapshot must be a tuple")
         ids = [item.goal_id for item in self.candidates]
         if len(ids) != len(set(ids)):
             raise ValueError("arbitration candidate goal IDs must be unique")
@@ -330,6 +338,10 @@ class GoalCommitmentLedger:
 
     def record_many(self, items) -> tuple[GoalCommitment, ...]:
         batch = tuple(items)
+        if any(not isinstance(item, GoalCommitment) for item in batch):
+            raise TypeError("items must contain GoalCommitment values")
+        if len({item.commitment_id for item in batch}) != len(batch):
+            raise ValueError("commitment IDs must be unique within a batch")
         trial = GoalCommitmentLedger()
         for item in sorted((*self.entries(), *batch), key=lambda x: (x.tick, x.owner_id, x.commitment_id)):
             trial.record(item)
