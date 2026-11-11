@@ -19,6 +19,10 @@ from .goal_arbitration import (
 )
 from .goals import GoalBook
 from .identity_context import NPCEmotionalState
+from .goal_intention_memory import GoalIntentionMemoryLedger
+from .goal_intention_recall import (
+    GoalIntentionRecall, GoalIntentionRecallAdapter, GoalIntentionRecallRule,
+)
 
 
 @dataclass(frozen=True)
@@ -29,6 +33,7 @@ class GoalContinuityResult:
     commitment: GoalCommitment
     previous_commitment: GoalCommitment | None
     retained_previous_focus: bool
+    intention_recall: GoalIntentionRecall | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.assessment, GoalArbitrationAssessment):
@@ -41,6 +46,12 @@ class GoalContinuityResult:
             raise TypeError("previous_commitment must be GoalCommitment or None")
         if not isinstance(self.retained_previous_focus, bool):
             raise TypeError("retained_previous_focus must be bool")
+        if self.intention_recall is not None:
+            if not isinstance(self.intention_recall, GoalIntentionRecall):
+                raise TypeError("intention_recall must be GoalIntentionRecall or None")
+            if (self.intention_recall.owner_id != self.commitment.owner_id
+                    or self.intention_recall.tick != self.commitment.tick):
+                raise ValueError("intention recall must match the committed owner and tick")
         if self.commitment.assessment_id != self.assessment.assessment_id:
             raise ValueError("commitment must reference the supplied fresh assessment")
         if self.commitment.selected_goal_id != self.assessment.selected_goal_id:
@@ -65,6 +76,8 @@ class GoalIntentionContinuityAdapter:
         value_alignment: Mapping[str, float] | None = None,
         resources: Mapping[str, float] | None = None,
         experience_adjustments: Mapping[str, float] | None = None,
+        intention_memories: GoalIntentionMemoryLedger | None = None,
+        recall_rules: tuple[GoalIntentionRecallRule, ...] = (),
     ) -> GoalContinuityResult:
         if not isinstance(goals, GoalBook):
             raise TypeError("goals must be GoalBook")
@@ -80,6 +93,25 @@ class GoalIntentionContinuityAdapter:
         # Reconstruct the original tick's incumbent, not the commitment created
         # by that same tick. This makes same-tick replay reproduce its digest.
         incumbent_id = previous.selected_goal_id if previous is not None else None
+        if intention_memories is not None and not isinstance(intention_memories, GoalIntentionMemoryLedger):
+            raise TypeError("intention_memories must be GoalIntentionMemoryLedger or None")
+        if not isinstance(recall_rules, tuple) or any(
+            not isinstance(item, GoalIntentionRecallRule) for item in recall_rules
+        ):
+            raise TypeError("recall_rules must be a tuple of GoalIntentionRecallRule values")
+        recall = None
+        if intention_memories is not None:
+            recall = GoalIntentionRecallAdapter.recall(
+                intention_memories, goals, owner_id, current_tick, rules=recall_rules,
+            )
+        elif recall_rules:
+            raise ValueError("intention_memories are required when recall_rules are supplied")
+        combined_experience = dict(experience_adjustments or {})
+        if recall is not None:
+            for goal_id, adjustment in recall.adjustments:
+                combined_experience[goal_id] = max(
+                    -0.25, min(0.25, combined_experience.get(goal_id, 0.0) + adjustment)
+                )
         assessment = GoalArbitrationEvaluator.assess(
             goals,
             owner_id,
@@ -89,7 +121,8 @@ class GoalIntentionContinuityAdapter:
             emotional_state=emotional_state,
             value_alignment=value_alignment,
             resources=resources,
-            experience_adjustments=experience_adjustments,
+            experience_adjustments=combined_experience,
+            experience_evidence_id=recall.recall_id if recall is not None else None,
             incumbent_goal_id=incumbent_id,
             continuity_margin=continuity_margin,
         )
@@ -109,4 +142,4 @@ class GoalIntentionContinuityAdapter:
             previous is not None
             and assessment.selected_goal_id == previous.selected_goal_id
         )
-        return GoalContinuityResult(assessment, commitment, previous, retained)
+        return GoalContinuityResult(assessment, commitment, previous, retained, recall)
