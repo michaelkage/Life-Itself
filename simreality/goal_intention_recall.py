@@ -133,6 +133,7 @@ class GoalIntentionStrategicEvidence:
     source_classes: tuple[tuple[str, str], ...]
     source_confidences: tuple[tuple[str, float], ...]
     source_influences: tuple[tuple[str, float], ...]
+    source_tags: tuple[tuple[str, tuple[str, ...]], ...]
 
     def __post_init__(self) -> None:
         if not isinstance(self.goal_id, str) or not self.goal_id.strip():
@@ -175,6 +176,22 @@ class GoalIntentionStrategicEvidence:
                 raise ValueError(f"{field_name} must not repeat evidence IDs")
             if any(not 0.0 <= _finite(item[1], field_name) <= 1.0 for item in values):
                 raise ValueError(f"{field_name} values must be in [0, 1]")
+        if not isinstance(self.source_tags, tuple) or any(
+            not isinstance(item, tuple) or len(item) != 2
+            or not isinstance(item[0], str) or not item[0].strip()
+            or not isinstance(item[1], tuple)
+            or any(not isinstance(tag, str) or not tag.strip() for tag in item[1])
+            for item in self.source_tags
+        ):
+            raise ValueError("source_tags must contain (evidence_id, tags) pairs")
+        if tuple(sorted(self.source_tags)) != self.source_tags:
+            raise ValueError("source tags must use canonical order")
+        if {item[0] for item in self.source_tags} != set(self.evidence_ids):
+            raise ValueError("source tags must cover every strategic evidence ID")
+        if len(self.source_tags) != len(self.evidence_ids):
+            raise ValueError("source tags must not repeat evidence IDs")
+        if any(tags != tuple(sorted(set(tags))) for _, tags in self.source_tags):
+            raise ValueError("source tags must be unique and sorted")
 
 
 @dataclass(frozen=True)
@@ -233,7 +250,8 @@ class GoalIntentionRecall:
                 [item.goal_id, item.adjustment, list(item.evidence_ids),
                  [list(source) for source in item.source_classes],
                  [list(source) for source in item.source_confidences],
-                 [list(source) for source in item.source_influences]]
+                 [list(source) for source in item.source_influences],
+                 [[evidence_id, list(tags)] for evidence_id, tags in item.source_tags]]
                 for item in self.strategic_evidence
             ],
         }
@@ -312,9 +330,13 @@ class GoalIntentionRecallAdapter:
                     (evidence_id, strategic_sources[evidence_id].influence)
                     for evidence_id in evidence_ids
                 ))
+                source_tags = tuple(sorted(
+                    (evidence_id, tuple(sorted(set(strategic_sources[evidence_id].tags))))
+                    for evidence_id in evidence_ids
+                ))
                 strategic_records.append(GoalIntentionStrategicEvidence(
                     goal_id, raw_adjustments[goal_id], evidence_ids, source_classes,
-                    source_confidences, source_influences,
+                    source_confidences, source_influences, source_tags,
                 ))
                 strategic_adjustments[goal_id] = raw_adjustments[goal_id]
                 strategic_memory_keys.update(
@@ -378,7 +400,8 @@ class GoalIntentionRecallAdapter:
                 [item.goal_id, item.adjustment, list(item.evidence_ids),
                  [list(source) for source in item.source_classes],
                  [list(source) for source in item.source_confidences],
-                 [list(source) for source in item.source_influences]]
+                 [list(source) for source in item.source_influences],
+                 [[evidence_id, list(tags)] for evidence_id, tags in item.source_tags]]
                 for item in strategic_records
             ],
         }
