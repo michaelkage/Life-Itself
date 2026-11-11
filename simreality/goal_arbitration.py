@@ -296,8 +296,8 @@ class GoalCommitment:
                 raise ValueError(f"{name} must be non-empty")
         if isinstance(self.tick, bool) or not isinstance(self.tick, int) or self.tick < 0:
             raise ValueError("tick must be non-negative")
-        if not math.isfinite(self.selected_score) or not 0.0 <= self.selected_score <= 1.0:
-            raise ValueError("selected_score must be finite and in [0, 1]")
+        if isinstance(self.selected_score, bool) or not isinstance(self.selected_score, (int, float)) or not math.isfinite(self.selected_score) or not 0.0 <= self.selected_score <= 1.0:
+            raise ValueError("selected_score must be finite numeric in [0, 1]")
         if not isinstance(self.deferred_goal_ids, tuple) or any(
             not isinstance(goal_id, str) or not goal_id.strip()
             for goal_id in self.deferred_goal_ids
@@ -354,6 +354,16 @@ class GoalCommitmentLedger:
     def for_owner(self, owner_id: str) -> tuple[GoalCommitment, ...]:
         return tuple(sorted((x for x in self._entries.values() if x.owner_id == owner_id),
                             key=lambda x: (x.tick, x.commitment_id)))
+
+    def latest_for_owner(self, owner_id: str) -> GoalCommitment | None:
+        """Return the most recent persisted focus decision for an NPC."""
+        history = self.for_owner(owner_id)
+        return history[-1] if history else None
+
+    def at_tick(self, owner_id: str, tick: int) -> GoalCommitment | None:
+        """Return the exact-tick commitment; never infer a commitment for another tick."""
+        commitment_id = self._tick_index.get((owner_id, tick))
+        return self._entries.get(commitment_id) if commitment_id is not None else None
 
     def entries(self) -> tuple[GoalCommitment, ...]:
         return tuple(sorted(self._entries.values(),
