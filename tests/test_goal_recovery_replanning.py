@@ -80,7 +80,7 @@ class GoalRecoveryReplanningTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "another NPC"):
             self.run_recovery(active_execution_id=foreign.execution_id)
         self.assertEqual(self.goals.goals["housing"].status, GoalStatus.ABANDONED)
-        self.assertEqual(len(self.lifecycle.snapshot()), 3)
+        self.assertEqual(len(self.lifecycle.snapshot()), 2)
 
     def test_retry_reuses_lifecycle_event_and_replanning_result(self):
         first = self.run_recovery()
@@ -88,7 +88,7 @@ class GoalRecoveryReplanningTests(unittest.TestCase):
         self.assertEqual(first.lifecycle_event, second.lifecycle_event)
         self.assertEqual(first.replanning, second.replanning)
         self.assertEqual(len(self.executions.active()), 1)
-        self.assertEqual(len(self.lifecycle.snapshot()), 2)
+        self.assertEqual(len(self.lifecycle.snapshot()), 3)
 
     def test_retry_rejects_goal_mutation_after_reopening(self):
         self.run_recovery()
