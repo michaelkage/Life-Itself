@@ -43,10 +43,12 @@ class PsychologicalLearningDecisionTests(unittest.TestCase):
                       rationale="Reject this conflicting replay")
         with self.assertRaisesRegex(ValueError, "conflicting content"):
             ledger.decide("d1", self.positive, accepted=True, decision_tick=2,
-                          conditioning=self.conditioning, profile=self.profile)
+                          conditioning=self.conditioning, profile=self.profile,
+                          rationale="Conflicting acceptance")
         with self.assertRaisesRegex(ValueError, "already has a decision"):
             ledger.decide("d2", self.positive, accepted=True, decision_tick=2,
-                          conditioning=self.conditioning, profile=self.profile)
+                          conditioning=self.conditioning, profile=self.profile,
+                          rationale="Second decision for same proposal")
 
     def test_later_contradictory_learning_can_revise_association(self):
         ledger = PsychologicalLearningDecisionLedger()
