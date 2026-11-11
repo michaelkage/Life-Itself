@@ -875,7 +875,11 @@ class SimulationWorldCheckpoint:
             if life_history is not None:
                 known_evidence = {memory.memory_id for memory in life_history.memories()}
                 known_evidence.update(event.event_id for event in coordinator.events.snapshot())
-                if strategy_belief_snapshot is not None:
+                if experience_transfer_snapshot is not None:
+                    known_evidence.update(item.transfer_id for item in experience_transfer_snapshot.records)
+                if any(evidence_id not in known_evidence for record in goal_lifecycle_snapshot.records for evidence_id in record[7]):
+                    raise ValueError('goal lifecycle evidence references an unknown autobiographical memory')
+        if strategy_belief_snapshot is not None:
             strategy_ledger = strategy_belief_snapshot.restore()
             known_npcs = {npc.entity_id for npc in NPCCollectionSnapshot.from_json(self.npcs_json).restore().values()}
             if any(item.owner_id not in known_npcs or item.observed_tick > self.current_tick
@@ -883,10 +887,6 @@ class SimulationWorldCheckpoint:
                 raise ValueError("strategy beliefs reference an unknown NPC or future observation")
             if any(item.decision_tick > self.current_tick for item in strategy_ledger.decisions()):
                 raise ValueError("strategy belief decision occurs after checkpoint tick")
-        if experience_transfer_snapshot is not None:
-                    known_evidence.update(item.transfer_id for item in experience_transfer_snapshot.records)
-                if any(evidence_id not in known_evidence for record in goal_lifecycle_snapshot.records for evidence_id in record[7]):
-                    raise ValueError('goal lifecycle evidence references an unknown autobiographical memory')
 
         goal_commitments_snapshot = None
         if goal_commitments is not None:
