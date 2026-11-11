@@ -988,3 +988,16 @@ __all__ += [
     "GoalCounterfactualPlan", "GoalPlanReflection", "GoalReflectionAlternative",
     "GoalReflectionRule", "NPCGoalReflectiveReasoner",
 ]
+
+
+# Owner-specific strategy reliability beliefs and explicit learning decisions.
+from .npc_strategy_beliefs import (
+    NPCStrategyBeliefLedger, StrategyBelief, StrategyBeliefDecision,
+    StrategyBeliefProposal, StrategyBeliefSnapshot, StrategyLearningRule,
+    StrategyObservation,
+)
+__all__ += [
+    "NPCStrategyBeliefLedger", "StrategyBelief", "StrategyBeliefDecision",
+    "StrategyBeliefProposal", "StrategyBeliefSnapshot", "StrategyLearningRule",
+    "StrategyObservation",
+]
