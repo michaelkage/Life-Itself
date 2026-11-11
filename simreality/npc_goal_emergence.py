@@ -142,6 +142,7 @@ class NPCGoalEmergence:
         memories = tuple(m for m in history.memories(owner_id) if m.tick <= current_tick) if history else ()
         existing = [g for g in goals.goals.values() if g.owner_id == owner_id]
         results = []
+        proposed_templates: set[tuple[str, str]] = set()
         for rule in sorted(rules, key=lambda x: x.rule_id):
             triggers, evidence, sources = [], [], []
             if rule.need_key is not None and needs.get(rule.need_key, 0.0) >= rule.need_threshold:
@@ -164,6 +165,9 @@ class NPCGoalEmergence:
                     triggers.append("experience:" + rule.experience_tag)
             if not triggers:
                 continue
+            template_key = (rule.template.category, rule.template.template_id)
+            if template_key in proposed_templates:
+                continue
             matching = [
                 g for g in existing
                 if g.category == rule.template.category
@@ -172,6 +176,7 @@ class NPCGoalEmergence:
             if any(g.status not in {GoalStatus.FAILED, GoalStatus.ABANDONED}
                    for g in matching):
                 continue
+            proposed_templates.add(template_key)
             incarnation = len(matching)
             payload = (owner_id, rule.rule_id, rule.template.template_id, str(incarnation))
             digest = hashlib.sha256("|".join(payload).encode("utf-8")).hexdigest()[:20]
