@@ -37,7 +37,7 @@ class IdentityEvolutionAuditTrailTests(unittest.TestCase):
         )
         self.evidence = ScarIdentityProposalEvidence(
             proposal, "scar-a", "fear-to-trust", "fear",
-            "crowded-room", 4, 0.8,
+            "crowded-room", 4, 0.8 * (0.999 ** 1),
         )
         self.proposals = ScarIdentityProposalLedger((self.evidence,))
 
