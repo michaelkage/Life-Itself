@@ -61,6 +61,7 @@ class StrategyObservation:
     strategy_id: str
     context_key: str
     plan_id: str
+    action_sequence: tuple[str, ...]
     outcome: str
     confidence: float
     observed_tick: int
@@ -70,6 +71,9 @@ class StrategyObservation:
     def __post_init__(self):
         for name in ("observation_id", "owner_id", "goal_id", "strategy_id", "context_key", "plan_id"):
             _nonempty(getattr(self, name), name)
+        if (not isinstance(self.action_sequence, tuple) or not self.action_sequence
+                or any(not isinstance(x, str) or not x.strip() for x in self.action_sequence)):
+            raise ValueError("action_sequence must contain non-empty action IDs")
         if self.outcome not in ("success", "failure"):
             raise ValueError("strategy observations must be success or failure")
         _unit(self.confidence, "confidence")
@@ -81,7 +85,8 @@ class StrategyObservation:
             _nonempty(self.reflection_id, "reflection_id")
         expected = _digest({
             "owner": self.owner_id, "goal": self.goal_id, "strategy": self.strategy_id,
-            "context": self.context_key, "plan": self.plan_id, "outcome": self.outcome,
+            "context": self.context_key, "plan": self.plan_id,
+            "actions": list(self.action_sequence), "outcome": self.outcome,
             "confidence": self.confidence, "tick": self.observed_tick,
             "events": list(self.evidence_event_ids), "reflection": self.reflection_id,
         })
@@ -123,12 +128,14 @@ class StrategyObservation:
         reflection_id = reflection.reflection_id if reflection is not None else None
         payload = {
             "owner": evaluation.owner_id, "goal": evaluation.goal_id, "strategy": strategy_id,
-            "context": context_key, "plan": evaluation.plan_id, "outcome": outcome,
+            "context": context_key, "plan": evaluation.plan_id,
+            "actions": list(evaluation.planned_actions), "outcome": outcome,
             "confidence": confidence, "tick": tick, "events": list(evidence),
             "reflection": reflection_id,
         }
         return cls(_digest(payload), evaluation.owner_id, evaluation.goal_id, strategy_id,
-                   context_key, evaluation.plan_id, outcome, confidence, tick, evidence,
+                   context_key, evaluation.plan_id, tuple(evaluation.planned_actions),
+                   outcome, confidence, tick, evidence,
                    reflection_id)
 
 
@@ -225,6 +232,7 @@ class StrategyBelief:
     confidence: float
     decision_id: str
     updated_tick: int
+    action_sequence: tuple[str, ...]
 
 
 class NPCStrategyBeliefLedger:
@@ -371,9 +379,23 @@ class NPCStrategyBeliefLedger:
         if not accepted:
             return None
         latest = max(accepted, key=lambda x: (x.decision_tick, x.decision_id))
+        source = self._observations[latest.observation_ids[0]]
         return StrategyBelief(latest.owner_id, latest.goal_id, latest.strategy_id,
                               latest.context_key, latest.confidence, latest.decision_id,
-                              latest.decision_tick)
+                              latest.decision_tick, source.action_sequence)
+
+    def plan_reliabilities(self, owner_id, context_key):
+        """Return accepted owner/context beliefs in the planner's native key shape."""
+        _nonempty(owner_id, "owner_id")
+        _nonempty(context_key, "context_key")
+        result = {}
+        for decision in self._decisions.values():
+            if not decision.accepted or (decision.owner_id, decision.context_key) != (owner_id, context_key):
+                continue
+            current = self.belief_for(owner_id, decision.strategy_id, context_key)
+            if current is not None and current.decision_id == decision.decision_id:
+                result[(decision.goal_id, current.action_sequence)] = current.confidence
+        return result
 
 
 @dataclass(frozen=True)
@@ -388,7 +410,7 @@ class StrategyBeliefSnapshot:
             raise TypeError("ledger must be NPCStrategyBeliefLedger")
         observations = tuple(tuple(getattr(x, field) for field in (
             "observation_id", "owner_id", "goal_id", "strategy_id", "context_key",
-            "plan_id", "outcome", "confidence", "observed_tick", "evidence_event_ids",
+            "plan_id", "action_sequence", "outcome", "confidence", "observed_tick", "evidence_event_ids",
             "reflection_id")) for x in sorted(ledger.observations(), key=lambda x: x.observation_id))
         decisions = tuple(tuple(getattr(x, field) for field in (
             "decision_id", "proposal_id", "owner_id", "goal_id", "strategy_id",
@@ -399,7 +421,7 @@ class StrategyBeliefSnapshot:
     def __post_init__(self):
         if not isinstance(self.observations, tuple) or not isinstance(self.decisions, tuple):
             raise ValueError("strategy snapshot collections must be tuples")
-        if any(not isinstance(x, tuple) or len(x) != 11 for x in self.observations):
+        if any(not isinstance(x, tuple) or len(x) != 12 for x in self.observations):
             raise ValueError("invalid strategy observation snapshot")
         if any(not isinstance(x, tuple) or len(x) != 11 for x in self.decisions):
             raise ValueError("invalid strategy decision snapshot")
