@@ -103,7 +103,10 @@ class GoalRecoveryEvaluator:
                     continue
                 if set(rule.forbidden_facts) & available_facts:
                     continue
-                matched = tuple(sorted(set(rule.required_facts)))
+                matched = tuple(sorted(
+                    set(rule.required_facts)
+                    | {"fact_absent:" + fact for fact in rule.forbidden_facts}
+                ))
                 if rule.need_key is not None:
                     matched += ("need_recovered:" + rule.need_key,)
                 seed = "|".join((
