@@ -25,23 +25,22 @@ class GoalLifecycleSnapshot:
                 record[0], record[1], record[2], record[3], record[4],
                 record[5], record[6], tuple(record[7]),
             ))
-        if ids != sorted(ids) or len(ids) != len(set(ids)):
-            raise ValueError("lifecycle event IDs must be unique and sorted")
-        # Ledger reconstruction validates transition continuity and terminal rules.
-        ordered = sorted(events, key=lambda x: (x.tick, x.event_id))
+        if len(ids) != len(set(ids)):
+            raise ValueError("lifecycle event IDs must be unique")
+        # Array order is append order; preserve same-tick transition order.
         ledger = GoalLifecycleLedger()
-        for event in ordered:
+        for event in events:
             ledger.append(event)
 
     @classmethod
     def capture(cls, ledger):
         if not isinstance(ledger, GoalLifecycleLedger):
             raise TypeError("ledger must be GoalLifecycleLedger")
-        records = tuple(sorted((
+        records = tuple(
             (e.event_id, e.goal_id, e.owner_id, e.from_status, e.to_status,
              e.tick, e.reason, tuple(e.evidence_ids))
             for e in ledger.snapshot()
-        ), key=lambda x: x[0]))
+        )
         return cls(records)
 
     def to_json(self):
@@ -73,5 +72,5 @@ class GoalLifecycleSnapshot:
     def restore(self):
         events = tuple(GoalLifecycleEvent(
             r[0], r[1], r[2], r[3], r[4], r[5], r[6], tuple(r[7])
-        ) for r in sorted(self.records, key=lambda x: (x[5], x[0])))
+        ) for r in self.records)
         return GoalLifecycleLedger(events)
