@@ -142,10 +142,11 @@ class WorldEventMemoryReplaySnapshot:
             # deliberately excluding retention.
             candidates = [
                 item for item in npc.memories
-                if (item.witness_id, item.target_entity_id, item.initial_impact,
-                    item.timestamp_hour, item.action_tag)
-                == (memory.witness_id, memory.target_entity_id, memory.initial_impact,
-                    memory.timestamp_hour, memory.action_tag)
+                if (item.witness_id == memory.witness_id
+                    and item.target_entity_id == memory.target_entity_id
+                    and item.action_tag == memory.action_tag
+                    and math.isclose(item.timestamp_hour, memory.timestamp_hour,
+                                     rel_tol=0.0, abs_tol=1e-9))
             ]
             if len(candidates) != 1:
                 raise ValueError(
