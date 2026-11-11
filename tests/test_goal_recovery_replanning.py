@@ -72,6 +72,16 @@ class GoalRecoveryReplanningTests(unittest.TestCase):
         self.assertEqual(result.replanning.action_id, "apply-for-housing")
         self.assertEqual(len(self.executions.active()), 1)
 
+    def test_foreign_active_execution_is_rejected_before_goal_reopening(self):
+        foreign = self.executions.start(
+            "foreign-work", "npc-2", 1, "resume-obsolete-search",
+            {"old_route"}, {}, plan_actions=("resume-obsolete-search",),
+        )
+        with self.assertRaisesRegex(ValueError, "another NPC"):
+            self.run_recovery(active_execution_id=foreign.execution_id)
+        self.assertEqual(self.goals.goals["housing"].status, GoalStatus.ABANDONED)
+        self.assertEqual(len(self.lifecycle.snapshot()), 1)
+
     def test_retry_reuses_lifecycle_event_and_replanning_result(self):
         first = self.run_recovery()
         second = self.run_recovery()
