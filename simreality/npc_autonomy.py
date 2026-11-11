@@ -49,6 +49,7 @@ class NPCDecisionCycle:
         plan_reliability: Mapping[tuple[str, tuple[str, ...]], float] | None = None,
         goal_experience_adjustments: Mapping[str, float] | None = None,
         goal_motivational_adjustments: Mapping[str, float] | None = None,
+        committed_goal_id: str | None = None,
     ) -> NPCDecision:
         """Propose a plan for the highest-ranked goal that can currently be planned.
 
@@ -64,7 +65,17 @@ class NPCDecisionCycle:
         combined_adjustments = dict(goal_experience_adjustments or {})
         for goal_id, value in (goal_motivational_adjustments or {}).items():
             combined_adjustments[goal_id] = max(-0.25, min(0.25, combined_adjustments.get(goal_id, 0.0) + value))
-        ranked_goals = self.goals.ranked(owner_id, current_tick, combined_adjustments)
+        if committed_goal_id is not None:
+            if not isinstance(committed_goal_id, str) or not committed_goal_id.strip():
+                raise ValueError("committed_goal_id must be a non-empty string")
+            committed_goal = self.goals.goals.get(committed_goal_id)
+            if committed_goal is None or committed_goal.owner_id != owner_id:
+                raise ValueError("committed goal must exist and belong to the NPC")
+            if not self.goals.evaluate(committed_goal_id, current_tick, combined_adjustments).actionable:
+                raise ValueError("committed goal is no longer actionable")
+            ranked_goals = (committed_goal,)
+        else:
+            ranked_goals = self.goals.ranked(owner_id, current_tick, combined_adjustments)
         if not ranked_goals:
             return NPCDecision(owner_id, current_tick, None, None, None,
                                "no actionable goal")
