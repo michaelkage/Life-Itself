@@ -54,7 +54,7 @@ class PresenceSocialTests(unittest.TestCase):
                                    conversation_id="chat-e3", listener=listener, speaker=speaker,
                                    conversation_adapter=conversations)
         self.assertIsNotNone(result.conversation)
-        self.assertEqual(len(listener.memories), 1)
+        self.assertEqual(len(listener.memories), 2)
 
     def test_trust_changes_only_with_explicit_direction_policy(self):
         _, trust, _, adapter = self.setup_world()
