@@ -70,9 +70,15 @@ class GoalIntentionContinuityAdapter:
             raise TypeError("goals must be GoalBook")
         if not isinstance(ledger, GoalCommitmentLedger):
             raise TypeError("ledger must be GoalCommitmentLedger")
-        previous = ledger.latest_for_owner(owner_id)
-        if previous is not None and previous.tick > current_tick:
+        history = ledger.for_owner(owner_id)
+        previous = next((item for item in reversed(history)
+                         if item.tick < current_tick), None)
+        existing_current = ledger.at_tick(owner_id, current_tick)
+        latest = ledger.latest_for_owner(owner_id)
+        if latest is not None and latest.tick > current_tick:
             raise ValueError("cannot reconsider a goal before the latest commitment tick")
+        # Reconstruct the original tick's incumbent, not the commitment created
+        # by that same tick. This makes same-tick replay reproduce its digest.
         incumbent_id = previous.selected_goal_id if previous is not None else None
         assessment = GoalArbitrationEvaluator.assess(
             goals,
@@ -89,12 +95,12 @@ class GoalIntentionContinuityAdapter:
         )
         if assessment.selected_goal_id is None:
             raise ValueError("no resource-feasible actionable goal can be committed")
-        if previous is not None and previous.tick == current_tick:
+        if existing_current is not None:
             # A tick is a single decision boundary. Replaying identical inputs is
             # safe; changing inputs after commitment would fork the same history.
-            if previous.assessment_id != assessment.assessment_id:
+            if existing_current.assessment_id != assessment.assessment_id:
                 raise ValueError("goal commitment already exists for this NPC and tick")
-            commitment = previous
+            commitment = existing_current
         else:
             commitment = GoalCommitmentAdapter.commit(
                 assessment, goals, ledger, rationale=rationale,
