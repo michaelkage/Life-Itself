@@ -900,7 +900,7 @@ class SimulationWorldCheckpoint:
                 raise TypeError("goal_intention_memories must be a GoalIntentionMemoryLedger or None")
             if goal_book is None:
                 raise ValueError("goal intention memories require the corresponding GoalBook")
-            goal_intention_memory_snapshot = GoalIntentionMemorySnapshot.capture(goal_intention_memories)
+            goal_intention_memory_snapshot = goal_intention_memories.snapshot()
             known_goals = {goal.goal_id: goal.owner_id for goal in goal_book.goals.values()}
             if any(known_goals.get(item.goal_id) != item.owner_id or item.tick > current_tick
                    for item in goal_intention_memories.entries()):
