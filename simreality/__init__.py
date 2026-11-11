@@ -934,3 +934,8 @@ __all__ += [
     "GoalArbitrationEvaluator", "GoalArbitrationRule", "GoalCommitment",
     "GoalCommitmentAdapter", "GoalCommitmentLedger", "GoalCommitmentSnapshot",
 ]
+
+
+# Fresh goal reassessment with bounded incumbent-focus continuity.
+from .goal_intention_continuity import GoalContinuityResult, GoalIntentionContinuityAdapter
+__all__ += ["GoalContinuityResult", "GoalIntentionContinuityAdapter"]
