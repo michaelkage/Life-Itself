@@ -7,6 +7,7 @@ challenger that clears the configured switching margin.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import math
 from typing import Mapping
 
 from .goal_arbitration import (
@@ -106,7 +107,18 @@ class GoalIntentionContinuityAdapter:
             )
         elif recall_rules:
             raise ValueError("intention_memories are required when recall_rules are supplied")
-        combined_experience = dict(experience_adjustments or {})
+        if experience_adjustments is not None and not isinstance(experience_adjustments, Mapping):
+            raise TypeError("experience_adjustments must be a mapping")
+        combined_experience = {}
+        for goal_id, raw_adjustment in (experience_adjustments or {}).items():
+            if not isinstance(goal_id, str) or not goal_id.strip():
+                raise ValueError("experience adjustment goal IDs must be non-empty")
+            if (isinstance(raw_adjustment, bool)
+                    or not isinstance(raw_adjustment, (int, float))
+                    or not math.isfinite(raw_adjustment)
+                    or not -0.25 <= raw_adjustment <= 0.25):
+                raise ValueError("experience adjustments must be finite and in [-0.25, 0.25]")
+            combined_experience[goal_id] = float(raw_adjustment)
         if recall is not None:
             for goal_id, adjustment in recall.adjustments:
                 combined_experience[goal_id] = max(
