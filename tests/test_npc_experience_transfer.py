@@ -101,7 +101,7 @@ def test_strategic_retrieval_weights_personal_witnessed_and_reported_evidence():
     by_class = {item.source_class: item for item in evidence}
     assert by_class["personal"].influence == 1.0
     assert by_class["witnessed"].influence == 0.6
-    assert by_class["reported"].influence == 0.28
+    assert by_class["reported"].influence == pytest.approx(0.28)
     assert by_class["reported"].confidence == 0.8
 
 
