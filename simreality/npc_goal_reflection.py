@@ -142,6 +142,9 @@ class NPCGoalReflectiveReasoner:
             raise TypeError("initial_facts and goal_facts must be sets")
         if any(not isinstance(x, str) or not x.strip() for x in initial_facts | goal_facts):
             raise ValueError("facts must be non-empty strings")
+        unknown_planned = set(evaluation.planned_actions) - set(planner.actions)
+        if unknown_planned:
+            raise ValueError(f"evaluated plan references unknown action: {sorted(unknown_planned)[0]}")
         if not isinstance(alternatives, tuple) or any(not isinstance(x, GoalReflectionAlternative) for x in alternatives):
             raise TypeError("alternatives must be a tuple of GoalReflectionAlternative values")
         if len({x.alternative_id for x in alternatives}) != len(alternatives):
