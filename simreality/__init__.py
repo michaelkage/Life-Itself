@@ -979,15 +979,6 @@ __all__ += [
 ]
 
 
-# Evidence-bounded causal reflection and deterministic counterfactual goal planning.
-from .npc_goal_reflection import (
-    GoalCounterfactualPlan, GoalPlanReflection, GoalReflectionAlternative,
-    GoalReflectionRule, NPCGoalReflectiveReasoner,
-)
-__all__ += [
-    "GoalCounterfactualPlan", "GoalPlanReflection", "GoalReflectionAlternative",
-    "GoalReflectionRule", "NPCGoalReflectiveReasoner",
-]
 
 
 # Owner-specific strategy reliability beliefs and explicit learning decisions.
