@@ -146,8 +146,10 @@ class GoalRecoveryAdapter:
             raise TypeError("goals must be GoalBook")
         if not isinstance(lifecycle, GoalLifecycleLedger):
             raise TypeError("lifecycle must be GoalLifecycleLedger")
-        if not isinstance(available_facts, frozenset):
-            raise TypeError("available_facts must be a frozenset")
+        if not isinstance(available_facts, frozenset) or any(
+            not isinstance(value, str) or not value.strip() for value in available_facts
+        ):
+            raise TypeError("available_facts must be a frozenset of non-empty strings")
         needs = dict(need_levels)
         if any(not isinstance(key, str) or not key.strip() or isinstance(value, bool)
                or not isinstance(value, (int, float)) or not math.isfinite(value)
