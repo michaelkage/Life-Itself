@@ -140,6 +140,10 @@ class StrategyBeliefProposal:
     strategy_id: str
     context_key: str
     rule_id: str
+    minimum_observations: int
+    minimum_confidence_delta: float
+    prior_alpha: float
+    prior_beta: float
     observation_ids: tuple[str, ...]
     reflection_ids: tuple[str, ...]
     success_weight: float
@@ -152,6 +156,15 @@ class StrategyBeliefProposal:
     def __post_init__(self):
         for name in ("proposal_id", "owner_id", "goal_id", "strategy_id", "context_key", "rule_id"):
             _nonempty(getattr(self, name), name)
+        if isinstance(self.minimum_observations, bool) or not isinstance(self.minimum_observations, int) or self.minimum_observations < 2:
+            raise ValueError("minimum_observations must be at least 2")
+        _unit(self.minimum_confidence_delta, "minimum_confidence_delta")
+        if not 0 < self.minimum_confidence_delta < 0.5:
+            raise ValueError("minimum_confidence_delta must be in (0, 0.5)")
+        for name in ("prior_alpha", "prior_beta"):
+            value = getattr(self, name)
+            if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value <= 0:
+                raise ValueError(f"{name} must be positive and finite")
         for name in ("success_weight", "failure_weight", "posterior_confidence", "prior_confidence"):
             _unit(getattr(self, name), name)
         if not isinstance(self.confidence_delta, (int, float)) or isinstance(self.confidence_delta, bool) or not math.isfinite(self.confidence_delta) or not -1 <= self.confidence_delta <= 1:
@@ -165,6 +178,9 @@ class StrategyBeliefProposal:
         expected = _digest({
             "owner": self.owner_id, "goal": self.goal_id, "strategy": self.strategy_id,
             "context": self.context_key, "rule": self.rule_id,
+            "minimum_observations": self.minimum_observations,
+            "minimum_confidence_delta": self.minimum_confidence_delta,
+            "prior_alpha": self.prior_alpha, "prior_beta": self.prior_beta,
             "observations": list(self.observation_ids), "reflections": list(self.reflection_ids),
             "success": self.success_weight, "failure": self.failure_weight,
             "posterior": self.posterior_confidence, "prior": self.prior_confidence,
@@ -267,12 +283,16 @@ class NPCStrategyBeliefLedger:
             "owner": owner_id, "goal": items[0].goal_id, "strategy": strategy_id,
             "context": context_key, "rule": rule.rule_id,
             "observations": list(observation_ids), "reflections": list(reflection_ids),
+            "minimum_observations": rule.minimum_observations,
+            "minimum_confidence_delta": rule.minimum_confidence_delta,
+            "prior_alpha": rule.prior_alpha, "prior_beta": rule.prior_beta,
             "success": success, "failure": failure, "posterior": posterior,
             "prior": prior, "delta": delta, "samples": len(items),
         }
         return StrategyBeliefProposal(_digest(payload), owner_id, items[0].goal_id,
-            strategy_id, context_key, rule.rule_id, observation_ids, reflection_ids,
-            success, failure, posterior, prior, delta, len(items))
+            strategy_id, context_key, rule.rule_id, rule.minimum_observations,
+            rule.minimum_confidence_delta, rule.prior_alpha, rule.prior_beta,
+            observation_ids, reflection_ids, success, failure, posterior, prior, delta, len(items))
 
     def decide(self, proposal, *, accepted, decision_tick, rationale):
         if not isinstance(proposal, StrategyBeliefProposal):
@@ -298,12 +318,16 @@ class NPCStrategyBeliefLedger:
         failure = sum(x.confidence for x in items if x.outcome == "failure")
         if not math.isclose(success, proposal.success_weight, abs_tol=1e-12) or not math.isclose(failure, proposal.failure_weight, abs_tol=1e-12):
             raise ValueError("proposal weights disagree with supporting observations")
-        posterior = proposal.posterior_confidence
-        expected_posterior = (proposal.prior_confidence * (proposal.success_weight + proposal.failure_weight)
-                              + proposal.success_weight) / (proposal.success_weight + proposal.failure_weight + 1.0)
-        # Validate posterior independently from caller-supplied proposal values.
-        if not 0.0 <= posterior <= 1.0 or not math.isfinite(expected_posterior):
-            raise ValueError("invalid proposal posterior")
+        rule = StrategyLearningRule(
+            proposal.rule_id, proposal.minimum_observations,
+            proposal.prior_alpha, proposal.prior_beta,
+            proposal.minimum_confidence_delta,
+        )
+        recomputed = self.assess(
+            proposal.owner_id, proposal.strategy_id, proposal.context_key, rule,
+        )
+        if recomputed != proposal:
+            raise ValueError("strategy proposal is stale or its derived confidence is invalid")
         decision_id = _digest({"proposal": proposal.proposal_id, "accepted": accepted,
                                "tick": decision_tick, "rationale": rationale})
         decision = StrategyBeliefDecision(
