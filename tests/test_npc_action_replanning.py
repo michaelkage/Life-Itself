@@ -378,6 +378,25 @@ class NPCActionReplanningTests(unittest.TestCase):
         self.assertEqual(dict(resume_event.attributes)["original_execution_id"],
                          first.execution_id)
 
+    def test_interruption_is_replanned_not_counted_as_goal_execution_failure(self):
+        evaluations = ActionPlanEvaluationLedger(self.ledger, self.events)
+        coordinator = NPCActionReplanningCoordinator(
+            self.cycle, self.ledger, self.events, evaluations,
+        )
+        facts, resources = {"at-market"}, {"cash": 10.0}
+        first = coordinator.replan(
+            "npc-1", 1, facts, resources,
+            {"repair": {"machine-fixed"}, "rest": {"rested"}},
+            reason="repair required",
+        )
+        progression = coordinator.advance(
+            first.execution_id, 2, facts, resources,
+            {"repair": {"machine-fixed"}, "rest": {"rested"}},
+            interruption="temporary interruption",
+        )
+        self.assertEqual(progression.execution.status, "interrupted")
+        self.assertEqual(progression.plan_evaluation.terminal_status, "replanned")
+
 
 if __name__ == "__main__":
     unittest.main()
