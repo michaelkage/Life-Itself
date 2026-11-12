@@ -76,5 +76,52 @@ class SocialBeliefSystemTests(unittest.TestCase):
         self.assertEqual([(owner, state.claim_id) for owner, state in system.snapshot()], [("a", "a-claim"), ("z", "z-claim")])
 
 
+    def test_npc_explicitly_learns_campaign_evidence_using_personal_source_trust(self):
+        from simreality.campaign_knowledge import CampaignKnowledgeLedger
+
+        shared = CampaignKnowledgeLedger((
+            Evidence("world-report-1", "bridge-damaged", "witness-a", 1, 1.0, 1.0, 7),
+        ))
+        trust = SocialTrustLedger({
+            ("skeptic", "witness-a"): 0.2,
+            ("supporter", "witness-a"): 0.9,
+        })
+        system = SocialBeliefSystem(trust)
+
+        skeptic = system.learn_campaign_evidence("skeptic", shared, "bridge-damaged")[0]
+        supporter = system.learn_campaign_evidence("supporter", shared, "bridge-damaged")[0]
+
+        self.assertAlmostEqual(skeptic.confidence, 0.6)
+        self.assertAlmostEqual(supporter.confidence, 0.95)
+        self.assertEqual(skeptic.evidence_ids, ("campaign:world-report-1",))
+        self.assertEqual(supporter.evidence_ids, ("campaign:world-report-1",))
+        self.assertEqual(shared.evidence_for("bridge-damaged")[0].source_reliability, 1.0)
+
+    def test_campaign_learning_is_explicit_replay_safe_and_observer_scoped(self):
+        from simreality.campaign_knowledge import CampaignKnowledgeLedger
+
+        shared = CampaignKnowledgeLedger((
+            Evidence("report-1", "market-closed", "merchant", 1, 0.8, 0.7, 3),
+        ))
+        system = SocialBeliefSystem(SocialTrustLedger())
+        self.assertEqual(system.beliefs_for("unaware"), ())
+        first = system.learn_campaign_evidence("informed", shared, "market-closed")
+        second = system.learn_campaign_evidence("informed", shared, "market-closed")
+        self.assertEqual(first, second)
+        self.assertEqual(len(system.beliefs_for("informed")), 1)
+        self.assertEqual(system.beliefs_for("unaware"), ())
+        self.assertEqual(system.get("informed", "market-closed").evidence_ids,
+                         ("campaign:report-1",))
+
+    def test_campaign_learning_rejects_wrong_ledger_and_ignores_unknown_claim(self):
+        system = SocialBeliefSystem(SocialTrustLedger())
+        from simreality.campaign_knowledge import CampaignKnowledgeLedger
+        with self.assertRaises(TypeError):
+            system.learn_campaign_evidence("npc", object(), "claim")
+        self.assertEqual(
+            system.learn_campaign_evidence("npc", CampaignKnowledgeLedger(), "missing"),
+            (),
+        )
+
 if __name__ == "__main__":
     unittest.main()
