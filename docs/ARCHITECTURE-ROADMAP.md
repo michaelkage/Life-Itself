@@ -67,7 +67,7 @@ conversation, enforcement, and fixer interactions. Versioned snapshots preserve
 world state, simulation time, fixer networks, and RNG continuation. The CMake
 target builds the library and dependency-free regression executable.
 
-At commit `be5cafc81dc88b85ece1538bc8ede182d16a9411`, GitHub Actions verified the Python test suite, the Python 3.12 and C++20 simulation-core matrix (Linux and Windows), and the GitHub Pages documentation deployment. The Python test workflow currently runs Python 3.11; the simulation-core workflow additionally exercises Python 3.12. Unreal-specific integration remains unbuilt.
+At commit `f882128041115639f99dc2c93fdf633a013c7558`, GitHub Actions verified the Python test suite, the Python 3.12 and C++20 simulation-core matrix (Linux and Windows), and the GitHub Pages documentation deployment. The Python test workflow runs Python 3.11; the simulation-core workflow additionally exercises Python 3.12. Unreal-specific integration remains unbuilt.
 
 ## Roadmap and exit criteria
 
