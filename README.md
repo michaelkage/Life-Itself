@@ -531,3 +531,8 @@ Campaign transitions can now carry the complete LifeSimulation service state alo
 Archived service snapshots are keyed by the timeline's death-archive ID and stored with the campaign JSON. visit_archive_runtime(archive_id) returns a detached archived world and, when one was captured, a restored LifeSimulation bound to that exact world. Old campaign payloads without archived service snapshots remain supported. Composite SimulationWorldCheckpoint persistence includes this campaign data and separately stores the active service snapshot.
 
 Regression coverage: tests/test_campaign_lifecycle.py and tests/test_world_checkpoint.py.
+
+
+## Cross-life campaign knowledge
+
+`CampaignKnowledgeLedger` preserves attributed world evidence across lives without transferring a previous character's private memories, personality, or personal relationships. Query shared claims with provenance through `LifeItselfCampaign.shared_belief()` and `shared_evidence_for()`. Evidence remains source-attributed and confidence is not treated as objective truth. See [the cross-life knowledge guide](docs/CROSS-LIFE-CAMPAIGN-KNOWLEDGE.md).
