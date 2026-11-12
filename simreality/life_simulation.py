@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
+import math
 from random import Random
 from typing import Any
 
@@ -23,6 +24,26 @@ class Treatment:
     care_hours: float = 0.0
     complication_risk: float = 0.0
     active: bool = True
+
+    def __post_init__(self) -> None:
+        for name in ("treatment_id", "condition_id"):
+            value = getattr(self, name)
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError(f"{name} must be a non-empty string")
+        for name in ("effectiveness", "daily_cost", "care_hours", "complication_risk"):
+            value = getattr(self, name)
+            if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+                raise ValueError(f"{name} must be a finite number")
+        if not 0.0 <= self.effectiveness <= 1.0:
+            raise ValueError("effectiveness must be in [0, 1]")
+        if self.daily_cost < 0.0:
+            raise ValueError("daily_cost must be non-negative")
+        if self.care_hours < 0.0:
+            raise ValueError("care_hours must be non-negative")
+        if not 0.0 <= self.complication_risk <= 1.0:
+            raise ValueError("complication_risk must be in [0, 1]")
+        if not isinstance(self.active, bool):
+            raise ValueError("active must be a boolean")
 
 
 @dataclass
@@ -134,9 +155,14 @@ class LifeSimulation:
         return estimate
 
     def prescribe_treatment(self, character_id: str, treatment: Treatment) -> bool:
+        if not isinstance(treatment, Treatment):
+            raise TypeError("treatment must be a Treatment")
         health = self.world.health[character_id]
         if not any(c.condition_id == treatment.condition_id for c in health.conditions):
             raise KeyError(treatment.condition_id)
+        existing = self.treatments.get(character_id, ())
+        if any(item.treatment_id == treatment.treatment_id for item in existing):
+            raise ValueError(f"duplicate treatment ID for {character_id}: {treatment.treatment_id}")
         if self.world.money.get(character_id, 0.0) < treatment.daily_cost:
             return False
         self.treatments.setdefault(character_id, []).append(treatment)
