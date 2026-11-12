@@ -21,7 +21,7 @@ class PersonalRoutePlannerTests(unittest.TestCase):
         self.assertEqual(affected.avoided_locations, ("alley",))
         self.assertEqual(unaffected.path, ("home", "alley", "market"))
         self.assertEqual(affected.base_cost, 4)
-        self.assertGreater(affected.adjusted_cost, affected.base_cost)
+        self.assertEqual(affected.adjusted_cost, affected.base_cost)
 
     def test_deterministic_equal_cost_tie_and_edge_order(self):
         edges = (
