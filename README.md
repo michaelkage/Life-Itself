@@ -523,3 +523,11 @@ NPCs can now reflect on terminal plan outcomes through exact, authored causal ma
 
 
 NPC strategy beliefs now form from repeated, comparable terminal plan outcomes. Reliability is owner-, goal-, strategy-, and context-specific; replanned or unobserved outcomes are neutral. Bayesian-style evidence aggregation emits proposals only after a minimum sample and meaningful confidence shift, and NPCs explicitly accept or reject each proposal. Accepted beliefs can feed the existing planner's bounded risk premium without changing authored action costs. Strategy observations and decisions persist through SimulationWorldCheckpoint with source-plan and event-provenance validation. See docs/NPC-STRATEGY-BELIEFS.md and tests/test_npc_strategy_beliefs.py.
+
+## Campaign life continuity
+
+Campaign transitions can now carry the complete LifeSimulation service state alongside each world timeline. LifeItselfCampaign.record_death(..., life_simulation=...) resolves outstanding responsibilities before the world is frozen; continue_as_ghost(..., life_simulation=...) validates service ownership; and start_fresh_life(...) archives the old service snapshot before returning a new service bound to the fresh world.
+
+Archived service snapshots are keyed by the timeline's death-archive ID and stored with the campaign JSON. visit_archive_runtime(archive_id) returns a detached archived world and, when one was captured, a restored LifeSimulation bound to that exact world. Old campaign payloads without archived service snapshots remain supported. Composite SimulationWorldCheckpoint persistence includes this campaign data and separately stores the active service snapshot.
+
+Regression coverage: tests/test_campaign_lifecycle.py and tests/test_world_checkpoint.py.
