@@ -56,8 +56,10 @@ class LifeSimulationSnapshot:
                 for owner, items in sorted(simulation.treatments.items()) for item in items
             ),
             recovery_estimates=tuple(
-                {"character_id": key.split(":", 1)[0], **asdict(item)}
+                {"character_id": owner, **asdict(item)}
                 for key, item in sorted(simulation.recovery_estimates.items())
+                for owner in simulation.people
+                if key == f"{owner}:{item.condition_id}"
             ),
             daily_records=tuple(asdict(item) for item in simulation.daily_records),
             ghost_windows=tuple({
@@ -138,8 +140,9 @@ class LifeSimulationSnapshot:
             }:
                 raise ValueError("invalid person profile in LifeSimulation snapshot")
             profile = PersonProfile(**raw)
-            if profile.character_id not in world.health:
-                raise ValueError(f"LifeSimulation person is missing from PersistentWorld health: {profile.character_id}")
+            if (profile.character_id not in world.health or profile.character_id not in world.money
+                    or profile.character_id not in world.stress):
+                raise ValueError(f"LifeSimulation person is missing from PersistentWorld state: {profile.character_id}")
             if profile.character_id in simulation.people:
                 raise ValueError(f"duplicate person profile: {profile.character_id}")
             simulation.people[profile.character_id] = profile
