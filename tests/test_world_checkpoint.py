@@ -1660,15 +1660,15 @@ class SimulationWorldCheckpointTests(unittest.TestCase):
             restored.life_simulation.treatments["speaker"][0].treatment_id, "care"
         )
         self.assertEqual(
-            simulation.random.random(), restored.life_simulation.random.random()
-        )
-        self.assertEqual(
             SimulationWorldCheckpoint.capture(
                 4, restored.coordinator, restored.npcs,
                 campaign=restored.campaign,
                 life_simulation=restored.life_simulation,
             ).to_json(),
             payload,
+        )
+        self.assertEqual(
+            simulation.random.random(), restored.life_simulation.random.random()
         )
 
     def test_life_simulation_checkpoint_requires_matching_campaign_world(self):
