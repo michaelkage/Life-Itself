@@ -1,8 +1,9 @@
 """Regression coverage for daily life, support, estate resolution, and ghost decisions."""
 import unittest
+from random import Random
 
 from simreality.campaign import LifeItselfCampaign
-from simreality.health_life import HealthCondition, SocialObligation
+from simreality.health_life import CharacterHealth, HealthCondition, SocialObligation
 from simreality.life_simulation import (
     GhostWindow, LifeSimulation, PersonProfile, ResponsibilityOutcome, Treatment,
 )
@@ -28,6 +29,21 @@ class LifeSimulationTests(unittest.TestCase):
         self.assertEqual(record.wage_lost, 100)
         self.assertEqual(world.money["patient"], 45)
         self.assertGreater(record.care_hours_needed, 0)
+
+    def test_daily_recovery_and_condition_duration_advance_exactly_once(self):
+        world = LifeItselfCampaign().active_world
+        world.health["patient"] = CharacterHealth("patient")
+        condition = HealthCondition("injury", "injury", 0.8, recovery_per_day=0.2)
+        world.health["patient"].conditions.append(condition)
+        sim = LifeSimulation(world, seed=1)
+
+        lower, upper = 0.08, 0.32
+        sampled_recovery = Random(1).uniform(lower, upper)
+        sim.simulate_day()
+
+        self.assertAlmostEqual(condition.severity, 0.8 - sampled_recovery)
+        self.assertEqual(condition.days_present, 1)
+        self.assertEqual(world.day, 1)
 
     def test_reciprocal_support_transfers_money_and_builds_trust(self):
         world = LifeItselfCampaign().active_world
