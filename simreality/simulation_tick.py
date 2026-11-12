@@ -163,12 +163,10 @@ class SimulationTickCoordinator:
             or any(npc_id in (item.listener_id, item.speaker_id) for item in ordered_conversations)
         }
         npc_memories = {npc_id: deepcopy(npc.memories) for npc_id, npc in affected_npcs.items()}
-        memory_processed = self.memory_adapter._processed.copy()
-        conversation_inputs = self.conversation_adapter._inputs.copy()
-        conversation_results_before = self.conversation_adapter._results.copy()
+        memory_state = self.memory_adapter.transaction_snapshot()
+        conversation_state = self.conversation_adapter.transaction_snapshot()
         beliefs = self.conversation_adapter.beliefs
-        belief_ledgers = deepcopy(beliefs._ledgers)
-        belief_inputs = deepcopy(beliefs._inputs)
+        belief_state = beliefs.transaction_snapshot()
 
         try:
             memories: list[tuple[str, str, NPCMemory | None]] = []
@@ -195,11 +193,9 @@ class SimulationTickCoordinator:
         except BaseException:
             for npc_id, prior_memories in npc_memories.items():
                 affected_npcs[npc_id].memories[:] = prior_memories
-            self.memory_adapter._processed = memory_processed
-            self.conversation_adapter._inputs = conversation_inputs
-            self.conversation_adapter._results = conversation_results_before
-            beliefs._ledgers = belief_ledgers
-            beliefs._inputs = belief_inputs
+            self.memory_adapter.restore_transaction_snapshot(memory_state)
+            self.conversation_adapter.restore_transaction_snapshot(conversation_state)
+            beliefs.restore_transaction_snapshot(belief_state)
             raise
 
     def execute_routines(
