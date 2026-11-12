@@ -992,3 +992,8 @@ __all__ += [
     "StrategyBeliefProposal", "StrategyBeliefSnapshot", "StrategyLearningRule",
     "StrategyObservation",
 ]
+
+
+# Versioned persistence for LifeSimulation-owned state and deterministic RNG continuation.
+from .life_simulation_save_state import LifeSimulationSnapshot
+__all__ += ["LifeSimulationSnapshot"]
