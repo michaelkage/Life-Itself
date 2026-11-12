@@ -136,17 +136,23 @@ class TickCoordinatorTests(unittest.TestCase):
                 attributes={
                     "action_tag": ActionTag.CRIME_THEFT.value,
                     "target_entity_id": "subject-b",
-                    "memory_impact": float("nan"),
                 },
             ),
         ))
+        class FailingNPC(NPC):
+            def remember(self, memory):
+                if memory.target_entity_id == "subject-b":
+                    raise RuntimeError("injected materialization failure")
+                super().remember(memory)
+
+        npcs = {"speaker": FailingNPC("speaker"), "listener": NPC("listener")}
         memory = WorldEventMemoryAdapter(events)
         trust = SocialTrustLedger()
         conversations = SocialConversationAdapter(trust, SocialBeliefSystem(trust))
         coordinator = SimulationTickCoordinator(events, memory, conversations)
-        with self.assertRaisesRegex(ValueError, "memory_impact"):
-            coordinator.step(3, self.npcs, event_ids=("event-a", "event-b"))
-        self.assertEqual(self.npcs["speaker"].memories, [])
+        with self.assertRaisesRegex(RuntimeError, "injected materialization failure"):
+            coordinator.step(3, npcs, event_ids=("event-a", "event-b"))
+        self.assertEqual(npcs["speaker"].memories, [])
         self.assertEqual(memory.snapshot(), ())
         self.assertEqual(coordinator.snapshot(), ())
 
