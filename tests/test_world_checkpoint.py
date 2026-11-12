@@ -1616,6 +1616,95 @@ class SimulationWorldCheckpointTests(unittest.TestCase):
             payload,
         )
 
+
+    def test_life_simulation_component_round_trips_with_campaign_world(self):
+        from simreality.health_life import HealthCondition, SocialObligation
+        from simreality.life_simulation import LifeSimulation, PersonProfile, Treatment
+
+        coordinator, npcs, _ = self.make_simulation()
+        campaign = LifeItselfCampaign()
+        campaign.begin_first_life("speaker")
+        world = campaign.active_world
+        world.money["speaker"] = 30.0
+        world.health["speaker"].conditions.append(
+            HealthCondition("injury", "injury", 0.7, recovery_per_day=0.1)
+        )
+        world.obligations.append(SocialObligation(
+            "life-debt", "speaker", "listener", money_due=5.0, due_day=99,
+        ))
+        simulation = LifeSimulation(world, seed=29)
+        simulation.register_person(__import__(
+            "simreality.life_simulation", fromlist=["PersonProfile"]
+        ).PersonProfile(
+            "speaker", personality={"compassion": 0.8},
+            memories={"incident": 0.6}, relationships={"listener": 0.9},
+        ))
+        simulation.prescribe_treatment(
+            "speaker", Treatment("care", "injury", 0.4, 2.0)
+        )
+        simulation.estimate_recovery("speaker", "injury")
+        simulation.random.random()
+
+        payload = SimulationWorldCheckpoint.capture(
+            4, coordinator, npcs, campaign=campaign,
+            life_simulation=simulation,
+        ).to_json()
+        restored = SimulationWorldCheckpoint.from_json(payload).restore()
+
+        self.assertIsNotNone(restored.life_simulation)
+        self.assertIs(restored.life_simulation.world, restored.campaign.active_world)
+        self.assertEqual(
+            restored.life_simulation.people["speaker"].memories, {"incident": 0.6}
+        )
+        self.assertEqual(
+            restored.life_simulation.treatments["speaker"][0].treatment_id, "care"
+        )
+        self.assertEqual(
+            simulation.random.random(), restored.life_simulation.random.random()
+        )
+        self.assertEqual(
+            SimulationWorldCheckpoint.capture(
+                4, restored.coordinator, restored.npcs,
+                campaign=restored.campaign,
+                life_simulation=restored.life_simulation,
+            ).to_json(),
+            payload,
+        )
+
+    def test_life_simulation_checkpoint_requires_matching_campaign_world(self):
+        from simreality.life_simulation import LifeSimulation, PersonProfile
+
+        coordinator, npcs, _ = self.make_simulation()
+        campaign = LifeItselfCampaign()
+        campaign.begin_first_life("speaker")
+        simulation = LifeSimulation(campaign.active_world)
+        simulation.register_person(PersonProfile("speaker"))
+
+        with self.assertRaisesRegex(ValueError, "requires the corresponding campaign"):
+            SimulationWorldCheckpoint.capture(
+                4, coordinator, npcs, life_simulation=simulation,
+            )
+        other_campaign = LifeItselfCampaign()
+        other_campaign.begin_first_life("speaker")
+        with self.assertRaisesRegex(ValueError, "share the campaign active PersistentWorld"):
+            SimulationWorldCheckpoint.capture(
+                4, coordinator, npcs, campaign=other_campaign,
+                life_simulation=simulation,
+            )
+
+    def test_legacy_world_checkpoint_without_life_simulation_remains_compatible(self):
+        coordinator, npcs, _ = self.make_simulation()
+        payload = SimulationWorldCheckpoint.capture(4, coordinator, npcs).to_json()
+        self.assertNotIn('"life_simulation"', payload)
+        restored = SimulationWorldCheckpoint.from_json(payload).restore()
+        self.assertIsNone(restored.life_simulation)
+        self.assertEqual(
+            SimulationWorldCheckpoint.capture(
+                4, restored.coordinator, restored.npcs,
+            ).to_json(),
+            payload,
+        )
+
 if __name__ == "__main__":
     unittest.main()
 
