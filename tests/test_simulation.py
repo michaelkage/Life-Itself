@@ -1,7 +1,7 @@
-"""Test suite for the simulation core.
+"""Core regression tests, written with unittest.TestCase and collected by pytest.
 
-Deliberately no pytest dependency -- `python -m unittest` on a bare interpreter is
-the only requirement, matching the engine's C++ target of no external libraries.
+The repository-wide test command is `python -m pytest -q`; pytest is a test-only
+dependency and is not required by the simulation package at runtime.
 """
 
 import unittest
