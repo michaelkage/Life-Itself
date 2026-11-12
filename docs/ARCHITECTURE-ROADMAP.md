@@ -11,7 +11,7 @@ Status labels:
 
 The Python reference core lives under `simreality/`, with a data contract in
 `simreality/model.py`, a blueprint in `docs/BLUEPRINT.md`, math corrections in
-`docs/MATH-NOTES.md`, and a unittest suite under `tests/`. The current reference
+`docs/MATH-NOTES.md`, and a pytest-based regression suite under `tests/`. The current reference
 suite includes Python/C++ differential checks in addition to the reference regressions.
 Run the complete suite with the repository's supported test runner:
 
