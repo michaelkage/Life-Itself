@@ -6,6 +6,7 @@ and which NPCs converse. The coordinator imposes a stable order and replay rules
 """
 from __future__ import annotations
 
+from copy import deepcopy
 from dataclasses import dataclass
 from typing import Iterable, Mapping
 
@@ -152,27 +153,54 @@ class SimulationTickCoordinator:
         if self._last_tick is not None and tick <= self._last_tick:
             raise ValueError("new ticks must be strictly greater than the last processed tick")
 
-        memories: list[tuple[str, str, NPCMemory | None]] = []
-        for event in ordered_events:
-            for witness_id in sorted(event.witnesses):
-                memory = self.memory_adapter.materialize(event.event_id, witness_id, npcs)
-                memories.append((event.event_id, witness_id, memory))
+        # A tick is one state transition. Memory materialization and gossip both
+        # mutate NPC memory lists; conversations additionally mutate belief ledgers
+        # and adapter replay indexes. Capture only those owned state surfaces so an
+        # exception cannot leave a half-applied tick that a retry would misinterpret.
+        affected_npcs = {
+            npc_id: npc for npc_id, npc in npcs.items()
+            if any(npc_id in event.witnesses for event in ordered_events)
+            or any(npc_id in (item.listener_id, item.speaker_id) for item in ordered_conversations)
+        }
+        npc_memories = {npc_id: deepcopy(npc.memories) for npc_id, npc in affected_npcs.items()}
+        memory_processed = self.memory_adapter._processed.copy()
+        conversation_inputs = self.conversation_adapter._inputs.copy()
+        conversation_results_before = self.conversation_adapter._results.copy()
+        beliefs = self.conversation_adapter.beliefs
+        belief_ledgers = deepcopy(beliefs._ledgers)
+        belief_inputs = deepcopy(beliefs._inputs)
 
-        conversation_results = tuple(
-            self.conversation_adapter.converse(
-                intent.conversation_id,
-                listener=npcs[intent.listener_id],
-                speaker=npcs[intent.speaker_id],
-                observed_tick=tick,
-                district_id=intent.district_id,
+        try:
+            memories: list[tuple[str, str, NPCMemory | None]] = []
+            for event in ordered_events:
+                for witness_id in sorted(event.witnesses):
+                    memory = self.memory_adapter.materialize(event.event_id, witness_id, npcs)
+                    memories.append((event.event_id, witness_id, memory))
+
+            conversation_results = tuple(
+                self.conversation_adapter.converse(
+                    intent.conversation_id,
+                    listener=npcs[intent.listener_id],
+                    speaker=npcs[intent.speaker_id],
+                    observed_tick=tick,
+                    district_id=intent.district_id,
+                )
+                for intent in ordered_conversations
             )
-            for intent in ordered_conversations
-        )
-        result = SimulationTickResult(tick, tuple(memories), conversation_results)
-        self._requests[tick] = signature
-        self._results[tick] = result
-        self._last_tick = tick
-        return result
+            result = SimulationTickResult(tick, tuple(memories), conversation_results)
+            self._requests[tick] = signature
+            self._results[tick] = result
+            self._last_tick = tick
+            return result
+        except BaseException:
+            for npc_id, prior_memories in npc_memories.items():
+                affected_npcs[npc_id].memories[:] = prior_memories
+            self.memory_adapter._processed = memory_processed
+            self.conversation_adapter._inputs = conversation_inputs
+            self.conversation_adapter._results = conversation_results_before
+            beliefs._ledgers = belief_ledgers
+            beliefs._inputs = belief_inputs
+            raise
 
     def execute_routines(
         self,
