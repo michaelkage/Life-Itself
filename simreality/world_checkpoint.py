@@ -8,6 +8,8 @@ import hashlib
 
 from .adapter_replay_state import WorldEventMemoryReplaySnapshot
 from .campaign import LifeItselfCampaign
+from .life_simulation import LifeSimulation
+from .life_simulation_save_state import LifeSimulationSnapshot
 from .misconduct import MisconductReportingSystem
 from .misconduct_save_state import MisconductSnapshot
 from .routine_save_state import RoutineBookSnapshot
@@ -124,6 +126,7 @@ class RestoredSimulation:
     goal_commitments: GoalCommitmentLedger | None = None
     goal_intention_memories: GoalIntentionMemoryLedger | None = None
     strategy_beliefs: NPCStrategyBeliefLedger | None = None
+    life_simulation: LifeSimulation | None = None
 
     def restore_action_execution_ledger(self, planner, policies, goals=None):
         """Rebind persisted execution progress to runtime planning and goal definitions."""
@@ -226,6 +229,7 @@ class SimulationWorldCheckpoint:
     goal_commitments_json: str | None = None
     goal_intention_memories_json: str | None = None
     strategy_beliefs_json: str | None = None
+    life_simulation_json: str | None = None
 
     SCHEMA_VERSION = 1
 
@@ -257,7 +261,7 @@ class SimulationWorldCheckpoint:
                 consequence_recorder=None, campaign=None, misconduct=None, routines=None,
                 routine_executions=None, routine_institutions=None, institutional_politics=None,
                 goal_book=None, goal_event_adapter=None, goal_review_decisions=None, identity_decisions=None,
-                testimony_inquiries=None, testimony=None, travel=None, presence=None, presence_encounters=None, familiarity=None, relationships=None, emotions=None, stress=None, conditioning=None, psychological_learning_decisions=None, life_history=None, memory_reflections=None, emotional_scars=None, emotional_scar_decisions=None, scar_identity_proposals=None, identity_goal_reviews=None, action_executions=None, action_world_facts=None, action_resources=None, action_replanning=None, action_evaluations=None, experience_transfers=None, goal_lifecycle=None, goal_review_applications=None, goal_commitments=None, goal_intention_memories=None, strategy_beliefs=None):
+                testimony_inquiries=None, testimony=None, travel=None, presence=None, presence_encounters=None, familiarity=None, relationships=None, emotions=None, stress=None, conditioning=None, psychological_learning_decisions=None, life_history=None, memory_reflections=None, emotional_scars=None, emotional_scar_decisions=None, scar_identity_proposals=None, identity_goal_reviews=None, action_executions=None, action_world_facts=None, action_resources=None, action_replanning=None, action_evaluations=None, experience_transfers=None, goal_lifecycle=None, goal_review_applications=None, goal_commitments=None, goal_intention_memories=None, strategy_beliefs=None, life_simulation=None):
         if not isinstance(coordinator, SimulationTickCoordinator):
             raise TypeError("coordinator must be a SimulationTickCoordinator")
         if not isinstance(npcs, dict):
@@ -278,6 +282,15 @@ class SimulationWorldCheckpoint:
                 raise ValueError("consequence recorder must share the checkpoint trust and belief systems")
         if campaign is not None and not isinstance(campaign, LifeItselfCampaign):
             raise TypeError("campaign must be a LifeItselfCampaign or None")
+        if life_simulation is not None:
+            if not isinstance(life_simulation, LifeSimulation):
+                raise TypeError("life_simulation must be a LifeSimulation or None")
+            if campaign is None:
+                raise ValueError("LifeSimulation persistence requires the corresponding campaign")
+            if life_simulation.world is not campaign.active_world:
+                raise ValueError("LifeSimulation must share the campaign active PersistentWorld")
+        life_simulation_snapshot = (LifeSimulationSnapshot.capture(life_simulation)
+                                    if life_simulation is not None else None)
         if routines is not None and not isinstance(routines, RoutineBook):
             raise TypeError("routines must be a RoutineBook or None")
         routines_snapshot = RoutineBookSnapshot.capture(routines) if routines is not None else None
@@ -986,6 +999,7 @@ class SimulationWorldCheckpoint:
             goal_commitments_snapshot.to_json() if goal_commitments_snapshot is not None else None,
             goal_intention_memory_snapshot.to_json() if goal_intention_memory_snapshot is not None else None,
             strategy_belief_snapshot.to_json() if strategy_belief_snapshot is not None else None,
+            life_simulation_snapshot.to_json() if life_simulation_snapshot is not None else None,
         )
 
     def _components(self):
@@ -1039,6 +1053,7 @@ class SimulationWorldCheckpoint:
             GoalCommitmentSnapshot.from_json(self.goal_commitments_json) if self.goal_commitments_json is not None else None,
             GoalIntentionMemorySnapshot.from_json(self.goal_intention_memories_json) if self.goal_intention_memories_json is not None else None,
             StrategyBeliefSnapshot.from_json(self.strategy_beliefs_json) if self.strategy_beliefs_json is not None else None,
+            LifeSimulationSnapshot.from_json(self.life_simulation_json) if self.life_simulation_json is not None else None,
         )
         goals_snapshot, goal_replay, goal_review_decisions = components[14], components[15], components[16]
         identity_decisions = components[17]
@@ -1070,6 +1085,9 @@ class SimulationWorldCheckpoint:
         goal_commitments_snapshot = components[43]
         goal_intention_memory_snapshot = components[44]
         strategy_belief_snapshot = components[45]
+        life_simulation_snapshot = components[46]
+        if life_simulation_snapshot is not None and components[8] is None:
+            raise ValueError("LifeSimulation snapshot requires the corresponding campaign world")
         if strategy_belief_snapshot is not None:
             strategy_ledger = strategy_belief_snapshot.restore()
             if strategy_ledger.observations() and action_evaluation_snapshot is None:
@@ -1708,7 +1726,7 @@ class SimulationWorldCheckpoint:
         return components
 
     def to_json(self):
-        envelope, npcs, trust, beliefs, memory, conversations, ticks, consequence, campaign, misconduct, routines, routine_executions, routine_institutions, institutional_politics, goals, goal_event_replay, goal_review_decisions, identity_decisions, testimony_inquiries, testimony, travel, presence, presence_encounters, familiarity, relationships, emotions, stress, conditioning, learning_decisions, life_history, memory_reflections, emotional_scars, emotional_scar_decisions, scar_identity_proposals, identity_goal_reviews, action_execution_snapshot, action_world_facts, action_resources, action_replanning_snapshot, action_evaluation_snapshot, experience_transfer_snapshot, goal_lifecycle_snapshot, goal_review_applications_snapshot, goal_commitments_snapshot, goal_intention_memory_snapshot, strategy_belief_snapshot = self._components()
+        envelope, npcs, trust, beliefs, memory, conversations, ticks, consequence, campaign, misconduct, routines, routine_executions, routine_institutions, institutional_politics, goals, goal_event_replay, goal_review_decisions, identity_decisions, testimony_inquiries, testimony, travel, presence, presence_encounters, familiarity, relationships, emotions, stress, conditioning, learning_decisions, life_history, memory_reflections, emotional_scars, emotional_scar_decisions, scar_identity_proposals, identity_goal_reviews, action_execution_snapshot, action_world_facts, action_resources, action_replanning_snapshot, action_evaluation_snapshot, experience_transfer_snapshot, goal_lifecycle_snapshot, goal_review_applications_snapshot, goal_commitments_snapshot, goal_intention_memory_snapshot, strategy_belief_snapshot, life_simulation_snapshot = self._components()
         payload = {
             "schema_version": self.SCHEMA_VERSION, "current_tick": self.current_tick,
             "events": json.loads(envelope.to_json()), "npcs": json.loads(npcs.to_json()),
@@ -1798,6 +1816,8 @@ class SimulationWorldCheckpoint:
             payload["goal_intention_memories"] = json.loads(goal_intention_memory_snapshot.to_json())
         if strategy_belief_snapshot is not None:
             payload["strategy_beliefs"] = json.loads(strategy_belief_snapshot.to_json())
+        if life_simulation_snapshot is not None:
+            payload["life_simulation"] = json.loads(life_simulation_snapshot.to_json())
         return json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False)
 
     @classmethod
@@ -1849,7 +1869,8 @@ class SimulationWorldCheckpoint:
                        json.dumps(raw["goal_review_applications"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("goal_review_applications") is not None else None,
                        json.dumps(raw["goal_commitments"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("goal_commitments") is not None else None,
                        json.dumps(raw["goal_intention_memories"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("goal_intention_memories") is not None else None,
-                       json.dumps(raw["strategy_beliefs"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("strategy_beliefs") is not None else None)
+                       json.dumps(raw["strategy_beliefs"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("strategy_beliefs") is not None else None,
+                       json.dumps(raw["life_simulation"], sort_keys=True, separators=(",", ":"), allow_nan=False) if raw.get("life_simulation") is not None else None)
         except ValueError:
             raise
         except (TypeError, KeyError, IndexError, json.JSONDecodeError) as exc:
@@ -1917,4 +1938,6 @@ class SimulationWorldCheckpoint:
                                   goal_lifecycle, goal_review_applications_snapshot.restore() if goal_review_applications_snapshot is not None else None,
                                   goal_commitments_snapshot.restore() if goal_commitments_snapshot is not None else None,
                                   goal_intention_memory_snapshot.restore() if goal_intention_memory_snapshot is not None else None,
-                                  strategy_belief_snapshot.restore() if strategy_belief_snapshot is not None else None)
+                                  strategy_belief_snapshot.restore() if strategy_belief_snapshot is not None else None,
+                                  life_simulation_snapshot.restore(campaign.active_world)
+                                  if life_simulation_snapshot is not None else None)
