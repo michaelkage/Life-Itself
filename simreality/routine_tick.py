@@ -7,6 +7,7 @@ existing RoutineExecutionLedger.
 """
 from __future__ import annotations
 
+import math
 from typing import Iterable, Mapping
 
 from .routine_execution import RoutineExecution, RoutineExecutionLedger
@@ -72,20 +73,40 @@ class RoutineTickAdapter:
             if block.start_minute <= minute_of_day < block.end_minute
             and (selected_owners is None or block.owner_id in selected_owners)
         )
-        results = []
+        # Validate every selected request before committing any execution. A
+        # missing/invalid sample or conflicting replay must not leave a partial
+        # phase in the ledger.
+        prepared = []
         for block in blocks:
             if block.routine_id not in outcome_samples:
                 raise ValueError(f"missing outcome sample for routine: {block.routine_id}")
-            owner_disruptions = tuple(
-                item for item in all_disruptions if item.owner_id == block.owner_id
-            )
-            execution_id = f"{tick_id}:{block.routine_id}"
-            results.append(self.ledger.execute(
-                execution_id,
-                book,
-                block,
-                minute_of_day,
-                owner_disruptions,
-                outcome_sample=outcome_samples[block.routine_id],
+            sample = outcome_samples[block.routine_id]
+            if isinstance(sample, bool) or not isinstance(sample, (int, float)):
+                raise ValueError(f"outcome sample for {block.routine_id} must be numeric")
+            if not math.isfinite(sample) or not 0.0 <= sample <= 1.0:
+                raise ValueError(f"outcome sample for {block.routine_id} must be finite and in [0, 1]")
+            owner_disruptions = tuple(sorted(
+                (item for item in all_disruptions if item.owner_id == block.owner_id),
+                key=lambda item: item.disruption_id,
             ))
-        return tuple(results)
+            execution_id = f"{tick_id}:{block.routine_id}"
+            existing = self.ledger.get(execution_id)
+            if existing is not None and not (
+                existing.routine_id == block.routine_id
+                and existing.resolution.owner_id == block.owner_id
+                and existing.resolution.intended_activity == block.activity
+                and existing.resolution.intended_location_id == block.location_id
+                and existing.minute_of_day == minute_of_day
+                and existing.disruptions == owner_disruptions
+                and existing.outcome_sample == sample
+            ):
+                raise ValueError(f"conflicting routine execution ID: {execution_id}")
+            prepared.append((execution_id, block, owner_disruptions, float(sample)))
+
+        return tuple(
+            self.ledger.execute(
+                execution_id, book, block, minute_of_day, owner_disruptions,
+                outcome_sample=sample,
+            )
+            for execution_id, block, owner_disruptions, sample in prepared
+        )
