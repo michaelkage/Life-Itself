@@ -137,5 +137,86 @@ class LifeSimulationTests(unittest.TestCase):
         self.assertGreater(inside.influence_score, 0.9)
 
 
+
+    def test_versioned_snapshot_round_trips_service_state_and_rng(self):
+        from simreality.health_life import PersistentWorld
+        from simreality.life_simulation_save_state import LifeSimulationSnapshot
+
+        world = LifeItselfCampaign().active_world
+        world.money["patient"] = 25.0
+        world.health["patient"] = CharacterHealth("patient", [
+            HealthCondition("injury", "injury", 0.7, recovery_per_day=0.1),
+        ])
+        world.obligations.append(SocialObligation(
+            "care-debt", "patient", "clinic", money_due=3.0, due_day=99,
+        ))
+        simulation = LifeSimulation(world, seed=17)
+        simulation.register_person(PersonProfile(
+            "patient", personality={"compassion": 0.8},
+            memories={"friend": 0.4}, relationships={"friend": 0.7},
+        ))
+        simulation.prescribe_treatment("patient", Treatment("care", "injury", 0.4, 2.0))
+        simulation.estimate_recovery("patient", "injury")
+        simulation.schedule_ghost_window(GhostWindow(1, 3, permitted_actions=("sound",)))
+        simulation.care_providers["patient"] = ["friend"]
+        simulation.random.random()
+
+        payload = LifeSimulationSnapshot.capture(simulation).to_json()
+        restored_world = PersistentWorld.from_json(world.to_json())
+        restored = LifeSimulationSnapshot.from_json(payload).restore(restored_world)
+
+        self.assertEqual(LifeSimulationSnapshot.capture(restored).to_json(), payload)
+        self.assertEqual(simulation.random.random(), restored.random.random())
+        self.assertEqual(restored.people["patient"].memories, {"friend": 0.4})
+        self.assertEqual(restored.treatments["patient"][0].treatment_id, "care")
+
+    def test_death_resolution_history_survives_snapshot_restore(self):
+        from simreality.health_life import PersistentWorld
+        from simreality.life_simulation_save_state import LifeSimulationSnapshot
+
+        world = LifeItselfCampaign().active_world
+        world.money.update({"deceased": 0.0, "helper": 20.0, "creditor": 0.0})
+        simulation = LifeSimulation(world)
+        simulation.register_person(PersonProfile("deceased"))
+        simulation.register_person(PersonProfile(
+            "helper", personality={"compassion": 1.0, "duty": 1.0},
+            relationships={"deceased": 1.0},
+        ))
+        simulation.create_responsibility(SocialObligation(
+            "persistent-debt", "deceased", "creditor", money_due=15.0, due_day=99,
+        ))
+        first = simulation.resolve_after_death("deceased")
+        self.assertEqual(len(first), 1)
+
+        restored_world = PersistentWorld.from_json(world.to_json())
+        restored = LifeSimulationSnapshot.from_json(
+            LifeSimulationSnapshot.capture(simulation).to_json(),
+        ).restore(restored_world)
+        balances = dict(restored_world.money)
+        trust = dict(restored_world.trust)
+        self.assertEqual(restored.resolve_after_death("deceased"), [])
+        self.assertEqual(restored_world.money, balances)
+        self.assertEqual(restored_world.trust, trust)
+        self.assertEqual(len(restored.resolutions), 1)
+
+    def test_snapshot_rejects_unsupported_schema_and_world_mismatch(self):
+        import json
+        from simreality.health_life import PersistentWorld
+        from simreality.life_simulation_save_state import LifeSimulationSnapshot
+
+        world = LifeItselfCampaign().active_world
+        world.health["patient"] = CharacterHealth("patient")
+        simulation = LifeSimulation(world)
+        simulation.register_person(PersonProfile("patient"))
+        payload = LifeSimulationSnapshot.capture(simulation).to_json()
+        raw = json.loads(payload)
+        raw["schema_version"] = 999
+        with self.assertRaisesRegex(ValueError, "unsupported"):
+            LifeSimulationSnapshot.from_json(json.dumps(raw))
+
+        detached = PersistentWorld()
+        with self.assertRaisesRegex(ValueError, "missing from PersistentWorld"):
+            LifeSimulationSnapshot.from_json(payload).restore(detached)
+
 if __name__ == "__main__":
     unittest.main()
