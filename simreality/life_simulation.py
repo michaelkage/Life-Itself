@@ -239,8 +239,10 @@ class LifeSimulation:
         if profile:
             profile.alive = False
             profile.estate_money = max(0.0, self.world.money.get(deceased_id, 0.0))
+        resolved_ids = {result.obligation_id for result in self.resolutions}
         unresolved = [o for o in self.world.obligations
-                      if not o.settled and not o.missed and o.debtor_id == deceased_id]
+                      if not o.settled and not o.missed and o.debtor_id == deceased_id
+                      and o.obligation_id not in resolved_ids]
         outcomes: list[ResponsibilityResolution] = []
         for obligation in unresolved:
             amount = min(profile.estate_money if profile else 0.0, obligation.money_due)
