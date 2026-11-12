@@ -182,7 +182,8 @@ class LifeSimulation:
                                      profile.care_need, treatment_cost, capacity)
             self.daily_records.append(record)
             day_records.append(record)
-        self.world.advance_day()
+        # Recovery and condition duration were already advanced above.
+        self.world.advance_day(advance_health=False)
         return day_records
 
     def create_responsibility(self, obligation: SocialObligation) -> None:
