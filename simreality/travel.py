@@ -283,6 +283,13 @@ class TravelTickAdapter:
                     progress = 0.0
                 else:
                     break
+            # A closure is a world condition, not a side effect of having
+            # spare movement budget. Detect it even when this tick's budget
+            # was consumed exactly while reaching the junction.
+            if index < len(edge_ids) and edge_ids[index] in closed:
+                status = "blocked"
+                if journey.journey_id not in blocked:
+                    blocked.append(journey.journey_id)
             if index >= len(edge_ids):
                 status, arrived_tick = "arrived", tick
                 arrivals.append(journey.journey_id)
