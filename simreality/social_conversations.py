@@ -6,6 +6,7 @@ speaker. It never reads world events or asserts that a rumour is objectively tru
 """
 from __future__ import annotations
 
+from copy import deepcopy
 from dataclasses import dataclass
 
 from .gossip import Conversation, Rumour, converse
@@ -110,6 +111,20 @@ class SocialConversationAdapter:
         self._inputs[conversation_id] = signature
         self._results[conversation_id] = result
         return result
+
+    def transaction_snapshot(self) -> tuple[dict, dict]:
+        """Capture replay indexes for an enclosing atomic simulation phase."""
+        return deepcopy(self._inputs), deepcopy(self._results)
+
+    def restore_transaction_snapshot(self, snapshot: tuple[dict, dict]) -> None:
+        """Restore replay indexes captured before a failed enclosing phase."""
+        if not isinstance(snapshot, tuple) or len(snapshot) != 2:
+            raise TypeError("snapshot must be a two-item transaction snapshot")
+        inputs, results = snapshot
+        if not isinstance(inputs, dict) or not isinstance(results, dict):
+            raise TypeError("transaction snapshot contents must be dictionaries")
+        self._inputs = deepcopy(inputs)
+        self._results = deepcopy(results)
 
     def snapshot(self) -> tuple[ConversationBeliefResult, ...]:
         """Return recorded conversation results in stable ID order."""
