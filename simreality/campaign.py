@@ -12,6 +12,8 @@ from typing import Any
 import json
 
 from .health_life import CampaignLife, LifeState, PersistentWorld, WorldArchive
+from .beliefs import Evidence, BeliefState
+from .campaign_knowledge import CampaignKnowledgeLedger
 
 
 
@@ -29,6 +31,7 @@ class LifeItselfCampaign:
     active_world: PersistentWorld = field(default_factory=PersistentWorld)
     archived_worlds: list[ArchivedTimeline] = field(default_factory=list)
     archived_life_simulations: dict[str, str] = field(default_factory=dict, repr=False)
+    shared_knowledge: CampaignKnowledgeLedger = field(default_factory=CampaignKnowledgeLedger, repr=False)
 
     def begin_first_life(self, character_id: str) -> None:
         if self.active_world.life is not None:
@@ -113,6 +116,18 @@ class LifeItselfCampaign:
         world, _ = self.visit_archive_runtime(archive_id)
         return world
 
+    def record_shared_evidence(self, evidence: Evidence) -> Evidence:
+        """Record attributable world evidence at campaign scope, not as a personal memory."""
+        return self.shared_knowledge.add(evidence)
+
+    def shared_belief(self, claim_id: str) -> BeliefState:
+        """Retrieve a cross-life claim assessment with its evidence IDs."""
+        return self.shared_knowledge.belief(claim_id)
+
+    def shared_evidence_for(self, claim_id: str) -> tuple[Evidence, ...]:
+        """Return provenance records available to every life in this campaign."""
+        return self.shared_knowledge.evidence_for(claim_id)
+
     def advance_day(self) -> None:
         self.active_world.advance_day()
 
@@ -135,6 +150,9 @@ class LifeItselfCampaign:
         }
         if self.archived_life_simulations:
             payload["archived_life_simulations"] = dict(sorted(self.archived_life_simulations.items()))
+        knowledge = self.shared_knowledge.to_json()
+        if knowledge != CampaignKnowledgeLedger().to_json():
+            payload["shared_knowledge"] = json.loads(knowledge)
         return json.dumps(payload, sort_keys=True, allow_nan=False)
 
     @classmethod
@@ -173,4 +191,7 @@ class LifeItselfCampaign:
             active_world=load_world(raw["active_world"]),
             archived_worlds=archived,
             archived_life_simulations=dict(service_states),
+            shared_knowledge=CampaignKnowledgeLedger.from_json(json.dumps(
+                raw.get("shared_knowledge", {"schema_version": 1, "evidence": []}),
+                sort_keys=True, separators=(",", ":"), allow_nan=False)),
         )
