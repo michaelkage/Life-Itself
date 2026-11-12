@@ -14,7 +14,7 @@ animation, physics, and asset integration are not implemented.
 - **Product/game:** Life Itself
 - **Engine / code name:** Simulated Reality Engine (SRE)
 - **Python package and C++ namespace:** `simreality` (kept stable for code compatibility)
-- **Repository:** currently `SIMULATED-REALITY-ENGINE`; the README and product-facing documentation use the Life Itself brand.
+- **Repository:** `michaelkage/Life-Itself`; product and technical naming are kept distinct.
 
 ## Running it
 
