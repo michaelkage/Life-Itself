@@ -94,6 +94,31 @@ class LifeSimulationTests(unittest.TestCase):
         self.assertEqual(results[0].outcome, ResponsibilityOutcome.PAID_FROM_ESTATE)
         self.assertEqual(world.money["creditor"], 15)
 
+    def test_death_obligation_resolution_is_idempotent(self):
+        world = LifeItselfCampaign().active_world
+        world.money.update({"deceased": 0.0, "helper": 20.0, "creditor": 0.0})
+        sim = LifeSimulation(world)
+        sim.register_person(PersonProfile("deceased"))
+        sim.register_person(PersonProfile(
+            "helper", personality={"compassion": 1.0, "duty": 1.0},
+            relationships={"deceased": 1.0},
+        ))
+        sim.create_responsibility(SocialObligation(
+            "debt-once", "deceased", "creditor", money_due=15.0, due_day=99,
+        ))
+
+        first = sim.resolve_after_death("deceased")
+        money_after_first = dict(world.money)
+        trust_after_first = dict(world.trust)
+        second = sim.resolve_after_death("deceased")
+
+        self.assertEqual(len(first), 1)
+        self.assertEqual(second, [])
+        self.assertEqual(world.money, money_after_first)
+        self.assertEqual(world.trust, trust_after_first)
+        self.assertEqual(world.money["helper"], 5.0)
+        self.assertEqual(world.money["creditor"], 15.0)
+
     def test_ghost_window_uses_npc_personality_memory_and_relationship(self):
         campaign = LifeItselfCampaign()
         campaign.begin_first_life("lost")
