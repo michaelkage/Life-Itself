@@ -12,10 +12,12 @@ Status labels:
 The Python reference core lives under `simreality/`, with a data contract in
 `simreality/model.py`, a blueprint in `docs/BLUEPRINT.md`, math corrections in
 `docs/MATH-NOTES.md`, and a unittest suite under `tests/`. The current reference
-suite now includes Python/C++ differential checks in addition to the reference regressions and can be run with:
+suite includes Python/C++ differential checks in addition to the reference regressions.
+Run the complete suite with the repository's supported test runner:
 
 ```bash
-python -m unittest discover -s tests -t .
+python -m pip install pytest
+python -m pytest -q
 ```
 
 The Python core covers memory decay, rumour/gossip propagation, district pressure and city-scar dynamics, trauma tiers, legal evidence/plea calculations, and fixer reputation/betrayal logic. The inspected blueprint explicitly requires the core to avoid Unreal types, inject randomness rather than drawing it globally, keep tuning values named, and separate data records from behaviour.
@@ -65,13 +67,13 @@ conversation, enforcement, and fixer interactions. Versioned snapshots preserve
 world state, simulation time, fixer networks, and RNG continuation. The CMake
 target builds the library and dependency-free regression executable.
 
-The last completed CI run for commit `6b46715954f2d3e72064f466632970962186ddd4` passed all three jobs: the Python regression and differential suite, Linux C++ build/tests, and Windows C++ build/tests. Later commits update branding and CI metadata; check the latest Actions run for the current HEAD before treating those exact commits as validated. Unreal-specific integration remains unbuilt.
+At commit `be5cafc81dc88b85ece1538bc8ede182d16a9411`, GitHub Actions verified the Python test suite, the Python 3.12 and C++20 simulation-core matrix (Linux and Windows), and the GitHub Pages documentation deployment. The Python test workflow currently runs Python 3.11; the simulation-core workflow additionally exercises Python 3.12. Unreal-specific integration remains unbuilt.
 
 ## Roadmap and exit criteria
 
 ### Phase 0 — Baseline and contracts
-1. Run the existing Python unittest command on a clean checkout.
-2. Record exact test count, Python version, branch/commit, and baseline result.
+1. Run `python -m pytest -q` on a clean checkout.
+2. Record exact test count, Python version, branch/commit, and baseline result in CI.
 3. Document units, ID rules, legal ranges, update cadence, and save compatibility.
 **Exit:** baseline is reproducible and model contract is documented.
 
