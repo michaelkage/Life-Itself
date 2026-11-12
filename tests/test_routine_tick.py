@@ -59,6 +59,36 @@ class RoutineTickAdapterTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "missing outcome sample"):
             self.adapter.execute_due("tick-9", self.book, 550, outcome_samples={"work-a": 0.0})
 
+    def test_missing_later_sample_does_not_partially_commit_tick(self):
+        with self.assertRaisesRegex(ValueError, "missing outcome sample"):
+            self.adapter.execute_due(
+                "tick-atomic", self.book, 550,
+                outcome_samples={"shop-b": 0.0},
+            )
+        self.assertEqual(self.adapter.ledger.snapshot(), ())
+
+    def test_invalid_later_sample_does_not_partially_commit_tick(self):
+        with self.assertRaisesRegex(ValueError, "finite and in"):
+            self.adapter.execute_due(
+                "tick-invalid", self.book, 550,
+                outcome_samples={"shop-b": 0.0, "work-a": float("nan")},
+            )
+        self.assertEqual(self.adapter.ledger.snapshot(), ())
+
+    def test_conflicting_later_replay_does_not_commit_earlier_execution(self):
+        self.adapter.execute_due(
+            "tick-conflict", self.book, 550,
+            owner_ids=("npc-b",), outcome_samples={"shop-b": 0.0},
+        )
+        before = self.adapter.ledger.snapshot()
+        with self.assertRaisesRegex(ValueError, "conflicting routine execution ID"):
+            self.adapter.execute_due(
+                "tick-conflict", self.book, 550,
+                outcome_samples={"work-a": 0.0, "shop-b": 1.0},
+            )
+        self.assertEqual(self.adapter.ledger.snapshot(), before)
+        self.assertIsNone(self.adapter.ledger.get("tick-conflict:work-a"))
+
     def test_owner_filter_and_invalid_duplicate_disruptions(self):
         result = self.adapter.execute_due(
             "tick-9", self.book, 550, owner_ids=("npc-a",),
