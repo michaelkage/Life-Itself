@@ -1867,7 +1867,7 @@ int main() {
     fluid_agent.local_corruption = 0.5F;
     fluid_agent.rumour_retention = 0.6F;
     fluid_agent.target_known = true;
-    const std::array<fluid::AgentInput, 1> fluid_agents{fluid_agent};
+    std::array<fluid::AgentInput, 1> fluid_agents{fluid_agent};
     const auto fluid_bytes = fluid::pack_agents({fluid_agent});
     assert(fluid_bytes.size() == fluid::kAgentInputStride);
     assert(fluid_bytes[0] == 0x00U && fluid_bytes[1] == 0x00U
