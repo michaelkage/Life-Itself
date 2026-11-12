@@ -299,7 +299,7 @@ footer{padding:17px 0 30px;color:var(--stone);font-size:10px;display:flex;justif
     <div><span class="section-index">04 / BUILD & TEST</span><h2>Run the reference core</h2></div>
     <div class="copy">
       <p>Python 3.10+ is required for the reference package. The Python package itself has no third-party runtime dependency; the regression suite uses `pytest`:</p>
-      <div class="command"><code>python -m pytest -q</code><button class="action-btn copy-btn" data-copy="python -m unittest discover -s tests -t .">Copy</button></div>
+      <div class="command"><code>python -m pytest -q</code><button class="action-btn copy-btn" data-copy="python -m pytest -q">Copy</button></div>
       <p>The portable C++ core requires C++20 and CMake 3.20+:</p>
       <div class="command"><code>cmake -S cpp -B build</code><button class="action-btn copy-btn" data-copy="cmake -S cpp -B build">Copy</button></div>
       <div class="command"><code>cmake --build build</code><button class="action-btn copy-btn" data-copy="cmake --build build">Copy</button></div>
