@@ -1,7 +1,8 @@
 """Regression tests for deterministic tick orchestration."""
 import unittest
 
-from simreality.model import ActionTag, NPC
+from simreality.beliefs import Evidence
+from simreality.model import ActionTag, Description, NPC, NPCMemory
 from simreality.routine_execution import RoutineExecutionLedger
 from simreality.routines import DisruptionKind, RoutineBlock, RoutineBook, RoutineDisruption
 from simreality.social_beliefs import SocialBeliefSystem
@@ -120,6 +121,70 @@ class TickCoordinatorTests(unittest.TestCase):
                 3, self.npcs,
                 conversations=(ConversationIntent("chat", "missing", "speaker"),),
             )
+
+    def test_failed_later_event_rolls_back_earlier_materialized_memory(self):
+        events = WorldEventLedger((
+            WorldEventLedger.make_event(
+                "event-a", 3, "incident", witnesses=("speaker",),
+                attributes={
+                    "action_tag": ActionTag.CRIME_THEFT.value,
+                    "target_entity_id": "subject-a",
+                },
+            ),
+            WorldEventLedger.make_event(
+                "event-b", 3, "incident", witnesses=("speaker",),
+                attributes={
+                    "action_tag": ActionTag.CRIME_THEFT.value,
+                    "target_entity_id": "subject-b",
+                    "memory_impact": float("nan"),
+                },
+            ),
+        ))
+        memory = WorldEventMemoryAdapter(events)
+        trust = SocialTrustLedger()
+        conversations = SocialConversationAdapter(trust, SocialBeliefSystem(trust))
+        coordinator = SimulationTickCoordinator(events, memory, conversations)
+        with self.assertRaisesRegex(ValueError, "memory_impact"):
+            coordinator.step(3, self.npcs, event_ids=("event-a", "event-b"))
+        self.assertEqual(self.npcs["speaker"].memories, [])
+        self.assertEqual(memory.snapshot(), ())
+        self.assertEqual(coordinator.snapshot(), ())
+
+    def test_failed_conversation_rolls_back_gossip_and_belief_mutations(self):
+        trust = SocialTrustLedger({("listener", "speaker"): 0.9})
+        beliefs = SocialBeliefSystem(trust)
+        adapter = SocialConversationAdapter(trust, beliefs)
+        coordinator = SimulationTickCoordinator(
+            self.events, WorldEventMemoryAdapter(self.events), adapter
+        )
+        speaker = self.npcs["speaker"]
+        listener = self.npcs["listener"]
+        speaker.remember(NPCMemory(
+            witness_id="speaker", target_entity_id="subject",
+            initial_impact=0.9, retention=0.9, timestamp_hour=1.0,
+            action_tag=ActionTag.CRIME_THEFT,
+            description=Description(),
+        ))
+        beliefs.observe(
+            "listener",
+            Evidence(
+                evidence_id="conversation:chat-fail:rumour:0",
+                claim_id="preexisting-claim", source_id="someone-else",
+                direction=1, strength=0.2, source_reliability=0.5,
+                observed_tick=3,
+            ),
+        )
+        prior_listener_memories = list(listener.memories)
+        prior_beliefs = beliefs.snapshot()
+        with self.assertRaisesRegex(ValueError, "evidence ID reused"):
+            coordinator.step(
+                3, self.npcs,
+                conversations=(ConversationIntent("chat-fail", "listener", "speaker"),),
+            )
+        self.assertEqual(listener.memories, prior_listener_memories)
+        self.assertEqual(beliefs.snapshot(), prior_beliefs)
+        self.assertEqual(adapter.snapshot(), ())
+        self.assertEqual(coordinator.snapshot(), ())
 
 
 if __name__ == "__main__":
