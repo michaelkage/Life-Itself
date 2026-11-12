@@ -536,3 +536,6 @@ Regression coverage: tests/test_campaign_lifecycle.py and tests/test_world_check
 ## Cross-life campaign knowledge
 
 `CampaignKnowledgeLedger` preserves attributed world evidence across lives without transferring a previous character's private memories, personality, or personal relationships. Query shared claims with provenance through `LifeItselfCampaign.shared_belief()` and `shared_evidence_for()`. Evidence remains source-attributed and confidence is not treated as objective truth. See [the cross-life knowledge guide](docs/CROSS-LIFE-CAMPAIGN-KNOWLEDGE.md).
+
+
+NPC knowledge acquisition now has an explicit bridge: `SocialBeliefSystem.learn_campaign_evidence(observer_id, campaign.shared_knowledge, claim_id)` imports a selected campaign claim into one NPC's private belief ledger, weighted by that NPC's trust in the original sources. No automatic broadcast occurs. Imported beliefs use the existing social-belief persistence codec and checkpoint pipeline.
