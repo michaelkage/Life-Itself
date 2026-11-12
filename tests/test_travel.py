@@ -27,10 +27,10 @@ class TravelTickTests(unittest.TestCase):
         self.assertEqual(second.journeys[0].current_location, "crossroads")
         self.assertEqual(second.journeys[0].edge_progress, 2)
         third = self.adapter.advance(3, {"npc-1": 2})
-        self.assertEqual(third.arrivals, ())
-        fourth = self.adapter.advance(4, {"npc-1": 1})
-        self.assertEqual(fourth.arrivals, ("trip-1",))
+        self.assertEqual(third.arrivals, ("trip-1",))
         self.assertEqual(self.adapter.ledger.get("trip-1").status, "arrived")
+        fourth = self.adapter.advance(4, {"npc-1": 1})
+        self.assertEqual(fourth.arrivals, ())
 
     def test_closure_pauses_and_can_be_reopened(self):
         result = self.adapter.advance(1, {"npc-1": 5}, closed_edge_ids=("home-road",))
