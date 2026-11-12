@@ -40,7 +40,8 @@ Engine-independent Python reference systems:
 
 | Module | Brief section | What it does |
 | --- | --- | --- |
-| `simreality/model.py` | — | Shared data records and tuning constants. The C++ port contract |\n| `simreality/fluid.py` | SRE-Fluid | Packed 48-byte-per-agent GPU input contract and deterministic CPU reference for parallel pressure, trauma-tier, and rumour-gating evaluation |
+| `simreality/model.py` | — | Shared data records and tuning constants. The C++ port contract |
+| `simreality/fluid.py` | SRE-Fluid | Packed 48-byte-per-agent GPU input contract and deterministic CPU reference for parallel pressure, trauma-tier, and rumour-gating evaluation |
 | `simreality/fluid_social.py` | SRE-Fluid | Canonically ordered, packed per-claim evidence gather with a CPU reference matching the belief ledger's sequential confidence recurrence |
 | `simreality/decay.py` | 1.A Memory Decay | Exponential decay with situational modifiers |
 | `simreality/gossip.py` | 1.B Gossip Network | Rumour mutation through social contact |
@@ -55,7 +56,9 @@ Engine-independent Python reference systems:
 | `simreality/goal_lifecycle_save_state.py` | NPC goal persistence | Canonical lifecycle snapshots, explicit abandoned-goal reopening, and composite world-checkpoint validation |
 | `simreality/identity_evolution.py` | NPC identity evolution | Deterministic, read-only proposals for gradual, individual-specific changes to configurable long-term traits; bounded per-event effects and explicit event policies |
 | `simreality/identity_interpretation.py` | NPC identity interpretation | Applies each NPC’s own belief confidence to an event proposal through explicit, inspectable rules; preserves caps and requires a separate accept/reject decision |
-| `simreality/world_checkpoint.py` | Identity-goal review persistence | Saves goal review decisions with identity and goal state; validates accepted identity provenance, source event role, ownership, and chronology on capture and restore |\n| `simreality/identity_goal_alignment.py` | Identity-to-goal alignment | Accepted identity changes produce read-only goal proposals; each goal adjustment requires separate NPC acceptance, stale-state checks, exactly-once application, and canonical decision snapshots |\n| `simreality/identity_decisions.py` | NPC identity decisions | Append-only acceptance/rejection decisions; accepted changes update durable traits exactly once, rejected changes remain history; canonical snapshots and world-checkpoint integration |
+| `simreality/world_checkpoint.py` | Identity-goal review persistence | Saves goal review decisions with identity and goal state; validates accepted identity provenance, source event role, ownership, and chronology on capture and restore |
+| `simreality/identity_goal_alignment.py` | Identity-to-goal alignment | Accepted identity changes produce read-only goal proposals; each goal adjustment requires separate NPC acceptance, stale-state checks, exactly-once application, and canonical decision snapshots |
+| `simreality/identity_decisions.py` | NPC identity decisions | Append-only acceptance/rejection decisions; accepted changes update durable traits exactly once, rejected changes remain history; canonical snapshots and world-checkpoint integration |
 | `simreality/emotional_scar_identity.py` | Emotional scars + identity | Maps active, accepted, recovered scar severity through explicit cue/axis policies into bounded identity-change proposals; never changes traits or bypasses NPC acceptance/rejection |
 | `simreality/goal_review.py` | NPC goal evolution | Converts explicit life events into deterministic persist, reprioritize, pause, reframe, or abandon proposals without silently changing NPC intentions |
 | `simreality/goal_review_decisions.py` | NPC goal decision history | Records explicit accepted/rejected goal-review proposals as an append-only, idempotent ledger; `goal_review_decisions_save_state.py` provides canonical persistence |
