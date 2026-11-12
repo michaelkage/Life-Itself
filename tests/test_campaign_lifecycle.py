@@ -163,5 +163,64 @@ class CampaignTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "known timeline IDs"):
             LifeItselfCampaign.from_json(json.dumps(payload))
 
+    def test_shared_evidence_crosses_lives_without_copying_personal_memory(self):
+        from simreality.beliefs import Evidence
+        from simreality.life_simulation import LifeSimulation, PersonProfile
+
+        campaign = LifeItselfCampaign()
+        campaign.begin_first_life("first")
+        first_service = LifeSimulation(campaign.active_world)
+        first_service.register_person(PersonProfile(
+            "first", personality={"caution": 0.9},
+            memories={"private-event": 0.8},
+            relationships={"friend": 0.7},
+        ))
+        campaign.record_shared_evidence(Evidence(
+            "witness-report-1", "bridge-is-damaged", "witness-17",
+            1, 0.8, 0.75, 12,
+        ))
+        campaign.record_death("natural causes", life_simulation=first_service)
+        campaign.start_fresh_life("second", first_service, seed=5)
+
+        self.assertEqual(campaign.active_world.life.character_id, "second")
+        self.assertEqual(campaign.shared_belief("bridge-is-damaged").evidence_ids,
+                         ("witness-report-1",))
+        self.assertAlmostEqual(campaign.shared_belief("bridge-is-damaged").confidence, 0.8 * 0.75 * 0.5 + 0.5)
+        self.assertEqual(campaign.shared_evidence_for("bridge-is-damaged")[0].source_id,
+                         "witness-17")
+        self.assertEqual(campaign.shared_knowledge.snapshot()[0].observed_tick, 12)
+        self.assertEqual(campaign.active_world.money.get("first"), None)
+
+        loaded = LifeItselfCampaign.from_json(campaign.to_json())
+        self.assertEqual(loaded.shared_belief("bridge-is-damaged"),
+                         campaign.shared_belief("bridge-is-damaged"))
+        self.assertEqual(loaded.shared_evidence_for("bridge-is-damaged"),
+                         campaign.shared_evidence_for("bridge-is-damaged"))
+
+    def test_shared_evidence_is_idempotent_and_rejects_provenance_reuse(self):
+        from simreality.beliefs import Evidence
+
+        campaign = LifeItselfCampaign()
+        item = Evidence("e1", "claim", "source", 1, 0.6, 0.8, 4)
+        campaign.record_shared_evidence(item)
+        campaign.record_shared_evidence(item)
+        self.assertEqual(len(campaign.shared_evidence_for("claim")), 1)
+        with self.assertRaisesRegex(ValueError, "reused with different content"):
+            campaign.record_shared_evidence(Evidence(
+                "e1", "claim", "different-source", 1, 0.6, 0.8, 4,
+            ))
+
+    def test_legacy_campaign_without_shared_knowledge_loads_empty(self):
+        import json
+
+        campaign = LifeItselfCampaign()
+        campaign.begin_first_life("legacy")
+        payload = json.loads(campaign.to_json())
+        payload.pop("shared_knowledge", None)
+        restored = LifeItselfCampaign.from_json(json.dumps(payload))
+        self.assertEqual(restored.shared_knowledge.snapshot(), ())
+        with self.assertRaises(KeyError):
+            restored.shared_belief("unknown")
+
 if __name__ == "__main__":
     unittest.main()
