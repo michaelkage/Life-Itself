@@ -44,6 +44,18 @@ class LifeSimulationSnapshot:
     def capture(cls, simulation: LifeSimulation) -> "LifeSimulationSnapshot":
         if not isinstance(simulation, LifeSimulation):
             raise TypeError("simulation must be a LifeSimulation")
+        for key, profile in simulation.people.items():
+            if key != profile.character_id:
+                raise ValueError("LifeSimulation person keys must match profile character IDs")
+        recovery_records = []
+        for key, estimate in sorted(simulation.recovery_estimates.items()):
+            owners = [owner for owner in simulation.people
+                      if key == f"{owner}:{estimate.condition_id}"]
+            if len(owners) != 1:
+                raise ValueError(f"recovery estimate has no unique owner: {key}")
+            recovery_records.append({
+                "character_id": owners[0], **asdict(estimate),
+            })
         return cls(
             people=tuple(
                 {"character_id": item.character_id, "personality": dict(item.personality),
@@ -55,12 +67,7 @@ class LifeSimulationSnapshot:
                 {"character_id": owner, **asdict(item)}
                 for owner, items in sorted(simulation.treatments.items()) for item in items
             ),
-            recovery_estimates=tuple(
-                {"character_id": owner, **asdict(item)}
-                for key, item in sorted(simulation.recovery_estimates.items())
-                for owner in simulation.people
-                if key == f"{owner}:{item.condition_id}"
-            ),
+            recovery_estimates=tuple(recovery_records),
             daily_records=tuple(asdict(item) for item in simulation.daily_records),
             ghost_windows=tuple({
                 "start_hour": item.start_hour, "end_hour": item.end_hour,
