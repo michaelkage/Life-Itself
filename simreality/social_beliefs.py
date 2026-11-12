@@ -6,6 +6,8 @@ ledger, so later trust changes do not silently rewrite the past.
 """
 from __future__ import annotations
 
+from copy import deepcopy
+
 from .beliefs import BeliefLedger, BeliefState, Evidence
 from .social_trust import SocialTrustLedger
 from .gossip import Rumour
@@ -105,6 +107,20 @@ class SocialBeliefSystem:
         if observer_id not in self._ledgers:
             return ()
         return self._ledgers[observer_id].snapshot()
+
+    def transaction_snapshot(self) -> tuple[dict, dict]:
+        """Capture all observer ledgers and replay inputs for atomic orchestration."""
+        return deepcopy(self._ledgers), deepcopy(self._inputs)
+
+    def restore_transaction_snapshot(self, snapshot: tuple[dict, dict]) -> None:
+        """Restore state captured before a failed enclosing transaction."""
+        if not isinstance(snapshot, tuple) or len(snapshot) != 2:
+            raise TypeError("snapshot must be a two-item transaction snapshot")
+        ledgers, inputs = snapshot
+        if not isinstance(ledgers, dict) or not isinstance(inputs, dict):
+            raise TypeError("transaction snapshot contents must be dictionaries")
+        self._ledgers = deepcopy(ledgers)
+        self._inputs = deepcopy(inputs)
 
     def snapshot(self) -> tuple[tuple[str, BeliefState], ...]:
         """Return a stable snapshot sorted by observer ID then claim ID."""
