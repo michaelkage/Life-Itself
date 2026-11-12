@@ -78,16 +78,16 @@ class RoutineTickAdapterTests(unittest.TestCase):
     def test_conflicting_later_replay_does_not_commit_earlier_execution(self):
         self.adapter.execute_due(
             "tick-conflict", self.book, 550,
-            owner_ids=("npc-b",), outcome_samples={"shop-b": 0.0},
+            owner_ids=("npc-a",), outcome_samples={"work-a": 1.0},
         )
         before = self.adapter.ledger.snapshot()
         with self.assertRaisesRegex(ValueError, "conflicting routine execution ID"):
             self.adapter.execute_due(
                 "tick-conflict", self.book, 550,
-                outcome_samples={"work-a": 0.0, "shop-b": 1.0},
+                outcome_samples={"work-a": 0.0, "shop-b": 0.0},
             )
         self.assertEqual(self.adapter.ledger.snapshot(), before)
-        self.assertIsNone(self.adapter.ledger.get("tick-conflict:work-a"))
+        self.assertIsNone(self.adapter.ledger.get("tick-conflict:shop-b"))
 
     def test_owner_filter_and_invalid_duplicate_disruptions(self):
         result = self.adapter.execute_due(
