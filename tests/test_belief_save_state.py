@@ -44,5 +44,23 @@ class BeliefPersistenceTests(unittest.TestCase):
             BeliefLedgerSnapshot.from_json('{"schema_version":99}')
 
 
+    def test_campaign_evidence_learning_survives_social_belief_persistence(self):
+        from simreality import CampaignKnowledgeLedger
+
+        shared = CampaignKnowledgeLedger((
+            Evidence("archive-report", "claim:bridge", "witness", 1, 0.8, 0.95, 22),
+        ))
+        trust = SocialTrustLedger({("npc", "witness"): 0.65})
+        beliefs = SocialBeliefSystem(trust)
+        original = beliefs.learn_campaign_evidence("npc", shared, "claim:bridge")[0]
+
+        payload = SocialBeliefSnapshot.capture(beliefs).to_json()
+        restored = SocialBeliefSnapshot.from_json(payload).restore(trust)
+        replayed = restored.learn_campaign_evidence("npc", shared, "claim:bridge")[0]
+
+        self.assertEqual(replayed, original)
+        self.assertEqual(replayed.evidence_ids, ("campaign:archive-report",))
+        self.assertEqual(SocialBeliefSnapshot.capture(restored).to_json(), payload)
+
 if __name__ == "__main__":
     unittest.main()
