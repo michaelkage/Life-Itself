@@ -140,10 +140,18 @@ class PersistentWorld:
     def _trust_key(a: str, b: str) -> str:
         return f"{a}->{b}"
 
-    def advance_day(self) -> None:
+    def advance_day(self, *, advance_health: bool = True) -> None:
+        """Advance world time and obligations, optionally advancing health.
+
+        Health-owning simulation layers can pass ``advance_health=False`` when
+        they have already applied their own recovery model for this day.
+        """
+        if not isinstance(advance_health, bool):
+            raise TypeError("advance_health must be a boolean")
         self.day += 1
-        for health in self.health.values():
-            health.advance_day()
+        if advance_health:
+            for health in self.health.values():
+                health.advance_day()
         for obligation in self.obligations:
             if not obligation.settled and not obligation.missed and obligation.due_day < self.day:
                 obligation.missed = True
