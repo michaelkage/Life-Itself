@@ -4,6 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&display=swap" rel="stylesheet">
 <meta name="description" content="Technical manual and interactive reference demo for Life Itself / Simulated Reality Engine.">
 <title>Life Itself — Engineering Manual</title>
 <style>
@@ -301,7 +304,7 @@ footer{padding:17px 0 30px;color:var(--stone);font-size:10px;display:flex;justif
       <div class="command"><code>cmake -S cpp -B build</code><button class="action-btn copy-btn" data-copy="cmake -S cpp -B build">Copy</button></div>
       <div class="command"><code>cmake --build build</code><button class="action-btn copy-btn" data-copy="cmake --build build">Copy</button></div>
       <div class="command"><code>ctest --test-dir build --output-on-failure</code><button class="action-btn copy-btn" data-copy="ctest --test-dir build --output-on-failure">Copy</button></div>
-      <p>Python reference regression cases for the mechanisms shown here include <code>tests/test_routines.py</code>, <code>tests/test_planning.py</code>, <code>tests/test_npc_autonomy.py</code>, and checkpoint tests. CI runs the Python suite with pytest on Python 3.11.</p>
+      <p>Python regression cases for the mechanisms shown here include <code>tests/test_routines.py</code>, <code>tests/test_planning.py</code>, <code>tests/test_npc_autonomy.py</code>, and checkpoint tests. GitHub Actions runs pytest on Python 3.11 and the standard-library unittest suite on Python 3.12; the C++20 library is also configured, built and tested on both Ubuntu and Windows runners.</p>
       <div class="toolbar"><a href="https://github.com/michaelkage/Life-Itself/tree/main/tests" target="_blank" rel="noopener">Browse tests ↗</a><a href="https://github.com/michaelkage/Life-Itself/tree/main/docs" target="_blank" rel="noopener">Engineering notes ↗</a></div>
     </div>
   </div>
