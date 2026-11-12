@@ -997,3 +997,8 @@ __all__ += [
 # Versioned persistence for LifeSimulation-owned state and deterministic RNG continuation.
 from .life_simulation_save_state import LifeSimulationSnapshot
 __all__ += ["LifeSimulationSnapshot"]
+
+
+# Campaign-scoped evidence ledger shared across life timelines.
+from .campaign_knowledge import CampaignKnowledgeLedger
+__all__ += ["CampaignKnowledgeLedger"]
