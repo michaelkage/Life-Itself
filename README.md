@@ -19,10 +19,10 @@ animation, physics, and asset integration are not implemented.
 ## Running it
 
 ```
-python -m unittest discover -s tests -t .
+python -m pytest -q
 ```
 
-The Python reference suite uses only the standard library and is run by GitHub Actions. Python 3.10+ is required (the code uses `X | Y` type syntax).
+The Python simulation package uses only the standard library; the regression suite uses `pytest`. Install it with `python -m pip install pytest`. Python 3.10+ is required (the code uses `X | Y` type syntax).
 
 For the portable C++ core:
 
