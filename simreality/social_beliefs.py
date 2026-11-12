@@ -63,6 +63,43 @@ class SocialBeliefSystem:
         observer_inputs[evidence.evidence_id] = evidence
         return state
 
+    def learn_campaign_evidence(
+        self,
+        observer_id: str,
+        campaign_knowledge,
+        claim_id: str,
+    ) -> tuple[BeliefState, ...]:
+        """Explicitly teach one NPC the campaign evidence for a claim.
+
+        This is an opt-in knowledge-acquisition boundary: campaign evidence is
+        not broadcast into every NPC's private belief ledger. Each source is
+        evaluated using this observer's trust at learning time. Campaign IDs
+        are namespaced in the observer ledger so an independently acquired
+        report cannot collide with the campaign record's identity.
+        """
+        from .campaign_knowledge import CampaignKnowledgeLedger
+
+        if not isinstance(campaign_knowledge, CampaignKnowledgeLedger):
+            raise TypeError("campaign_knowledge must be a CampaignKnowledgeLedger")
+        if not isinstance(claim_id, str) or not claim_id.strip():
+            raise ValueError("claim_id must be a non-empty string")
+
+        evidence_items = campaign_knowledge.evidence_for(claim_id)
+        if not evidence_items:
+            return ()
+
+        for item in evidence_items:
+            self.observe(observer_id, Evidence(
+                evidence_id=f"campaign:{item.evidence_id}",
+                claim_id=item.claim_id,
+                source_id=item.source_id,
+                direction=item.direction,
+                strength=item.strength,
+                source_reliability=item.source_reliability,
+                observed_tick=item.observed_tick,
+            ))
+        return (self.get(observer_id, claim_id),)
+
     def observe_rumour(
         self,
         observer_id: str,
