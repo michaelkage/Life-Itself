@@ -1357,7 +1357,7 @@ class SimulationWorldCheckpointTests(unittest.TestCase):
         goals = GoalBook()
         goals.add(NPCGoal("career-goal", "speaker", "career", 5.0))
         identity = IdentityDecisionLedger((NPCIdentityProfile("speaker", {"ambition": 0.0}),))
-        proposal = IdentityChangeProposal("event-1", "speaker", "identity-policy", "ambition", 0.0, 0.3, 0.3, 0.8, "participant", 0.1)
+        proposal = IdentityChangeProposal("event-1", "speaker", "identity-policy", "ambition", 0.0, 0.1, 0.1, 0.8, "participant", 0.1)
         identity.decide("identity-rejected", proposal, accepted=False, decision_tick=4, rationale="This is not me")
         from simreality.identity_goal_alignment import IdentityGoalReviewProposal
         forged = IdentityGoalReviewProposal("identity-rejected", "event-1", "speaker", "identity-policy", "ambition", 0.1, "career-goal", "career-alignment", IdentityGoalAction.REPRIORITIZE, 4, "career", "career", 5.0, 6.0, 0.5, 0.5)
