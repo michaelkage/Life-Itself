@@ -79,6 +79,8 @@ class SocialBeliefSystem:
         """
         from .campaign_knowledge import CampaignKnowledgeLedger
 
+        if not isinstance(observer_id, str) or not observer_id.strip():
+            raise ValueError("observer_id must be a non-empty string")
         if not isinstance(campaign_knowledge, CampaignKnowledgeLedger):
             raise TypeError("campaign_knowledge must be a CampaignKnowledgeLedger")
         if not isinstance(claim_id, str) or not claim_id.strip():
