@@ -47,6 +47,8 @@ class LifeItselfCampaign:
         """Resolve life-owned responsibilities, then freeze the authoritative world."""
         if life_simulation is not None:
             self._validate_life_simulation(life_simulation, self.active_world)
+            if self.active_world.life is None or self.active_world.life.state is not LifeState.ACTIVE:
+                raise RuntimeError("only an active life can die")
             life_simulation.resolve_after_death(self.active_world.life.character_id)
         return self.active_world.kill_current_life(cause)
 
