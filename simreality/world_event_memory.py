@@ -1,6 +1,8 @@
 """Create witness-specific memories from authoritative world events."""
 from __future__ import annotations
 
+from copy import deepcopy
+
 import math
 from typing import Mapping
 
@@ -113,6 +115,16 @@ class WorldEventMemoryAdapter:
         npcs[witness_id].remember(memory)
         self._processed[key] = memory
         return memory
+
+    def transaction_snapshot(self) -> dict[tuple[str, str], NPCMemory]:
+        """Capture replay state for an enclosing atomic simulation phase."""
+        return deepcopy(self._processed)
+
+    def restore_transaction_snapshot(self, snapshot: Mapping[tuple[str, str], NPCMemory]) -> None:
+        """Restore replay state captured before a failed enclosing phase."""
+        if not isinstance(snapshot, Mapping):
+            raise TypeError("snapshot must be a mapping")
+        self._processed = deepcopy(dict(snapshot))
 
     def snapshot(self) -> tuple[tuple[str, str, NPCMemory], ...]:
         """Return stable processed-key state for a save system."""
