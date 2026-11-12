@@ -19,6 +19,7 @@
 #include "simreality/Trauma.h"
 #include "simreality/WorldPersistence.h"
 
+#include <array>
 #include <cassert>
 #include <bit>
 #include <cmath>
@@ -1866,11 +1867,12 @@ int main() {
     fluid_agent.local_corruption = 0.5F;
     fluid_agent.rumour_retention = 0.6F;
     fluid_agent.target_known = true;
+    const std::array<fluid::AgentInput, 1> fluid_agents{fluid_agent};
     const auto fluid_bytes = fluid::pack_agents({fluid_agent});
     assert(fluid_bytes.size() == fluid::kAgentInputStride);
     assert(fluid_bytes[0] == 0x00U && fluid_bytes[1] == 0x00U
         && fluid_bytes[2] == 0x48U && fluid_bytes[3] == 0x41U); // 12.5f, little-endian.
-    const auto fluid_result = fluid::evaluate_cpu({fluid_agent});
+    const auto fluid_result = fluid::evaluate_cpu(fluid_agents);
     assert(fluid_result.size() == 1);
     assert(fluid_result[0].agent_id == "fluid-1");
     assert(fluid_result[0].trauma_tier == 2U);
@@ -1879,14 +1881,17 @@ int main() {
     // Below the attribution threshold, a known target degrades to an
     // appearance-only rumour and therefore uses the lower 0.01 floor.
     fluid_agent.rumour_retention = 0.05F;
-    const auto unattributed_fluid = fluid::evaluate_cpu({fluid_agent});
+    fluid_agents[0] = fluid_agent;
+    const auto unattributed_fluid = fluid::evaluate_cpu(fluid_agents);
     assert(unattributed_fluid[0].rumour_transmittable);
     assert(!unattributed_fluid[0].attribution_survives);
     fluid_agent.rumour_retention = 0.01F;
     fluid_agent.target_known = false;
-    assert(!fluid::evaluate_cpu({fluid_agent})[0].rumour_transmittable);
+    fluid_agents[0] = fluid_agent;
+    assert(!fluid::evaluate_cpu(fluid_agents)[0].rumour_transmittable);
     fluid_agent.rumour_retention = 0.0101F;
-    assert(fluid::evaluate_cpu({fluid_agent})[0].rumour_transmittable);
+    fluid_agents[0] = fluid_agent;
+    assert(fluid::evaluate_cpu(fluid_agents)[0].rumour_transmittable);
     bool rejected_fluid_duplicate_ids = false;
     try {
         (void)fluid::pack_agents({fluid_agent, fluid_agent});
@@ -1898,7 +1903,8 @@ int main() {
     try {
         auto invalid = fluid_agent;
         invalid.x = std::numeric_limits<float>::quiet_NaN();
-        (void)fluid::evaluate_cpu({invalid});
+        const std::array<fluid::AgentInput, 1> invalid_agents{invalid};
+        (void)fluid::evaluate_cpu(invalid_agents);
     } catch (const std::invalid_argument&) {
         rejected_fluid_nan = true;
     }
@@ -1925,7 +1931,7 @@ int main() {
             return {"test backend", device_available, 1000U};
         }
         [[nodiscard]] std::vector<fluid::AgentOutput> evaluate(
-            const std::vector<fluid::AgentInput>& inputs) override {
+            std::span<const fluid::AgentInput> inputs) override {
             if (should_throw) throw std::runtime_error("simulated device loss");
             auto outputs = fluid::evaluate_cpu(inputs);
             if (malformed && !outputs.empty()) outputs.front().agent_id = "wrong-id";
@@ -1972,7 +1978,7 @@ int main() {
     append_test_f32(fluid_readback, 2.0F);
     append_test_f32(fluid_readback, 1.0F);
     append_test_f32(fluid_readback, 1.0F);
-    const auto decoded_fluid = fluid::unpack_outputs({fluid_agent}, fluid_readback);
+    const auto decoded_fluid = fluid::unpack_outputs(fluid_agents, fluid_readback);
     assert(decoded_fluid.size() == 1U);
     assert(decoded_fluid[0].agent_id == fluid_agent.agent_id);
     assert(decoded_fluid[0].desperation_index == 0.75F);
@@ -1981,7 +1987,7 @@ int main() {
     assert(decoded_fluid[0].attribution_survives);
     bool rejected_short_fluid_readback = false;
     try {
-        (void)fluid::unpack_outputs({fluid_agent}, std::vector<std::uint8_t>{0U});
+        (void)fluid::unpack_outputs(fluid_agents, std::vector<std::uint8_t>{0U});
     } catch (const std::invalid_argument&) {
         rejected_short_fluid_readback = true;
     }
@@ -1993,7 +1999,7 @@ int main() {
         invalid_readback[9] = 0x00U;
         invalid_readback[10] = 0x00U;
         invalid_readback[11] = 0x40U;
-        (void)fluid::unpack_outputs({fluid_agent}, invalid_readback);
+        (void)fluid::unpack_outputs(fluid_agents, invalid_readback);
     } catch (const std::invalid_argument&) {
         rejected_invalid_fluid_flag = true;
     }
