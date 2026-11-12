@@ -45,6 +45,32 @@ class LifeSimulationTests(unittest.TestCase):
         self.assertEqual(condition.days_present, 1)
         self.assertEqual(world.day, 1)
 
+    def test_treatment_rejects_invalid_economic_and_clinical_inputs(self):
+        for kwargs in (
+            {"effectiveness": 0.5, "daily_cost": -1.0},
+            {"effectiveness": 1.1, "daily_cost": 1.0},
+            {"effectiveness": 0.5, "daily_cost": 1.0, "care_hours": -2.0},
+            {"effectiveness": 0.5, "daily_cost": 1.0, "complication_risk": 1.1},
+            {"effectiveness": float("nan"), "daily_cost": 1.0},
+        ):
+            values = {"effectiveness": 0.5, "daily_cost": 1.0, **kwargs}
+            with self.assertRaises(ValueError):
+                Treatment("invalid", "injury", **values)
+
+    def test_duplicate_treatment_id_cannot_charge_twice(self):
+        world = LifeItselfCampaign().active_world
+        world.money["patient"] = 20.0
+        world.health["patient"] = CharacterHealth("patient", [
+            HealthCondition("injury", "injury", 0.8, recovery_per_day=0.1),
+        ])
+        sim = LifeSimulation(world)
+        treatment = Treatment("care", "injury", 0.5, 5.0)
+        self.assertTrue(sim.prescribe_treatment("patient", treatment))
+        with self.assertRaisesRegex(ValueError, "duplicate treatment ID"):
+            sim.prescribe_treatment("patient", Treatment("care", "injury", 0.5, 5.0))
+        sim.simulate_day()
+        self.assertEqual(world.money["patient"], 15.0)
+
     def test_reciprocal_support_transfers_money_and_builds_trust(self):
         world = LifeItselfCampaign().active_world
         world.money.update({"helper": 40, "recipient": 0})
