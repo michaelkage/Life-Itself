@@ -109,6 +109,8 @@ class PopulationExecutionLoop:
             raise TypeError("encounter_adapter must be a PresenceSocialAdapter or None")
         if encounter_adapter is not None and presence_adapter is None:
             raise ValueError("encounter integration requires travel and presence adapters")
+        if encounter_adapter is not None and encounter_adapter.presence is not presence_adapter.ledger:
+            raise ValueError("encounter and presence adapters must share the same PresenceLedger")
         self.encounter_adapter = encounter_adapter
         self._results: dict[int, PopulationTickResult] = {}
         self._requests: dict[int, tuple[object, ...]] = {}
