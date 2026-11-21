@@ -2,6 +2,8 @@
 import unittest
 
 from simreality.model import NPC
+from simreality.action_execution import ActionExecution
+from simreality.household_economy import EconomicAccount, EconomicLedger, EconomicActionAdapter, ActionEconomicEffect, HouseholdLedger, HouseholdObligation
 from simreality.goals import GoalBook, NPCGoal
 from simreality.npc_autonomy import NPCDecisionCycle
 from simreality.planning import DeterministicPlanner, PlanningAction
@@ -118,6 +120,37 @@ class PopulationExecutionLoopTests(unittest.TestCase):
             )
         self.assertEqual(self.loop.coordinator.snapshot(), ())
 
+
+    def test_completed_action_wage_and_household_settlement_share_population_tick(self):
+        economics = EconomicLedger((
+            EconomicAccount("employer", "company", "business"),
+            EconomicAccount("household", "family", "household"),
+            EconomicAccount("utility", "utility", "provider"),
+        ))
+        economics._balances.update({"employer": 100.0, "household": 0.0, "utility": 0.0})
+        household = HouseholdLedger(economics)
+        household.add(HouseholdObligation("rent-1", "family", "household", "utility", 10.0, 1, "utility bill"))
+        adapter = EconomicActionAdapter(economics, (
+            ActionEconomicEffect("work-shift", "employer", "household", 20.0, "wage"),
+        ))
+        loop = PopulationExecutionLoop(
+            self.loop.coordinator, RoutineBook(), RoutineExecutionLedger(),
+            economic_action_adapter=adapter, household_ledger=household,
+        )
+        completed = ActionExecution(
+            "action-1", "npc-a", 1, "work-shift", "completed", "shift completed",
+            (), (), (), (), "action-event-1",
+        )
+        result = loop.run_tick(
+            1, 500, self.npcs, outcome_samples={},
+            completed_action_executions=(completed,), household_settlement_ids=("rent-1",),
+        )
+        self.assertEqual(len(result.economic_transfers), 1)
+        self.assertEqual(result.economic_transfers[0].reference, "action:action-1:wage")
+        self.assertEqual(len(result.household_settlements), 1)
+        self.assertEqual(economics.balance("employer"), 80.0)
+        self.assertEqual(economics.balance("household"), 10.0)
+        self.assertEqual(economics.balance("utility"), 10.0)
 
 if __name__ == "__main__":
     unittest.main()
