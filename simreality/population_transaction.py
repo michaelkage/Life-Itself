@@ -8,6 +8,7 @@ interrupted transaction and post-state for a committed transaction.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import Enum
 from hashlib import sha256
 import json
 import os
@@ -21,7 +22,7 @@ def _canonical(value) -> str:
     def encode(item):
         if hasattr(item, "__dataclass_fields__"):
             return {name: encode(getattr(item, name)) for name in item.__dataclass_fields__}
-        if hasattr(item, "value") and type(item).__module__ == "enum":
+        if isinstance(item, Enum):
             return encode(item.value)
         if isinstance(item, dict):
             return {str(key): encode(item[key]) for key in sorted(item, key=lambda k: str(k))}
@@ -174,6 +175,7 @@ class PopulationTickTransactionCoordinator:
                 "before": before,
                 "after": {},
                 "result_digest": None,
+                "result_payload": None,
             }
             self._records[tick] = record
             self._persist()
@@ -183,6 +185,7 @@ class PopulationTickTransactionCoordinator:
                 result_payload = _canonical(result)
                 record["after"] = after
                 record["result_digest"] = sha256(result_payload.encode("utf-8")).hexdigest()
+                record["result_payload"] = result_payload
                 record["status"] = "committed"
                 self._persist()
                 return result
