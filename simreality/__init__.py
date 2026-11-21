@@ -1017,3 +1017,12 @@ __all__ += ["PopulationLOD", "PopulationSchedule", "PopulationSlice", "Populatio
 # Live-state validation bridge from NPC proposals into replay-safe execution.
 from .population_actions import NPCActionDispatch, NPCActionDispatchAdapter
 __all__ += ["NPCActionDispatch", "NPCActionDispatchAdapter"]
+
+from .household_economy import (
+    ActionEconomicEffect, EconomicAccount, EconomicActionAdapter,
+    EconomicLedger, EconomicTransfer, HouseholdLedger, HouseholdObligation,
+)
+__all__ += [
+    "ActionEconomicEffect", "EconomicAccount", "EconomicActionAdapter",
+    "EconomicLedger", "EconomicTransfer", "HouseholdLedger", "HouseholdObligation",
+]
