@@ -118,10 +118,14 @@ class PopulationExecutionLoop:
         if missing:
             raise KeyError(f"routine owners are absent from population: {', '.join(missing)}")
 
+        if decision_contexts is not None and not isinstance(decision_contexts, Mapping):
+            raise TypeError("decision_contexts must map NPC IDs to decision contexts")
         contexts = dict(decision_contexts or {})
         if contexts and self.decision_cycle is None:
             raise ValueError("decision contexts require an NPCDecisionCycle")
         for owner, context in contexts.items():
+            if not isinstance(owner, str) or not owner.strip():
+                raise ValueError("decision context owner IDs must be non-empty strings")
             if owner not in npcs:
                 raise KeyError(f"decision owner is absent from population: {owner}")
             if not isinstance(context, NPCDecisionContext):
@@ -130,6 +134,13 @@ class PopulationExecutionLoop:
                 raise ValueError("world_facts must be a frozenset of non-empty strings")
             if not isinstance(context.goal_facts, Mapping):
                 raise TypeError("goal_facts must map goal IDs to desired fact sets")
+            for goal_id, desired_facts in context.goal_facts.items():
+                if not isinstance(goal_id, str) or not goal_id.strip():
+                    raise ValueError("goal fact mappings require non-empty goal IDs")
+                if not isinstance(desired_facts, (frozenset, set, tuple)) or any(
+                    not isinstance(fact, str) or not fact for fact in desired_facts
+                ):
+                    raise ValueError("desired goal facts must be sets or tuples of non-empty strings")
             if context.committed_goal_id is not None and (not isinstance(context.committed_goal_id, str) or not context.committed_goal_id.strip()):
                 raise ValueError("committed_goal_id must be None or a non-empty string")
         disruption_values = tuple(disruptions)
