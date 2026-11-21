@@ -99,3 +99,48 @@ satisfied decisions are explicitly reported as not dispatched.
 Both adapters are deterministic and reject conflicting same-tick replay.
 Neither adapter creates coordinates, travel budgets, social encounters,
 economic balances or world facts.
+
+
+## Travel and presence integration
+
+When a `TravelTickAdapter` and `PresenceTickAdapter` are supplied together,
+`PopulationExecutionLoop.run_tick` now requires explicit owner travel budgets.
+It advances the travel ledger, materializes arrival/presence world events, and
+synchronizes the authoritative presence ledger before the social/event-memory
+phase. The returned `PopulationTickResult` includes the travel result and
+presence records. Closed edges and time multipliers are explicit tick inputs
+and participate in population replay signatures.
+
+Encounter creation remains evidence-gated: callers must supply explicit
+opportunity evidence to `PresenceSocialAdapter`. Merely sharing a district or
+route node does not create a social encounter.
+
+## Subsystem LOD policies
+
+`PopulationLODPolicy` resolves which subsystems are due at a given tick for
+each LOD tier. The default policy keeps travel active at every tier, reduces
+social, memory, economy and decision cadence for background NPCs, and disables
+those high-detail systems for dormant NPCs. These are execution-policy
+decisions, not silent changes to simulation facts. The scheduler returns the
+tier for each owner; the runtime integrator must consult `due_subsystems`
+before invoking each subsystem.
+
+## Household economics
+
+`EconomicLedger` provides owner-scoped accounts and replay-safe, balanced
+double-entry transfers. `HouseholdLedger` records explicit obligations and
+settles them through that same ledger. `EconomicActionAdapter` applies a
+configured account transfer only for a completed `ActionExecution`; it does
+not infer wages, purchases, prices, inventory quantities, or obligations from
+action names. Configure policies with real account IDs and explicit amounts.
+The ledger supports canonical JSON snapshots for persistence.
+
+## Transaction boundary status
+
+Travel, presence, social, routine, action, and economic ledgers retain their
+existing component-level replay and checkpoint behavior. Population orchestration
+now orders travel/presence before social work, but it does **not yet provide a
+single rollback transaction across all these ledgers and mutable NPC state**.
+A failure after a committed travel or social phase can therefore leave earlier
+phases committed. Whole-tick atomicity remains an explicit outstanding task;
+do not treat per-component replay as a substitute for it.
