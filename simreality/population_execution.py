@@ -123,6 +123,22 @@ class PopulationExecutionLoop:
         if transaction_coordinator is not None and not isinstance(transaction_coordinator, PopulationTickTransactionCoordinator):
             raise TypeError("transaction_coordinator must be a PopulationTickTransactionCoordinator or None")
         self.transaction_coordinator = transaction_coordinator
+        if transaction_coordinator is not None:
+            required_participants = {
+                "npcs", "world_events", "event_memory", "social_conversations",
+                "social_beliefs", "social_trust", "routine_book", "routine_executions",
+            }
+            if travel_adapter is not None:
+                required_participants.update(("travel", "presence"))
+            if encounter_adapter is not None:
+                required_participants.add("encounters")
+            if economic_action_adapter is not None:
+                required_participants.update(("economics", "economic_actions"))
+            if household_ledger is not None:
+                required_participants.add("households")
+            missing_participants = required_participants - transaction_coordinator.participant_names
+            if missing_participants:
+                raise ValueError("whole-tick transaction is missing participants: " + ", ".join(sorted(missing_participants)))
         if economic_action_adapter is not None and not isinstance(economic_action_adapter, EconomicActionAdapter):
             raise TypeError("economic_action_adapter must be an EconomicActionAdapter or None")
         if household_ledger is not None and not isinstance(household_ledger, HouseholdLedger):
@@ -254,6 +270,8 @@ class PopulationExecutionLoop:
             raise ValueError("household settlement IDs must be unique within a population tick")
         if completed_action_executions and self.economic_action_adapter is None:
             raise ValueError("completed action executions require an EconomicActionAdapter")
+        if completed_action_executions and self.transaction_coordinator is not None and "action_executions" not in self.transaction_coordinator.participant_names:
+            raise ValueError("whole-tick transaction requires an action_executions participant for completed action inputs")
         if household_settlement_ids and self.household_ledger is None:
             raise ValueError("household settlements require a HouseholdLedger")
         signature = (
