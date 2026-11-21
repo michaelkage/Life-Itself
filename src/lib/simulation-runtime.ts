@@ -10,7 +10,7 @@ import type {
 export interface HttpSimulationRuntimeOptions {
   readonly baseUrl: string;
   readonly fetchImpl?: typeof fetch;
-  readonly eventSourceFactory?: (url: string) => EventSource;
+  readonly eventSourceFactory?: (url: string, options?: EventSourceInit) => EventSource;
 }
 
 function apiError(code: string, message: string, retryable = false): SimulationApiError {
@@ -47,7 +47,7 @@ function isCommandAccepted(value: unknown): value is CommandAccepted {
 export class HttpSimulationRuntimePort implements SimulationRuntimePort {
   private readonly baseUrl: string;
   private readonly fetchImpl: typeof fetch;
-  private readonly eventSourceFactory: (url: string) => EventSource;
+  private readonly eventSourceFactory: (url: string, options?: EventSourceInit) => EventSource;
 
   constructor(options: HttpSimulationRuntimeOptions) {
     const parsed = new URL(options.baseUrl);
@@ -56,7 +56,7 @@ export class HttpSimulationRuntimePort implements SimulationRuntimePort {
     }
     this.baseUrl = parsed.toString().replace(/\/$/, '');
     this.fetchImpl = options.fetchImpl ?? fetch.bind(globalThis);
-    this.eventSourceFactory = options.eventSourceFactory ?? ((url) => new EventSource(url));
+    this.eventSourceFactory = options.eventSourceFactory ?? ((url, init) => new EventSource(url, init));
   }
 
   async getWorldSnapshot(signal?: AbortSignal): Promise<Result<WorldSnapshot>> {
@@ -64,6 +64,7 @@ export class HttpSimulationRuntimePort implements SimulationRuntimePort {
       const response = await this.fetchImpl(`${this.baseUrl}/v1/world/snapshot`, {
         method: 'GET',
         headers: { Accept: 'application/json' },
+        credentials: 'include',
         signal,
       });
       if (!response.ok) return { ok: false, error: await this.readError(response) };
@@ -92,6 +93,7 @@ export class HttpSimulationRuntimePort implements SimulationRuntimePort {
           'Content-Type': 'application/json',
           'Idempotency-Key': command.commandId,
         },
+        credentials: 'include',
         body: JSON.stringify(command),
         signal,
       });
@@ -113,7 +115,7 @@ export class HttpSimulationRuntimePort implements SimulationRuntimePort {
     listener: (snapshot: WorldSnapshot) => void,
     onError?: (error: SimulationApiError) => void,
   ): () => void {
-    const source = this.eventSourceFactory(`${this.baseUrl}/v1/world/stream`);
+    const source = this.eventSourceFactory(`${this.baseUrl}/v1/world/stream`, { withCredentials: true });
     let closed = false;
     source.onmessage = (event: MessageEvent<string>) => {
       if (closed) return;
