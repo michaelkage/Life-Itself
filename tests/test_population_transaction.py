@@ -94,5 +94,20 @@ class PopulationTickTransactionTests(unittest.TestCase):
             self.assertEqual(state, {"value": 0})
 
 
+    def test_rolled_back_tick_can_retry_same_request(self):
+        with tempfile.TemporaryDirectory() as directory:
+            state = {"count": 0}
+            coordinator = PopulationTickTransactionCoordinator(
+                Path(directory) / "ticks.json", (self.participant("state", state),),
+            )
+            def fail_once():
+                state["count"] += 1
+                raise RuntimeError("transient")
+            with self.assertRaisesRegex(RuntimeError, "transient"):
+                coordinator.execute(2, {"seed": 7}, fail_once)
+            result = coordinator.execute(2, {"seed": 7}, lambda: state.update(count=state["count"] + 1))
+            self.assertIsNone(result)
+            self.assertEqual(state["count"], 1)
+
 if __name__ == "__main__":
     unittest.main()
