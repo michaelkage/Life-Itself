@@ -16,6 +16,7 @@ from .routine_execution import RoutineExecution, RoutineExecutionLedger
 from .routines import RoutineBook, RoutineDisruption
 from .travel import TravelTickAdapter, TravelTickResult
 from .presence import PresenceTickAdapter, NPCPresence
+from .presence_encounters import PresenceSocialAdapter, PresenceEncounterResult
 from .simulation_tick import (
     ConversationIntent,
     SimulationTickCoordinator,
@@ -33,6 +34,24 @@ class NPCDecisionContext:
 
 
 @dataclass(frozen=True)
+class PresenceEncounterIntent:
+    encounter_id: str
+    first_id: str
+    second_id: str
+    opportunity: bool = True
+
+    def __post_init__(self):
+        for name in ("encounter_id", "first_id", "second_id"):
+            value = getattr(self, name)
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError(f"{name} must be non-empty text")
+        if self.first_id == self.second_id:
+            raise ValueError("encounter participants must be different NPCs")
+        if not isinstance(self.opportunity, bool):
+            raise TypeError("opportunity must be boolean")
+
+
+@dataclass(frozen=True)
 class PopulationTickResult:
     """Committed outputs from the two replay-safe phases of one population tick."""
 
@@ -43,6 +62,7 @@ class PopulationTickResult:
     processed_npc_ids: tuple[str, ...]
     travel: TravelTickResult | None = None
     presence: tuple[NPCPresence, ...] = ()
+    encounters: tuple[PresenceEncounterResult, ...] = ()
 
 
 class PopulationExecutionLoop:
@@ -63,6 +83,7 @@ class PopulationExecutionLoop:
         decision_cycle: NPCDecisionCycle | None = None,
         travel_adapter: TravelTickAdapter | None = None,
         presence_adapter: PresenceTickAdapter | None = None,
+        encounter_adapter: PresenceSocialAdapter | None = None,
     ) -> None:
         if not isinstance(coordinator, SimulationTickCoordinator):
             raise TypeError("coordinator must be a SimulationTickCoordinator")
@@ -84,6 +105,11 @@ class PopulationExecutionLoop:
             raise ValueError("travel and presence adapters must be configured together")
         self.travel_adapter = travel_adapter
         self.presence_adapter = presence_adapter
+        if encounter_adapter is not None and not isinstance(encounter_adapter, PresenceSocialAdapter):
+            raise TypeError("encounter_adapter must be a PresenceSocialAdapter or None")
+        if encounter_adapter is not None and presence_adapter is None:
+            raise ValueError("encounter integration requires travel and presence adapters")
+        self.encounter_adapter = encounter_adapter
         self._results: dict[int, PopulationTickResult] = {}
         self._requests: dict[int, tuple[object, ...]] = {}
 
@@ -115,6 +141,7 @@ class PopulationExecutionLoop:
         travel_budgets: Mapping[str, float] | None = None,
         closed_edge_ids: Iterable[str] = (),
         time_multipliers: Mapping[str, float] | None = None,
+        encounter_opportunities: tuple[PresenceEncounterIntent, ...] = (),
     ) -> PopulationTickResult:
         """Execute social/event and routine phases for one stable roster snapshot."""
         if isinstance(tick, bool) or not isinstance(tick, int) or tick < 0:
@@ -170,6 +197,10 @@ class PopulationExecutionLoop:
         sample_values = dict(outcome_samples)
         closed_edges = tuple(sorted(set(closed_edge_ids)))
         multiplier_values = dict(time_multipliers or {})
+        if not isinstance(encounter_opportunities, tuple) or any(not isinstance(item, PresenceEncounterIntent) for item in encounter_opportunities):
+            raise TypeError("encounter_opportunities must be a tuple of PresenceEncounterIntent values")
+        if len({item.encounter_id for item in encounter_opportunities}) != len(encounter_opportunities):
+            raise ValueError("encounter IDs must be unique within a population tick")
         signature = (
             minute_of_day,
             roster,
@@ -182,6 +213,7 @@ class PopulationExecutionLoop:
             None if travel_budgets is None else tuple(sorted(dict(travel_budgets).items())),
             closed_edges,
             tuple(sorted(multiplier_values.items())),
+            tuple(sorted(encounter_opportunities, key=lambda item: item.encounter_id)),
         )
         existing = self._results.get(tick)
         if existing is not None:
@@ -229,8 +261,23 @@ class PopulationExecutionLoop:
                 tick, self.travel_adapter.ledger, events=self.coordinator.events,
             )
 
+        encounter_results = []
+        generated_event_ids = []
+        if encounter_opportunities and self.encounter_adapter is None:
+            raise ValueError("encounter opportunities require a configured PresenceSocialAdapter")
+        for intent in sorted(encounter_opportunities, key=lambda item: item.encounter_id):
+            if not intent.opportunity:
+                continue
+            result = self.encounter_adapter.encounter(
+                intent.encounter_id, intent.first_id, intent.second_id, tick,
+                opportunity=True, events=self.coordinator.events,
+            )
+            if result is not None:
+                encounter_results.append(result)
+                generated_event_ids.append(f"npc_encounter:{intent.encounter_id}")
+        selected_event_ids = tuple(sorted(set(event_ids) | set(generated_event_ids)))
         social = self.coordinator.step(
-            tick, npcs, event_ids=event_ids, conversations=conversations,
+            tick, npcs, event_ids=selected_event_ids, conversations=conversations,
         )
         executions = self.coordinator.execute_routines(
             tick, minute_of_day, self.routine_book, self.routine_ledger,
@@ -246,6 +293,7 @@ class PopulationExecutionLoop:
             processed_npc_ids=roster,
             travel=travel_result,
             presence=presence_records,
+            encounters=tuple(encounter_results),
         )
         self._requests[tick] = signature
         self._results[tick] = result
