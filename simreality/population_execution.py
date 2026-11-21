@@ -7,6 +7,7 @@ or random outcomes: the world driver supplies those inputs explicitly.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import math
 from typing import Iterable, Mapping
 
 from .model import NPC
@@ -88,14 +89,26 @@ class PopulationExecutionLoop:
         if isinstance(minute_of_day, bool) or not isinstance(minute_of_day, int) or not 0 <= minute_of_day < 1440:
             raise ValueError("minute_of_day must be an integer from 0 to 1439")
         roster = self._validate_roster(npcs)
-        selected_owners = roster if owner_ids is None else tuple(sorted(set(owner_ids)))
-        if any(not isinstance(owner, str) or not owner.strip() for owner in selected_owners):
-            raise ValueError("owner_ids must contain non-empty strings")
+        if owner_ids is None:
+            selected_owners = roster
+        else:
+            supplied_owners = tuple(owner_ids)
+            if any(not isinstance(owner, str) or not owner.strip() for owner in supplied_owners):
+                raise ValueError("owner_ids must contain non-empty strings")
+            if len(supplied_owners) != len(set(supplied_owners)):
+                raise ValueError("owner_ids must not contain duplicates")
+            selected_owners = tuple(sorted(supplied_owners))
         missing = sorted(set(selected_owners) - set(roster))
         if missing:
             raise KeyError(f"routine owners are absent from population: {', '.join(missing)}")
 
         disruption_values = tuple(disruptions)
+        if any(not isinstance(item, RoutineDisruption) for item in disruption_values):
+            raise TypeError("disruptions must contain RoutineDisruption values")
+        if len({item.disruption_id for item in disruption_values}) != len(disruption_values):
+            raise ValueError("disruption IDs must be unique within a tick")
+        if not isinstance(outcome_samples, Mapping):
+            raise TypeError("outcome_samples must be a mapping")
         sample_values = dict(outcome_samples)
         signature = (
             minute_of_day,
@@ -125,8 +138,8 @@ class PopulationExecutionLoop:
             sample = sample_values[block.routine_id]
             if isinstance(sample, bool) or not isinstance(sample, (int, float)):
                 raise ValueError(f"outcome sample for {block.routine_id} must be numeric")
-            if not 0.0 <= sample <= 1.0:
-                raise ValueError(f"outcome sample for {block.routine_id} must be in [0, 1]")
+            if not math.isfinite(sample) or not 0.0 <= sample <= 1.0:
+                raise ValueError(f"outcome sample for {block.routine_id} must be finite and in [0, 1]")
 
         social = self.coordinator.step(
             tick, npcs, event_ids=event_ids, conversations=conversations,
