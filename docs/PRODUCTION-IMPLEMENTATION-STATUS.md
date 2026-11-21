@@ -9,6 +9,9 @@ This document distinguishes existing engine capability from application and runt
 - Responsive Life Itself application shell with navigation and explicit engine-connection status.
 - Domain-facing UI sections for overview, people, districts, society, economy, history and campaigns.
 - UI avoids presenting fabricated live world telemetry when the simulation adapter is absent.
+- Added a validated browser HTTP adapter for versioned world snapshots, idempotency-keyed commands and Server-Sent Events updates.
+- Application shell now reports API connection state and displays revision/day only after receiving a validated snapshot.
+- Documented the HTTP API, command idempotency, SSE behavior, security boundary and missing server-side responsibilities.
 - Visual design tokens and responsive layout.
 
 ## Existing engine capability on the base branch
@@ -19,7 +22,7 @@ The Python reference layer contains substantial NPC psychology, goals, memory, r
 
 The following remain substantive engineering projects, not completed features:
 
-1. Unified domain/API integration across Python, C++, Unreal and the web application.
+1. Unified domain/API integration across Python, C++, Unreal and the web application (web transport contract and client adapter added; authoritative cross-runtime implementation remains outstanding).
 2. Full C++ behavioral parity with the Python reference.
 3. Autonomous population runtime that discovers and schedules world activity.
 4. Population-scale simulation LOD and spatial partitioning.
