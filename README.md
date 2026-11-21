@@ -55,3 +55,8 @@ C++20 and CMake 3.20+ are required.
 ## Architecture
 
 The Python reference and C++ core remain engine-independent. Unreal integration is intended to consume immutable snapshots and submit validated commands through an adapter; Unreal object references must not leak into simulation domain modules. The browser application uses the same versioned boundary concept and must not invent live state when its runtime is disconnected.
+
+
+## Simulation API connection
+
+The browser application can connect to a separately hosted simulation API by setting `VITE_SIMULATION_API_URL`. The validated HTTP/SSE adapter and endpoint contract are documented in [docs/SIMULATION-HTTP-API.md](docs/SIMULATION-HTTP-API.md). The API server and Unreal bridge are not included in this frontend foundation.
