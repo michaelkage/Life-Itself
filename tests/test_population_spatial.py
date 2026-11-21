@@ -25,10 +25,11 @@ class PopulationSpatialSchedulerTests(unittest.TestCase):
         )
         self.assertEqual(result.selected_owner_ids, ("npc-a", "npc-c", "npc-b"))
         self.assertEqual(result.deferred_owner_ids, ("npc-d",))
-        by_cell = {item.cell_id: item for item in result.slices}
-        self.assertEqual(by_cell["district-1"].lod, PopulationLOD.FULL)
-        self.assertEqual(by_cell["district-2"].lod, PopulationLOD.STANDARD)
-        self.assertEqual(by_cell["road-node-4"].lod, PopulationLOD.BACKGROUND)
+        by_cell_lod = {(item.cell_id, item.lod): item.owner_ids for item in result.slices}
+        self.assertEqual(by_cell_lod[("district-1", PopulationLOD.FULL)], ("npc-a",))
+        self.assertEqual(by_cell_lod[("district-1", PopulationLOD.BACKGROUND)], ("npc-b",))
+        self.assertEqual(by_cell_lod[("district-2", PopulationLOD.STANDARD)], ("npc-c",))
+        self.assertEqual(by_cell_lod[("road-node-4", PopulationLOD.DORMANT)], ("npc-d",))
 
     def test_identical_schedule_replay_is_idempotent(self):
         args = (1, ("npc-a", "npc-b"), {"npc-a": 0.9, "npc-b": 0.1})
