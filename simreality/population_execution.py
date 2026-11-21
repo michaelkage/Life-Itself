@@ -151,15 +151,20 @@ class PopulationExecutionLoop:
         """Execute a population tick inside the configured durable transaction."""
         if self.transaction_coordinator is None:
             return self._run_tick_untransactional(tick, minute_of_day, npcs, **kwargs)
+        normalized_kwargs = dict(kwargs)
+        for iterable_name in ("disruptions", "closed_edge_ids", "owner_ids"):
+            value = normalized_kwargs.get(iterable_name)
+            if value is not None and not isinstance(value, (tuple, list, set, frozenset)):
+                normalized_kwargs[iterable_name] = tuple(value)
         request = {
             "tick": tick,
             "minute_of_day": minute_of_day,
             "npc_ids": tuple(sorted(npcs)) if isinstance(npcs, Mapping) else npcs,
-            "kwargs": kwargs,
+            "kwargs": normalized_kwargs,
         }
         return self.transaction_coordinator.execute(
             tick, request,
-            lambda: self._run_tick_untransactional(tick, minute_of_day, npcs, **kwargs),
+            lambda: self._run_tick_untransactional(tick, minute_of_day, npcs, **normalized_kwargs),
         )
 
     def _run_tick_untransactional(
