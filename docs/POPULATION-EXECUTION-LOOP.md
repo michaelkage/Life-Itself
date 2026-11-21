@@ -154,3 +154,22 @@ physical location. Valid encounter events are included in the same tick's
 selected event IDs, allowing the social memory phase to process them. A false
 opportunity creates no encounter. This remains caller-evidence-driven; the
 loop does not infer line of sight, attention, or social intent.
+
+
+## Durable whole-tick transaction boundary
+
+`PopulationTickTransactionCoordinator` provides the enclosing transaction boundary for population execution. Configure it on `PopulationExecutionLoop` and register a `TransactionParticipant` for every mutable subsystem that can participate in the tick.
+
+A participant supplies two operations:
+- `capture() -> str`: return a complete canonical JSON checkpoint of domain state and replay/idempotency indexes.
+- `restore(checkpoint_json)`: restore exactly that checkpoint.
+
+The participant set must include, when configured: the NPC collection (including memories and mutable beliefs), world event ledger, event-memory adapter, social conversation adapter and belief/trust ledgers, travel ledger, presence ledger, encounter ledger, routine book/execution ledger, action execution ledger, economic ledger/action adapter, and household ledger. Shared state must be represented once or restored in an order that preserves shared object identity. Checkpoint callbacks should use each subsystem's versioned save-state codec rather than serializing arbitrary object internals.
+
+The coordinator writes and fsyncs a `prepared` journal record before invoking the tick. On success it captures all post-tick participant checkpoints and the canonical result payload, then atomically replaces and fsyncs the journal with `committed`. On an exception it restores participants in reverse registration order and durably marks the transaction aborted. On startup it restores the pre-tick checkpoints for interrupted `prepared` records, and restores post-tick checkpoints for committed records.
+
+A committed replay verifies the durable request signature, restores the committed post-state, and invokes the population operation again. Component replay indexes must therefore be included in participant checkpoints so this second invocation reconstructs the original typed result without applying effects twice. Conflicting requests for an already journaled tick are rejected.
+
+`PopulationTickResult` now carries economic transfers and household settlements when explicit completed action executions and settlement IDs are supplied. These effects run inside the same operation callback and therefore share the same rollback/commit boundary provided the economic and household ledgers are registered as transaction participants.
+
+The transaction coordinator is opt-in for compatibility. A loop without a configured coordinator retains its previous component-level guarantees only; it must not be described as whole-tick atomic. The journal is a local durable file and assumes a single writer process. Multi-process execution requires an external transactional store or an exclusive process lock. Schema migrations must be versioned before changing the journal format.
