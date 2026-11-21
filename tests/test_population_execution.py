@@ -1,0 +1,85 @@
+"""Population execution loop integration tests."""
+import unittest
+
+from simreality.model import NPC
+from simreality.population_execution import PopulationExecutionLoop
+from simreality.routine_execution import RoutineExecutionLedger
+from simreality.routines import RoutineBlock, RoutineBook
+from simreality.simulation_tick import SimulationTickCoordinator
+from simreality.social_beliefs import SocialBeliefSystem
+from simreality.social_conversations import SocialConversationAdapter
+from simreality.social_trust import SocialTrustLedger
+from simreality.world_event_memory import WorldEventMemoryAdapter
+from simreality.world_events import WorldEventLedger
+
+
+class PopulationExecutionLoopTests(unittest.TestCase):
+    def setUp(self):
+        self.events = WorldEventLedger()
+        trust = SocialTrustLedger()
+        conversations = SocialConversationAdapter(trust, SocialBeliefSystem(trust))
+        coordinator = SimulationTickCoordinator(
+            self.events, WorldEventMemoryAdapter(self.events), conversations,
+        )
+        self.book = RoutineBook((
+            RoutineBlock("work-a", "npc-a", "work", "office", 480, 960),
+            RoutineBlock("rest-b", "npc-b", "rest", "home", 480, 960),
+        ))
+        self.ledger = RoutineExecutionLedger()
+        self.loop = PopulationExecutionLoop(coordinator, self.book, self.ledger)
+        self.npcs = {"npc-b": NPC("npc-b"), "npc-a": NPC("npc-a")}
+
+    def test_executes_roster_in_stable_order_and_resolves_due_routines(self):
+        result = self.loop.run_tick(
+            1, 500, self.npcs, outcome_samples={"work-a": 0.2, "rest-b": 0.7},
+        )
+        self.assertEqual(result.processed_npc_ids, ("npc-a", "npc-b"))
+        self.assertEqual(
+            tuple(item.routine_id for item in result.routine_executions),
+            ("rest-b", "work-a"),
+        )
+        self.assertEqual(result.tick, 1)
+
+    def test_population_tick_replay_returns_original_result(self):
+        request = {"outcome_samples": {"work-a": 0.2, "rest-b": 0.7}}
+        first = self.loop.run_tick(1, 500, self.npcs, **request)
+        second = self.loop.run_tick(1, 500, self.npcs, **request)
+        self.assertIs(first, second)
+        self.assertEqual(len(self.ledger.snapshot()), 2)
+
+    def test_conflicting_population_replay_is_rejected(self):
+        self.loop.run_tick(
+            1, 500, self.npcs, outcome_samples={"work-a": 0.2, "rest-b": 0.7},
+        )
+        with self.assertRaisesRegex(ValueError, "replayed with different inputs"):
+            self.loop.run_tick(
+                1, 500, self.npcs, outcome_samples={"work-a": 0.8, "rest-b": 0.7},
+            )
+
+    def test_missing_sample_fails_before_world_tick_is_committed(self):
+        with self.assertRaisesRegex(ValueError, "missing outcome sample"):
+            self.loop.run_tick(1, 500, self.npcs, outcome_samples={"work-a": 0.2})
+        self.assertEqual(self.loop.coordinator.snapshot(), ())
+        self.assertEqual(self.ledger.snapshot(), ())
+
+    def test_population_slice_can_select_a_subset_of_owners(self):
+        result = self.loop.run_tick(
+            1, 500, self.npcs,
+            outcome_samples={"work-a": 0.2},
+            owner_ids=("npc-a",),
+        )
+        self.assertEqual(tuple(item.routine_id for item in result.routine_executions), ("work-a",))
+        self.assertEqual(result.processed_npc_ids, ("npc-a", "npc-b"))
+
+    def test_unknown_owner_fails_before_world_tick_is_committed(self):
+        with self.assertRaisesRegex(KeyError, "absent from population"):
+            self.loop.run_tick(
+                1, 500, self.npcs,
+                outcome_samples={},
+                owner_ids=("not-present",),
+            )
+        self.assertEqual(self.loop.coordinator.snapshot(), ())
+
+
+if __name__ == "__main__":
+    unittest.main()
