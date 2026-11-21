@@ -201,6 +201,10 @@ class PopulationTickTransactionCoordinator:
                 self._persist()
                 raise
 
+    @property
+    def participant_names(self) -> frozenset[str]:
+        return frozenset(participant.name for participant in self.participants)
+
     def journal_snapshot(self) -> tuple[dict, ...]:
         with self._lock:
             return tuple(json.loads(json.dumps(self._records[tick])) for tick in sorted(self._records))
