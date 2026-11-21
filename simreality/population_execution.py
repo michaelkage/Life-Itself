@@ -17,6 +17,7 @@ from .routines import RoutineBook, RoutineDisruption
 from .travel import TravelTickAdapter, TravelTickResult
 from .presence import PresenceTickAdapter, NPCPresence
 from .presence_encounters import PresenceSocialAdapter, PresenceEncounterResult
+from .population_transaction import PopulationTickTransactionCoordinator
 from .simulation_tick import (
     ConversationIntent,
     SimulationTickCoordinator,
@@ -84,6 +85,7 @@ class PopulationExecutionLoop:
         travel_adapter: TravelTickAdapter | None = None,
         presence_adapter: PresenceTickAdapter | None = None,
         encounter_adapter: PresenceSocialAdapter | None = None,
+        transaction_coordinator: PopulationTickTransactionCoordinator | None = None,
     ) -> None:
         if not isinstance(coordinator, SimulationTickCoordinator):
             raise TypeError("coordinator must be a SimulationTickCoordinator")
@@ -112,6 +114,9 @@ class PopulationExecutionLoop:
         if encounter_adapter is not None and encounter_adapter.presence is not presence_adapter.ledger:
             raise ValueError("encounter and presence adapters must share the same PresenceLedger")
         self.encounter_adapter = encounter_adapter
+        if transaction_coordinator is not None and not isinstance(transaction_coordinator, PopulationTickTransactionCoordinator):
+            raise TypeError("transaction_coordinator must be a PopulationTickTransactionCoordinator or None")
+        self.transaction_coordinator = transaction_coordinator
         self._results: dict[int, PopulationTickResult] = {}
         self._requests: dict[int, tuple[object, ...]] = {}
 
@@ -128,7 +133,22 @@ class PopulationExecutionLoop:
                 raise ValueError("population keys must match NPC entity IDs")
         return tuple(sorted(npcs))
 
-    def run_tick(
+    def run_tick(self, tick: int, minute_of_day: int, npcs: Mapping[str, NPC], **kwargs) -> PopulationTickResult:
+        """Execute a population tick inside the configured durable transaction."""
+        if self.transaction_coordinator is None:
+            return self._run_tick_untransactional(tick, minute_of_day, npcs, **kwargs)
+        request = {
+            "tick": tick,
+            "minute_of_day": minute_of_day,
+            "npc_ids": tuple(sorted(npcs)) if isinstance(npcs, Mapping) else npcs,
+            "kwargs": kwargs,
+        }
+        return self.transaction_coordinator.execute(
+            tick, request,
+            lambda: self._run_tick_untransactional(tick, minute_of_day, npcs, **kwargs),
+        )
+
+    def _run_tick_untransactional(
         self,
         tick: int,
         minute_of_day: int,
