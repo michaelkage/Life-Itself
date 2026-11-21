@@ -1007,3 +1007,8 @@ __all__ += ["CampaignKnowledgeLedger"]
 # Population-level deterministic orchestration of event, social and routine phases.
 from .population_execution import NPCDecisionContext, PopulationExecutionLoop, PopulationTickResult
 __all__ += ["NPCDecisionContext", "PopulationExecutionLoop", "PopulationTickResult"]
+
+
+# Deterministic spatial partitioning and budgeted population simulation detail.
+from .population_spatial import PopulationLOD, PopulationSchedule, PopulationSlice, PopulationSpatialScheduler
+__all__ += ["PopulationLOD", "PopulationSchedule", "PopulationSlice", "PopulationSpatialScheduler"]
