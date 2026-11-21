@@ -1,0 +1,40 @@
+name: Web application
+
+on:
+  push:
+    branches: [main, "implementation/**"]
+    paths:
+      - "src/**"
+      - "index.html"
+      - "package.json"
+      - "package-lock.json"
+      - "vite.config.ts"
+      - "tsconfig.json"
+      - ".github/workflows/web-application.yml"
+  pull_request:
+    paths:
+      - "src/**"
+      - "index.html"
+      - "package.json"
+      - "package-lock.json"
+      - "vite.config.ts"
+      - "tsconfig.json"
+      - ".github/workflows/web-application.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Typecheck and build
+        run: npm run build
