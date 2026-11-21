@@ -109,5 +109,23 @@ class PopulationTickTransactionTests(unittest.TestCase):
             self.assertIsNone(result)
             self.assertEqual(state["count"], 1)
 
+    def test_startup_recovers_interrupted_prepared_tick_to_pre_tick_state(self):
+        with tempfile.TemporaryDirectory() as directory:
+            journal = Path(directory) / "ticks.json"
+            journal.write_text(json.dumps({
+                "schema_version": 1,
+                "records": [{
+                    "tick": 3, "request_signature": "a" * 64, "status": "prepared",
+                    "before": {"state": json.dumps({"count": 5})},
+                    "after": {}, "result_digest": None, "result_payload": None,
+                }],
+            }), encoding="utf-8")
+            live = {"count": 99}
+            coordinator = PopulationTickTransactionCoordinator(
+                journal, (self.participant("state", live),),
+            )
+            self.assertEqual(live, {"count": 5})
+            self.assertEqual(coordinator.journal_snapshot()[0]["status"], "aborted")
+
 if __name__ == "__main__":
     unittest.main()
