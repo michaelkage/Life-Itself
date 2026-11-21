@@ -168,6 +168,8 @@ class PopulationExecutionLoop:
         if not isinstance(outcome_samples, Mapping):
             raise TypeError("outcome_samples must be a mapping")
         sample_values = dict(outcome_samples)
+        closed_edges = tuple(sorted(set(closed_edge_ids)))
+        multiplier_values = dict(time_multipliers or {})
         signature = (
             minute_of_day,
             roster,
@@ -178,8 +180,8 @@ class PopulationExecutionLoop:
             selected_owners,
             tuple(sorted(contexts.items())),
             None if travel_budgets is None else tuple(sorted(dict(travel_budgets).items())),
-            tuple(sorted(closed_edge_ids)),
-            tuple(sorted((time_multipliers or {}).items())),
+            closed_edges,
+            tuple(sorted(multiplier_values.items())),
         )
         existing = self._results.get(tick)
         if existing is not None:
@@ -214,14 +216,14 @@ class PopulationExecutionLoop:
         travel_result = None
         presence_records: tuple[NPCPresence, ...] = ()
         if self.travel_adapter is None:
-            if travel_budgets is not None or tuple(closed_edge_ids) or time_multipliers:
+            if travel_budgets is not None or closed_edges or multiplier_values:
                 raise ValueError("travel inputs require configured travel and presence adapters")
         else:
             if travel_budgets is None:
                 raise ValueError("travel_budgets are required when travel integration is configured")
             travel_result = self.travel_adapter.advance(
-                tick, travel_budgets, closed_edge_ids=closed_edge_ids,
-                time_multipliers=time_multipliers, events=self.coordinator.events,
+                tick, travel_budgets, closed_edge_ids=closed_edges,
+                time_multipliers=multiplier_values, events=self.coordinator.events,
             )
             presence_records = self.presence_adapter.synchronize(
                 tick, self.travel_adapter.ledger, events=self.coordinator.events,
