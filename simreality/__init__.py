@@ -1031,3 +1031,6 @@ from .population_lod_policy import (
     PopulationLODPolicy, SubsystemLODPolicy, default_population_lod_policy,
 )
 __all__ += ["PopulationLODPolicy", "SubsystemLODPolicy", "default_population_lod_policy"]
+
+from .population_execution import PresenceEncounterIntent
+__all__ += ["PresenceEncounterIntent"]
