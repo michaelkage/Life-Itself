@@ -160,6 +160,8 @@ loop does not infer line of sight, attention, or social intent.
 
 `PopulationTickTransactionCoordinator` provides the enclosing transaction boundary for population execution. Configure it on `PopulationExecutionLoop` and register a `TransactionParticipant` for every mutable subsystem that can participate in the tick.
 
+The loop validates participant coverage at construction. The required names are `npcs`, `world_events`, `event_memory`, `social_conversations`, `social_beliefs`, `social_trust`, `routine_book`, and `routine_executions`; configured travel/presence add `travel` and `presence`, encounter integration adds `encounters`, economic action effects add `economics` and `economic_actions`, and household settlement adds `households`. Supplying completed action execution records additionally requires `action_executions`.
+
 A participant supplies two operations:
 - `capture() -> str`: return a complete canonical JSON checkpoint of domain state and replay/idempotency indexes.
 - `restore(checkpoint_json)`: restore exactly that checkpoint.
