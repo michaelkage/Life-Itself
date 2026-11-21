@@ -14,6 +14,8 @@ from .model import NPC
 from .npc_autonomy import NPCDecision, NPCDecisionCycle
 from .routine_execution import RoutineExecution, RoutineExecutionLedger
 from .routines import RoutineBook, RoutineDisruption
+from .travel import TravelTickAdapter, TravelTickResult
+from .presence import PresenceTickAdapter, NPCPresence
 from .simulation_tick import (
     ConversationIntent,
     SimulationTickCoordinator,
@@ -39,6 +41,8 @@ class PopulationTickResult:
     routine_executions: tuple[RoutineExecution, ...]
     decisions: tuple[NPCDecision, ...]
     processed_npc_ids: tuple[str, ...]
+    travel: TravelTickResult | None = None
+    presence: tuple[NPCPresence, ...] = ()
 
 
 class PopulationExecutionLoop:
@@ -57,6 +61,8 @@ class PopulationExecutionLoop:
         routine_book: RoutineBook,
         routine_ledger: RoutineExecutionLedger,
         decision_cycle: NPCDecisionCycle | None = None,
+        travel_adapter: TravelTickAdapter | None = None,
+        presence_adapter: PresenceTickAdapter | None = None,
     ) -> None:
         if not isinstance(coordinator, SimulationTickCoordinator):
             raise TypeError("coordinator must be a SimulationTickCoordinator")
@@ -70,6 +76,14 @@ class PopulationExecutionLoop:
         self.routine_book = routine_book
         self.routine_ledger = routine_ledger
         self.decision_cycle = decision_cycle
+        if travel_adapter is not None and not isinstance(travel_adapter, TravelTickAdapter):
+            raise TypeError("travel_adapter must be a TravelTickAdapter or None")
+        if presence_adapter is not None and not isinstance(presence_adapter, PresenceTickAdapter):
+            raise TypeError("presence_adapter must be a PresenceTickAdapter or None")
+        if (travel_adapter is None) != (presence_adapter is None):
+            raise ValueError("travel and presence adapters must be configured together")
+        self.travel_adapter = travel_adapter
+        self.presence_adapter = presence_adapter
         self._results: dict[int, PopulationTickResult] = {}
         self._requests: dict[int, tuple[object, ...]] = {}
 
@@ -98,6 +112,9 @@ class PopulationExecutionLoop:
         outcome_samples: Mapping[str, float],
         owner_ids: Iterable[str] | None = None,
         decision_contexts: Mapping[str, NPCDecisionContext] | None = None,
+        travel_budgets: Mapping[str, float] | None = None,
+        closed_edge_ids: Iterable[str] = (),
+        time_multipliers: Mapping[str, float] | None = None,
     ) -> PopulationTickResult:
         """Execute social/event and routine phases for one stable roster snapshot."""
         if isinstance(tick, bool) or not isinstance(tick, int) or tick < 0:
@@ -160,6 +177,9 @@ class PopulationExecutionLoop:
             tuple(sorted(sample_values.items())),
             selected_owners,
             tuple(sorted(contexts.items())),
+            None if travel_budgets is None else tuple(sorted(dict(travel_budgets).items())),
+            tuple(sorted(closed_edge_ids)),
+            tuple(sorted((time_multipliers or {}).items())),
         )
         existing = self._results.get(tick)
         if existing is not None:
@@ -191,6 +211,22 @@ class PopulationExecutionLoop:
             for owner, context in sorted(contexts.items())
         ) if self.decision_cycle is not None else ()
 
+        travel_result = None
+        presence_records: tuple[NPCPresence, ...] = ()
+        if self.travel_adapter is None:
+            if travel_budgets is not None or tuple(closed_edge_ids) or time_multipliers:
+                raise ValueError("travel inputs require configured travel and presence adapters")
+        else:
+            if travel_budgets is None:
+                raise ValueError("travel_budgets are required when travel integration is configured")
+            travel_result = self.travel_adapter.advance(
+                tick, travel_budgets, closed_edge_ids=closed_edge_ids,
+                time_multipliers=time_multipliers, events=self.coordinator.events,
+            )
+            presence_records = self.presence_adapter.synchronize(
+                tick, self.travel_adapter.ledger, events=self.coordinator.events,
+            )
+
         social = self.coordinator.step(
             tick, npcs, event_ids=event_ids, conversations=conversations,
         )
@@ -206,6 +242,8 @@ class PopulationExecutionLoop:
             routine_executions=executions,
             decisions=decisions,
             processed_npc_ids=roster,
+            travel=travel_result,
+            presence=presence_records,
         )
         self._requests[tick] = signature
         self._results[tick] = result
