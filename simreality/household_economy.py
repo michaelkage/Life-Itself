@@ -132,10 +132,6 @@ class EconomicLedger:
             # Replay validates journal consistency; opening balances in a snapshot
             # are reconstructed by reversing transfers before applying the journal.
             ledger._transfers[transfer.transfer_id] = transfer
-        for account_id in ledger._balances:
-            ledger._balances[account_id] += sum(
-                t.amount for t in ledger._transfers.values() if t.debit_account == account_id
-            ) - sum(t.amount for t in ledger._transfers.values() if t.credit_account == account_id)
         return ledger
 
 
