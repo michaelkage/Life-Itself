@@ -2,7 +2,10 @@
 import unittest
 
 from simreality.model import NPC
-from simreality.population_execution import PopulationExecutionLoop
+from simreality.goals import GoalBook, NPCGoal
+from simreality.npc_autonomy import NPCDecisionCycle
+from simreality.planning import DeterministicPlanner, PlanningAction
+from simreality.population_execution import NPCDecisionContext, PopulationExecutionLoop
 from simreality.routine_execution import RoutineExecutionLedger
 from simreality.routines import RoutineBlock, RoutineBook
 from simreality.simulation_tick import SimulationTickCoordinator
@@ -70,6 +73,41 @@ class PopulationExecutionLoopTests(unittest.TestCase):
         )
         self.assertEqual(tuple(item.routine_id for item in result.routine_executions), ("work-a",))
         self.assertEqual(result.processed_npc_ids, ("npc-a", "npc-b"))
+
+
+    def test_runs_explicit_read_only_npc_decisions_in_stable_order(self):
+        goals = GoalBook()
+        goals.add(NPCGoal("goal-a", "npc-a", "security", priority=5))
+        goals.add(NPCGoal("goal-b", "npc-b", "rest", priority=5))
+        planner = DeterministicPlanner((
+            PlanningAction("earn", frozenset({"available"}), frozenset({"paid"})),
+            PlanningAction("rest", frozenset({"available"}), frozenset({"rested"})),
+        ))
+        loop = PopulationExecutionLoop(
+            self.loop.coordinator, self.book, self.ledger,
+            decision_cycle=NPCDecisionCycle(goals, planner),
+        )
+        result = loop.run_tick(
+            1, 500, self.npcs,
+            outcome_samples={"work-a": 0.2, "rest-b": 0.7},
+            decision_contexts={
+                "npc-b": NPCDecisionContext(frozenset({"available"}), {"goal-b": frozenset({"rested"})}),
+                "npc-a": NPCDecisionContext(frozenset({"available"}), {"goal-a": frozenset({"paid"})}),
+            },
+        )
+        self.assertEqual(tuple(item.owner_id for item in result.decisions), ("npc-a", "npc-b"))
+        self.assertTrue(all(item.actionable for item in result.decisions))
+        self.assertEqual(result.decisions[0].plan.actions, ("earn",))
+
+    def test_decision_context_requires_configured_cycle(self):
+        with self.assertRaisesRegex(ValueError, "require an NPCDecisionCycle"):
+            self.loop.run_tick(
+                1, 500, self.npcs,
+                outcome_samples={"work-a": 0.2, "rest-b": 0.7},
+                decision_contexts={
+                    "npc-a": NPCDecisionContext(frozenset({"available"}), {}),
+                },
+            )
 
     def test_unknown_owner_fails_before_world_tick_is_committed(self):
         with self.assertRaisesRegex(KeyError, "absent from population"):
