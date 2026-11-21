@@ -1034,3 +1034,8 @@ __all__ += ["PopulationLODPolicy", "SubsystemLODPolicy", "default_population_lod
 
 from .population_execution import PresenceEncounterIntent
 __all__ += ["PresenceEncounterIntent"]
+
+
+# Durable cross-subsystem atomicity for population tick execution.
+from .population_transaction import PopulationTickTransactionCoordinator, TransactionParticipant
+__all__ += ["PopulationTickTransactionCoordinator", "TransactionParticipant"]
