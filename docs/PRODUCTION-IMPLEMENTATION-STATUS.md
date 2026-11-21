@@ -12,6 +12,8 @@ This document distinguishes existing engine capability from application and runt
 - Added a validated browser HTTP adapter for versioned world snapshots, idempotency-keyed commands and Server-Sent Events updates.
 - Application shell now reports API connection state and displays revision/day only after receiving a validated snapshot.
 - Documented the HTTP API, command idempotency, SSE behavior, security boundary and missing server-side responsibilities.
+- Added `PopulationExecutionLoop` to compose the existing deterministic event-memory, conversation and routine phases over a stable NPC roster, with owner slicing, input preflight and replay protection.
+- Added population-loop regression tests and explicit documentation of its phase-atomic (not globally atomic) failure semantics.
 - Visual design tokens and responsive layout.
 
 ## Existing engine capability on the base branch
@@ -24,7 +26,7 @@ The following remain substantive engineering projects, not completed features:
 
 1. Unified domain/API integration across Python, C++, Unreal and the web application (web transport contract and client adapter added; authoritative cross-runtime implementation remains outstanding).
 2. Full C++ behavioral parity with the Python reference.
-3. Autonomous population runtime that discovers and schedules world activity.
+3. Autonomous population runtime that discovers and schedules world activity (partial foundation: explicit roster/tick orchestration and routine-owner slicing; automatic activity discovery, NPC decision execution, travel/presence scheduling and world-level transactionality remain outstanding).
 4. Population-scale simulation LOD and spatial partitioning.
 5. End-to-end social knowledge transmission integrated into actual encounters.
 6. Complete birth-to-death generational simulation.
