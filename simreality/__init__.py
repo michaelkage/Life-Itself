@@ -1002,3 +1002,8 @@ __all__ += ["LifeSimulationSnapshot"]
 # Campaign-scoped evidence ledger shared across life timelines.
 from .campaign_knowledge import CampaignKnowledgeLedger
 __all__ += ["CampaignKnowledgeLedger"]
+
+
+# Population-level deterministic orchestration of event, social and routine phases.
+from .population_execution import PopulationExecutionLoop, PopulationTickResult
+__all__ += ["PopulationExecutionLoop", "PopulationTickResult"]
