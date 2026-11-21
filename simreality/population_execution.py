@@ -11,6 +11,7 @@ import math
 from typing import Iterable, Mapping
 
 from .model import NPC
+from .npc_autonomy import NPCDecision, NPCDecisionCycle
 from .routine_execution import RoutineExecution, RoutineExecutionLedger
 from .routines import RoutineBook, RoutineDisruption
 from .simulation_tick import (
@@ -21,12 +22,22 @@ from .simulation_tick import (
 
 
 @dataclass(frozen=True)
+class NPCDecisionContext:
+    """Explicit world and goal facts used for one NPC's read-only decision."""
+
+    world_facts: frozenset[str]
+    goal_facts: Mapping[str, frozenset[str]]
+    committed_goal_id: str | None = None
+
+
+@dataclass(frozen=True)
 class PopulationTickResult:
     """Committed outputs from the two replay-safe phases of one population tick."""
 
     tick: int
     social: SimulationTickResult
     routine_executions: tuple[RoutineExecution, ...]
+    decisions: tuple[NPCDecision, ...]
     processed_npc_ids: tuple[str, ...]
 
 
@@ -45,6 +56,7 @@ class PopulationExecutionLoop:
         coordinator: SimulationTickCoordinator,
         routine_book: RoutineBook,
         routine_ledger: RoutineExecutionLedger,
+        decision_cycle: NPCDecisionCycle | None = None,
     ) -> None:
         if not isinstance(coordinator, SimulationTickCoordinator):
             raise TypeError("coordinator must be a SimulationTickCoordinator")
@@ -52,9 +64,12 @@ class PopulationExecutionLoop:
             raise TypeError("routine_book must be a RoutineBook")
         if not isinstance(routine_ledger, RoutineExecutionLedger):
             raise TypeError("routine_ledger must be a RoutineExecutionLedger")
+        if decision_cycle is not None and not isinstance(decision_cycle, NPCDecisionCycle):
+            raise TypeError("decision_cycle must be an NPCDecisionCycle or None")
         self.coordinator = coordinator
         self.routine_book = routine_book
         self.routine_ledger = routine_ledger
+        self.decision_cycle = decision_cycle
         self._results: dict[int, PopulationTickResult] = {}
         self._requests: dict[int, tuple[object, ...]] = {}
 
@@ -82,6 +97,7 @@ class PopulationExecutionLoop:
         disruptions: Iterable[RoutineDisruption] = (),
         outcome_samples: Mapping[str, float],
         owner_ids: Iterable[str] | None = None,
+        decision_contexts: Mapping[str, NPCDecisionContext] | None = None,
     ) -> PopulationTickResult:
         """Execute social/event and routine phases for one stable roster snapshot."""
         if isinstance(tick, bool) or not isinstance(tick, int) or tick < 0:
@@ -102,6 +118,20 @@ class PopulationExecutionLoop:
         if missing:
             raise KeyError(f"routine owners are absent from population: {', '.join(missing)}")
 
+        contexts = dict(decision_contexts or {})
+        if contexts and self.decision_cycle is None:
+            raise ValueError("decision contexts require an NPCDecisionCycle")
+        for owner, context in contexts.items():
+            if owner not in npcs:
+                raise KeyError(f"decision owner is absent from population: {owner}")
+            if not isinstance(context, NPCDecisionContext):
+                raise TypeError("decision contexts must contain NPCDecisionContext values")
+            if not isinstance(context.world_facts, frozenset) or any(not isinstance(fact, str) or not fact for fact in context.world_facts):
+                raise ValueError("world_facts must be a frozenset of non-empty strings")
+            if not isinstance(context.goal_facts, Mapping):
+                raise TypeError("goal_facts must map goal IDs to desired fact sets")
+            if context.committed_goal_id is not None and (not isinstance(context.committed_goal_id, str) or not context.committed_goal_id.strip()):
+                raise ValueError("committed_goal_id must be None or a non-empty string")
         disruption_values = tuple(disruptions)
         if any(not isinstance(item, RoutineDisruption) for item in disruption_values):
             raise TypeError("disruptions must contain RoutineDisruption values")
@@ -118,6 +148,7 @@ class PopulationExecutionLoop:
             tuple(sorted(disruption_values, key=lambda item: item.disruption_id)),
             tuple(sorted(sample_values.items())),
             selected_owners,
+            tuple(sorted(contexts.items())),
         )
         existing = self._results.get(tick)
         if existing is not None:
@@ -141,6 +172,14 @@ class PopulationExecutionLoop:
             if not math.isfinite(sample) or not 0.0 <= sample <= 1.0:
                 raise ValueError(f"outcome sample for {block.routine_id} must be finite and in [0, 1]")
 
+        decisions = tuple(
+            self.decision_cycle.decide(
+                owner, tick, context.world_facts, context.goal_facts,
+                committed_goal_id=context.committed_goal_id,
+            )
+            for owner, context in sorted(contexts.items())
+        ) if self.decision_cycle is not None else ()
+
         social = self.coordinator.step(
             tick, npcs, event_ids=event_ids, conversations=conversations,
         )
@@ -154,6 +193,7 @@ class PopulationExecutionLoop:
             tick=tick,
             social=social,
             routine_executions=executions,
+            decisions=decisions,
             processed_npc_ids=roster,
         )
         self._requests[tick] = signature
