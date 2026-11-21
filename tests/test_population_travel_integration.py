@@ -85,6 +85,7 @@ class PopulationTravelIntegrationTests(unittest.TestCase):
         self.assertEqual(len(result.encounters), 1)
         self.assertEqual(result.encounters[0].encounter.location_id, "market")
         self.assertEqual(events.query(event_type="npc_encounter")[0].participants, ("npc-a", "npc-b"))
+        self.assertEqual(events.query(event_type="npc_encounter")[0].witnesses, ("npc-a", "npc-b"))
 
 
 if __name__ == "__main__":
