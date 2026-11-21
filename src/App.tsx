@@ -80,8 +80,8 @@ export function App() {
         </nav>
         <div className="sidebar-bottom">
           <strong>Simulation connection</strong>
-          <p><span className="status-dot" />Reference engine only</p>
-          <p>The live Unreal/runtime bridge has not been connected.</p>
+          <p><span className="status-dot" />{connection === 'connected' ? 'Simulation API connected' : connection === 'connecting' ? 'Connecting to simulation API' : connection === 'disconnected' ? 'Simulation API unavailable' : 'Reference engine only'}</p>
+          <p>{snapshot ? `World revision ${snapshot.revision} · Day ${snapshot.clock.day}` : 'Configure VITE_SIMULATION_API_URL to connect the runtime API.'}</p>
         </div>
       </aside>
 
