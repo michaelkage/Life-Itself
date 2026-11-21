@@ -68,6 +68,7 @@ class PopulationTickResult:
     encounters: tuple[PresenceEncounterResult, ...] = ()
     economic_transfers: tuple[EconomicTransfer, ...] = ()
     household_settlements: tuple[HouseholdObligation, ...] = ()
+    household_obligations: tuple[HouseholdObligation, ...] = ()
 
 
 class PopulationExecutionLoop:
@@ -201,6 +202,7 @@ class PopulationExecutionLoop:
         encounter_opportunities: tuple[PresenceEncounterIntent, ...] = (),
         completed_action_executions: tuple[ActionExecution, ...] = (),
         household_settlement_ids: tuple[str, ...] = (),
+        household_obligations: tuple[HouseholdObligation, ...] = (),
     ) -> PopulationTickResult:
         """Execute social/event and routine phases for one stable roster snapshot."""
         if isinstance(tick, bool) or not isinstance(tick, int) or tick < 0:
@@ -264,6 +266,12 @@ class PopulationExecutionLoop:
             raise TypeError("completed_action_executions must be a tuple of ActionExecution values")
         if len({item.execution_id for item in completed_action_executions}) != len(completed_action_executions):
             raise ValueError("completed action execution IDs must be unique within a population tick")
+        if not isinstance(household_obligations, tuple) or any(not isinstance(item, HouseholdObligation) for item in household_obligations):
+            raise TypeError("household_obligations must be a tuple of HouseholdObligation values")
+        if len({item.obligation_id for item in household_obligations}) != len(household_obligations):
+            raise ValueError("household obligation IDs must be unique within a population tick")
+        if household_obligations and self.household_ledger is None:
+            raise ValueError("household obligations require a HouseholdLedger")
         if not isinstance(household_settlement_ids, tuple) or any(not isinstance(item, str) or not item.strip() for item in household_settlement_ids):
             raise TypeError("household_settlement_ids must be a tuple of non-empty strings")
         if len(set(household_settlement_ids)) != len(household_settlement_ids):
@@ -289,6 +297,7 @@ class PopulationExecutionLoop:
             tuple(sorted(encounter_opportunities, key=lambda item: item.encounter_id)),
             tuple(sorted(completed_action_executions, key=lambda item: item.execution_id)),
             tuple(sorted(household_settlement_ids)),
+            tuple(sorted(household_obligations, key=lambda item: item.obligation_id)),
         )
         existing = self._results.get(tick)
         if existing is not None:
@@ -366,6 +375,10 @@ class PopulationExecutionLoop:
                 for item in sorted(completed_action_executions, key=lambda value: value.execution_id)
             ) if transfer is not None
         ) if self.economic_action_adapter is not None else ()
+        household_records = tuple(
+            self.household_ledger.add(item)
+            for item in sorted(household_obligations, key=lambda value: value.obligation_id)
+        ) if self.household_ledger is not None else ()
         household_settlements = tuple(
             self.household_ledger.settle(obligation_id, tick)
             for obligation_id in sorted(household_settlement_ids)
@@ -381,6 +394,7 @@ class PopulationExecutionLoop:
             encounters=tuple(encounter_results),
             economic_transfers=economic_transfers,
             household_settlements=household_settlements,
+            household_obligations=household_records,
         )
         self._requests[tick] = signature
         self._results[tick] = result
