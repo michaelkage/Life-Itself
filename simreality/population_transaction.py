@@ -160,10 +160,15 @@ class PopulationTickTransactionCoordinator:
             if existing is not None:
                 if existing["request_signature"] != signature:
                     raise ValueError(f"population transaction {tick} replayed with different inputs")
-                if existing["status"] != "committed":
-                    raise RuntimeError(f"population transaction {tick} did not commit; retry requires a new tick")
-                self._restore(existing["after"])
-                return operation()
+                if existing["status"] == "committed":
+                    self._restore(existing["after"])
+                    return operation()
+                if existing["status"] == "prepared":
+                    raise RuntimeError(f"population transaction {tick} is awaiting crash recovery")
+                if tick != max(self._records):
+                    raise ValueError("only the latest aborted population transaction can be retried")
+                del self._records[tick]
+                self._persist()
 
             if self._records and tick <= max(self._records):
                 raise ValueError("new population transactions must have strictly increasing ticks")
