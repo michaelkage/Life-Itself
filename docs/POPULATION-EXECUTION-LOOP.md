@@ -14,8 +14,11 @@ logic.
    `SimulationTickCoordinator.step`.
 4. Resolve due routines through `SimulationTickCoordinator.execute_routines`
    and the existing `RoutineTickAdapter` / `RoutineExecutionLedger`.
-5. Return an immutable result containing the social phase, routine executions
-   and roster IDs.
+5. If an `NPCDecisionCycle` is configured, evaluate only the NPCs with explicit
+   `NPCDecisionContext` inputs in stable owner-ID order. These are read-only
+   proposals; no plan action is dispatched.
+6. Return an immutable result containing decisions, the social phase, routine
+   executions and roster IDs.
 
 Routine owners default to the full roster. A caller may pass `owner_ids` to
 execute a deterministic subset, enabling an external population manager to
@@ -38,9 +41,9 @@ world checkpoint/transaction boundary.
 
 ## Intentional non-goals
 
-The loop does not synthesize event witnesses, proximity, conversations,
-disruptions, travel routes or random samples. The caller must supply actual
-observations and deterministic outcome samples. It also does not yet execute
+The loop does not synthesize world facts, desired goal facts, event witnesses,
+proximity, conversations, disruptions, travel routes or random samples. The caller must supply actual
+observations and deterministic outcome samples. Decision proposals are connected to the loop, but it does not yet execute
 symbolic NPC plans or dispatch physical actions; those remain separate
 integration work.
 
