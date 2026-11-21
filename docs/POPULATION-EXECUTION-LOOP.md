@@ -144,3 +144,13 @@ single rollback transaction across all these ledgers and mutable NPC state**.
 A failure after a committed travel or social phase can therefore leave earlier
 phases committed. Whole-tick atomicity remains an explicit outstanding task;
 do not treat per-component replay as a substitute for it.
+
+
+Explicit encounter evidence can also be passed as
+`PresenceEncounterIntent` values when a shared `PresenceSocialAdapter` is
+configured. The loop synchronizes travel-derived presence first, then asks the
+adapter to validate the supplied opportunity against both NPCs' current
+physical location. Valid encounter events are included in the same tick's
+selected event IDs, allowing the social memory phase to process them. A false
+opportunity creates no encounter. This remains caller-evidence-driven; the
+loop does not infer line of sight, attention, or social intent.
