@@ -30,8 +30,9 @@ function isWorldSnapshot(value: unknown): value is WorldSnapshot {
       !Number.isSafeInteger(value.clock.day) || !Number.isSafeInteger(value.clock.minuteOfDay) ||
       !Number.isSafeInteger(value.clock.ticksPerDay)) return false;
   if (!['stopped', 'paused', 'running', 'faulted'].includes(String(value.runState))) return false;
-  if (!isRecord(value.population) || !['total', 'active', 'archived'].every(
-    (key) => Number.isSafeInteger(value.population[key]) && (value.population[key] as number) >= 0,
+  const population = value.population;
+  if (!isRecord(population) || !['total', 'active', 'archived'].every(
+    (key) => Number.isSafeInteger(population[key]) && (population[key] as number) >= 0,
   )) return false;
   if (!Array.isArray(value.districts) || !Array.isArray(value.recentEvents)) return false;
   return true;
