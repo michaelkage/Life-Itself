@@ -1005,5 +1005,5 @@ __all__ += ["CampaignKnowledgeLedger"]
 
 
 # Population-level deterministic orchestration of event, social and routine phases.
-from .population_execution import PopulationExecutionLoop, PopulationTickResult
-__all__ += ["PopulationExecutionLoop", "PopulationTickResult"]
+from .population_execution import NPCDecisionContext, PopulationExecutionLoop, PopulationTickResult
+__all__ += ["NPCDecisionContext", "PopulationExecutionLoop", "PopulationTickResult"]
