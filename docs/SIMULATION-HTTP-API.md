@@ -56,7 +56,8 @@ The browser adapter falls back to a stable HTTP status error when the envelope i
 
 ## Operational and security requirements
 
-- Authenticate every request using the application's account session; the transport adapter intentionally does not invent an authentication scheme.
+- Authenticate every request using a secure, HttpOnly account-session cookie; the browser adapter sends credentials on HTTP requests and opens the event stream with credentials enabled.
+- For cross-origin deployments, configure an exact allowed origin, credentialed CORS and secure SameSite cookie policy; never use wildcard origins with credentials.
 - Authorize campaign membership and command permissions on the server, never from client-supplied IDs alone.
 - Enforce payload size limits, rate limits, schema validation and command allow-lists.
 - Keep simulation mutations behind the command queue; snapshot and stream endpoints are read-only.
