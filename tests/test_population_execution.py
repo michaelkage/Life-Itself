@@ -1,5 +1,8 @@
 """Population execution loop integration tests."""
 import unittest
+import json
+import tempfile
+from pathlib import Path
 
 from simreality.model import NPC
 from simreality.action_execution import ActionExecution
@@ -8,6 +11,7 @@ from simreality.goals import GoalBook, NPCGoal
 from simreality.npc_autonomy import NPCDecisionCycle
 from simreality.planning import DeterministicPlanner, PlanningAction
 from simreality.population_execution import NPCDecisionContext, PopulationExecutionLoop
+from simreality.population_transaction import PopulationTickTransactionCoordinator, TransactionParticipant
 from simreality.routine_execution import RoutineExecutionLedger
 from simreality.routines import RoutineBlock, RoutineBook
 from simreality.simulation_tick import SimulationTickCoordinator
@@ -151,6 +155,20 @@ class PopulationExecutionLoopTests(unittest.TestCase):
         self.assertEqual(economics.balance("employer"), 80.0)
         self.assertEqual(economics.balance("household"), 10.0)
         self.assertEqual(economics.balance("utility"), 10.0)
+
+    def test_transactional_population_loop_rejects_incomplete_participant_set(self):
+        with tempfile.TemporaryDirectory() as directory:
+            state = {"value": 0}
+            participant = TransactionParticipant(
+                "npcs", lambda: json.dumps(state),
+                lambda payload: (state.clear(), state.update(json.loads(payload))),
+            )
+            transaction = PopulationTickTransactionCoordinator(Path(directory) / "ticks.json", (participant,))
+            with self.assertRaisesRegex(ValueError, "missing participants"):
+                PopulationExecutionLoop(
+                    self.loop.coordinator, self.book, self.ledger,
+                    transaction_coordinator=transaction,
+                )
 
 if __name__ == "__main__":
     unittest.main()
