@@ -68,3 +68,34 @@ result = loop.run_tick(
 ```
 
 Regression coverage: `tests/test_population_execution.py`.
+
+
+## Spatial partitioning and population LOD
+
+`PopulationSpatialScheduler` consumes a `PresenceLedger` plus an explicit
+importance score for every scheduled owner. It partitions owners by their
+authoritative symbolic current location (including the current route node for
+travelling NPCs), then assigns FULL, STANDARD, BACKGROUND or DORMANT detail
+under deterministic global budgets. Equal scores break by owner ID. It rejects
+missing presence and conflicting tick replays rather than inventing a location.
+
+The scheduler returns stable cell/LOD slices and the selected/deferred owner
+sets. Pass `selected_owner_ids` to `PopulationExecutionLoop.run_tick` as
+`owner_ids` to bound routine execution. LOD is a scheduling decision only:
+the caller remains responsible for selecting which subsystems run at each
+detail tier.
+
+## Validated action dispatch
+
+`NPCActionDispatchAdapter` converts actionable `NPCDecision` proposals into
+the first active action in each plan. It requires live, owner-scoped mutable
+world-fact and resource maps. `ActionExecutionLedger.start` rechecks action
+preconditions and unreserved resource costs before creating an active
+execution and journal event. Missing state, stale preconditions and insufficient
+resources reject dispatch. Only one plan step is started per NPC per tick;
+subsequent steps require fresh live validation. Non-actionable or already
+satisfied decisions are explicitly reported as not dispatched.
+
+Both adapters are deterministic and reject conflicting same-tick replay.
+Neither adapter creates coordinates, travel budgets, social encounters,
+economic balances or world facts.
