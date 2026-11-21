@@ -1,4 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import type { WorldSnapshot } from './types/domain-contracts';
+import { createConfiguredSimulationRuntime } from './lib/simulation-runtime';
 
 const navigation = [
   { id: 'overview', label: 'World overview', icon: '◈' },
@@ -28,6 +30,35 @@ const pageDescriptions: Record<string, string> = {
 
 export function App() {
   const [activePage, setActivePage] = useState('overview');
+  const [connection, setConnection] = useState<'unconfigured' | 'connecting' | 'connected' | 'disconnected'>('unconfigured');
+  const [snapshot, setSnapshot] = useState<WorldSnapshot | null>(null);
+
+  useEffect(() => {
+    const runtime = createConfiguredSimulationRuntime();
+    if (!runtime) return;
+    let mounted = true;
+    setConnection('connecting');
+    void runtime.getWorldSnapshot().then((result) => {
+      if (!mounted) return;
+      if (result.ok) {
+        setSnapshot(result.value);
+        setConnection('connected');
+      } else {
+        setConnection('disconnected');
+      }
+    });
+    const unsubscribe = runtime.subscribe((next) => {
+      if (!mounted) return;
+      setSnapshot(next);
+      setConnection('connected');
+    }, () => {
+      if (mounted) setConnection('disconnected');
+    });
+    return () => {
+      mounted = false;
+      unsubscribe();
+    };
+  }, []);
   const active = navigation.find((item) => item.id === activePage) ?? navigation[0];
 
   return (
