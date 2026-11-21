@@ -83,7 +83,7 @@ class PopulationTravelIntegrationTests(unittest.TestCase):
             encounter_opportunities=(PresenceEncounterIntent("meet-a-b", "npc-a", "npc-b"),),
         )
         self.assertEqual(len(result.encounters), 1)
-        self.assertEqual(result.encounters[0].record.location_id, "market")
+        self.assertEqual(result.encounters[0].encounter.location_id, "market")
         self.assertEqual(events.query(event_type="npc_encounter")[0].participants, ("npc-a", "npc-b"))
 
 
