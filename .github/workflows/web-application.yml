@@ -9,6 +9,7 @@ on:
       - "package.json"
       - "package-lock.json"
       - "vite.config.ts"
+      - "postcss.config.js"
       - "tsconfig.json"
       - ".github/workflows/web-application.yml"
   pull_request:
