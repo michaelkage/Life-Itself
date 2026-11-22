@@ -8,7 +8,7 @@ from simreality.model import NPC
 from simreality.action_execution import ActionExecution, ActionExecutionLedger, ActionExecutionPolicy
 from simreality.action_world_state import ActionWorldState
 from simreality.population_actions import NPCActionDispatchAdapter
-from simreality.household_economy import EconomicAccount, EconomicLedger, EconomicActionAdapter, ActionEconomicEffect, HouseholdLedger, HouseholdObligation
+from simreality.household_economy import EconomicAccount, EconomicLedger, EconomicActionAdapter, ActionEconomicEffect, ActionHouseholdEffect, HouseholdActionAdapter, HouseholdLedger, HouseholdObligation
 from simreality.goals import GoalBook, NPCGoal
 from simreality.npc_autonomy import NPCDecisionCycle
 from simreality.planning import DeterministicPlanner, PlanningAction
@@ -139,9 +139,16 @@ class PopulationExecutionLoopTests(unittest.TestCase):
         adapter = EconomicActionAdapter(economics, (
             ActionEconomicEffect("work-shift", "employer", "household", 20.0, "wage"),
         ))
+        household_actions = HouseholdActionAdapter(household, (
+            ActionHouseholdEffect(
+                "work-shift", "utility", "family", "household", "utility",
+                5.0, 1, "utility obligation created by completed shift",
+            ),
+        ))
         loop = PopulationExecutionLoop(
             self.loop.coordinator, RoutineBook(), RoutineExecutionLedger(),
             economic_action_adapter=adapter, household_ledger=household,
+            household_action_adapter=household_actions,
         )
         completed = ActionExecution(
             "action-1", "npc-a", 1, "work-shift", "completed", "shift completed",
@@ -154,6 +161,8 @@ class PopulationExecutionLoopTests(unittest.TestCase):
         self.assertEqual(len(result.economic_transfers), 1)
         self.assertEqual(result.economic_transfers[0].reference, "action:action-1:wage")
         self.assertEqual(len(result.household_settlements), 1)
+        self.assertEqual(len(result.action_obligations), 1)
+        self.assertEqual(result.action_obligations[0].obligation_id, "action:action-1:utility")
         self.assertEqual(economics.balance("employer"), 80.0)
         self.assertEqual(economics.balance("household"), 10.0)
         self.assertEqual(economics.balance("utility"), 10.0)
