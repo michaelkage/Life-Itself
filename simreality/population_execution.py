@@ -471,9 +471,6 @@ class PopulationExecutionLoop:
             item for item in self.action_execution_ledger.snapshot()
             if item.tick == tick
         ) if self.action_execution_ledger is not None else ()
-        completed_tick_actions = tuple(
-            item for item in tick_action_records if item.status == "completed"
-        )
         decisions = tuple(
             self.decision_cycle.decide(
                 owner, tick, context.world_facts, context.goal_facts,
