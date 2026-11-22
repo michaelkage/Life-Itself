@@ -292,7 +292,7 @@ class PopulationExecutionLoop:
         if subsystem_owner_ids is not None:
             if not isinstance(subsystem_owner_ids, Mapping):
                 raise TypeError("subsystem_owner_ids must map subsystem IDs to owner tuples")
-            allowed_subsystems = {"action", "decision", "economy", "memory", "routine", "social", "travel"}
+            allowed_subsystems = {"action", "decision", "economy", "memory", "presence", "routine", "social", "travel"}
             if any(not isinstance(name, str) or name not in allowed_subsystems for name in subsystem_owner_ids):
                 raise ValueError("subsystem_owner_ids contains an unknown subsystem")
             subsystem_plan = {}
@@ -374,6 +374,7 @@ class PopulationExecutionLoop:
         memory_owners = set(roster if subsystem_plan is None else subsystem_plan.get("memory", ()))
         economy_owners = set(roster if subsystem_plan is None else subsystem_plan.get("economy", ()))
         travel_owners = set(roster if subsystem_plan is None else subsystem_plan.get("travel", ()))
+        presence_owners = set(roster if subsystem_plan is None else subsystem_plan.get("presence", ()))
         contexts = {owner: context for owner, context in contexts.items() if owner in decision_owners}
         disruption_values = tuple(disruptions)
         if any(not isinstance(item, RoutineDisruption) for item in disruption_values):
@@ -486,6 +487,8 @@ class PopulationExecutionLoop:
             if travel_budgets is not None or closed_edges or multiplier_values:
                 raise ValueError("travel inputs require configured travel and presence adapters")
         else:
+            if presence_owners != set(roster):
+                raise ValueError("presence synchronization is authoritative and must include every roster owner")
             if travel_budgets is None:
                 raise ValueError("travel_budgets are required when travel integration is configured")
             if not isinstance(travel_budgets, Mapping):
