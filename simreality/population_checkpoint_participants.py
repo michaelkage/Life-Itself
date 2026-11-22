@@ -87,6 +87,25 @@ def build_population_transaction_participants(
         raise TypeError("tick_coordinator must be a SimulationTickCoordinator")
     if not isinstance(routine_book, RoutineBook) or not isinstance(routine_ledger, RoutineExecutionLedger):
         raise TypeError("routine book and execution ledger are required")
+    from .travel import TravelTickAdapter
+    from .presence import PresenceTickAdapter
+    from .presence_encounters import PresenceSocialAdapter
+    if travel_adapter is not None and not isinstance(travel_adapter, TravelTickAdapter):
+        raise TypeError("travel_adapter must be a TravelTickAdapter or None")
+    if presence_adapter is not None and not isinstance(presence_adapter, PresenceTickAdapter):
+        raise TypeError("presence_adapter must be a PresenceTickAdapter or None")
+    if (travel_adapter is None) != (presence_adapter is None):
+        raise ValueError("travel and presence checkpoint participants must be configured together")
+    if encounter_adapter is not None and not isinstance(encounter_adapter, PresenceSocialAdapter):
+        raise TypeError("encounter_adapter must be a PresenceSocialAdapter or None")
+    if encounter_adapter is not None and (presence_adapter is None or encounter_adapter.presence is not presence_adapter.ledger):
+        raise ValueError("encounter adapter must share the configured presence ledger")
+    if economic_action_adapter is not None and not isinstance(economic_action_adapter, EconomicActionAdapter):
+        raise TypeError("economic_action_adapter must be an EconomicActionAdapter or None")
+    if household_ledger is not None and not isinstance(household_ledger, HouseholdLedger):
+        raise TypeError("household_ledger must be a HouseholdLedger or None")
+    if action_ledger is not None and not isinstance(action_ledger, ActionExecutionLedger):
+        raise TypeError("action_ledger must be an ActionExecutionLedger or None")
     participants = []
 
     def add(name, capture, restore):
