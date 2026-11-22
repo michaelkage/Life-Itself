@@ -199,11 +199,11 @@ class PopulationExecutionLoopTests(unittest.TestCase):
             phase_observer=fail_after_social,
         )
         with self.assertRaisesRegex(RuntimeError, "phase failure"):
-            loop.run_tick(1, 500, self.npcs, event_ids=("untransactional-memory",), outcome_samples={})
+            loop.run_tick(1, 500, self.npcs, event_ids=("untransactional-memory",), outcome_samples={"work-a": 0.2, "rest-b": 0.7})
         self.assertEqual(len(self.npcs["npc-a"].memories), 1)
         loop.phase_observer = None
         retried = loop.run_tick(
-            1, 500, self.npcs, event_ids=("untransactional-memory",), outcome_samples={},
+            1, 500, self.npcs, event_ids=("untransactional-memory",), outcome_samples={"work-a": 0.2, "rest-b": 0.7},
         )
         self.assertEqual(len(self.npcs["npc-a"].memories), 1)
         self.assertEqual(len(retried.social.materialized_memories), 1)
