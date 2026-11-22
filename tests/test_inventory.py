@@ -3,7 +3,7 @@ import unittest
 
 from simreality.action_execution import ActionExecution
 from simreality.inventory import (
-    ActionInventoryAdapter, ActionInventoryEffect, InventoryLedger,
+    ActionInventoryAdapter, ActionInventoryEffect, InventoryLedger, InventoryTransfer,
 )
 
 
@@ -18,9 +18,7 @@ class InventoryLedgerTests(unittest.TestCase):
         receipt = self.inventory.receive("receipt-1", 1, "store", "meal", 5, "restock")
         self.assertEqual(self.inventory.receive("receipt-1", 1, "store", "meal", 5, "restock"), receipt)
         transfer = self.inventory.apply(
-            __import__("simreality.inventory", fromlist=["InventoryTransfer"]).InventoryTransfer(
-                "transfer-1", 2, "store", "npc-a", "meal", 3, "purchase",
-            )
+            InventoryTransfer("transfer-1", 2, "store", "npc-a", "meal", 3, "purchase")
         )
         self.assertEqual(self.inventory.apply(transfer), transfer)
         consumed = self.inventory.consume("consume-1", 3, "npc-a", "meal", 1, "breakfast")
