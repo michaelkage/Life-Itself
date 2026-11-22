@@ -63,6 +63,7 @@ class WorldEventMemoryAdapterTests(unittest.TestCase):
             ),
         ))
         adapter = WorldEventMemoryAdapter(ledger)
+        self.assertTrue(adapter.is_memory_resolved("unknown", "guard"))
         self.assertIsNone(adapter.materialize("unknown", "guard", self.npcs))
         self.assertEqual(len(self.npcs["guard"].memories), 0)
 
