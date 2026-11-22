@@ -255,7 +255,15 @@ class PopulationExecutionLoop:
             if value is not None and not isinstance(value, (tuple, list, set, frozenset)):
                 normalized_kwargs[iterable_name] = tuple(value)
         if self.transaction_coordinator is None:
-            return self._run_tick_untransactional(tick, minute_of_day, npcs, **normalized_kwargs)
+            try:
+                return self._run_tick_untransactional(tick, minute_of_day, npcs, **normalized_kwargs)
+            except BaseException:
+                self.coordinator.discard_tick_cache(tick)
+                if self.action_dispatch_adapter is not None:
+                    self.action_dispatch_adapter.discard_tick_cache(tick)
+                self._requests.pop(tick, None)
+                self._results.pop(tick, None)
+                raise
         request = {
             "tick": tick,
             "minute_of_day": minute_of_day,
