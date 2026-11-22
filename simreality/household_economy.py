@@ -245,6 +245,10 @@ class EconomicActionAdapter:
         }
         self._applied: dict[str, tuple[str, ...]] = {}
 
+    def has_applied(self, execution_id: str) -> bool:
+        """Return whether all configured effects for an execution were committed."""
+        return execution_id in self._applied
+
     def apply_all(self, execution, tick: int) -> tuple[EconomicTransfer, ...]:
         """Apply all configured effects atomically after a completed action."""
         from .action_execution import ActionExecution
@@ -342,6 +346,10 @@ class HouseholdActionAdapter:
         }
         self._applied: dict[str, tuple[str, ...]] = {}
 
+    def has_applied(self, execution_id: str) -> bool:
+        """Return whether configured household effects were materialized."""
+        return execution_id in self._applied
+
     def apply_all(self, execution, tick: int) -> tuple[HouseholdObligation, ...]:
         """Create all configured obligations once for a completed action."""
         from .action_execution import ActionExecution
@@ -349,6 +357,8 @@ class HouseholdActionAdapter:
             raise TypeError("execution must be an ActionExecution")
         if isinstance(tick, bool) or not isinstance(tick, int) or tick < 0:
             raise ValueError("tick must be a non-negative integer")
+        if isinstance(execution.tick, bool) or not isinstance(execution.tick, int) or execution.tick < 0 or tick < execution.tick:
+            raise ValueError("household effect tick cannot precede action completion")
         if execution.status != "completed":
             return ()
         prior = self._applied.get(execution.execution_id)
