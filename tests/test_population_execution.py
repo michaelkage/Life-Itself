@@ -87,6 +87,55 @@ class PopulationExecutionLoopTests(unittest.TestCase):
         self.assertEqual(tuple(item.routine_id for item in result.routine_executions), ("work-a",))
         self.assertEqual(result.processed_npc_ids, ("npc-a", "npc-b"))
 
+    def test_completed_action_economy_effect_waits_for_background_lod_cadence(self):
+        economics = EconomicLedger((
+            EconomicAccount("employer", "business", "business"),
+            EconomicAccount("household", "npc-a", "household"),
+        ))
+        economics._balances.update({"employer": 50.0, "household": 0.0})
+        economic_actions = EconomicActionAdapter(economics, (
+            ActionEconomicEffect("earn", "employer", "household", 10.0, "wage"),
+        ))
+        action_ledger = ActionExecutionLedger(
+            DeterministicPlanner((
+                PlanningAction("earn", frozenset({"available"}), frozenset({"paid"})),
+            )),
+            (ActionExecutionPolicy("earn", duration_ticks=1),),
+            events=self.events,
+        )
+        action_ledger.start(
+            "execution-background", "npc-a", 0, "earn",
+            {"available"}, {}, plan_actions=("earn",),
+        )
+        completed = action_ledger.advance("execution-background", 1, {"available"}, {})
+        self.assertEqual(completed.status, "completed")
+        loop = PopulationExecutionLoop(
+            self.loop.coordinator, RoutineBook(), RoutineExecutionLedger(),
+            economic_action_adapter=economic_actions,
+            action_execution_ledger=action_ledger,
+        )
+        def background_schedule(tick):
+            return PopulationSchedule(
+                tick,
+                (PopulationSlice("cell-a", PopulationLOD.BACKGROUND, ("npc-a",)),),
+                ("npc-a",), (),
+            )
+        first = loop.run_tick(
+            1, 500, self.npcs, outcome_samples={},
+            population_schedule=background_schedule(1),
+            lod_policy=default_population_lod_policy(),
+        )
+        self.assertEqual(first.economic_transfers, ())
+        self.assertEqual(economics.balance("employer"), 50.0)
+        later = loop.run_tick(
+            4, 500, self.npcs, outcome_samples={},
+            population_schedule=background_schedule(4),
+            lod_policy=default_population_lod_policy(),
+        )
+        self.assertEqual(len(later.economic_transfers), 1)
+        self.assertEqual(economics.balance("employer"), 40.0)
+        self.assertEqual(economics.balance("household"), 10.0)
+
     def test_population_tick_replay_returns_original_result(self):
         request = {"outcome_samples": {"work-a": 0.2, "rest-b": 0.7}}
         first = self.loop.run_tick(1, 500, self.npcs, **request)
