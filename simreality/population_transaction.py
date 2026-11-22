@@ -157,7 +157,11 @@ class PopulationTickTransactionCoordinator:
                 result_payload = item.get("result_payload")
                 result_digest = item.get("result_digest")
                 if legacy and result_payload is None:
-                    item["result_payload"] = None
+                    # Historical v1 journals did not persist the result envelope.
+                    # Preserve recoverability while marking that replay must rebuild it.
+                    item["result_payload"] = "null"
+                    item["result_digest"] = sha256(b"null").hexdigest()
+                    item["result_reconstructed"] = True
                 else:
                     if not isinstance(result_payload, str) or not isinstance(result_digest, str):
                         raise ValueError("committed population transaction is missing its result envelope")
