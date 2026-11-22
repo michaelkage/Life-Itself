@@ -61,7 +61,7 @@ class PopulationTickTransactionCoordinator:
     order during rollback and forward order during committed recovery.
     """
 
-    SCHEMA_VERSION = 1
+    SCHEMA_VERSION = 2
 
     def __init__(self, journal_path: str | os.PathLike, participants: Iterable[TransactionParticipant]):
         self.path = Path(journal_path)
@@ -118,19 +118,63 @@ class PopulationTickTransactionCoordinator:
 
     def _load(self) -> None:
         raw = json.loads(self.path.read_text(encoding="utf-8"))
-        if not isinstance(raw, dict) or raw.get("schema_version") != self.SCHEMA_VERSION or not isinstance(raw.get("records"), list):
+        if not isinstance(raw, dict) or raw.get("schema_version") not in (1, self.SCHEMA_VERSION) or not isinstance(raw.get("records"), list):
             raise ValueError("unsupported or malformed population transaction journal")
+        legacy = raw["schema_version"] == 1
+        expected = {participant.name for participant in self.participants}
         records = {}
+        previous_tick = -1
         for item in raw["records"]:
+            if not isinstance(item, dict):
+                raise ValueError("population transaction journal records must be objects")
             tick = item.get("tick")
             if isinstance(tick, bool) or not isinstance(tick, int) or tick < 0 or tick in records:
                 raise ValueError("invalid or duplicate population transaction tick")
-            if item.get("status") not in ("prepared", "committed", "aborted"):
+            if tick <= previous_tick:
+                raise ValueError("population transaction records must be ordered by tick")
+            previous_tick = tick
+            status = item.get("status")
+            if status not in ("prepared", "committed", "aborted"):
                 raise ValueError("invalid population transaction status")
-            if not isinstance(item.get("request_signature"), str) or len(item["request_signature"]) != 64:
+            signature = item.get("request_signature")
+            if not isinstance(signature, str) or len(signature) != 64 or any(ch not in "0123456789abcdef" for ch in signature):
                 raise ValueError("invalid population transaction request signature")
+            before = item.get("before")
+            if not isinstance(before, dict) or set(before) != expected:
+                raise ValueError("population transaction pre-checkpoint participant set does not match runtime")
+            for name, checkpoint in before.items():
+                if not isinstance(checkpoint, str):
+                    raise ValueError(f"invalid pre-checkpoint for participant {name}")
+                json.loads(checkpoint)
+            after = item.get("after", {})
+            if status == "committed":
+                if not isinstance(after, dict) or set(after) != expected:
+                    raise ValueError("committed post-checkpoint participant set does not match runtime")
+                for name, checkpoint in after.items():
+                    if not isinstance(checkpoint, str):
+                        raise ValueError(f"invalid post-checkpoint for participant {name}")
+                    json.loads(checkpoint)
+                result_payload = item.get("result_payload")
+                result_digest = item.get("result_digest")
+                if legacy and result_payload is None:
+                    item["result_payload"] = None
+                else:
+                    if not isinstance(result_payload, str) or not isinstance(result_digest, str):
+                        raise ValueError("committed population transaction is missing its result envelope")
+                    actual_digest = sha256(result_payload.encode("utf-8")).hexdigest()
+                    if actual_digest != result_digest:
+                        raise ValueError("committed population transaction result digest mismatch")
+                    json.loads(result_payload)
+            elif status == "prepared":
+                if not isinstance(after, dict) or after:
+                    raise ValueError("prepared transaction cannot contain post-checkpoints")
+            else:
+                if not isinstance(after, dict) or after:
+                    raise ValueError("aborted transaction cannot contain post-checkpoints")
             records[tick] = item
         self._records = records
+        if legacy:
+            self._persist()
 
     def recover(self) -> tuple[int, ...]:
         """Recover incomplete transactions and restore latest committed state."""
