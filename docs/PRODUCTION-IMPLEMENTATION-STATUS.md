@@ -13,7 +13,7 @@ This document distinguishes existing engine capability from application and runt
 - Application shell now reports API connection state and displays revision/day only after receiving a validated snapshot.
 - Documented the HTTP API, command idempotency, SSE behavior, security boundary and missing server-side responsibilities.
 - Added `PopulationExecutionLoop` to compose the existing deterministic event-memory, conversation and routine phases over a stable NPC roster, with owner slicing, input preflight and replay protection; optional read-only NPC goal/plan proposals now run from explicit per-agent fact contexts.
-- Added population-loop regression tests and explicit documentation of its phase-atomic (not globally atomic) failure semantics.
+- Added durable whole-tick transaction coordination with registered participant snapshots, rollback/recovery and replay-cache invalidation; transaction remains opt-in and only covers registered state.\n- Integrated multi-tick NPC action advancement and validated first-step dispatch into the population loop, with checkpointable owner facts/resources and same-tick action completion economic effects.
 - Visual design tokens and responsive layout.
 
 ## Existing engine capability on the base branch
@@ -26,13 +26,13 @@ The following remain substantive engineering projects, not completed features:
 
 1. Unified domain/API integration across Python, C++, Unreal and the web application (web transport contract and client adapter added; authoritative cross-runtime implementation remains outstanding).
 2. Full C++ behavioral parity with the Python reference.
-3. Autonomous population runtime that discovers and schedules world activity (partial foundation: explicit roster/tick orchestration and routine-owner slicing; automatic activity discovery, action dispatch and complete world-level transactionality across every runtime-owned mutable subsystem remain outstanding).
+3. Autonomous population runtime that discovers and schedules world activity (partial foundation: explicit roster/tick orchestration and routine-owner slicing; automatic activity discovery, subsystem-specific LOD dispatch and transaction registration for every runtime-owned mutable subsystem remain outstanding).
 4. Population-scale simulation LOD and spatial partitioning.
 5. End-to-end social knowledge transmission integrated into actual encounters.
 6. Complete birth-to-death generational simulation.
 7. Autonomous family and social-network lifecycle integration.
-8. Fully closed NPC goal-to-action-to-consequence feedback loop.
-9. Production economy, labor, businesses, markets and inventory.
+8. A fully closed NPC goal-to-action-to-consequence feedback loop across all action types, inventory, purchases, consumption and household lifecycle.
+9. Production economy, labor, businesses, markets and inventory (the current foundation is explicit account transfers and household obligations, not a complete market/inventory simulation).
 10. Housing, property, infrastructure and urban development.
 11. Fully integrated law, government, elections, budgets and public accountability.
 12. Emergent world-event generation and propagation.
