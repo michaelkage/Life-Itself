@@ -604,6 +604,23 @@ class PopulationExecutionLoop:
             item for item in sorted(completed_action_inputs.values(), key=lambda value: value.execution_id)
             if item.owner_id in economy_owners
         )
+        pending_action_ids = {
+            item.execution_id
+            for item in due_economic_actions
+            if (
+                self.economic_action_adapter is not None
+                and self.economic_action_adapter.has_policy(item.action_id)
+                and not self.economic_action_adapter.has_applied(item.execution_id)
+            ) or (
+                self.household_action_adapter is not None
+                and self.household_action_adapter.has_policy(item.action_id)
+                and not self.household_action_adapter.has_applied(item.execution_id)
+            ) or (
+                self.inventory_action_adapter is not None
+                and self.inventory_action_adapter.has_policy(item.action_id)
+                and not self.inventory_action_adapter.has_applied(item.execution_id)
+            )
+        }
         economic_transfers = tuple(
             transfer
             for item in due_economic_actions
@@ -640,7 +657,7 @@ class PopulationExecutionLoop:
             *advanced_actions,
             *tick_action_records,
             *completed_action_executions,
-            *ledger_completed_actions,
+            *(item for item in due_economic_actions if item.execution_id in pending_action_ids),
             *(dispatch.active for dispatch in action_dispatches if dispatch.active is not None),
         ):
             action_result_by_id[item.execution_id] = item
