@@ -116,6 +116,19 @@ class PopulationExecutionLoopTests(unittest.TestCase):
         progress = {item.owner_id: item.progress_ticks for item in ledger.active()}
         self.assertEqual(progress, {"npc-a": 1, "npc-b": 0})
 
+    def test_lod_schedule_must_cover_exact_population_roster(self):
+        schedule = PopulationSchedule(
+            1,
+            (PopulationSlice("cell-a", PopulationLOD.FULL, ("npc-a",)),),
+            ("npc-a",), (),
+        )
+        with self.assertRaisesRegex(ValueError, "exact NPC roster"):
+            self.loop.run_tick(
+                1, 500, self.npcs, outcome_samples={},
+                population_schedule=schedule,
+                lod_policy=default_population_lod_policy(),
+            )
+
     def test_completed_action_economy_effect_waits_for_background_lod_cadence(self):
         economics = EconomicLedger((
             EconomicAccount("employer", "business", "business"),
