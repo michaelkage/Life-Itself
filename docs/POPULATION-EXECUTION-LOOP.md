@@ -175,3 +175,12 @@ A committed replay verifies the durable request signature, restores the committe
 `PopulationTickResult` now carries economic transfers and household settlements when explicit completed action executions and settlement IDs are supplied. These effects run inside the same operation callback and therefore share the same rollback/commit boundary provided the economic and household ledgers are registered as transaction participants.
 
 The transaction coordinator is opt-in for compatibility. A loop without a configured coordinator retains its previous component-level guarantees only; it must not be described as whole-tick atomic. The journal is a local durable file and assumes a single writer process. Multi-process execution requires an external transactional store or an exclusive process lock. Schema migrations must be versioned before changing the journal format.
+
+
+### Concrete checkpoint participant registration
+
+Use `build_population_transaction_participants(...)` to bind the existing versioned save-state codecs to live objects. It creates participants for NPC state, world events, event-memory replay, social conversation replay, social trust, social beliefs, routine definitions and routine execution history; optional travel/presence, encounters, economics, economic-action replay, household obligations and action execution history are included when their live adapters are supplied.
+
+The builder restores mutable ledgers in place, preserving references held by adapters. Register order is intentional: world events precede action execution restoration, social trust precedes social beliefs, and economics precedes economic-action replay restoration. The NPC mapping and its instances must remain stable for the coordinator lifetime; changing the roster between durable ticks is rejected during restore.
+
+The NPC checkpoint currently follows `NPCCollectionSnapshot` schema version 1 and therefore covers the core NPC model fields and witnessed memories represented by that codec. Any newly introduced mutable NPC field must be added to that codec before it can be claimed as transactionally protected. External mutable stores, planner/goal state, and other runtime-owned state must have their own participant before whole-tick atomicity can be claimed for them.
