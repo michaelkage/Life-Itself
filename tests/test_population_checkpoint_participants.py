@@ -160,6 +160,7 @@ class PopulationCheckpointParticipantTests(unittest.TestCase):
                 decision_cycle=NPCDecisionCycle(self.goals, self.action_ledger.planner),
                 transaction_coordinator=transaction,
                 economic_action_adapter=self.economic_actions,
+                household_ledger=self.households,
                 action_execution_ledger=self.action_ledger,
                 action_dispatch_adapter=dispatch,
                 action_world_state=state,
