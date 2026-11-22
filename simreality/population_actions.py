@@ -11,6 +11,7 @@ from typing import Mapping
 
 from .action_execution import ActionExecutionLedger, ActiveActionExecution
 from .npc_autonomy import NPCDecision
+from .action_execution import ActionExecution, ActiveActionExecution
 
 
 @dataclass(frozen=True)
@@ -96,6 +97,24 @@ class NPCActionDispatchAdapter:
         result = tuple(output)
         self._requests[tick] = (signature, result)
         return result
+
+    def advance_active(self, tick: int, world_state):
+        """Advance every active execution in stable ID order against live owner state."""
+        from .action_world_state import ActionWorldState
+        if not isinstance(world_state, ActionWorldState):
+            raise TypeError("world_state must be an ActionWorldState")
+        if isinstance(tick, bool) or not isinstance(tick, int) or tick < 0:
+            raise ValueError("tick must be a non-negative integer")
+        results = []
+        for active in self.executions.active():
+            if active.last_tick >= tick:
+                continue
+            facts = world_state.world_facts_by_owner.get(active.owner_id)
+            resources = world_state.resources_by_owner.get(active.owner_id)
+            if facts is None or resources is None:
+                raise KeyError(f"missing live action state for active owner: {active.owner_id}")
+            results.append(self.executions.advance(active.execution_id, tick, facts, resources))
+        return tuple(results)
 
     def snapshot(self) -> tuple[tuple[int, tuple[NPCActionDispatch, ...]], ...]:
         return tuple((tick, item[1]) for tick, item in sorted(self._requests.items()))
