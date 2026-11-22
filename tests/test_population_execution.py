@@ -194,7 +194,7 @@ class PopulationExecutionLoopTests(unittest.TestCase):
         third = loop.run_tick(3, 502, self.npcs, outcome_samples={}, decision_contexts=contexts)
         self.assertEqual(third.action_results[0].status, "completed")
         self.assertEqual(third.action_dispatches[0].status, "completed_this_tick")
-        self.assertEqual(facts, {"paid"})
+        self.assertEqual(facts, {"available", "paid"})
         self.assertEqual(resources, {"energy": 3.0})
         self.assertEqual(action_ledger.active(), ())
 
