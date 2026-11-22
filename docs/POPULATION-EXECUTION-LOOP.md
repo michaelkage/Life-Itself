@@ -10,15 +10,18 @@ logic.
 1. Capture and validate a stable, sorted NPC roster for the request.
 2. Validate the selected routine-owner slice, disruption IDs and required
    outcome samples for all routine blocks active at the supplied minute.
-3. Run the event-memory and conversation phase through
-   `SimulationTickCoordinator.step`.
-4. Resolve due routines through `SimulationTickCoordinator.execute_routines`
-   and the existing `RoutineTickAdapter` / `RoutineExecutionLedger`.
-5. If an `NPCDecisionCycle` is configured, evaluate only the NPCs with explicit
-   `NPCDecisionContext` inputs in stable owner-ID order. These are read-only
-   proposals; no plan action is dispatched.
-6. Return an immutable result containing decisions, the social phase, routine
-   executions and roster IDs.
+3. Advance active multi-tick actions against checkpointable owner-scoped action
+   facts/resources, then evaluate explicit `NPCDecisionContext` inputs in stable
+   owner-ID order.
+4. Revalidate and dispatch the first action step for each actionable decision.
+   An owner with an active action or one completed earlier in the same tick is
+   not dispatched again.
+5. Advance travel and synchronize presence, then resolve evidence-backed
+   encounters before event-memory and conversation processing.
+6. Resolve due routines, apply configured economic effects for action completions,
+   add explicit household obligations and settle requested obligations.
+7. Return immutable phase outputs, including action dispatches and action
+   advancement records.
 
 Routine owners default to the full roster. A caller may pass `owner_ids` to
 execute a deterministic subset, enabling an external population manager to
@@ -28,24 +31,24 @@ snapshot; it does not imply that all NPCs had a routine due in that slice.
 ## Replay and failure semantics
 
 The loop rejects conflicting replay inputs and returns the original successful
-result for identical in-memory replay. The underlying social and routine phases
-also have their own replay ledgers.
-
-This composition is deliberately **phase-atomic, not globally atomic**. The
-coordinator commits event memory/conversations before the routine ledger is
-updated. Routine inputs are preflighted before that commit; if an unexpected
-routine-ledger failure occurs afterward, the social phase remains committed.
-Retrying the exact same tick inputs reuses the coordinator's result and retries
-the routine phase. A durable whole-world transaction still belongs in the
-world checkpoint/transaction boundary.
+result for identical in-memory replay. The underlying subsystems retain their
+own replay ledgers. When a `PopulationTickTransactionCoordinator` is supplied,
+the loop executes inside its durable prepare/commit boundary. All mutated
+subsystems must be registered; the participant factory covers NPC state, world
+events, social memory/conversations/trust/beliefs, routines, travel, presence,
+encounters, action ledger and goals, action facts/resources, economics and
+household obligations when configured. On failure, registered participants are
+restored and derived per-tick caches are discarded. Without that coordinator,
+the loop remains component-replay-safe but is not globally atomic.
 
 ## Intentional non-goals
 
 The loop does not synthesize world facts, desired goal facts, event witnesses,
 proximity, conversations, disruptions, travel routes or random samples. The caller must supply actual
-observations and deterministic outcome samples. Decision proposals are connected to the loop, but it does not yet execute
-symbolic NPC plans or dispatch physical actions; those remain separate
-integration work.
+observations and deterministic outcome samples. The loop dispatches and advances symbolic actions only when an
+`NPCActionDispatchAdapter`, `ActionExecutionLedger` and `ActionWorldState` are
+configured. It does not infer physical movement, world facts, resources or
+real-world side effects.
 
 ## Example
 
@@ -87,14 +90,20 @@ detail tier.
 
 ## Validated action dispatch
 
-`NPCActionDispatchAdapter` converts actionable `NPCDecision` proposals into
-the first active action in each plan. It requires live, owner-scoped mutable
-world-fact and resource maps. `ActionExecutionLedger.start` rechecks action
-preconditions and unreserved resource costs before creating an active
-execution and journal event. Missing state, stale preconditions and insufficient
-resources reject dispatch. Only one plan step is started per NPC per tick;
-subsequent steps require fresh live validation. Non-actionable or already
-satisfied decisions are explicitly reported as not dispatched.
+`ActionWorldState` owns per-owner mutable fact sets and resource dictionaries
+and exposes a versioned JSON checkpoint. Restore mutates existing nested sets
+and dictionaries in place, preserving references held by action systems. The
+transaction participant factory can register it as `action_world_state`.
+
+`NPCActionDispatchAdapter` dispatches the first plan step after live
+precondition/resource validation. Existing active actions advance once per
+population tick; multi-tick policies retain reservations until completion or
+interruption. An owner cannot start a second action while one is active, nor
+restart the same action in the tick in which it completes. Completion mutates
+world facts/resources, records the world event and applies configured goal
+progress through `ActionExecutionLedger`. The population loop exposes action
+advancement and dispatch records and sends newly completed actions to the
+economic adapter in the same tick.
 
 Both adapters are deterministic and reject conflicting same-tick replay.
 Neither adapter creates coordinates, travel budgets, social encounters,
@@ -137,13 +146,14 @@ The ledger supports canonical JSON snapshots for persistence.
 
 ## Transaction boundary status
 
-Travel, presence, social, routine, action, and economic ledgers retain their
-existing component-level replay and checkpoint behavior. Population orchestration
-now orders travel/presence before social work, but it does **not yet provide a
-single rollback transaction across all these ledgers and mutable NPC state**.
-A failure after a committed travel or social phase can therefore leave earlier
-phases committed. Whole-tick atomicity remains an explicit outstanding task;
-do not treat per-component replay as a substitute for it.
+A durable transaction is available when explicitly configured. It is opt-in
+and only protects state represented by registered participants. Use
+`build_population_transaction_participants` with the same live roster,
+coordinator, ledgers and adapters used by the loop; include `action_ledger` and
+`action_world_state` when action dispatch is enabled. External mutable objects
+not registered as participants are outside the rollback guarantee. The local
+JSON journal uses atomic replacement and fsync, but multi-process locking and a
+production shared-storage backend remain outstanding.
 
 
 Explicit encounter evidence can also be passed as
