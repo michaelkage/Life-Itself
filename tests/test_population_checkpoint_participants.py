@@ -9,6 +9,9 @@ from simreality.population_transaction import PopulationTickTransactionCoordinat
 from simreality.action_execution import ActionExecutionLedger, ActionExecutionPolicy
 from simreality.action_world_state import ActionWorldState
 from simreality.goals import GoalBook, NPCGoal
+from simreality.npc_autonomy import NPCDecisionCycle
+from simreality.population_execution import NPCDecisionContext, PopulationExecutionLoop
+from simreality.population_actions import NPCActionDispatchAdapter
 from simreality.planning import DeterministicPlanner, PlanningAction
 from simreality.routine_execution import RoutineExecutionLedger
 from simreality.routines import RoutineBook, RoutineBlock
@@ -137,6 +140,51 @@ class PopulationCheckpointParticipantTests(unittest.TestCase):
             self.assertEqual(self.households.snapshot()[0].status, "open")
             self.assertEqual(self.action_facts, {"available"})
             self.assertEqual(self.action_resources, {"energy": 8.0})
+
+    def test_population_tick_rolls_back_action_dispatch_facts_and_economy_after_failure(self):
+        state = ActionWorldState({"npc-a": set()}, {"npc-a": {}})
+        dispatch = NPCActionDispatchAdapter(self.action_ledger)
+        with tempfile.TemporaryDirectory() as directory:
+            transaction = PopulationTickTransactionCoordinator(
+                Path(directory) / "population.json", self.participants,
+            )
+            loop = PopulationExecutionLoop(
+                self.tick, RoutineBook(), RoutineExecutionLedger(),
+                decision_cycle=NPCDecisionCycle(self.goals, self.action_ledger.planner),
+                transaction_coordinator=transaction,
+                economic_action_adapter=self.economic_actions,
+                action_execution_ledger=self.action_ledger,
+                action_dispatch_adapter=dispatch,
+                action_world_state=state,
+            )
+            context = {"npc-a": NPCDecisionContext(
+                frozenset(), {"goal-work": frozenset({"done"})},
+            )}
+            started = loop.run_tick(1, 500, self.npcs, outcome_samples={}, decision_contexts=context)
+            self.assertEqual(started.action_dispatches[0].status, "started")
+            self.assertEqual(len(self.action_ledger.active()), 1)
+
+            original_apply = self.economic_actions.apply
+            def fail_economic_phase(execution, tick):
+                raise RuntimeError("injected economic phase failure")
+            self.economic_actions.apply = fail_economic_phase
+            with self.assertRaisesRegex(RuntimeError, "injected economic phase failure"):
+                loop.run_tick(2, 501, self.npcs, outcome_samples={}, decision_contexts=context)
+
+            self.assertEqual(len(self.action_ledger.active()), 1)
+            self.assertEqual(self.action_ledger.active()[0].progress_ticks, 0)
+            self.assertEqual(state.world_facts_by_owner["npc-a"], set())
+            self.assertEqual(state.resources_by_owner["npc-a"], {})
+            self.assertEqual(self.economics.balance("employer"), 100.0)
+            self.assertEqual(self.economics.snapshot(), ())
+            self.economic_actions.apply = original_apply
+
+            retried = loop.run_tick(2, 501, self.npcs, outcome_samples={}, decision_contexts=context)
+            self.assertEqual(retried.action_results[0].status, "completed")
+            self.assertEqual(state.world_facts_by_owner["npc-a"], {"done"})
+            self.assertEqual(self.economics.balance("employer"), 80.0)
+            self.assertEqual(self.economics.balance("family"), 20.0)
+            self.assertEqual(len(retried.economic_transfers), 1)
 
     def test_action_execution_ledger_and_its_world_events_rollback_together(self):
         with tempfile.TemporaryDirectory() as directory:
