@@ -191,12 +191,12 @@ class PopulationExecutionLoopTests(unittest.TestCase):
             },
         )
         self.events.append(event)
+        def fail_after_social(phase, tick):
+            if phase == "social":
+                raise RuntimeError("phase failure")
         loop = PopulationExecutionLoop(
             self.loop.coordinator, self.book, self.ledger,
-            phase_observer=lambda phase, tick: (
-                (_ for _ in ()).throw(RuntimeError("phase failure"))
-                if phase == "social" else None
-            ),
+            phase_observer=fail_after_social,
         )
         with self.assertRaisesRegex(RuntimeError, "phase failure"):
             loop.run_tick(1, 500, self.npcs, event_ids=("untransactional-memory",), outcome_samples={})
