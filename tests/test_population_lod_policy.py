@@ -42,7 +42,7 @@ class PopulationLODPolicyTests(unittest.TestCase):
         )
         resolved = schedule.subsystem_slices(default_population_lod_policy())
         by_subsystem = {item.subsystem_id: item.owner_ids for item in resolved}
-        self.assertEqual(by_subsystem["action"], ("npc-a",))
+        self.assertEqual(by_subsystem["action"], ("npc-a", "npc-b"))
         self.assertEqual(by_subsystem["decision"], ("npc-a",))
         self.assertEqual(by_subsystem["economy"], ("npc-a",))
         self.assertEqual(by_subsystem["routine"], ("npc-a",))
