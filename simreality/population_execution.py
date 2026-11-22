@@ -318,6 +318,27 @@ class PopulationExecutionLoop:
                 raise KeyError(f"routine owners are absent from population: {', '.join(missing)}")
             selected_owners = tuple(sorted(set(supplied_owners) & set(routine_owners)))
 
+        if not isinstance(event_ids, tuple) or any(not isinstance(item, str) or not item.strip() for item in event_ids):
+            raise ValueError("event_ids must be a tuple of non-empty strings")
+        if len(set(event_ids)) != len(event_ids):
+            raise ValueError("event_ids must not contain duplicates")
+        if not isinstance(conversations, tuple) or any(not isinstance(item, ConversationIntent) for item in conversations):
+            raise TypeError("conversations must be a tuple of ConversationIntent values")
+        if len({item.conversation_id for item in conversations}) != len(conversations):
+            raise ValueError("conversation IDs must be unique within a tick")
+        for event_id in event_ids:
+            event = self.coordinator.events.get(event_id)
+            if event.tick != tick:
+                raise ValueError(f"event {event_id!r} is at tick {event.tick}, not requested tick {tick}")
+            missing_witnesses = set(event.witnesses) - set(roster)
+            if missing_witnesses:
+                raise KeyError(f"event witnesses are absent from population: {', '.join(sorted(missing_witnesses))}")
+        for intent in conversations:
+            if intent.listener_id not in npcs or intent.speaker_id not in npcs:
+                raise KeyError(f"conversation {intent.conversation_id!r} references an absent NPC")
+        for intent in encounter_opportunities:
+            if intent.first_id not in npcs or intent.second_id not in npcs:
+                raise KeyError(f"encounter {intent.encounter_id!r} references an absent NPC")
         if decision_contexts is not None and not isinstance(decision_contexts, Mapping):
             raise TypeError("decision_contexts must map NPC IDs to decision contexts")
         contexts = dict(decision_contexts or {})
