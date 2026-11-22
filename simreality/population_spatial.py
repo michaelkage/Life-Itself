@@ -25,6 +25,18 @@ class PopulationSlice:
     lod: PopulationLOD
     owner_ids: tuple[str, ...]
 
+    def __post_init__(self):
+        if not isinstance(self.cell_id, str) or not self.cell_id.strip():
+            raise ValueError("cell_id must be non-empty")
+        if not isinstance(self.lod, PopulationLOD):
+            raise TypeError("lod must be a PopulationLOD")
+        if not isinstance(self.owner_ids, tuple) or any(
+            not isinstance(owner, str) or not owner.strip() for owner in self.owner_ids
+        ):
+            raise ValueError("owner_ids must be a tuple of non-empty strings")
+        if tuple(sorted(set(self.owner_ids))) != self.owner_ids:
+            raise ValueError("population slice owner IDs must be unique and sorted")
+
 
 @dataclass(frozen=True)
 class PopulationSubsystemSlice:
@@ -48,6 +60,32 @@ class PopulationSchedule:
     slices: tuple[PopulationSlice, ...]
     selected_owner_ids: tuple[str, ...]
     deferred_owner_ids: tuple[str, ...]
+
+    def __post_init__(self):
+        if isinstance(self.tick, bool) or not isinstance(self.tick, int) or self.tick < 0:
+            raise ValueError("schedule tick must be a non-negative integer")
+        if not isinstance(self.slices, tuple) or any(not isinstance(item, PopulationSlice) for item in self.slices):
+            raise TypeError("slices must be a tuple of PopulationSlice values")
+        if len({(item.cell_id, item.lod) for item in self.slices}) != len(self.slices):
+            raise ValueError("schedule contains duplicate cell/LOD slices")
+        for name, owners in (("selected_owner_ids", self.selected_owner_ids), ("deferred_owner_ids", self.deferred_owner_ids)):
+            if not isinstance(owners, tuple) or any(not isinstance(owner, str) or not owner.strip() for owner in owners):
+                raise ValueError(f"{name} must be a tuple of non-empty owner IDs")
+            if len(set(owners)) != len(owners):
+                raise ValueError(f"{name} must not contain duplicates")
+        selected = set(self.selected_owner_ids)
+        deferred = set(self.deferred_owner_ids)
+        if selected & deferred:
+            raise ValueError("selected and deferred owner sets must be disjoint")
+        sliced = [owner for item in self.slices for owner in item.owner_ids]
+        if len(sliced) != len(set(sliced)) or set(sliced) != selected | deferred:
+            raise ValueError("schedule slices must partition selected and deferred owners exactly")
+        dormant = {
+            owner for item in self.slices if item.lod == PopulationLOD.DORMANT
+            for owner in item.owner_ids
+        }
+        if dormant != deferred:
+            raise ValueError("deferred owners must correspond exactly to dormant LOD slices")
 
     def subsystem_slices(self, policy) -> tuple[PopulationSubsystemSlice, ...]:
         """Resolve LOD cadence into stable owner batches for each subsystem."""
