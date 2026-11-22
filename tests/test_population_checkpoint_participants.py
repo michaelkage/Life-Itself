@@ -6,6 +6,8 @@ from pathlib import Path
 from simreality.model import NPC, NPCMemory, ActionTag, Description
 from simreality.population_checkpoint_participants import build_population_transaction_participants
 from simreality.population_transaction import PopulationTickTransactionCoordinator
+from simreality.action_execution import ActionExecutionLedger
+from simreality.planning import DeterministicPlanner, PlanningAction
 from simreality.routine_execution import RoutineExecutionLedger
 from simreality.routines import RoutineBook, RoutineBlock
 from simreality.simulation_tick import SimulationTickCoordinator
@@ -48,6 +50,10 @@ class PopulationCheckpointParticipantTests(unittest.TestCase):
         self.households.add(HouseholdObligation(
             "bill-1", "npc-a", "family", "utility", 15, 1, "utility bill",
         ))
+        self.action_ledger = ActionExecutionLedger(
+            DeterministicPlanner((PlanningAction("work", frozenset(), frozenset({"done"})),)),
+            (), self.events,
+        )
         self.economic_actions = EconomicActionAdapter(self.economics, (
             ActionEconomicEffect("work", "employer", "family", 20, "wage"),
         ))
@@ -58,6 +64,7 @@ class PopulationCheckpointParticipantTests(unittest.TestCase):
             encounter_adapter=self.encounters,
             economic_action_adapter=self.economic_actions,
             household_ledger=self.households,
+            action_ledger=self.action_ledger,
         )
 
     def test_concrete_participants_restore_npc_social_event_routine_and_economy_state(self):
@@ -69,7 +76,7 @@ class PopulationCheckpointParticipantTests(unittest.TestCase):
             self.assertTrue({
                 "npcs", "world_events", "event_memory", "social_conversations",
                 "social_trust", "social_beliefs", "routine_book", "routine_executions",
-                "travel", "presence", "encounters",
+                "travel", "presence", "encounters", "action_executions",
                 "economics", "economic_actions", "households",
             } <= before_names)
 
@@ -115,6 +122,24 @@ class PopulationCheckpointParticipantTests(unittest.TestCase):
             self.assertEqual(self.economics.snapshot(), ())
             self.assertEqual(self.economic_actions._applied, {})
             self.assertEqual(self.households.snapshot()[0].status, "open")
+
+    def test_action_execution_ledger_and_its_world_events_rollback_together(self):
+        with tempfile.TemporaryDirectory() as directory:
+            transaction = PopulationTickTransactionCoordinator(
+                Path(directory) / "population.json", self.participants,
+            )
+            def execute_then_fail():
+                result = self.action_ledger.execute(
+                    "execution-1", "npc-a", 1, "work", set(), {},
+                    plan_actions=("work",),
+                )
+                self.assertEqual(result.status, "completed")
+                raise RuntimeError("action phase failure")
+            with self.assertRaisesRegex(RuntimeError, "action phase failure"):
+                transaction.execute(1, {"action": "work"}, execute_then_fail)
+            self.assertIsNone(self.action_ledger.get("execution-1"))
+            self.assertEqual(self.action_ledger.active(), ())
+            self.assertEqual(self.events.snapshot(), ())
 
     def test_concrete_participant_restore_preserves_live_object_identity(self):
         with tempfile.TemporaryDirectory() as directory:
