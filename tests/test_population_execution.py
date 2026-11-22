@@ -86,7 +86,8 @@ class PopulationExecutionLoopTests(unittest.TestCase):
                 "npc-a": NPCDecisionContext(frozenset({"available"}), {"goal-a": frozenset({"paid"})}),
                 "npc-b": NPCDecisionContext(frozenset({"available"}), {"goal-b": frozenset({"rested"})}),
             },
-            subsystem_owner_ids=subsystem_plan,
+            population_schedule=schedule,
+            lod_policy=default_population_lod_policy(),
         )
         self.assertEqual(tuple(item.owner_id for item in result.decisions), ("npc-a",))
         self.assertEqual(tuple(item.routine_id for item in result.routine_executions), ("work-a",))
@@ -127,19 +128,15 @@ class PopulationExecutionLoopTests(unittest.TestCase):
             )
         first = loop.run_tick(
             1, 500, self.npcs, outcome_samples={},
-            subsystem_owner_ids={
-                item.subsystem_id: item.owner_ids
-                for item in background_schedule(1).subsystem_slices(default_population_lod_policy())
-            },
+            population_schedule=background_schedule(1),
+            lod_policy=default_population_lod_policy(),
         )
         self.assertEqual(first.economic_transfers, ())
         self.assertEqual(economics.balance("employer"), 50.0)
         later = loop.run_tick(
             4, 500, self.npcs, outcome_samples={},
-            subsystem_owner_ids={
-                item.subsystem_id: item.owner_ids
-                for item in background_schedule(4).subsystem_slices(default_population_lod_policy())
-            },
+            population_schedule=background_schedule(4),
+            lod_policy=default_population_lod_policy(),
         )
         self.assertEqual(len(later.economic_transfers), 1)
         self.assertEqual(economics.balance("employer"), 40.0)
