@@ -240,10 +240,14 @@ def build_population_transaction_participants(
         def capture_economic_actions():
             records = []
             for execution_id, applied in sorted(economic_action_adapter._applied.items()):
-                transfers = (applied,) if isinstance(applied, EconomicTransfer) else tuple(applied)
+                if isinstance(applied, EconomicTransfer):
+                    transfer_ids = [applied.transfer_id]
+                else:
+                    values = tuple(applied)
+                    transfer_ids = [item if isinstance(item, str) else item.transfer_id for item in values]
                 records.append({
                     "execution_id": execution_id,
-                    "transfer_ids": [item.transfer_id for item in transfers],
+                    "transfer_ids": transfer_ids,
                 })
             return _json({"schema_version": 2, "applied": records})
         def restore_economic_actions(payload):
@@ -265,13 +269,9 @@ def build_population_transaction_participants(
                 transfer_ids = item["transfer_ids"]
                 if not isinstance(transfer_ids, list) or not transfer_ids:
                     raise ValueError("economic action checkpoint requires transfer IDs")
-                transfers = []
-                for transfer_id in transfer_ids:
-                    transfer = economics._transfers.get(transfer_id)
-                    if transfer is None:
-                        raise ValueError("economic action checkpoint references a missing transfer")
-                    transfers.append(transfer)
-                restored[execution_id] = tuple(transfers)
+                if any(not isinstance(item, str) or not item.strip() for item in transfer_ids):
+                    raise ValueError("invalid economic action transfer reference")
+                restored[execution_id] = tuple(transfer_ids)
             _replace_mapping(economic_action_adapter._applied, restored)
         add("economic_actions", capture_economic_actions, restore_economic_actions)
 
@@ -291,7 +291,10 @@ def build_population_transaction_participants(
         def capture_household_actions():
             return _json({"schema_version": 1, "applied": [
                 {"execution_id": execution_id,
-                 "obligation_ids": [item.obligation_id for item in obligations]}
+                 "obligation_ids": [
+                     item if isinstance(item, str) else item.obligation_id
+                     for item in obligations
+                 ]}
                 for execution_id, obligations in sorted(household_action_adapter._applied.items())
             ]})
         def restore_household_actions(payload):
@@ -303,13 +306,12 @@ def build_population_transaction_participants(
                 execution_id = item["execution_id"]
                 if not isinstance(execution_id, str) or not execution_id.strip() or execution_id in restored:
                     raise ValueError("invalid or duplicate household action execution ID")
-                obligations = []
-                for obligation_id in item["obligation_ids"]:
-                    obligation = household_ledger._obligations.get(obligation_id)
-                    if obligation is None:
-                        raise ValueError("household action checkpoint references a missing obligation")
-                    obligations.append(obligation)
-                restored[execution_id] = tuple(obligations)
+                obligation_ids = item["obligation_ids"]
+                if not isinstance(obligation_ids, list) or any(
+                    not isinstance(value, str) or not value.strip() for value in obligation_ids
+                ):
+                    raise ValueError("invalid household action obligation references")
+                restored[execution_id] = tuple(obligation_ids)
             _replace_mapping(household_action_adapter._applied, restored)
         add("household_actions", capture_household_actions, restore_household_actions)
 
