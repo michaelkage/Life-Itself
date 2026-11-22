@@ -304,6 +304,7 @@ class PopulationExecutionLoop:
                 absent = set(owners) - set(roster)
                 if absent:
                     raise KeyError(f"subsystem {name!r} references absent NPCs: {', '.join(sorted(absent))}")
+                subsystem_plan[name] = owners
         routine_owners = roster if subsystem_plan is None else subsystem_plan.get("routine", ())
         if owner_ids is None:
             selected_owners = tuple(routine_owners)
