@@ -631,9 +631,8 @@ class PopulationExecutionLoop:
             self.household_ledger.add(item)
             for item in sorted(household_obligations, key=lambda value: value.obligation_id)
         ) if self.household_ledger is not None else ()
-        household_settlements = tuple(
-            self.household_ledger.settle(obligation_id, tick)
-            for obligation_id in sorted(household_settlement_ids)
+        household_settlements = self.household_ledger.settle_many(
+            tuple(sorted(household_settlement_ids)), tick,
         ) if self.household_ledger is not None else ()
         self._phase_completed("households", tick)
         action_result_by_id = {}
