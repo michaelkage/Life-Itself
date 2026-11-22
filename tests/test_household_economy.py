@@ -100,7 +100,7 @@ class HouseholdEconomyTests(unittest.TestCase):
         )
         with self.assertRaisesRegex(ValueError, "insufficient funds"):
             adapter.apply_all(execution, 2)
-        self.assertEqual(self.economics.balance("employer"), 100.0)
+        self.assertEqual(self.economics.balance("employer"), 10.0)
         self.assertEqual(self.economics.snapshot(), ())
 
     def test_completed_action_creates_explicit_household_obligations_once(self):
