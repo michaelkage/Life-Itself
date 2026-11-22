@@ -7,6 +7,7 @@ from simreality.model import NPC, NPCMemory, ActionTag, Description
 from simreality.population_checkpoint_participants import build_population_transaction_participants
 from simreality.population_transaction import PopulationTickTransactionCoordinator
 from simreality.action_execution import ActionExecutionLedger, ActionExecutionPolicy
+from simreality.action_world_state import ActionWorldState
 from simreality.goals import GoalBook, NPCGoal
 from simreality.planning import DeterministicPlanner, PlanningAction
 from simreality.routine_execution import RoutineExecutionLedger
@@ -58,6 +59,11 @@ class PopulationCheckpointParticipantTests(unittest.TestCase):
             (ActionExecutionPolicy("work", goal_progress=(("goal-work", 0.25),)),),
             self.events, self.goals,
         )
+        self.action_facts = {"available"}
+        self.action_resources = {"energy": 8.0}
+        self.action_world_state = ActionWorldState(
+            {"npc-a": self.action_facts}, {"npc-a": self.action_resources},
+        )
         self.economic_actions = EconomicActionAdapter(self.economics, (
             ActionEconomicEffect("work", "employer", "family", 20, "wage"),
         ))
@@ -69,6 +75,7 @@ class PopulationCheckpointParticipantTests(unittest.TestCase):
             economic_action_adapter=self.economic_actions,
             household_ledger=self.households,
             action_ledger=self.action_ledger,
+            action_world_state=self.action_world_state,
         )
 
     def test_concrete_participants_restore_npc_social_event_routine_and_economy_state(self):
@@ -81,7 +88,7 @@ class PopulationCheckpointParticipantTests(unittest.TestCase):
                 "npcs", "world_events", "event_memory", "social_conversations",
                 "social_trust", "social_beliefs", "routine_book", "routine_executions",
                 "travel", "presence", "encounters", "action_executions", "action_goals",
-                "economics", "economic_actions", "households",
+                "economics", "economic_actions", "households", "action_world_state",
             } <= before_names)
 
             def partially_apply_then_fail():
@@ -108,6 +115,8 @@ class PopulationCheckpointParticipantTests(unittest.TestCase):
                 ))
                 self.economic_actions._applied["execution-1"] = self.economics.snapshot()[0]
                 self.households.settle("bill-1", 1)
+                self.action_facts.add("mutated")
+                self.action_resources["energy"] = 0.0
                 raise RuntimeError("injected after economic phase")
 
             with self.assertRaisesRegex(RuntimeError, "injected after economic phase"):
@@ -126,6 +135,8 @@ class PopulationCheckpointParticipantTests(unittest.TestCase):
             self.assertEqual(self.economics.snapshot(), ())
             self.assertEqual(self.economic_actions._applied, {})
             self.assertEqual(self.households.snapshot()[0].status, "open")
+            self.assertEqual(self.action_facts, {"available"})
+            self.assertEqual(self.action_resources, {"energy": 8.0})
 
     def test_action_execution_ledger_and_its_world_events_rollback_together(self):
         with tempfile.TemporaryDirectory() as directory:
