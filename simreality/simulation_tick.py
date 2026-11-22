@@ -198,6 +198,17 @@ class SimulationTickCoordinator:
             beliefs.restore_transaction_snapshot(belief_state)
             raise
 
+    def discard_tick_cache(self, tick: int) -> None:
+        """Forget orchestration replay metadata after an enclosing transaction rolls back.
+
+        Domain mutations and adapter replay indexes are restored by transaction
+        participants. Keeping this cache would short-circuit the retry and skip
+        re-applying those restored effects.
+        """
+        self._requests.pop(tick, None)
+        self._results.pop(tick, None)
+        self._last_tick = max(self._requests) if self._requests else None
+
     def execute_routines(
         self,
         tick: int,
