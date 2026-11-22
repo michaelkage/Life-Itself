@@ -35,6 +35,20 @@ class WorldEventMemoryAdapter:
         """Return whether this event/witness pair already has a memory record."""
         return (event_id, witness_id) in self._processed
 
+    def can_materialize(self, event_id: str) -> bool:
+        """Return whether an event contains the minimum supported memory evidence."""
+        event = self.events.get(event_id)
+        attributes = self._attributes(event)
+        raw_tag = attributes.get("action_tag")
+        target_id = attributes.get("target_entity_id")
+        if not isinstance(raw_tag, str) or not isinstance(target_id, str) or not target_id.strip():
+            return False
+        try:
+            ActionTag(raw_tag)
+        except ValueError:
+            return False
+        return True
+
     def is_memory_resolved(self, event_id: str, witness_id: str) -> bool:
         """Return whether the pair is processed or cannot produce a memory."""
         if self.has_materialized(event_id, witness_id):
