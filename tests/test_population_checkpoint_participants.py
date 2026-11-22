@@ -237,6 +237,50 @@ class PopulationCheckpointParticipantTests(unittest.TestCase):
             self.assertEqual(self.goals.goals["goal-work"].progress, 0.0)
             self.assertEqual(self.events.snapshot(), ())
 
+    def test_restart_rollback_restores_economic_household_and_inventory_replay_indexes(self):
+        execution = ActionExecution(
+            "execution-ledgers", "npc-a", 1, "work", "completed", "done",
+            (), (), (), (), "event-ledgers",
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            transaction = PopulationTickTransactionCoordinator(
+                Path(directory) / "population.json", self.participants,
+            )
+            def apply_all_ledgers():
+                wages = self.economic_actions.apply_all(execution, 1)
+                obligations = self.household_actions.apply_all(execution, 1)
+                inventory = self.inventory_actions.apply_all(execution, 1)
+                return (len(wages), len(obligations), len(inventory))
+            self.assertEqual(transaction.execute(1, {"apply": "all"}, apply_all_ledgers), (1, 1, 1))
+            balances = self.economics.account_snapshot()
+            obligations = self.households.snapshot()
+            stock = self.inventory.stock_snapshot()
+
+            def corrupt_then_fail():
+                self.economic_actions._applied.clear()
+                self.household_actions._applied.clear()
+                self.inventory_actions._applied.clear()
+                self.economics._transfers.clear()
+                self.households._obligations.clear()
+                self.inventory._transfers.clear()
+                self.inventory._stock.clear()
+                raise RuntimeError("restart recovery injection")
+            with self.assertRaisesRegex(RuntimeError, "restart recovery injection"):
+                transaction.execute(2, {"apply": "corrupt"}, corrupt_then_fail)
+
+            self.assertEqual(self.economics.account_snapshot(), balances)
+            self.assertEqual(self.households.snapshot(), obligations)
+            self.assertEqual(self.inventory.stock_snapshot(), stock)
+            self.assertEqual(self.economic_actions.apply_all(execution, 1), tuple(
+                item for item in self.economics.snapshot()
+                if item.transfer_id.startswith("action:execution-ledgers:")
+            ))
+            self.assertEqual(self.household_actions.apply_all(execution, 1), obligations[1:])
+            self.assertEqual(self.inventory_actions.apply_all(execution, 1), tuple(
+                item for item in self.inventory.snapshot()
+                if item.transfer_id.startswith("action:execution-ledgers:")
+            ))
+
     def test_concrete_participant_restore_preserves_live_object_identity(self):
         with tempfile.TemporaryDirectory() as directory:
             transaction = PopulationTickTransactionCoordinator(
