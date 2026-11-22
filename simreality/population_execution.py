@@ -611,15 +611,24 @@ class PopulationExecutionLoop:
             if (
                 self.economic_action_adapter is not None
                 and self.economic_action_adapter.has_policy(item.action_id)
-                and not self.economic_action_adapter.has_applied(item.execution_id)
+                and (
+                    not self.economic_action_adapter.has_applied(item.execution_id)
+                    or self.economic_action_adapter.has_applied_at(item.execution_id, tick)
+                )
             ) or (
                 self.household_action_adapter is not None
                 and self.household_action_adapter.has_policy(item.action_id)
-                and not self.household_action_adapter.has_applied(item.execution_id)
+                and (
+                    not self.household_action_adapter.has_applied(item.execution_id)
+                    or self.household_action_adapter.has_applied_at(item.execution_id, item.action_id, tick)
+                )
             ) or (
                 self.inventory_action_adapter is not None
                 and self.inventory_action_adapter.has_policy(item.action_id)
-                and not self.inventory_action_adapter.has_applied(item.execution_id)
+                and (
+                    not self.inventory_action_adapter.has_applied(item.execution_id)
+                    or self.inventory_action_adapter.has_applied_at(item.execution_id, tick)
+                )
             )
         }
         economic_transfers = tuple(
@@ -634,8 +643,10 @@ class PopulationExecutionLoop:
             obligation
             for item in due_economic_actions
             if self.household_action_adapter is not None
-            and not self.household_action_adapter.has_applied(item.execution_id)
             for obligation in self.household_action_adapter.apply_all(item, tick)
+            if self.household_action_adapter.created_at(
+                item.execution_id, item.action_id, obligation, tick,
+            )
         )
         inventory_transfers = tuple(
             transfer
