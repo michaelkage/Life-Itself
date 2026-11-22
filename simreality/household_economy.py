@@ -82,25 +82,58 @@ class EconomicLedger:
         return self._balances[account_id]
 
     def transfer(self, transfer: EconomicTransfer) -> EconomicTransfer:
-        if not isinstance(transfer, EconomicTransfer):
-            raise TypeError("transfer must be an EconomicTransfer")
-        if transfer.debit_account not in self._accounts or transfer.credit_account not in self._accounts:
-            raise KeyError("transfer references an unknown account")
-        debit = self._accounts[transfer.debit_account]
-        credit = self._accounts[transfer.credit_account]
-        if debit.currency != credit.currency:
-            raise ValueError("cross-currency transfers require an explicit conversion transaction")
-        prior = self._transfers.get(transfer.transfer_id)
-        if prior is not None:
-            if prior != transfer:
-                raise ValueError(f"conflicting transfer replay: {transfer.transfer_id}")
-            return prior
-        if self._balances[transfer.debit_account] + 1e-12 < transfer.amount:
-            raise ValueError(f"insufficient funds in account: {transfer.debit_account}")
-        self._balances[transfer.debit_account] -= transfer.amount
-        self._balances[transfer.credit_account] += transfer.amount
-        self._transfers[transfer.transfer_id] = transfer
-        return transfer
+        """Apply one transfer using the atomic batch posting path."""
+        return self.transfer_many((transfer,))[0]
+
+    def transfer_many(self, transfers: Iterable[EconomicTransfer]) -> tuple[EconomicTransfer, ...]:
+        """Post a balanced batch atomically, including valid same-batch cash flows."""
+        values = tuple(transfers)
+        if any(not isinstance(item, EconomicTransfer) for item in values):
+            raise TypeError("transfers must contain EconomicTransfer values")
+        if len({item.transfer_id for item in values}) != len(values):
+            raise ValueError("transfer IDs must be unique within a batch")
+        result = []
+        pending = []
+        for transfer in values:
+            if transfer.debit_account not in self._accounts or transfer.credit_account not in self._accounts:
+                raise KeyError("transfer references an unknown account")
+            debit = self._accounts[transfer.debit_account]
+            credit = self._accounts[transfer.credit_account]
+            if debit.currency != credit.currency:
+                raise ValueError("cross-currency transfers require an explicit conversion transaction")
+            prior = self._transfers.get(transfer.transfer_id)
+            if prior is not None:
+                if prior != transfer:
+                    raise ValueError(f"conflicting transfer replay: {transfer.transfer_id}")
+                result.append(prior)
+            else:
+                pending.append(transfer)
+                result.append(transfer)
+
+        debit_totals = {}
+        credit_totals = {}
+        for transfer in pending:
+            debit_totals[transfer.debit_account] = (
+                debit_totals.get(transfer.debit_account, 0.0) + transfer.amount
+            )
+            credit_totals[transfer.credit_account] = (
+                credit_totals.get(transfer.credit_account, 0.0) + transfer.amount
+            )
+        final_balances = {}
+        for account_id in set(debit_totals) | set(credit_totals):
+            balance = (
+                self._balances[account_id]
+                - debit_totals.get(account_id, 0.0)
+                + credit_totals.get(account_id, 0.0)
+            )
+            if balance < -1e-12:
+                raise ValueError(f"insufficient funds in account: {account_id}")
+            final_balances[account_id] = max(0.0, balance)
+
+        self._balances.update(final_balances)
+        for transfer in pending:
+            self._transfers[transfer.transfer_id] = transfer
+        return tuple(result)
 
     def snapshot(self) -> tuple[EconomicTransfer, ...]:
         return tuple(sorted(self._transfers.values(), key=lambda item: (item.tick, item.transfer_id)))
@@ -277,17 +310,7 @@ class EconomicActionAdapter:
             policy.amount, f"action:{execution.execution_id}:{policy.effect_kind}",
         ) for policy in policies)
 
-        debit_totals = {}
-        for transfer in transfers:
-            debit_totals[transfer.debit_account] = debit_totals.get(transfer.debit_account, 0.0) + transfer.amount
-            existing = self.economics._transfers.get(transfer.transfer_id)
-            if existing is not None and existing != transfer:
-                raise ValueError(f"conflicting transfer replay: {transfer.transfer_id}")
-        for account_id, amount in debit_totals.items():
-            if self.economics.balance(account_id) + 1e-12 < amount:
-                raise ValueError(f"insufficient funds in account: {account_id}")
-
-        applied = tuple(self.economics.transfer(item) for item in transfers)
+        applied = self.economics.transfer_many(transfers)
         self._applied[execution.execution_id] = tuple(item.transfer_id for item in applied)
         return applied
 
