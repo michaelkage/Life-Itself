@@ -46,7 +46,7 @@ class PopulationLODPolicyTests(unittest.TestCase):
         self.assertEqual(by_subsystem["economy"], ("npc-a",))
         self.assertEqual(by_subsystem["routine"], ("npc-a",))
         self.assertEqual(by_subsystem["travel"], ("npc-a", "npc-b"))
-        self.assertNotIn("social", by_subsystem.get("dormant", ()))
+        self.assertEqual(by_subsystem["social"], ("npc-a",))
 
     def test_all_lod_tiers_must_be_defined(self):
         with self.assertRaisesRegex(ValueError, "every PopulationLOD"):
