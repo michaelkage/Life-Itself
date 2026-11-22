@@ -568,6 +568,7 @@ class PopulationExecutionLoop:
                 if (
                     witness_id in memory_owners
                     and witness_id in npcs
+                    and self.coordinator.memory_adapter.can_materialize(event.event_id)
                     and (
                         event.tick == tick
                         or not self.coordinator.memory_adapter.is_memory_resolved(event.event_id, witness_id)
