@@ -258,9 +258,8 @@ class PopulationExecutionLoop:
             try:
                 return self._run_tick_untransactional(tick, minute_of_day, npcs, **normalized_kwargs)
             except BaseException:
-                self.coordinator.discard_tick_cache(tick)
-                if self.action_dispatch_adapter is not None:
-                    self.action_dispatch_adapter.discard_tick_cache(tick)
+                # Without rollback, preserve subsystem replay caches for state
+                # that may already have been committed by earlier phases.
                 self._requests.pop(tick, None)
                 self._results.pop(tick, None)
                 raise
