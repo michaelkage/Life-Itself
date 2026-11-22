@@ -142,7 +142,7 @@ class PopulationCheckpointParticipantTests(unittest.TestCase):
             self.assertEqual(self.action_resources, {"energy": 8.0})
 
     def test_population_tick_rolls_back_action_dispatch_facts_and_economy_after_failure(self):
-        state = ActionWorldState({"npc-a": set()}, {"npc-a": {}})
+        state = self.action_world_state
         dispatch = NPCActionDispatchAdapter(self.action_ledger)
         with tempfile.TemporaryDirectory() as directory:
             transaction = PopulationTickTransactionCoordinator(
@@ -173,7 +173,7 @@ class PopulationCheckpointParticipantTests(unittest.TestCase):
 
             self.assertEqual(len(self.action_ledger.active()), 1)
             self.assertEqual(self.action_ledger.active()[0].progress_ticks, 0)
-            self.assertEqual(state.world_facts_by_owner["npc-a"], set())
+            self.assertEqual(state.world_facts_by_owner["npc-a"], {"available"})
             self.assertEqual(state.resources_by_owner["npc-a"], {})
             self.assertEqual(self.economics.balance("employer"), 100.0)
             self.assertEqual(self.economics.snapshot(), ())
@@ -181,7 +181,7 @@ class PopulationCheckpointParticipantTests(unittest.TestCase):
 
             retried = loop.run_tick(2, 501, self.npcs, outcome_samples={}, decision_contexts=context)
             self.assertEqual(retried.action_results[0].status, "completed")
-            self.assertEqual(state.world_facts_by_owner["npc-a"], {"done"})
+            self.assertEqual(state.world_facts_by_owner["npc-a"], {"available", "done"})
             self.assertEqual(self.economics.balance("employer"), 80.0)
             self.assertEqual(self.economics.balance("family"), 20.0)
             self.assertEqual(len(retried.economic_transfers), 1)
