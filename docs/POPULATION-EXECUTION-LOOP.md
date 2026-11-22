@@ -142,7 +142,13 @@ settles them through that same ledger. `EconomicActionAdapter` applies a
 configured account transfer only for a completed `ActionExecution`; it does
 not infer wages, purchases, prices, inventory quantities, or obligations from
 action names. Configure policies with real account IDs and explicit amounts.
-The ledger supports canonical JSON snapshots for persistence.
+The ledger supports canonical JSON snapshots for persistence. Multiple configured
+transfers may be applied atomically for one action (for example, gross wages and
+payroll withholding); debit totals are preflighted before any transfer is posted.
+`HouseholdActionAdapter` can also create deterministic obligations from completed
+actions with explicit household/account IDs, amounts and due-tick offsets. The
+population transaction factory checkpoints both adapter replay indexes alongside
+the economic and household ledgers.
 
 ## Transaction boundary status
 
