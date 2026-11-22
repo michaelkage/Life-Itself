@@ -467,8 +467,14 @@ class PopulationExecutionLoop:
         else:
             if travel_budgets is None:
                 raise ValueError("travel_budgets are required when travel integration is configured")
+            if not isinstance(travel_budgets, Mapping):
+                raise TypeError("travel_budgets must map owner IDs to travel budgets")
+            effective_travel_budgets = {
+                owner: budget for owner, budget in travel_budgets.items()
+                if owner in travel_owners
+            }
             travel_result = self.travel_adapter.advance(
-                tick, travel_budgets, closed_edge_ids=closed_edges,
+                tick, effective_travel_budgets, closed_edge_ids=closed_edges,
                 time_multipliers=multiplier_values, events=self.coordinator.events,
             )
             presence_records = self.presence_adapter.synchronize(
@@ -480,7 +486,7 @@ class PopulationExecutionLoop:
         if encounter_opportunities and self.encounter_adapter is None:
             raise ValueError("encounter opportunities require a configured PresenceSocialAdapter")
         for intent in sorted(encounter_opportunities, key=lambda item: item.encounter_id):
-            if not intent.opportunity:
+            if not intent.opportunity or intent.first_id not in social_owners or intent.second_id not in social_owners:
                 continue
             result = self.encounter_adapter.encounter(
                 intent.encounter_id, intent.first_id, intent.second_id, tick,
@@ -489,9 +495,22 @@ class PopulationExecutionLoop:
             if result is not None:
                 encounter_results.append(result)
                 generated_event_ids.append(f"npc_encounter:{intent.encounter_id}")
-        selected_event_ids = tuple(sorted(set(event_ids) | set(generated_event_ids)))
+        memory_event_ids = []
+        for event_id in event_ids:
+            event = self.coordinator.events.get(event_id)
+            if set(event.witnesses).issubset(memory_owners):
+                memory_event_ids.append(event_id)
+        for event_id in generated_event_ids:
+            event = self.coordinator.events.get(event_id)
+            if set(event.witnesses).issubset(memory_owners):
+                memory_event_ids.append(event_id)
+        social_conversations = tuple(
+            intent for intent in conversations
+            if intent.listener_id in social_owners and intent.speaker_id in social_owners
+        )
         social = self.coordinator.step(
-            tick, npcs, event_ids=selected_event_ids, conversations=conversations,
+            tick, npcs, event_ids=tuple(sorted(set(memory_event_ids))),
+            conversations=social_conversations,
         )
         executions = self.coordinator.execute_routines(
             tick, minute_of_day, self.routine_book, self.routine_ledger,
