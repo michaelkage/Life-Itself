@@ -95,9 +95,12 @@ class NPCActionDispatchAdapter:
                 continue
             active_for_owner = next((item for item in self.executions.active() if item.owner_id == owner), None)
             if active_for_owner is not None:
+                replayed_start = active_for_owner.started_tick == tick
                 output.append(NPCActionDispatch(
                     owner, active_for_owner.execution_id, active_for_owner.action_id,
-                    "already_active", "owner already has an active action", active_for_owner,
+                    "started" if replayed_start else "already_active",
+                    "action start restored from this tick" if replayed_start else "owner already has an active action",
+                    active_for_owner,
                 ))
                 continue
             if owner not in world_facts_by_owner or owner not in resources_by_owner:
