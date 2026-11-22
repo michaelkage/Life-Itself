@@ -6,7 +6,8 @@ from pathlib import Path
 from simreality.model import NPC, NPCMemory, ActionTag, Description
 from simreality.population_checkpoint_participants import build_population_transaction_participants
 from simreality.population_transaction import PopulationTickTransactionCoordinator
-from simreality.action_execution import ActionExecutionLedger
+from simreality.action_execution import ActionExecutionLedger, ActionExecutionPolicy
+from simreality.goals import GoalBook, NPCGoal
 from simreality.planning import DeterministicPlanner, PlanningAction
 from simreality.routine_execution import RoutineExecutionLedger
 from simreality.routines import RoutineBook, RoutineBlock
@@ -50,9 +51,12 @@ class PopulationCheckpointParticipantTests(unittest.TestCase):
         self.households.add(HouseholdObligation(
             "bill-1", "npc-a", "family", "utility", 15, 1, "utility bill",
         ))
+        self.goals = GoalBook()
+        self.goals.add(NPCGoal("goal-work", "npc-a", "employment", priority=1.0))
         self.action_ledger = ActionExecutionLedger(
             DeterministicPlanner((PlanningAction("work", frozenset(), frozenset({"done"})),)),
-            (), self.events,
+            (ActionExecutionPolicy("work", goal_progress=(("goal-work", 0.25),)),),
+            self.events, self.goals,
         )
         self.economic_actions = EconomicActionAdapter(self.economics, (
             ActionEconomicEffect("work", "employer", "family", 20, "wage"),
@@ -76,7 +80,7 @@ class PopulationCheckpointParticipantTests(unittest.TestCase):
             self.assertTrue({
                 "npcs", "world_events", "event_memory", "social_conversations",
                 "social_trust", "social_beliefs", "routine_book", "routine_executions",
-                "travel", "presence", "encounters", "action_executions",
+                "travel", "presence", "encounters", "action_executions", "action_goals",
                 "economics", "economic_actions", "households",
             } <= before_names)
 
@@ -139,6 +143,7 @@ class PopulationCheckpointParticipantTests(unittest.TestCase):
                 transaction.execute(1, {"action": "work"}, execute_then_fail)
             self.assertIsNone(self.action_ledger.get("execution-1"))
             self.assertEqual(self.action_ledger.active(), ())
+            self.assertEqual(self.goals.goals["goal-work"].progress, 0.0)
             self.assertEqual(self.events.snapshot(), ())
 
     def test_concrete_participant_restore_preserves_live_object_identity(self):
