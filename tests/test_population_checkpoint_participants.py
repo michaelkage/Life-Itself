@@ -15,6 +15,9 @@ from simreality.social_trust import SocialTrustLedger, SocialInteraction
 from simreality.beliefs import Evidence
 from simreality.world_event_memory import WorldEventMemoryAdapter
 from simreality.world_events import WorldEventLedger
+from simreality.travel import TravelLedger, TravelJourney, TravelTickAdapter
+from simreality.presence import PresenceLedger, PresenceTickAdapter
+from simreality.presence_encounters import PresenceSocialAdapter
 from simreality.household_economy import (
     EconomicAccount, EconomicLedger, EconomicTransfer, EconomicActionAdapter,
     ActionEconomicEffect, HouseholdLedger, HouseholdObligation,
@@ -29,6 +32,11 @@ class PopulationCheckpointParticipantTests(unittest.TestCase):
         self.beliefs = SocialBeliefSystem(self.trust)
         self.conversations = SocialConversationAdapter(self.trust, self.beliefs)
         self.memory = WorldEventMemoryAdapter(self.events)
+        self.travel_ledger = TravelLedger()
+        self.travel_adapter = TravelTickAdapter((), self.travel_ledger)
+        self.presence_ledger = PresenceLedger()
+        self.presence_adapter = PresenceTickAdapter(self.presence_ledger)
+        self.encounters = PresenceSocialAdapter(self.presence_ledger)
         self.tick = SimulationTickCoordinator(self.events, self.memory, self.conversations)
         self.routines = RoutineBook()
         self.routine_executions = RoutineExecutionLedger()
@@ -45,6 +53,9 @@ class PopulationCheckpointParticipantTests(unittest.TestCase):
         ))
         self.participants = build_population_transaction_participants(
             self.npcs, self.tick, self.routines, self.routine_executions,
+            travel_adapter=self.travel_adapter,
+            presence_adapter=self.presence_adapter,
+            encounter_adapter=self.encounters,
             economic_action_adapter=self.economic_actions,
             household_ledger=self.households,
         )
@@ -58,6 +69,7 @@ class PopulationCheckpointParticipantTests(unittest.TestCase):
             self.assertTrue({
                 "npcs", "world_events", "event_memory", "social_conversations",
                 "social_trust", "social_beliefs", "routine_book", "routine_executions",
+                "travel", "presence", "encounters",
                 "economics", "economic_actions", "households",
             } <= before_names)
 
@@ -127,7 +139,7 @@ class PopulationCheckpointParticipantTests(unittest.TestCase):
             transaction = PopulationTickTransactionCoordinator(
                 Path(directory) / "population.json", self.participants,
             )
-            for failed_phase in range(6):
+            for failed_phase in range(8):
                 tick = 10 + failed_phase
                 memory = NPCMemory(
                     "npc-a", "npc-b", 0.7, 0.8, float(tick),
@@ -151,6 +163,18 @@ class PopulationCheckpointParticipantTests(unittest.TestCase):
                     lambda: self.routines.add(RoutineBlock(
                         f"routine-{tick}", "npc-a", "work", "office", 480, 600,
                     )),
+                    lambda: self.travel_ledger.add(TravelJourney(
+                        f"journey-{tick}", "npc-a", "origin", "destination",
+                        ("origin", "destination"), ("edge",), started_tick=tick,
+                    )),
+                    lambda: (
+                        self.presence_ledger.place("npc-a", "market", tick),
+                        self.presence_ledger.place("npc-b", "market", tick),
+                        self.encounters.encounter(
+                            f"encounter-{tick}", "npc-a", "npc-b", tick,
+                            opportunity=True, events=self.events,
+                        ),
+                    ),
                     lambda: (
                         self.economics.transfer(EconomicTransfer(
                             f"transfer-{tick}", tick, "employer", "family", 1, "phase-test",
@@ -179,7 +203,10 @@ class PopulationCheckpointParticipantTests(unittest.TestCase):
                 self.assertEqual(self.economics.balance("family"), 0.0)
                 self.assertEqual(self.economics.snapshot(), ())
                 self.assertEqual(self.economic_actions._applied, {})
-                self.assertEqual(self.households.snapshot()[0].status, "pending")
+                self.assertEqual(self.households.snapshot()[0].status, "open")
+                self.assertEqual(self.travel_ledger.snapshot(), ())
+                self.assertEqual(self.presence_ledger.snapshot(), ())
+                self.assertEqual(self.encounters.ledger.snapshot(), ())
 
 if __name__ == "__main__":
     unittest.main()
