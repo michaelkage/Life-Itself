@@ -1,4 +1,5 @@
 import unittest
+import json
 
 from simreality import (
     ActionTag, NPC, NPCCollectionSnapshot, SocialBeliefSnapshot,
@@ -96,6 +97,25 @@ class SimulationTickReplayPersistenceTests(unittest.TestCase):
         self.assertEqual(replay, original)
         self.assertEqual(len(restored_npcs["speaker"].memories), 1)
         self.assertEqual(restored_coordinator._last_tick, 4)
+
+    def test_legacy_v1_tick_replay_snapshot_migrates_all_witness_memory_refs(self):
+        events = self.make_events()
+        trust = SocialTrustLedger()
+        beliefs = SocialBeliefSystem(trust)
+        conversations = SocialConversationAdapter(trust, beliefs)
+        coordinator = SimulationTickCoordinator(
+            events, WorldEventMemoryAdapter(events), conversations,
+        )
+        coordinator.step(3, {"speaker": NPC("speaker"), "listener": NPC("listener")}, event_ids=("event-1",))
+        raw = json.loads(SimulationTickReplaySnapshot.capture(coordinator).to_json())
+        raw["schema_version"] = 1
+        for entry in raw["entries"]:
+            entry.pop("memory_requests")
+        migrated = SimulationTickReplaySnapshot.from_json(json.dumps(raw))
+        self.assertEqual(
+            migrated.entries[0].memory_requests,
+            (("event-1", "speaker"),),
+        )
 
     def test_unknown_schema_rejected(self):
         with self.assertRaises(ValueError):
