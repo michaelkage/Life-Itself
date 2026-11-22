@@ -18,7 +18,7 @@ from .travel import TravelTickAdapter, TravelTickResult
 from .presence import PresenceTickAdapter, NPCPresence
 from .presence_encounters import PresenceSocialAdapter, PresenceEncounterResult
 from .population_transaction import PopulationTickTransactionCoordinator
-from .action_execution import ActionExecution
+from .action_execution import ActionExecution, ActionExecutionLedger
 from .household_economy import EconomicActionAdapter, EconomicTransfer, HouseholdLedger, HouseholdObligation
 from .simulation_tick import (
     ConversationIntent,
@@ -93,6 +93,7 @@ class PopulationExecutionLoop:
         transaction_coordinator: PopulationTickTransactionCoordinator | None = None,
         economic_action_adapter: EconomicActionAdapter | None = None,
         household_ledger: HouseholdLedger | None = None,
+        action_execution_ledger: ActionExecutionLedger | None = None,
     ) -> None:
         if not isinstance(coordinator, SimulationTickCoordinator):
             raise TypeError("coordinator must be a SimulationTickCoordinator")
@@ -148,6 +149,13 @@ class PopulationExecutionLoop:
             raise ValueError("household and action adapters must share the same EconomicLedger")
         self.economic_action_adapter = economic_action_adapter
         self.household_ledger = household_ledger
+        if action_execution_ledger is not None and not isinstance(action_execution_ledger, ActionExecutionLedger):
+            raise TypeError("action_execution_ledger must be an ActionExecutionLedger or None")
+        if action_execution_ledger is not None and action_execution_ledger.events is not coordinator.events:
+            raise ValueError("action execution ledger must share the population world event ledger")
+        self.action_execution_ledger = action_execution_ledger
+        if action_execution_ledger is not None and transaction_coordinator is not None and "action_executions" not in transaction_coordinator.participant_names:
+            raise ValueError("transaction coordinator is missing the action_executions participant")
         self._results: dict[int, PopulationTickResult] = {}
         self._requests: dict[int, tuple[object, ...]] = {}
 
@@ -286,6 +294,10 @@ class PopulationExecutionLoop:
             raise ValueError("completed action executions require an EconomicActionAdapter")
         if completed_action_executions and self.transaction_coordinator is not None and "action_executions" not in self.transaction_coordinator.participant_names:
             raise ValueError("whole-tick transaction requires an action_executions participant for completed action inputs")
+        if completed_action_executions and self.action_execution_ledger is not None:
+            for execution in completed_action_executions:
+                if self.action_execution_ledger.get(execution.execution_id) != execution:
+                    raise ValueError(f"completed action {execution.execution_id} is not present in the configured action ledger")
         if household_settlement_ids and self.household_ledger is None:
             raise ValueError("household settlements require a HouseholdLedger")
         signature = (
