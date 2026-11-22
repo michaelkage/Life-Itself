@@ -21,6 +21,7 @@ from .presence_encounter_save_state import PresenceEncounterSnapshot
 from .routine_save_state import RoutineBookSnapshot
 from .routine_execution_save_state import RoutineExecutionSnapshot
 from .action_execution import ActionExecutionLedger, ActionExecutionSnapshot
+from .action_world_state import ActionWorldState
 from .household_economy import EconomicLedger, EconomicActionAdapter, HouseholdLedger, HouseholdObligation
 from .world_events import WorldEvent, WorldEventLedger
 from .population_transaction import TransactionParticipant
@@ -72,6 +73,7 @@ def build_population_transaction_participants(
     economic_action_adapter: EconomicActionAdapter | None = None,
     household_ledger: HouseholdLedger | None = None,
     action_ledger: ActionExecutionLedger | None = None,
+    action_world_state: ActionWorldState | None = None,
 ) -> tuple[TransactionParticipant, ...]:
     """Build complete participants for the supplied live population loop.
 
@@ -106,6 +108,8 @@ def build_population_transaction_participants(
         raise TypeError("household_ledger must be a HouseholdLedger or None")
     if action_ledger is not None and not isinstance(action_ledger, ActionExecutionLedger):
         raise TypeError("action_ledger must be an ActionExecutionLedger or None")
+    if action_world_state is not None and not isinstance(action_world_state, ActionWorldState):
+        raise TypeError("action_world_state must be an ActionWorldState or None")
     participants = []
 
     def add(name, capture, restore):
@@ -253,6 +257,9 @@ def build_population_transaction_participants(
             restored = {item["obligation_id"]: HouseholdObligation(**item) for item in raw["obligations"]}
             _replace_mapping(household_ledger._obligations, restored)
         add("households", capture_households, restore_households)
+
+    if action_world_state is not None:
+        add("action_world_state", action_world_state.to_json, action_world_state.restore_json)
 
     if action_ledger is not None:
         if action_ledger.events is not events:
