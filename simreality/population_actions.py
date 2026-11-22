@@ -11,7 +11,6 @@ from typing import Mapping
 
 from .action_execution import ActionExecutionLedger, ActiveActionExecution
 from .npc_autonomy import NPCDecision
-from .action_execution import ActionExecution, ActiveActionExecution
 
 
 @dataclass(frozen=True)
@@ -46,6 +45,10 @@ class NPCActionDispatchAdapter:
             raise ValueError("tick must be a non-negative integer")
         if not isinstance(decisions, tuple) or any(not isinstance(item, NPCDecision) for item in decisions):
             raise TypeError("decisions must be a tuple of NPCDecision values")
+        if not isinstance(unavailable_owner_ids, frozenset) or any(
+            not isinstance(owner, str) or not owner.strip() for owner in unavailable_owner_ids
+        ):
+            raise TypeError("unavailable_owner_ids must be a frozenset of non-empty owner IDs")
         if tuple(sorted(item.owner_id for item in decisions)) != tuple(item.owner_id for item in decisions):
             raise ValueError("decisions must be in stable owner-ID order")
         if len({item.owner_id for item in decisions}) != len(decisions):
