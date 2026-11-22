@@ -72,11 +72,7 @@ class TickCoordinatorTests(unittest.TestCase):
         self.assertEqual(self.npcs["speaker"].memories[0].timestamp_hour, 3.0)
 
     def test_historical_memory_request_rejects_future_events_and_non_witnesses(self):
-        self.coordinator.step(3, self.npcs)
-        with self.assertRaisesRegex(ValueError, "future event"):
-            self.coordinator.step(4, self.npcs, memory_requests=(("event-1", "speaker"),))
-        # A new coordinator is needed because failed requests must not commit a tick.
-        events = WorldEventLedger((
+        future_events = WorldEventLedger((
             WorldEventLedger.make_event(
                 "future-event", 5, "incident", witnesses=("speaker",),
                 attributes={"action_tag": ActionTag.CRIME_THEFT.value, "target_entity_id": "subject"},
@@ -84,11 +80,29 @@ class TickCoordinatorTests(unittest.TestCase):
         ))
         trust = SocialTrustLedger()
         conversations = SocialConversationAdapter(trust, SocialBeliefSystem(trust))
-        coordinator = SimulationTickCoordinator(events, WorldEventMemoryAdapter(events), conversations)
+        future_coordinator = SimulationTickCoordinator(
+            future_events, WorldEventMemoryAdapter(future_events), conversations,
+        )
         with self.assertRaisesRegex(ValueError, "future event"):
-            coordinator.step(4, self.npcs, memory_requests=(("future-event", "speaker"),))
+            future_coordinator.step(4, self.npcs, memory_requests=(("future-event", "speaker"),))
+
+        historical_events = WorldEventLedger((
+            WorldEventLedger.make_event(
+                "historical-event", 3, "incident", witnesses=("speaker",),
+                attributes={"action_tag": ActionTag.CRIME_THEFT.value, "target_entity_id": "subject"},
+            ),
+        ))
+        historical_trust = SocialTrustLedger()
+        historical_conversations = SocialConversationAdapter(
+            historical_trust, SocialBeliefSystem(historical_trust),
+        )
+        historical_coordinator = SimulationTickCoordinator(
+            historical_events, WorldEventMemoryAdapter(historical_events), historical_conversations,
+        )
         with self.assertRaisesRegex(ValueError, "not recorded as a witness"):
-            coordinator.step(4, self.npcs, memory_requests=(("future-event", "listener"),))
+            historical_coordinator.step(
+                4, self.npcs, memory_requests=(("historical-event", "listener"),),
+            )
 
     def test_tick_must_increase(self):
         self.coordinator.step(3, self.npcs)
