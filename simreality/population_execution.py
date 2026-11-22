@@ -408,6 +408,15 @@ class PopulationExecutionLoop:
             for execution in completed_action_executions:
                 if self.action_execution_ledger.get(execution.execution_id) != execution:
                     raise ValueError(f"completed action {execution.execution_id} is not present in the configured action ledger")
+        if subsystem_plan is not None:
+            for execution in completed_action_executions:
+                if execution.owner_id not in economy_owners and (
+                    self.action_execution_ledger is None
+                    or self.action_execution_ledger.get(execution.execution_id) != execution
+                ):
+                    raise ValueError(
+                        "completed actions deferred by the economy LOD cadence must be recorded in the configured ActionExecutionLedger"
+                    )
         if household_settlement_ids and self.household_ledger is None:
             raise ValueError("household settlements require a HouseholdLedger")
         signature = (
