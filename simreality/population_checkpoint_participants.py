@@ -233,16 +233,41 @@ def build_population_transaction_participants(
             economics.to_json,
             lambda payload: _restore_economics(economics, EconomicLedger.from_json(payload)))
         def capture_economic_actions():
-            return _json({"schema_version": 1, "applied": sorted(economic_action_adapter._applied)})
+            records = []
+            for execution_id, applied in sorted(economic_action_adapter._applied.items()):
+                transfers = (applied,) if isinstance(applied, EconomicTransfer) else tuple(applied)
+                records.append({
+                    "execution_id": execution_id,
+                    "transfer_ids": [item.transfer_id for item in transfers],
+                })
+            return _json({"schema_version": 2, "applied": records})
         def restore_economic_actions(payload):
             raw = json.loads(payload)
-            if raw.get("schema_version") != 1:
+            if not isinstance(raw, dict) or raw.get("schema_version") not in (1, 2):
                 raise ValueError("unsupported economic action participant schema")
-            _replace_mapping(economic_action_adapter._applied, {
-                execution_id: economics._transfers[f"action:{execution_id}:economic"]
-                for execution_id in raw["applied"]
-                if f"action:{execution_id}:economic" in economics._transfers
-            })
+            if raw["schema_version"] == 1:
+                records = [
+                    {"execution_id": execution_id, "transfer_ids": [f"action:{execution_id}:economic"]}
+                    for execution_id in raw.get("applied", [])
+                ]
+            else:
+                records = raw.get("applied")
+            restored = {}
+            for item in records:
+                execution_id = item["execution_id"]
+                if not isinstance(execution_id, str) or not execution_id.strip() or execution_id in restored:
+                    raise ValueError("invalid or duplicate economic action execution ID")
+                transfer_ids = item["transfer_ids"]
+                if not isinstance(transfer_ids, list) or not transfer_ids:
+                    raise ValueError("economic action checkpoint requires transfer IDs")
+                transfers = []
+                for transfer_id in transfer_ids:
+                    transfer = economics._transfers.get(transfer_id)
+                    if transfer is None:
+                        raise ValueError("economic action checkpoint references a missing transfer")
+                    transfers.append(transfer)
+                restored[execution_id] = tuple(transfers)
+            _replace_mapping(economic_action_adapter._applied, restored)
         add("economic_actions", capture_economic_actions, restore_economic_actions)
 
     if household_ledger is not None:
