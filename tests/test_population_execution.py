@@ -13,6 +13,8 @@ from simreality.goals import GoalBook, NPCGoal
 from simreality.npc_autonomy import NPCDecisionCycle
 from simreality.planning import DeterministicPlanner, PlanningAction
 from simreality.population_execution import NPCDecisionContext, PopulationExecutionLoop
+from simreality.population_lod_policy import default_population_lod_policy
+from simreality.population_spatial import PopulationLOD, PopulationSchedule, PopulationSlice
 from simreality.population_transaction import PopulationTickTransactionCoordinator, TransactionParticipant
 from simreality.routine_execution import RoutineExecutionLedger
 from simreality.routines import RoutineBlock, RoutineBook
@@ -50,6 +52,40 @@ class PopulationExecutionLoopTests(unittest.TestCase):
             ("rest-b", "work-a"),
         )
         self.assertEqual(result.tick, 1)
+
+    def test_lod_schedule_dispatches_each_subsystem_to_its_own_owner_batch(self):
+        goals = GoalBook()
+        goals.add(NPCGoal("goal-a", "npc-a", "security", priority=5))
+        goals.add(NPCGoal("goal-b", "npc-b", "rest", priority=5))
+        planner = DeterministicPlanner((
+            PlanningAction("earn", frozenset({"available"}), frozenset({"paid"})),
+            PlanningAction("rest", frozenset({"available"}), frozenset({"rested"})),
+        ))
+        loop = PopulationExecutionLoop(
+            self.loop.coordinator, self.book, self.ledger,
+            decision_cycle=NPCDecisionCycle(goals, planner),
+        )
+        schedule = PopulationSchedule(
+            1,
+            (
+                PopulationSlice("cell-a", PopulationLOD.FULL, ("npc-a",)),
+                PopulationSlice("cell-b", PopulationLOD.DORMANT, ("npc-b",)),
+            ),
+            ("npc-a",), ("npc-b",),
+        )
+        result = loop.run_tick(
+            1, 500, self.npcs,
+            outcome_samples={"work-a": 0.2},
+            decision_contexts={
+                "npc-a": NPCDecisionContext(frozenset({"available"}), {"goal-a": frozenset({"paid"})}),
+                "npc-b": NPCDecisionContext(frozenset({"available"}), {"goal-b": frozenset({"rested"})}),
+            },
+            population_schedule=schedule,
+            lod_policy=default_population_lod_policy(),
+        )
+        self.assertEqual(tuple(item.owner_id for item in result.decisions), ("npc-a",))
+        self.assertEqual(tuple(item.routine_id for item in result.routine_executions), ("work-a",))
+        self.assertEqual(result.processed_npc_ids, ("npc-a", "npc-b"))
 
     def test_population_tick_replay_returns_original_result(self):
         request = {"outcome_samples": {"work-a": 0.2, "rest-b": 0.7}}
