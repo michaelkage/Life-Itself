@@ -570,7 +570,7 @@ class PopulationExecutionLoop:
                     and witness_id in npcs
                     and (
                         event.tick == tick
-                        or not self.coordinator.memory_adapter.has_materialized(event.event_id, witness_id)
+                        or not self.coordinator.memory_adapter.is_memory_resolved(event.event_id, witness_id)
                     )
                 ):
                     memory_requests.append((event.event_id, witness_id))
