@@ -256,7 +256,9 @@ class EconomicActionAdapter:
             return ()
         prior = self._applied.get(execution.execution_id)
         if prior is not None:
-            return prior
+            if all(isinstance(item, str) for item in prior):
+                return tuple(self.economics._transfers[item] for item in prior)
+            return tuple(prior)
         policies = self.policies.get(execution.action_id, ())
         if not policies:
             return ()
@@ -278,7 +280,7 @@ class EconomicActionAdapter:
                 raise ValueError(f"insufficient funds in account: {account_id}")
 
         applied = tuple(self.economics.transfer(item) for item in transfers)
-        self._applied[execution.execution_id] = applied
+        self._applied[execution.execution_id] = tuple(item.transfer_id for item in applied)
         return applied
 
     def apply(self, execution, tick: int) -> EconomicTransfer | None:
@@ -347,7 +349,9 @@ class HouseholdActionAdapter:
             return ()
         prior = self._applied.get(execution.execution_id)
         if prior is not None:
-            return prior
+            if all(isinstance(item, str) for item in prior):
+                return tuple(self.households._obligations[item] for item in prior)
+            return tuple(prior)
         created = []
         for policy in self.policies.get(execution.action_id, ()):
             obligation = HouseholdObligation(
@@ -358,5 +362,5 @@ class HouseholdActionAdapter:
             created.append(self.households.add(obligation))
         result = tuple(created)
         if result:
-            self._applied[execution.execution_id] = result
+            self._applied[execution.execution_id] = tuple(item.obligation_id for item in result)
         return result
