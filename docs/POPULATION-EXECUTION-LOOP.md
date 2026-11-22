@@ -84,11 +84,29 @@ missing presence and conflicting tick replays rather than inventing a location.
 
 The scheduler returns stable cell/LOD slices and the selected/deferred owner
 sets. `PopulationSchedule.subsystem_slices(policy)` expands those tier
-assignments into stable owner batches for each subsystem (decision, economy,
-memory, routine, social and travel), applying each tier's enablement and cadence
-at the schedule tick. The runtime integrator passes each subsystem its own
-owner batch; it must not treat the population-wide selected set as a universal
-work list.
+assignments into stable owner batches for action advancement, decisions, economy,
+event memory, presence, routines, social encounters/conversations and travel.
+The population loop consumes these batches directly:
+
+```python
+result = loop.run_tick(
+    tick, minute_of_day, npcs,
+    outcome_samples=outcome_samples,
+    travel_budgets=travel_budgets,
+    population_schedule=schedule,
+    lod_policy=lod_policy,
+)
+```
+
+Decision contexts, active-action advancement, routine execution, event memory,
+social interactions and travel advancement are filtered by their respective
+owner batches. Completed action economics, household obligations and inventory
+effects are deferred until the owner's economy cadence is due; the action
+execution ledger is required when a completed action must survive that deferral.
+Presence remains a consistency-critical full-roster synchronization and the
+runtime rejects a policy plan that would partially synchronize it. Always pass
+each subsystem its own batch rather than treating selected population owners as
+a universal work list.
 
 ## Validated action dispatch
 
