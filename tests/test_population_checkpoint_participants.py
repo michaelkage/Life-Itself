@@ -259,7 +259,7 @@ class PopulationCheckpointParticipantTests(unittest.TestCase):
                 Path(directory) / "population.json", self.participants,
             )
             loop = PopulationExecutionLoop(
-                self.tick, RoutineBook(), RoutineExecutionLedger(),
+                self.tick, self.routines, self.routine_executions,
                 decision_cycle=NPCDecisionCycle(self.goals, self.action_ledger.planner),
                 transaction_coordinator=transaction,
                 economic_action_adapter=self.economic_actions,
@@ -278,7 +278,7 @@ class PopulationCheckpointParticipantTests(unittest.TestCase):
             self.assertEqual(len(self.action_ledger.active()), 1)
 
             restarted_loop = PopulationExecutionLoop(
-                self.tick, RoutineBook(), RoutineExecutionLedger(),
+                self.tick, self.routines, self.routine_executions,
                 decision_cycle=NPCDecisionCycle(self.goals, self.action_ledger.planner),
                 transaction_coordinator=transaction,
                 economic_action_adapter=self.economic_actions,
