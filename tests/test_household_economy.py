@@ -86,6 +86,7 @@ class HouseholdEconomyTests(unittest.TestCase):
         self.assertEqual(len(self.economics.snapshot()), 2)
 
     def test_multi_effect_action_preflights_total_debit_before_any_transfer(self):
+        self.economics._balances["employer"] = 10.0
         adapter = EconomicActionAdapter(
             self.economics,
             (
