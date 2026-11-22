@@ -6,8 +6,9 @@ from pathlib import Path
 from simreality.model import NPC, NPCMemory, ActionTag, Description
 from simreality.population_checkpoint_participants import build_population_transaction_participants
 from simreality.population_transaction import PopulationTickTransactionCoordinator
-from simreality.action_execution import ActionExecutionLedger, ActionExecutionPolicy
+from simreality.action_execution import ActionExecution, ActionExecutionLedger, ActionExecutionPolicy
 from simreality.action_world_state import ActionWorldState
+from simreality.inventory import ActionInventoryAdapter, ActionInventoryEffect, InventoryLedger
 from simreality.goals import GoalBook, NPCGoal
 from simreality.npc_autonomy import NPCDecisionCycle
 from simreality.population_execution import NPCDecisionContext, PopulationExecutionLoop
@@ -67,6 +68,13 @@ class PopulationCheckpointParticipantTests(unittest.TestCase):
         self.action_world_state = ActionWorldState(
             {"npc-a": self.action_facts}, {"npc-a": self.action_resources},
         )
+        self.inventory = InventoryLedger({
+            ("store", "meal"): 20.0,
+            ("npc-a", "meal"): 0.0,
+        })
+        self.inventory_actions = ActionInventoryAdapter(self.inventory, (
+            ActionInventoryEffect("work", "ration", "meal", 1.0, "store", "npc-a", "work_ration"),
+        ))
         self.economic_actions = EconomicActionAdapter(self.economics, (
             ActionEconomicEffect("work", "employer", "family", 20, "wage"),
         ))
@@ -86,6 +94,8 @@ class PopulationCheckpointParticipantTests(unittest.TestCase):
             action_ledger=self.action_ledger,
             action_world_state=self.action_world_state,
             household_action_adapter=self.household_actions,
+            inventory_ledger=self.inventory,
+            inventory_action_adapter=self.inventory_actions,
         )
 
     def test_concrete_participants_restore_npc_social_event_routine_and_economy_state(self):
@@ -98,7 +108,7 @@ class PopulationCheckpointParticipantTests(unittest.TestCase):
                 "npcs", "world_events", "event_memory", "social_conversations",
                 "social_trust", "social_beliefs", "routine_book", "routine_executions",
                 "travel", "presence", "encounters", "action_executions", "action_goals",
-                "economics", "economic_actions", "households", "action_world_state", "household_actions",
+                "economics", "economic_actions", "households", "action_world_state", "household_actions", "inventory", "inventory_actions",
             } <= before_names)
 
             def partially_apply_then_fail():
@@ -127,6 +137,10 @@ class PopulationCheckpointParticipantTests(unittest.TestCase):
                 self.households.settle("bill-1", 1)
                 self.action_facts.add("mutated")
                 self.action_resources["energy"] = 0.0
+                self.inventory_actions.apply_all(ActionExecution(
+                    "inventory-test", "npc-a", 1, "work", "completed", "done",
+                    (), (), (), (), "inventory-event",
+                ), 1)
                 raise RuntimeError("injected after economic phase")
 
             with self.assertRaisesRegex(RuntimeError, "injected after economic phase"):
@@ -147,6 +161,9 @@ class PopulationCheckpointParticipantTests(unittest.TestCase):
             self.assertEqual(self.households.snapshot()[0].status, "open")
             self.assertEqual(self.action_facts, {"available"})
             self.assertEqual(self.action_resources, {"energy": 8.0})
+            self.assertEqual(self.inventory.quantity("store", "meal"), 20.0)
+            self.assertEqual(self.inventory.quantity("npc-a", "meal"), 0.0)
+            self.assertEqual(self.inventory.snapshot(), ())
 
     def test_population_tick_rolls_back_action_dispatch_facts_and_economy_after_failure(self):
         state = self.action_world_state
@@ -165,6 +182,7 @@ class PopulationCheckpointParticipantTests(unittest.TestCase):
                 action_dispatch_adapter=dispatch,
                 action_world_state=state,
                 household_action_adapter=self.household_actions,
+                inventory_action_adapter=self.inventory_actions,
             )
             context = {"npc-a": NPCDecisionContext(
                 frozenset(), {"goal-work": frozenset({"done"})},
@@ -194,6 +212,9 @@ class PopulationCheckpointParticipantTests(unittest.TestCase):
             self.assertEqual(self.economics.balance("employer"), 80.0)
             self.assertEqual(self.economics.balance("family"), 20.0)
             self.assertEqual(len(retried.economic_transfers), 1)
+            self.assertEqual(len(retried.inventory_transfers), 1)
+            self.assertEqual(self.inventory.quantity("store", "meal"), 19.0)
+            self.assertEqual(self.inventory.quantity("npc-a", "meal"), 1.0)
             self.assertEqual(len(retried.action_obligations), 1)
             self.assertEqual(retried.action_obligations[0].obligation_id, "action:npc:npc-a:tick:1:step:0:rent-contribution")
 
