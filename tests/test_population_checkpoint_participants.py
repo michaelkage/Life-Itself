@@ -201,7 +201,7 @@ class PopulationCheckpointParticipantTests(unittest.TestCase):
             self.assertEqual(len(self.action_ledger.active()), 1)
             self.assertEqual(self.action_ledger.active()[0].progress_ticks, 0)
             self.assertEqual(state.world_facts_by_owner["npc-a"], {"available"})
-            self.assertEqual(state.resources_by_owner["npc-a"], {})
+            self.assertEqual(state.resources_by_owner["npc-a"], {"energy": 8.0})
             self.assertEqual(self.economics.balance("employer"), 100.0)
             self.assertEqual(self.economics.snapshot(), ())
             self.economic_actions.apply_all = original_apply
