@@ -17,6 +17,8 @@ This document distinguishes existing engine capability from application and runt
 - Added post-phase observation and end-to-end injected-failure coverage after social, routines and household effects; tests verify concrete participant rollback and same-tick retry across action state, economics, household obligations and inventory.
 - Integrated multi-tick NPC action advancement and validated first-step dispatch into the population loop, with checkpointable owner facts/resources and same-tick multi-transfer economics, action-generated household obligations and inventory receipts/transfers/consumption. All these ledgers and replay indexes can join the opt-in whole-tick transaction.
 - Added spatial population scheduling and wired per-subsystem LOD owner batches into `PopulationExecutionLoop.run_tick` for decisions, action advancement/dispatch, economy, event memory, routines, social encounters/conversations and travel. Completed-action economic, household and inventory effects defer to the owner's next economy cadence; presence remains an always-synchronized full-roster consistency phase.
+- Added witness-specific deferred event-memory requests: events remain eligible until each due witness has received their memory, including replay persistence and migration from the previous tick-replay schema.
+- Added atomic netted economic transfer batches, all-or-nothing household action-obligation creation, and all-or-nothing due household settlement batches.
 - Visual design tokens and responsive layout.
 
 ## Existing engine capability on the base branch
