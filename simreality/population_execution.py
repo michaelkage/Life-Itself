@@ -640,6 +640,7 @@ class PopulationExecutionLoop:
             *advanced_actions,
             *tick_action_records,
             *completed_action_executions,
+            *ledger_completed_actions,
             *(dispatch.active for dispatch in action_dispatches if dispatch.active is not None),
         ):
             action_result_by_id[item.execution_id] = item
