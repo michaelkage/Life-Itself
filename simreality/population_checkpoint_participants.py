@@ -22,7 +22,7 @@ from .routine_save_state import RoutineBookSnapshot
 from .routine_execution_save_state import RoutineExecutionSnapshot
 from .action_execution import ActionExecutionLedger, ActionExecutionSnapshot
 from .action_world_state import ActionWorldState
-from .household_economy import EconomicLedger, EconomicActionAdapter, HouseholdLedger, HouseholdObligation
+from .household_economy import EconomicLedger, EconomicActionAdapter, EconomicTransfer, HouseholdLedger, HouseholdObligation
 from .world_events import WorldEvent, WorldEventLedger
 from .population_transaction import TransactionParticipant
 
