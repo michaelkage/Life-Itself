@@ -97,18 +97,21 @@ class SimulationTickReplaySnapshot:
                 if schema_version == 1:
                     memory_requests = None
                 else:
-                    raw_requests = item["memory_requests"]
-                    if not isinstance(raw_requests, list):
-                        raise ValueError("memory_requests must be a list")
-                    memory_requests = tuple(
-                        (request[0], request[1]) for request in raw_requests
-                    )
-                    if any(
-                        not isinstance(event_id, str) or not event_id.strip()
-                        or not isinstance(witness_id, str) or not witness_id.strip()
-                        for event_id, witness_id in memory_requests
-                    ):
-                        raise ValueError("invalid witness-memory request")
+                    raw_requests = item.get("memory_requests")
+                    if raw_requests is None:
+                        memory_requests = None
+                    else:
+                        if not isinstance(raw_requests, list):
+                            raise ValueError("memory_requests must be a list or null")
+                        memory_requests = tuple(
+                            (request[0], request[1]) for request in raw_requests
+                        )
+                        if any(
+                            not isinstance(event_id, str) or not event_id.strip()
+                            or not isinstance(witness_id, str) or not witness_id.strip()
+                            for event_id, witness_id in memory_requests
+                        ):
+                            raise ValueError("invalid witness-memory request")
                 refs = tuple((ref[0], ref[1], ref[2]) for ref in item["memory_refs"])
                 if any(not isinstance(a, str) or not isinstance(b, str) or not isinstance(n, bool)
                        for a, b, n in refs):
