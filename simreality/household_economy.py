@@ -308,10 +308,14 @@ class EconomicActionAdapter:
 
     def has_applied_at(self, execution_id: str, tick: int) -> bool:
         """Return whether an economic effect for this execution was posted at tick."""
+        prior = self._applied.get(execution_id)
+        if isinstance(prior, EconomicTransfer):
+            return prior.tick == tick
         return any(
             self.economics._transfers.get(transfer_id) is not None
             and self.economics._transfers[transfer_id].tick == tick
-            for transfer_id in self._applied.get(execution_id, ())
+            for transfer_id in (prior or ())
+            if isinstance(transfer_id, str)
         )
 
     def apply_all(self, execution, tick: int) -> tuple[EconomicTransfer, ...]:
