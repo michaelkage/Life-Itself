@@ -313,10 +313,10 @@ class PopulationExecutionLoop:
                 raise ValueError("owner_ids must contain non-empty strings")
             if len(supplied_owners) != len(set(supplied_owners)):
                 raise ValueError("owner_ids must not contain duplicates")
+            missing = sorted(set(supplied_owners) - set(roster))
+            if missing:
+                raise KeyError(f"routine owners are absent from population: {', '.join(missing)}")
             selected_owners = tuple(sorted(set(supplied_owners) & set(routine_owners)))
-        missing = sorted(set(selected_owners) - set(roster))
-        if missing:
-            raise KeyError(f"routine owners are absent from population: {', '.join(missing)}")
 
         if decision_contexts is not None and not isinstance(decision_contexts, Mapping):
             raise TypeError("decision_contexts must map NPC IDs to decision contexts")
@@ -450,7 +450,7 @@ class PopulationExecutionLoop:
             for owner, context in sorted(contexts.items()) if owner in decision_owners
         ) if self.decision_cycle is not None else ()
         action_dispatches = self.action_dispatch_adapter.dispatch(
-            tick, decisions,
+            tick, tuple(item for item in decisions if item.owner_id in action_owners),
             self.action_world_state.world_facts_by_owner,
             self.action_world_state.resources_by_owner,
             unavailable_owner_ids=frozenset(
