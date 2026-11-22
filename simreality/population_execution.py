@@ -432,10 +432,9 @@ class PopulationExecutionLoop:
             for item in (*completed_action_executions, *newly_completed_actions)
         }
         economic_transfers = tuple(
-            transfer for transfer in (
-                self.economic_action_adapter.apply(item, tick)
-                for item in sorted(economic_inputs.values(), key=lambda value: value.execution_id)
-            ) if transfer is not None
+            transfer
+            for item in sorted(economic_inputs.values(), key=lambda value: value.execution_id)
+            for transfer in self.economic_action_adapter.apply_all(item, tick)
         ) if self.economic_action_adapter is not None else ()
         household_records = tuple(
             self.household_ledger.add(item)
