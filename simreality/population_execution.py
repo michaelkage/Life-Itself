@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import math
-from typing import Iterable, Mapping
+from typing import Callable, Iterable, Mapping
 
 from .model import NPC
 from .npc_autonomy import NPCDecision, NPCDecisionCycle
@@ -106,6 +106,7 @@ class PopulationExecutionLoop:
         action_world_state: ActionWorldState | None = None,
         household_action_adapter: HouseholdActionAdapter | None = None,
         inventory_action_adapter: ActionInventoryAdapter | None = None,
+        phase_observer: Callable[[str, int], None] | None = None,
     ) -> None:
         if not isinstance(coordinator, SimulationTickCoordinator):
             raise TypeError("coordinator must be a SimulationTickCoordinator")
@@ -173,6 +174,9 @@ class PopulationExecutionLoop:
         if inventory_action_adapter is not None and not isinstance(inventory_action_adapter, ActionInventoryAdapter):
             raise TypeError("inventory_action_adapter must be an ActionInventoryAdapter or None")
         self.inventory_action_adapter = inventory_action_adapter
+        if phase_observer is not None and not callable(phase_observer):
+            raise TypeError("phase_observer must be callable or None")
+        self.phase_observer = phase_observer
         if inventory_action_adapter is not None and transaction_coordinator is not None:
             missing_inventory = {"inventory", "inventory_actions"} - transaction_coordinator.participant_names
             if missing_inventory:
@@ -204,6 +208,11 @@ class PopulationExecutionLoop:
             raise ValueError("transaction coordinator is missing the action_goals participant")
         self._results: dict[int, PopulationTickResult] = {}
         self._requests: dict[int, tuple[object, ...]] = {}
+
+    def _phase_completed(self, phase: str, tick: int) -> None:
+        """Notify an optional deterministic observer after a committed phase boundary."""
+        if self.phase_observer is not None:
+            self.phase_observer(phase, tick)
 
     @staticmethod
     def _validate_roster(npcs: Mapping[str, NPC]) -> tuple[str, ...]:
