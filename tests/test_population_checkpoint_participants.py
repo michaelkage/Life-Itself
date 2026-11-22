@@ -191,12 +191,30 @@ class PopulationCheckpointParticipantTests(unittest.TestCase):
             self.assertEqual(started.action_dispatches[0].status, "started")
             self.assertEqual(len(self.action_ledger.active()), 1)
 
+            restarted_loop = PopulationExecutionLoop(
+                self.tick, RoutineBook(), RoutineExecutionLedger(),
+                decision_cycle=NPCDecisionCycle(self.goals, self.action_ledger.planner),
+                transaction_coordinator=transaction,
+                economic_action_adapter=self.economic_actions,
+                household_ledger=self.households,
+                action_execution_ledger=self.action_ledger,
+                action_dispatch_adapter=NPCActionDispatchAdapter(self.action_ledger),
+                action_world_state=state,
+                household_action_adapter=self.household_actions,
+                inventory_action_adapter=self.inventory_actions,
+            )
+            replayed_start = restarted_loop.run_tick(
+                1, 500, self.npcs, outcome_samples={}, decision_contexts=context,
+            )
+            self.assertEqual(replayed_start.action_dispatches[0].status, "started")
+            self.assertEqual(len(self.action_ledger.active()), 1)
+
             original_apply = self.economic_actions.apply_all
             def fail_economic_phase(execution, tick):
                 raise RuntimeError("injected economic phase failure")
             self.economic_actions.apply_all = fail_economic_phase
             with self.assertRaisesRegex(RuntimeError, "injected economic phase failure"):
-                loop.run_tick(2, 501, self.npcs, outcome_samples={}, decision_contexts=context)
+                restarted_loop.run_tick(2, 501, self.npcs, outcome_samples={}, decision_contexts=context)
 
             self.assertEqual(len(self.action_ledger.active()), 1)
             self.assertEqual(self.action_ledger.active()[0].progress_ticks, 0)
@@ -206,7 +224,7 @@ class PopulationCheckpointParticipantTests(unittest.TestCase):
             self.assertEqual(self.economics.snapshot(), ())
             self.economic_actions.apply_all = original_apply
 
-            retried = loop.run_tick(2, 501, self.npcs, outcome_samples={}, decision_contexts=context)
+            retried = restarted_loop.run_tick(2, 501, self.npcs, outcome_samples={}, decision_contexts=context)
             self.assertEqual(retried.action_results[0].status, "completed")
             self.assertEqual(state.world_facts_by_owner["npc-a"], {"available", "done"})
             self.assertEqual(self.economics.balance("employer"), 80.0)
