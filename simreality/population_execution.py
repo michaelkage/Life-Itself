@@ -568,7 +568,10 @@ class PopulationExecutionLoop:
                 if (
                     witness_id in memory_owners
                     and witness_id in npcs
-                    and not self.coordinator.memory_adapter.has_materialized(event.event_id, witness_id)
+                    and (
+                        event.tick == tick
+                        or not self.coordinator.memory_adapter.has_materialized(event.event_id, witness_id)
+                    )
                 ):
                     memory_requests.append((event.event_id, witness_id))
         social_conversations = tuple(
