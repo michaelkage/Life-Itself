@@ -558,21 +558,26 @@ class PopulationExecutionLoop:
                 encounter_results.append(result)
                 generated_event_ids.append(f"npc_encounter:{intent.encounter_id}")
         self._phase_completed("encounters", tick)
-        memory_event_ids = []
-        for event_id in event_ids:
-            event = self.coordinator.events.get(event_id)
-            if set(event.witnesses).issubset(memory_owners):
-                memory_event_ids.append(event_id)
-        for event_id in generated_event_ids:
-            event = self.coordinator.events.get(event_id)
-            if set(event.witnesses).issubset(memory_owners):
-                memory_event_ids.append(event_id)
+        # Materialize only due witness memories. Events remain authoritative in
+        # the world ledger until each witness's memory LOD cadence becomes due;
+        # one dormant witness must not block memories for another due witness.
+        memory_requests = []
+        for event in self.coordinator.events.snapshot():
+            if event.tick > tick:
+                continue
+            for witness_id in event.witnesses:
+                if (
+                    witness_id in memory_owners
+                    and witness_id in npcs
+                    and not self.coordinator.memory_adapter.has_materialized(event.event_id, witness_id)
+                ):
+                    memory_requests.append((event.event_id, witness_id))
         social_conversations = tuple(
             intent for intent in conversations
             if intent.listener_id in social_owners and intent.speaker_id in social_owners
         )
         social = self.coordinator.step(
-            tick, npcs, event_ids=tuple(sorted(set(memory_event_ids))),
+            tick, npcs, memory_requests=tuple(sorted(memory_requests)),
             conversations=social_conversations,
         )
         self._phase_completed("social", tick)
