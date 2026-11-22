@@ -18,9 +18,11 @@ logic.
    one finalized earlier in the same tick is not dispatched again.
 4. Advance travel for the travel batch and synchronize authoritative presence
    for the complete roster. Partial presence synchronization is rejected.
-5. Resolve encounter opportunities for the social batch, then process only
-   events whose witnesses are due for event memory and conversations whose two
-   participants are due for social processing.
+5. Resolve encounter opportunities for the social batch, then materialize
+   event memories independently for each due witness. Historical world events
+   remain eligible until each witness has received its memory, so a dormant
+   witness cannot block another witness's due memory. Process conversations only
+   when both participants are due for social processing.
 6. Execute routines for the routine batch.
 7. Apply completed-action economic, household and inventory effects only when
    the action owner is in the economy batch. Effects skipped by a cadence remain
@@ -38,7 +40,9 @@ those batches.
 
 The loop rejects conflicting replay inputs and returns the original successful
 result for identical in-memory replay. The underlying subsystems retain their
-own replay ledgers. When a `PopulationTickTransactionCoordinator` is supplied,
+own replay ledgers. The event-memory coordinator accepts explicit event/witness
+requests from earlier ticks, preserving deferred memory work across LOD cadence
+boundaries without duplicating already materialized memories. When a `PopulationTickTransactionCoordinator` is supplied,
 the loop executes inside its durable prepare/commit boundary. All mutated
 subsystems must be registered; the participant factory covers NPC state, world
 events, social memory/conversations/trust/beliefs, routines, travel, presence,
