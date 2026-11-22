@@ -27,6 +27,10 @@ logic.
 7. Apply completed-action economic, household and inventory effects only when
    the action owner is in the economy batch. Effects skipped by a cadence remain
    pending in the action ledger and are applied on a later due economy tick.
+   Multi-effect monetary postings use an atomic netted transfer batch, so valid
+   same-tick cash flows can fund downstream postings without order-dependent
+   partial writes. Household obligation settlement also posts the full due
+   settlement set atomically and rejects premature settlement.
 8. Add explicit household obligations, settle requested obligations and return
    immutable phase outputs, including action, travel, presence, social, routine
    and ledger effects.
