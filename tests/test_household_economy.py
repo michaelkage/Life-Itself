@@ -69,6 +69,33 @@ class HouseholdEconomyTests(unittest.TestCase):
         self.assertEqual(household.settle("rent-apr", 4), settled)
         self.assertEqual(len(self.economics.snapshot()), 1)
 
+    def test_household_settlement_batch_is_atomic_across_multiple_obligations(self):
+        household = HouseholdLedger(self.economics)
+        household.add(HouseholdObligation(
+            "rent-batch", "household-1", "home", "rent", 30.0, 4, "rent",
+        ))
+        household.add(HouseholdObligation(
+            "utility-batch", "household-1", "home", "worker", 20.0, 4, "utilities",
+        ))
+        with self.assertRaisesRegex(ValueError, "insufficient funds"):
+            household.settle_many(("rent-batch", "utility-batch"), 4)
+        self.assertEqual(self.economics.balance("home"), 40.0)
+        self.assertEqual(self.economics.snapshot(), ())
+        self.assertEqual(
+            tuple(item.status for item in household.snapshot()),
+            ("open", "open"),
+        )
+
+    def test_household_obligation_cannot_be_settled_before_due_tick(self):
+        household = HouseholdLedger(self.economics)
+        household.add(HouseholdObligation(
+            "rent-future", "household-1", "home", "rent", 10.0, 5, "future rent",
+        ))
+        with self.assertRaisesRegex(ValueError, "not due"):
+            household.settle("rent-future", 4)
+        self.assertEqual(self.economics.balance("home"), 40.0)
+        self.assertEqual(household.snapshot()[0].status, "open")
+
     def test_completed_action_applies_explicit_wage_effect(self):
         adapter = EconomicActionAdapter(
             self.economics,
