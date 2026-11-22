@@ -228,6 +228,14 @@ class ActionInventoryAdapter:
         """Return whether an action has configured inventory effects."""
         return bool(self.policies.get(action_id))
 
+    def has_applied_at(self, execution_id: str, tick: int) -> bool:
+        """Return whether an inventory effect for this execution was posted at tick."""
+        return any(
+            self.inventory._transfers.get(transfer_id) is not None
+            and self.inventory._transfers[transfer_id].tick == tick
+            for transfer_id in self._applied.get(execution_id, ())
+        )
+
     def apply_all(self, execution, tick: int) -> tuple[InventoryTransfer, ...]:
         from .action_execution import ActionExecution
         if not isinstance(execution, ActionExecution):
