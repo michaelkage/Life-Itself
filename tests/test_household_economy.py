@@ -62,6 +62,46 @@ class HouseholdEconomyTests(unittest.TestCase):
         self.assertEqual(adapter.apply(execution, 2), result)
         self.assertEqual(len(self.economics.snapshot()), 1)
 
+    def test_completed_action_applies_multiple_atomic_economic_effects(self):
+        self.economics.add_account(EconomicAccount("tax", "government", "revenue"))
+        adapter = EconomicActionAdapter(
+            self.economics,
+            (
+                ActionEconomicEffect("work_shift", "employer", "worker", 15, "wage"),
+                ActionEconomicEffect("work_shift", "employer", "tax", 5, "payroll_tax", "tax"),
+            ),
+        )
+        execution = ActionExecution(
+            "exec-multi", "npc-1", 2, "work_shift", "completed", "done",
+            (), (), (), (), "event-multi",
+        )
+        transfers = adapter.apply_all(execution, 2)
+        self.assertEqual(tuple(item.transfer_id for item in transfers), (
+            "action:exec-multi:economic", "action:exec-multi:tax",
+        ))
+        self.assertEqual(self.economics.balance("employer"), 80.0)
+        self.assertEqual(self.economics.balance("worker"), 15.0)
+        self.assertEqual(self.economics.balance("tax"), 5.0)
+        self.assertEqual(adapter.apply_all(execution, 2), transfers)
+        self.assertEqual(len(self.economics.snapshot()), 2)
+
+    def test_multi_effect_action_preflights_total_debit_before_any_transfer(self):
+        adapter = EconomicActionAdapter(
+            self.economics,
+            (
+                ActionEconomicEffect("work_shift", "employer", "worker", 8, "wage"),
+                ActionEconomicEffect("work_shift", "employer", "rent", 5, "withholding", "rent"),
+            ),
+        )
+        execution = ActionExecution(
+            "exec-insufficient", "npc-1", 2, "work_shift", "completed", "done",
+            (), (), (), (), "event-insufficient",
+        )
+        with self.assertRaisesRegex(ValueError, "insufficient funds"):
+            adapter.apply_all(execution, 2)
+        self.assertEqual(self.economics.balance("employer"), 100.0)
+        self.assertEqual(self.economics.snapshot(), ())
+
     def test_noncompleted_action_has_no_economic_effect(self):
         adapter = EconomicActionAdapter(
             self.economics,
