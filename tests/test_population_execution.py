@@ -159,8 +159,11 @@ class PopulationExecutionLoopTests(unittest.TestCase):
         def background_schedule(tick):
             return PopulationSchedule(
                 tick,
-                (PopulationSlice("cell-a", PopulationLOD.BACKGROUND, ("npc-a",)),),
-                ("npc-a",), (),
+                (
+                    PopulationSlice("cell-a", PopulationLOD.BACKGROUND, ("npc-a",)),
+                    PopulationSlice("cell-b", PopulationLOD.DORMANT, ("npc-b",)),
+                ),
+                ("npc-a",), ("npc-b",),
             )
         first = loop.run_tick(
             1, 500, self.npcs, outcome_samples={},
