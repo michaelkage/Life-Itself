@@ -223,6 +223,10 @@ class PopulationExecutionLoopTests(unittest.TestCase):
             lod_policy=default_population_lod_policy(),
         )
         self.assertEqual(len(later.economic_transfers), 1)
+        self.assertEqual(
+            tuple(item.execution_id for item in later.action_results),
+            ("execution-background",),
+        )
         self.assertEqual(economics.balance("employer"), 40.0)
         self.assertEqual(economics.balance("household"), 10.0)
 
