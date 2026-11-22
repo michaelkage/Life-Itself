@@ -13,7 +13,9 @@ This document distinguishes existing engine capability from application and runt
 - Application shell now reports API connection state and displays revision/day only after receiving a validated snapshot.
 - Documented the HTTP API, command idempotency, SSE behavior, security boundary and missing server-side responsibilities.
 - Added `PopulationExecutionLoop` to compose the existing deterministic event-memory, conversation and routine phases over a stable NPC roster, with owner slicing, input preflight and replay protection; optional read-only NPC goal/plan proposals now run from explicit per-agent fact contexts.
-- Added durable whole-tick transaction coordination with registered participant snapshots, rollback/recovery and replay-cache invalidation; transaction remains opt-in and only covers registered state.\n- Integrated multi-tick NPC action advancement and validated first-step dispatch into the population loop, with checkpointable owner facts/resources and same-tick multi-transfer economics, action-generated household obligations and inventory receipts/transfers/consumption. All these ledgers and replay indexes can join the opt-in whole-tick transaction.
+- Added durable whole-tick transaction coordination with registered participant snapshots, rollback/recovery and replay-cache invalidation; transaction remains opt-in and only covers registered state.
+- Integrated multi-tick NPC action advancement and validated first-step dispatch into the population loop, with checkpointable owner facts/resources and same-tick multi-transfer economics, action-generated household obligations and inventory receipts/transfers/consumption. All these ledgers and replay indexes can join the opt-in whole-tick transaction.
+- Added spatial population scheduling and per-subsystem LOD owner-batch expansion; the schedule resolves cadence/enablement by tier, while runtime integrations still need to dispatch those batches to each subsystem.
 - Visual design tokens and responsive layout.
 
 ## Existing engine capability on the base branch
@@ -26,8 +28,8 @@ The following remain substantive engineering projects, not completed features:
 
 1. Unified domain/API integration across Python, C++, Unreal and the web application (web transport contract and client adapter added; authoritative cross-runtime implementation remains outstanding).
 2. Full C++ behavioral parity with the Python reference.
-3. Autonomous population runtime that discovers and schedules world activity (partial foundation: explicit roster/tick orchestration and routine-owner slicing; automatic activity discovery, subsystem-specific LOD dispatch and transaction registration for every runtime-owned mutable subsystem remain outstanding).
-4. Population-scale simulation LOD and spatial partitioning.
+3. Autonomous population runtime that discovers and schedules world activity (partial foundation: explicit roster/tick orchestration and routine-owner slicing; automatic activity discovery, runtime invocation of subsystem-specific LOD batches and transaction registration for every runtime-owned mutable subsystem remain outstanding).
+4. Full population-scale simulation LOD and spatial partitioning (partial foundation: deterministic spatial partitions, budgeted tiers and per-subsystem cadence/enablement batches; automatic runtime dispatch and workload adaptation remain outstanding).
 5. End-to-end social knowledge transmission integrated into actual encounters.
 6. Complete birth-to-death generational simulation.
 7. Autonomous family and social-network lifecycle integration.
