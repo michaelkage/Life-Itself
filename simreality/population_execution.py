@@ -20,6 +20,7 @@ from .presence_encounters import PresenceSocialAdapter, PresenceEncounterResult
 from .population_transaction import PopulationTickTransactionCoordinator
 from .action_execution import ActionExecution, ActionExecutionLedger, ActiveActionExecution
 from .action_world_state import ActionWorldState
+from .inventory import ActionInventoryAdapter, InventoryTransfer
 from .population_actions import NPCActionDispatch, NPCActionDispatchAdapter
 from .household_economy import EconomicActionAdapter, EconomicTransfer, HouseholdActionAdapter, HouseholdLedger, HouseholdObligation
 from .simulation_tick import (
@@ -74,6 +75,7 @@ class PopulationTickResult:
     action_dispatches: tuple[NPCActionDispatch, ...] = ()
     action_results: tuple[ActionExecution | ActiveActionExecution, ...] = ()
     action_obligations: tuple[HouseholdObligation, ...] = ()
+    inventory_transfers: tuple[InventoryTransfer, ...] = ()
 
 
 class PopulationExecutionLoop:
@@ -101,6 +103,7 @@ class PopulationExecutionLoop:
         action_dispatch_adapter: NPCActionDispatchAdapter | None = None,
         action_world_state: ActionWorldState | None = None,
         household_action_adapter: HouseholdActionAdapter | None = None,
+        inventory_action_adapter: ActionInventoryAdapter | None = None,
     ) -> None:
         if not isinstance(coordinator, SimulationTickCoordinator):
             raise TypeError("coordinator must be a SimulationTickCoordinator")
@@ -165,6 +168,13 @@ class PopulationExecutionLoop:
         self.household_action_adapter = household_action_adapter
         if household_action_adapter is not None and transaction_coordinator is not None and "household_actions" not in transaction_coordinator.participant_names:
             raise ValueError("transaction coordinator is missing the household_actions participant")
+        if inventory_action_adapter is not None and not isinstance(inventory_action_adapter, ActionInventoryAdapter):
+            raise TypeError("inventory_action_adapter must be an ActionInventoryAdapter or None")
+        self.inventory_action_adapter = inventory_action_adapter
+        if inventory_action_adapter is not None and transaction_coordinator is not None:
+            missing_inventory = {"inventory", "inventory_actions"} - transaction_coordinator.participant_names
+            if missing_inventory:
+                raise ValueError("transaction coordinator is missing participants: " + ", ".join(sorted(missing_inventory)))
         if action_dispatch_adapter is not None and not isinstance(action_dispatch_adapter, NPCActionDispatchAdapter):
             raise TypeError("action_dispatch_adapter must be an NPCActionDispatchAdapter or None")
         if action_execution_ledger is None and action_dispatch_adapter is not None:
@@ -452,6 +462,11 @@ class PopulationExecutionLoop:
             for item in sorted(economic_inputs.values(), key=lambda value: value.execution_id)
             for obligation in self.household_action_adapter.apply_all(item, tick)
         ) if self.household_action_adapter is not None else ()
+        inventory_transfers = tuple(
+            transfer
+            for item in sorted(economic_inputs.values(), key=lambda value: value.execution_id)
+            for transfer in self.inventory_action_adapter.apply_all(item, tick)
+        ) if self.inventory_action_adapter is not None else ()
         household_records = tuple(
             self.household_ledger.add(item)
             for item in sorted(household_obligations, key=lambda value: value.obligation_id)
@@ -474,6 +489,7 @@ class PopulationExecutionLoop:
             household_obligations=household_records,
             action_dispatches=action_dispatches,
             action_obligations=action_obligations,
+            inventory_transfers=inventory_transfers,
             action_results=tuple((
                 *advanced_actions,
                 *(item.active for item in action_dispatches if item.active is not None),
