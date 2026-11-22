@@ -58,7 +58,7 @@ class PresenceEncounterIntent:
 
 @dataclass(frozen=True)
 class PopulationTickResult:
-    """Committed outputs from the two replay-safe phases of one population tick."""
+    """Immutable outputs from all committed population tick phases."""
 
     tick: int
     social: SimulationTickResult
@@ -78,11 +78,10 @@ class PopulationTickResult:
 class PopulationExecutionLoop:
     """Run stable population phases against an explicit roster snapshot.
 
-    Event memory and social exchange are committed by SimulationTickCoordinator.
-    Routine outcomes are then committed to RoutineExecutionLedger. Each phase is
-    independently idempotent and checkpointable; this class intentionally does
-    not claim a cross-ledger atomic transaction. A failure in the routine phase
-    leaves the social phase committed and safe to replay with the same tick inputs.
+    The loop composes travel, presence, encounters, action execution, social
+    memory, routines and configured economic effects. A durable cross-ledger
+    transaction is used only when a transaction coordinator and complete
+    participant set are explicitly supplied.
     """
 
     def __init__(
@@ -155,21 +154,23 @@ class PopulationExecutionLoop:
             raise ValueError("household and action adapters must share the same EconomicLedger")
         self.economic_action_adapter = economic_action_adapter
         self.household_ledger = household_ledger
+        if action_dispatch_adapter is not None and not isinstance(action_dispatch_adapter, NPCActionDispatchAdapter):
+            raise TypeError("action_dispatch_adapter must be an NPCActionDispatchAdapter or None")
+        if action_execution_ledger is None and action_dispatch_adapter is not None:
+            action_execution_ledger = action_dispatch_adapter.executions
         if action_execution_ledger is not None and not isinstance(action_execution_ledger, ActionExecutionLedger):
             raise TypeError("action_execution_ledger must be an ActionExecutionLedger or None")
         if action_execution_ledger is not None and action_execution_ledger.events is not coordinator.events:
             raise ValueError("action execution ledger must share the population world event ledger")
         self.action_execution_ledger = action_execution_ledger
-        if action_dispatch_adapter is not None and not isinstance(action_dispatch_adapter, NPCActionDispatchAdapter):
-            raise TypeError("action_dispatch_adapter must be an NPCActionDispatchAdapter or None")
         if action_world_state is not None and not isinstance(action_world_state, ActionWorldState):
             raise TypeError("action_world_state must be an ActionWorldState or None")
         if (action_dispatch_adapter is None) != (action_world_state is None):
             raise ValueError("action dispatch adapter and checkpointable action world state must be configured together")
         if action_dispatch_adapter is not None and action_execution_ledger is not action_dispatch_adapter.executions:
             raise ValueError("action dispatch adapter must use the configured action execution ledger")
-        if action_dispatch_adapter is not None and action_execution_ledger is None:
-            raise ValueError("action dispatch requires an ActionExecutionLedger")
+        if action_dispatch_adapter is not None and self.decision_cycle is None:
+            raise ValueError("action dispatch requires a configured NPCDecisionCycle")
         self.action_dispatch_adapter = action_dispatch_adapter
         self.action_world_state = action_world_state
         if action_dispatch_adapter is not None and transaction_coordinator is not None and "action_world_state" not in transaction_coordinator.participant_names:
@@ -457,7 +458,10 @@ class PopulationExecutionLoop:
             household_settlements=household_settlements,
             household_obligations=household_records,
             action_dispatches=action_dispatches,
-            action_results=tuple(advanced_actions),
+            action_results=tuple((
+                *advanced_actions,
+                *(item.active for item in action_dispatches if item.active is not None),
+            )),
         )
         self._requests[tick] = signature
         self._results[tick] = result
