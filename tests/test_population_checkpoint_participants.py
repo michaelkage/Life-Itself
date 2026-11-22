@@ -122,5 +122,64 @@ class PopulationCheckpointParticipantTests(unittest.TestCase):
             self.assertIs(self.conversations.beliefs, beliefs_ref)
 
 
+    def test_failure_after_each_population_phase_restores_all_registered_subsystems(self):
+        with tempfile.TemporaryDirectory() as directory:
+            transaction = PopulationTickTransactionCoordinator(
+                Path(directory) / "population.json", self.participants,
+            )
+            for failed_phase in range(6):
+                tick = 10 + failed_phase
+                memory = NPCMemory(
+                    "npc-a", "npc-b", 0.7, 0.8, float(tick),
+                    ActionTag.CRIME_ASSAULT, Description(),
+                )
+                phases = (
+                    lambda: setattr(self.npcs["npc-a"], "personal_stress", float(tick)),
+                    lambda: (
+                        self.events.append(WorldEventLedger.make_event(
+                            f"event-{tick}", tick, "phase_event", participants=("npc-a",),
+                        )),
+                        self.memory._processed.__setitem__((f"event-{tick}", "npc-a"), memory),
+                        self.npcs["npc-a"].remember(memory),
+                    ),
+                    lambda: self.trust.add(SocialInteraction(
+                        f"trust-{tick}", "npc-a", "npc-b", 1, 0.7, tick, "phase-test",
+                    )),
+                    lambda: self.beliefs.observe("npc-a", Evidence(
+                        f"evidence-{tick}", f"claim-{tick}", "npc-b", 1, 0.8, 0.5, tick,
+                    )),
+                    lambda: self.routines.add(RoutineBlock(
+                        f"routine-{tick}", "npc-a", "work", "office", 480, 600,
+                    )),
+                    lambda: (
+                        self.economics.transfer(EconomicTransfer(
+                            f"transfer-{tick}", tick, "employer", "family", 1, "phase-test",
+                        )),
+                        self.economic_actions._applied.__setitem__(
+                            f"execution-{tick}", self.economics.snapshot()[-1],
+                        ),
+                        self.households.settle("bill-1", tick),
+                    ),
+                )
+                def fail_at_boundary():
+                    for phase_index, phase in enumerate(phases):
+                        phase()
+                        if phase_index == failed_phase:
+                            raise RuntimeError(f"injected failure after phase {phase_index}")
+                with self.assertRaisesRegex(RuntimeError, f"phase {failed_phase}"):
+                    transaction.execute(tick, {"tick": tick, "fail_after": failed_phase}, fail_at_boundary)
+                self.assertEqual(self.npcs["npc-a"].personal_stress, 0.0)
+                self.assertEqual(self.npcs["npc-a"].memories, [])
+                self.assertEqual(self.events.snapshot(), ())
+                self.assertEqual(self.memory.snapshot(), ())
+                self.assertEqual(self.trust.snapshot(), ())
+                self.assertEqual(self.beliefs.beliefs_for("npc-a"), ())
+                self.assertEqual(self.routines.snapshot(), ())
+                self.assertEqual(self.economics.balance("employer"), 100.0)
+                self.assertEqual(self.economics.balance("family"), 0.0)
+                self.assertEqual(self.economics.snapshot(), ())
+                self.assertEqual(self.economic_actions._applied, {})
+                self.assertEqual(self.households.snapshot()[0].status, "pending")
+
 if __name__ == "__main__":
     unittest.main()
