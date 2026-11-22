@@ -212,22 +212,42 @@ class HouseholdLedger:
         return self._obligations[obligation.obligation_id]
 
     def settle(self, obligation_id: str, tick: int) -> HouseholdObligation:
-        item = self._obligations[obligation_id]
-        if item.status == "settled":
-            return item
-        transfer = EconomicTransfer(
-            f"obligation:{obligation_id}:settlement", tick,
-            item.debtor_account, item.creditor_account, item.amount,
-            f"household-obligation:{obligation_id}",
-        )
-        self.economics.transfer(transfer)
-        settled = HouseholdObligation(
-            item.obligation_id, item.household_id, item.debtor_account,
-            item.creditor_account, item.amount, item.due_tick,
-            item.description, "settled",
-        )
-        self._obligations[obligation_id] = settled
-        return settled
+        """Settle one obligation through the atomic batch settlement path."""
+        return self.settle_many((obligation_id,), tick)[0]
+
+    def settle_many(self, obligation_ids: Iterable[str], tick: int) -> tuple[HouseholdObligation, ...]:
+        """Settle a due set atomically with respect to balances and obligation status."""
+        if isinstance(tick, bool) or not isinstance(tick, int) or tick < 0:
+            raise ValueError("tick must be a non-negative integer")
+        ids = tuple(obligation_ids)
+        if any(not isinstance(item, str) or not item.strip() for item in ids):
+            raise ValueError("obligation IDs must be non-empty strings")
+        if len(ids) != len(set(ids)):
+            raise ValueError("obligation IDs must be unique within a settlement batch")
+        obligations = tuple(self._obligations[item] for item in ids)
+        transfers = []
+        for item in obligations:
+            if item.status == "settled":
+                continue
+            if tick < item.due_tick:
+                raise ValueError(f"household obligation is not due: {item.obligation_id}")
+            transfers.append(EconomicTransfer(
+                f"obligation:{item.obligation_id}:settlement", tick,
+                item.debtor_account, item.creditor_account, item.amount,
+                f"household-obligation:{item.obligation_id}",
+            ))
+        # The ledger validates every account, replay ID and aggregate balance
+        # before changing any account. Obligation statuses change only after the
+        # complete payment batch has posted successfully.
+        self.economics.transfer_many(transfers)
+        for item in obligations:
+            if item.status != "settled":
+                self._obligations[item.obligation_id] = HouseholdObligation(
+                    item.obligation_id, item.household_id, item.debtor_account,
+                    item.creditor_account, item.amount, item.due_tick,
+                    item.description, "settled",
+                )
+        return tuple(self._obligations[item] for item in ids)
 
     def snapshot(self) -> tuple[HouseholdObligation, ...]:
         return tuple(self._obligations[key] for key in sorted(self._obligations))
