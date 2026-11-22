@@ -93,6 +93,29 @@ class PopulationExecutionLoopTests(unittest.TestCase):
         self.assertEqual(tuple(item.routine_id for item in result.routine_executions), ("work-a",))
         self.assertEqual(result.processed_npc_ids, ("npc-a", "npc-b"))
 
+    def test_active_action_advancement_uses_action_subsystem_owner_batch(self):
+        planner = DeterministicPlanner((
+            PlanningAction("work", frozenset({"available"}), frozenset({"done"})),
+        ))
+        ledger = ActionExecutionLedger(
+            planner, (ActionExecutionPolicy("work", duration_ticks=3),),
+            events=self.events,
+        )
+        for owner in ("npc-a", "npc-b"):
+            ledger.start(
+                f"execution-{owner}", owner, 0, "work",
+                {"available"}, {}, plan_actions=("work",),
+            )
+        state = ActionWorldState(
+            {"npc-a": {"available"}, "npc-b": {"available"}},
+            {"npc-a": {}, "npc-b": {}},
+        )
+        adapter = NPCActionDispatchAdapter(ledger)
+        advanced = adapter.advance_active(1, state, owner_ids=("npc-a",))
+        self.assertEqual(tuple(item.owner_id for item in advanced), ("npc-a",))
+        progress = {item.owner_id: item.progress_ticks for item in ledger.active()}
+        self.assertEqual(progress, {"npc-a": 1, "npc-b": 0})
+
     def test_completed_action_economy_effect_waits_for_background_lod_cadence(self):
         economics = EconomicLedger((
             EconomicAccount("employer", "business", "business"),
