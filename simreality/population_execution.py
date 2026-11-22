@@ -179,10 +179,16 @@ class PopulationExecutionLoop:
             "npc_ids": tuple(sorted(npcs)) if isinstance(npcs, Mapping) else npcs,
             "kwargs": normalized_kwargs,
         }
-        return self.transaction_coordinator.execute(
-            tick, request,
-            lambda: self._run_tick_untransactional(tick, minute_of_day, npcs, **normalized_kwargs),
-        )
+        try:
+            return self.transaction_coordinator.execute(
+                tick, request,
+                lambda: self._run_tick_untransactional(tick, minute_of_day, npcs, **normalized_kwargs),
+            )
+        except BaseException:
+            self.coordinator.discard_tick_cache(tick)
+            self._requests.pop(tick, None)
+            self._results.pop(tick, None)
+            raise
 
     def _run_tick_untransactional(
         self,
