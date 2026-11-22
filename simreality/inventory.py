@@ -188,6 +188,10 @@ class ActionInventoryAdapter:
         }
         self._applied: dict[str, tuple[str, ...]] = {}
 
+    def has_applied(self, execution_id: str) -> bool:
+        """Return whether configured inventory effects were materialized."""
+        return execution_id in self._applied
+
     def apply_all(self, execution, tick: int) -> tuple[InventoryTransfer, ...]:
         from .action_execution import ActionExecution
         if not isinstance(execution, ActionExecution):
