@@ -22,6 +22,8 @@ from .action_execution import ActionExecution, ActionExecutionLedger, ActiveActi
 from .action_world_state import ActionWorldState
 from .inventory import ActionInventoryAdapter, InventoryTransfer
 from .population_actions import NPCActionDispatch, NPCActionDispatchAdapter
+from .population_lod_policy import PopulationLODPolicy
+from .population_spatial import PopulationSchedule
 from .household_economy import EconomicActionAdapter, EconomicTransfer, HouseholdActionAdapter, HouseholdLedger, HouseholdObligation
 from .simulation_tick import (
     ConversationIntent,
@@ -221,6 +223,21 @@ class PopulationExecutionLoop:
         if self.transaction_coordinator is None:
             return self._run_tick_untransactional(tick, minute_of_day, npcs, **kwargs)
         normalized_kwargs = dict(kwargs)
+        population_schedule = normalized_kwargs.pop("population_schedule", None)
+        lod_policy = normalized_kwargs.pop("lod_policy", None)
+        if (population_schedule is None) != (lod_policy is None):
+            raise ValueError("population_schedule and lod_policy must be supplied together")
+        if population_schedule is not None:
+            if not isinstance(population_schedule, PopulationSchedule):
+                raise TypeError("population_schedule must be a PopulationSchedule")
+            if not isinstance(lod_policy, PopulationLODPolicy):
+                raise TypeError("lod_policy must be a PopulationLODPolicy")
+            if population_schedule.tick != tick:
+                raise ValueError("population schedule tick must match run_tick tick")
+            normalized_kwargs["subsystem_owner_ids"] = {
+                item.subsystem_id: item.owner_ids
+                for item in population_schedule.subsystem_slices(lod_policy)
+            }
         for iterable_name in ("disruptions", "closed_edge_ids", "owner_ids"):
             value = normalized_kwargs.get(iterable_name)
             if value is not None and not isinstance(value, (tuple, list, set, frozenset)):
@@ -263,6 +280,7 @@ class PopulationExecutionLoop:
         completed_action_executions: tuple[ActionExecution, ...] = (),
         household_settlement_ids: tuple[str, ...] = (),
         household_obligations: tuple[HouseholdObligation, ...] = (),
+        subsystem_owner_ids: Mapping[str, tuple[str, ...]] | None = None,
     ) -> PopulationTickResult:
         """Execute social/event and routine phases for one stable roster snapshot."""
         if isinstance(tick, bool) or not isinstance(tick, int) or tick < 0:
