@@ -116,6 +116,51 @@ class PopulationExecutionLoopTests(unittest.TestCase):
         progress = {item.owner_id: item.progress_ticks for item in ledger.active()}
         self.assertEqual(progress, {"npc-a": 1, "npc-b": 0})
 
+    def test_deferred_event_memory_is_materialized_per_due_witness_without_blocking_others(self):
+        event = WorldEventLedger.make_event(
+            "deferred-memory", 1, "assault",
+            participants=("npc-b",), witnesses=("npc-a", "npc-b"),
+            attributes={
+                "action_tag": ActionTag.CRIME_ASSAULT.value,
+                "target_entity_id": "npc-b",
+            },
+        )
+        self.events.append(event)
+        loop = PopulationExecutionLoop(
+            self.loop.coordinator, RoutineBook(), RoutineExecutionLedger(),
+        )
+
+        def schedule(tick):
+            return PopulationSchedule(
+                tick,
+                (
+                    PopulationSlice("cell-a", PopulationLOD.BACKGROUND, ("npc-a",)),
+                    PopulationSlice("cell-b", PopulationLOD.DORMANT, ("npc-b",)),
+                ),
+                ("npc-a",), ("npc-b",),
+            )
+
+        first = loop.run_tick(
+            1, 500, self.npcs, outcome_samples={}, event_ids=("deferred-memory",),
+            population_schedule=schedule(1), lod_policy=default_population_lod_policy(),
+        )
+        self.assertEqual(first.social.materialized_memories, ())
+        self.assertEqual(self.npcs["npc-a"].memories, [])
+        self.assertEqual(self.npcs["npc-b"].memories, [])
+
+        later = loop.run_tick(
+            4, 500, self.npcs, outcome_samples={},
+            population_schedule=schedule(4), lod_policy=default_population_lod_policy(),
+        )
+        self.assertEqual(
+            tuple((event_id, witness_id) for event_id, witness_id, memory in later.social.materialized_memories),
+            (("deferred-memory", "npc-a"),),
+        )
+        self.assertEqual(len(self.npcs["npc-a"].memories), 1)
+        self.assertEqual(self.npcs["npc-b"].memories, [])
+        self.assertTrue(loop.coordinator.memory_adapter.has_materialized("deferred-memory", "npc-a"))
+        self.assertFalse(loop.coordinator.memory_adapter.has_materialized("deferred-memory", "npc-b"))
+
     def test_lod_schedule_must_cover_exact_population_roster(self):
         schedule = PopulationSchedule(
             1,
