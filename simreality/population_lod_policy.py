@@ -72,6 +72,7 @@ def default_population_lod_policy() -> PopulationLODPolicy:
             SubsystemLODPolicy("decision", 1),
             SubsystemLODPolicy("economy", 2),
             SubsystemLODPolicy("memory", 1),
+            SubsystemLODPolicy("presence", 1),
             SubsystemLODPolicy("routine", 1),
             SubsystemLODPolicy("social", 2),
             SubsystemLODPolicy("travel", 1),
