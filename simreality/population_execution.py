@@ -388,6 +388,13 @@ class PopulationExecutionLoop:
         # Existing actions advance before new decisions so completed effects are
         # visible to the decision phase in this same population tick.
         advanced_actions = self.action_dispatch_adapter.advance_active(tick, self.action_world_state) if self.action_dispatch_adapter is not None else ()
+        tick_action_records = tuple(
+            item for item in self.action_execution_ledger.snapshot()
+            if item.tick == tick
+        ) if self.action_execution_ledger is not None else ()
+        completed_tick_actions = tuple(
+            item for item in tick_action_records if item.status == "completed"
+        )
         decisions = tuple(
             self.decision_cycle.decide(
                 owner, tick, context.world_facts, context.goal_facts,
@@ -400,8 +407,8 @@ class PopulationExecutionLoop:
             self.action_world_state.world_facts_by_owner,
             self.action_world_state.resources_by_owner,
             unavailable_owner_ids=frozenset(
-                item.owner_id for item in advanced_actions
-                if isinstance(item, ActionExecution) and item.status == "completed"
+                {item.owner_id for item in completed_tick_actions}
+                | {item.owner_id for item in completed_action_executions if item.status == "completed"}
             ),
         ) if self.action_dispatch_adapter is not None else ()
 
@@ -445,13 +452,12 @@ class PopulationExecutionLoop:
             outcome_samples=sample_values,
             owner_ids=selected_owners,
         )
-        newly_completed_actions = tuple(
-            item for item in advanced_actions if isinstance(item, ActionExecution) and item.status == "completed"
-        )
-        economic_inputs = {
-            item.execution_id: item
-            for item in (*completed_action_executions, *newly_completed_actions)
-        }
+        economic_inputs = {}
+        for item in (*completed_action_executions, *completed_tick_actions):
+            prior = economic_inputs.get(item.execution_id)
+            if prior is not None and prior != item:
+                raise ValueError(f"conflicting completed action record: {item.execution_id}")
+            economic_inputs[item.execution_id] = item
         economic_transfers = tuple(
             transfer
             for item in sorted(economic_inputs.values(), key=lambda value: value.execution_id)
@@ -490,10 +496,24 @@ class PopulationExecutionLoop:
             action_dispatches=action_dispatches,
             action_obligations=action_obligations,
             inventory_transfers=inventory_transfers,
-            action_results=tuple((
-                *advanced_actions,
-                *(item.active for item in action_dispatches if item.active is not None),
-            )),
+            action_results=tuple(
+                {
+                    item.execution_id: item
+                    for item in (
+                        *advanced_actions,
+                        *tick_action_records,
+                        *(item.active for item in action_dispatches if item.active is not None),
+                    )
+                }[execution_id]
+                for execution_id in sorted({
+                    item.execution_id
+                    for item in (
+                        *advanced_actions,
+                        *tick_action_records,
+                        *(item.active for item in action_dispatches if item.active is not None),
+                    )
+                })
+            ),
         )
         self._requests[tick] = signature
         self._results[tick] = result
