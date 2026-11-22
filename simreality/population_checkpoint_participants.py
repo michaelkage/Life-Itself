@@ -238,6 +238,42 @@ def build_population_transaction_participants(
     if action_ledger is not None:
         if action_ledger.events is not events:
             raise ValueError("action ledger must share the tick coordinator world event ledger")
+        if action_ledger.goals is not None:
+            from .goals import GoalStatus, NPCGoal
+            goal_book = action_ledger.goals
+            def capture_action_goals():
+                return _json({"schema_version": 1, "goals": [
+                    {**asdict(goal), "status": goal.status.value}
+                    for goal in sorted(goal_book.goals.values(), key=lambda item: item.goal_id)
+                ]})
+            def restore_action_goals(payload):
+                raw = json.loads(payload)
+                if raw.get("schema_version") != 1:
+                    raise ValueError("unsupported action goal participant schema")
+                restored = {}
+                for item in raw["goals"]:
+                    values = dict(item)
+                    values["status"] = GoalStatus(values["status"])
+                    goal = NPCGoal(**values)
+                    goal.validate()
+                    if goal.goal_id in restored:
+                        raise ValueError("duplicate action goal ID in checkpoint")
+                    restored[goal.goal_id] = goal
+                existing = goal_book.goals
+                for goal_id in tuple(existing):
+                    if goal_id not in restored:
+                        del existing[goal_id]
+                for goal_id, saved in restored.items():
+                    live = existing.get(goal_id)
+                    if live is None:
+                        existing[goal_id] = saved
+                    else:
+                        for field_name, value in asdict(saved).items():
+                            if field_name == "status":
+                                value = saved.status
+                            setattr(live, field_name, value)
+                goal_book._validate_dependency_graph()
+            add("action_goals", capture_action_goals, restore_action_goals)
         def capture_actions():
             return action_ledger.to_snapshot().to_json()
         def restore_actions(payload):
