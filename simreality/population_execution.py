@@ -343,6 +343,13 @@ class PopulationExecutionLoop:
                     raise ValueError("desired goal facts must be sets or tuples of non-empty strings")
             if context.committed_goal_id is not None and (not isinstance(context.committed_goal_id, str) or not context.committed_goal_id.strip()):
                 raise ValueError("committed_goal_id must be None or a non-empty string")
+        action_owners = set(roster if subsystem_plan is None else subsystem_plan.get("action", ()))
+        decision_owners = set(roster if subsystem_plan is None else subsystem_plan.get("decision", ()))
+        social_owners = set(roster if subsystem_plan is None else subsystem_plan.get("social", ()))
+        memory_owners = set(roster if subsystem_plan is None else subsystem_plan.get("memory", ()))
+        economy_owners = set(roster if subsystem_plan is None else subsystem_plan.get("economy", ()))
+        travel_owners = set(roster if subsystem_plan is None else subsystem_plan.get("travel", ()))
+        contexts = {owner: context for owner, context in contexts.items() if owner in decision_owners}
         disruption_values = tuple(disruptions)
         if any(not isinstance(item, RoutineDisruption) for item in disruption_values):
             raise TypeError("disruptions must contain RoutineDisruption values")
@@ -425,7 +432,9 @@ class PopulationExecutionLoop:
 
         # Existing actions advance before new decisions so completed effects are
         # visible to the decision phase in this same population tick.
-        advanced_actions = self.action_dispatch_adapter.advance_active(tick, self.action_world_state) if self.action_dispatch_adapter is not None else ()
+        advanced_actions = self.action_dispatch_adapter.advance_active(
+            tick, self.action_world_state, owner_ids=tuple(sorted(action_owners)),
+        ) if self.action_dispatch_adapter is not None else ()
         tick_action_records = tuple(
             item for item in self.action_execution_ledger.snapshot()
             if item.tick == tick
@@ -438,7 +447,7 @@ class PopulationExecutionLoop:
                 owner, tick, context.world_facts, context.goal_facts,
                 committed_goal_id=context.committed_goal_id,
             )
-            for owner, context in sorted(contexts.items())
+            for owner, context in sorted(contexts.items()) if owner in decision_owners
         ) if self.decision_cycle is not None else ()
         action_dispatches = self.action_dispatch_adapter.dispatch(
             tick, decisions,
