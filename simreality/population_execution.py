@@ -216,6 +216,8 @@ class PopulationExecutionLoop:
             )
         except BaseException:
             self.coordinator.discard_tick_cache(tick)
+            if self.action_dispatch_adapter is not None:
+                self.action_dispatch_adapter.discard_tick_cache(tick)
             self._requests.pop(tick, None)
             self._results.pop(tick, None)
             raise
@@ -375,6 +377,10 @@ class PopulationExecutionLoop:
             tick, decisions,
             self.action_world_state.world_facts_by_owner,
             self.action_world_state.resources_by_owner,
+            unavailable_owner_ids=frozenset(
+                item.owner_id for item in advanced_actions
+                if isinstance(item, ActionExecution) and item.status == "completed"
+            ),
         ) if self.action_dispatch_adapter is not None else ()
 
         travel_result = None
