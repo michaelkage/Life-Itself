@@ -481,6 +481,15 @@ class PopulationExecutionLoop:
             self.household_ledger.settle(obligation_id, tick)
             for obligation_id in sorted(household_settlement_ids)
         ) if self.household_ledger is not None else ()
+        action_result_by_id = {}
+        for item in (
+            *advanced_actions,
+            *tick_action_records,
+            *completed_action_executions,
+            *(dispatch.active for dispatch in action_dispatches if dispatch.active is not None),
+        ):
+            action_result_by_id[item.execution_id] = item
+
         result = PopulationTickResult(
             tick=tick,
             social=social,
@@ -497,24 +506,8 @@ class PopulationExecutionLoop:
             action_obligations=action_obligations,
             inventory_transfers=inventory_transfers,
             action_results=tuple(
-                {
-                    item.execution_id: item
-                    for item in (
-                        *advanced_actions,
-                        *tick_action_records,
-                        *completed_action_executions,
-                        *(item.active for item in action_dispatches if item.active is not None),
-                    )
-                }[execution_id]
-                for execution_id in sorted({
-                    item.execution_id
-                    for item in (
-                        *advanced_actions,
-                        *tick_action_records,
-                        *completed_action_executions,
-                        *(item.active for item in action_dispatches if item.active is not None),
-                    )
-                })
+                action_result_by_id[execution_id]
+                for execution_id in sorted(action_result_by_id)
             ),
         )
         self._requests[tick] = signature
