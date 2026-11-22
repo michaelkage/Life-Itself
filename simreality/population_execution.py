@@ -288,15 +288,32 @@ class PopulationExecutionLoop:
         if isinstance(minute_of_day, bool) or not isinstance(minute_of_day, int) or not 0 <= minute_of_day < 1440:
             raise ValueError("minute_of_day must be an integer from 0 to 1439")
         roster = self._validate_roster(npcs)
+        subsystem_plan = None
+        if subsystem_owner_ids is not None:
+            if not isinstance(subsystem_owner_ids, Mapping):
+                raise TypeError("subsystem_owner_ids must map subsystem IDs to owner tuples")
+            allowed_subsystems = {"action", "decision", "economy", "memory", "routine", "social", "travel"}
+            if any(not isinstance(name, str) or name not in allowed_subsystems for name in subsystem_owner_ids):
+                raise ValueError("subsystem_owner_ids contains an unknown subsystem")
+            subsystem_plan = {}
+            for name, owners in subsystem_owner_ids.items():
+                if not isinstance(owners, tuple) or any(not isinstance(owner, str) or not owner.strip() for owner in owners):
+                    raise ValueError(f"subsystem owner batch {name!r} must be a tuple of non-empty IDs")
+                if tuple(sorted(set(owners))) != owners:
+                    raise ValueError(f"subsystem owner batch {name!r} must be unique and sorted")
+                absent = set(owners) - set(roster)
+                if absent:
+                    raise KeyError(f"subsystem {name!r} references absent NPCs: {', '.join(sorted(absent))}")
+        routine_owners = roster if subsystem_plan is None else subsystem_plan.get("routine", ())
         if owner_ids is None:
-            selected_owners = roster
+            selected_owners = tuple(routine_owners)
         else:
             supplied_owners = tuple(owner_ids)
             if any(not isinstance(owner, str) or not owner.strip() for owner in supplied_owners):
                 raise ValueError("owner_ids must contain non-empty strings")
             if len(supplied_owners) != len(set(supplied_owners)):
                 raise ValueError("owner_ids must not contain duplicates")
-            selected_owners = tuple(sorted(supplied_owners))
+            selected_owners = tuple(sorted(set(supplied_owners) & set(routine_owners)))
         missing = sorted(set(selected_owners) - set(roster))
         if missing:
             raise KeyError(f"routine owners are absent from population: {', '.join(missing)}")
@@ -380,6 +397,9 @@ class PopulationExecutionLoop:
             tuple(sorted(completed_action_executions, key=lambda item: item.execution_id)),
             tuple(sorted(household_settlement_ids)),
             tuple(sorted(household_obligations, key=lambda item: item.obligation_id)),
+            None if subsystem_plan is None else tuple(
+                (name, owners) for name, owners in sorted(subsystem_plan.items())
+            ),
         )
         existing = self._results.get(tick)
         if existing is not None:
