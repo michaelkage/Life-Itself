@@ -5,7 +5,9 @@ import tempfile
 from pathlib import Path
 
 from simreality.model import NPC
-from simreality.action_execution import ActionExecution
+from simreality.action_execution import ActionExecution, ActionExecutionLedger, ActionExecutionPolicy
+from simreality.action_world_state import ActionWorldState
+from simreality.population_actions import NPCActionDispatchAdapter
 from simreality.household_economy import EconomicAccount, EconomicLedger, EconomicActionAdapter, ActionEconomicEffect, HouseholdLedger, HouseholdObligation
 from simreality.goals import GoalBook, NPCGoal
 from simreality.npc_autonomy import NPCDecisionCycle
@@ -155,6 +157,46 @@ class PopulationExecutionLoopTests(unittest.TestCase):
         self.assertEqual(economics.balance("employer"), 80.0)
         self.assertEqual(economics.balance("household"), 10.0)
         self.assertEqual(economics.balance("utility"), 10.0)
+
+    def test_action_dispatch_and_multi_tick_execution_run_inside_population_tick(self):
+        goals = GoalBook()
+        goals.add(NPCGoal("goal-a", "npc-a", "work", priority=5))
+        planner = DeterministicPlanner((
+            PlanningAction("earn", frozenset({"available"}), frozenset({"paid"})),
+        ))
+        action_ledger = ActionExecutionLedger(
+            planner,
+            (ActionExecutionPolicy("earn", resource_costs=(("energy", 2.0),), duration_ticks=2),),
+            events=self.events,
+        )
+        dispatch = NPCActionDispatchAdapter(action_ledger)
+        facts = {"available"}
+        resources = {"energy": 5.0}
+        world_state = ActionWorldState({"npc-a": facts}, {"npc-a": resources})
+        loop = PopulationExecutionLoop(
+            self.loop.coordinator, RoutineBook(), RoutineExecutionLedger(),
+            decision_cycle=NPCDecisionCycle(goals, planner),
+            action_execution_ledger=action_ledger,
+            action_dispatch_adapter=dispatch,
+            action_world_state=world_state,
+        )
+        contexts = {"npc-a": NPCDecisionContext(frozenset({"available"}), {"goal-a": frozenset({"paid"})})}
+
+        first = loop.run_tick(1, 500, self.npcs, outcome_samples={}, decision_contexts=contexts)
+        self.assertEqual(first.action_dispatches[0].status, "started")
+        self.assertEqual(len(action_ledger.active()), 1)
+        self.assertEqual(resources["energy"], 5.0)
+
+        second = loop.run_tick(2, 501, self.npcs, outcome_samples={}, decision_contexts=contexts)
+        self.assertEqual(second.action_dispatches[0].status, "already_active")
+        self.assertEqual(action_ledger.active()[0].progress_ticks, 1)
+
+        third = loop.run_tick(3, 502, self.npcs, outcome_samples={}, decision_contexts=contexts)
+        self.assertEqual(third.action_results[0].status, "completed")
+        self.assertEqual(third.action_dispatches[0].status, "completed_this_tick")
+        self.assertEqual(facts, {"paid"})
+        self.assertEqual(resources, {"energy": 3.0})
+        self.assertEqual(action_ledger.active(), ())
 
     def test_transactional_population_loop_rejects_incomplete_participant_set(self):
         with tempfile.TemporaryDirectory() as directory:
