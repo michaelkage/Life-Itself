@@ -102,7 +102,7 @@ class PopulationCheckpointParticipantTests(unittest.TestCase):
             self.assertEqual(self.economics.balance("family"), 0.0)
             self.assertEqual(self.economics.snapshot(), ())
             self.assertEqual(self.economic_actions._applied, {})
-            self.assertEqual(self.households.snapshot()[0].status, "pending")
+            self.assertEqual(self.households.snapshot()[0].status, "open")
 
     def test_concrete_participant_restore_preserves_live_object_identity(self):
         with tempfile.TemporaryDirectory() as directory:
