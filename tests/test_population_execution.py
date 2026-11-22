@@ -7,6 +7,7 @@ from pathlib import Path
 from simreality.model import NPC, ActionTag
 from simreality.action_execution import ActionExecution, ActionExecutionLedger, ActionExecutionPolicy
 from simreality.action_world_state import ActionWorldState
+from simreality.inventory import ActionInventoryAdapter, ActionInventoryEffect, InventoryLedger
 from simreality.population_actions import NPCActionDispatchAdapter
 from simreality.household_economy import EconomicAccount, EconomicLedger, EconomicActionAdapter, ActionEconomicEffect, ActionHouseholdEffect, HouseholdActionAdapter, HouseholdLedger, HouseholdObligation
 from simreality.inventory import ActionInventoryAdapter, ActionInventoryEffect, InventoryLedger
@@ -304,6 +305,77 @@ class PopulationExecutionLoopTests(unittest.TestCase):
         self.assertEqual(len(economics.snapshot()), 1)
         self.assertEqual(len(inventory.snapshot()), 1)
         self.assertEqual(len(households.snapshot()), 1)
+
+    def test_untransactional_household_phase_retry_reconstructs_all_action_effect_outputs(self):
+        economics = EconomicLedger((
+            EconomicAccount("employer", "business", "business"),
+            EconomicAccount("household", "npc-a", "household"),
+            EconomicAccount("landlord", "property-owner", "business"),
+        ))
+        economics._balances.update({
+            "employer": 50.0, "household": 0.0, "landlord": 0.0,
+        })
+        economic_actions = EconomicActionAdapter(economics, (
+            ActionEconomicEffect("earn", "employer", "household", 10.0, "wage"),
+        ))
+        households = HouseholdLedger(economics)
+        household_actions = HouseholdActionAdapter(households, (
+            ActionHouseholdEffect(
+                "earn", "rent", "home-a", "household", "landlord",
+                5.0, 1, "rent obligation",
+            ),
+        ))
+        inventory = InventoryLedger({("store", "meal"): 1.0, ("npc-a", "meal"): 0.0})
+        inventory_actions = ActionInventoryAdapter(inventory, (
+            ActionInventoryEffect(
+                "earn", "ration", "meal", 1.0, "store", "npc-a", "ration",
+            ),
+        ))
+        action_ledger = ActionExecutionLedger(
+            DeterministicPlanner((
+                PlanningAction("earn", frozenset({"available"}), frozenset({"paid"})),
+            )),
+            (ActionExecutionPolicy("earn", duration_ticks=1),),
+            events=self.events,
+        )
+        action_ledger.start(
+            "execution-effects", "npc-a", 0, "earn",
+            {"available"}, {}, plan_actions=("earn",),
+        )
+        completed = action_ledger.advance("execution-effects", 1, {"available"}, {})
+        self.assertEqual(completed.status, "completed")
+
+        def fail_after_households(phase, tick):
+            if phase == "households":
+                raise RuntimeError("untransactional household failure")
+        loop = PopulationExecutionLoop(
+            self.loop.coordinator, RoutineBook(), RoutineExecutionLedger(),
+            economic_action_adapter=economic_actions,
+            household_ledger=households,
+            action_execution_ledger=action_ledger,
+            household_action_adapter=household_actions,
+            inventory_action_adapter=inventory_actions,
+            phase_observer=fail_after_households,
+        )
+        with self.assertRaisesRegex(RuntimeError, "untransactional household failure"):
+            loop.run_tick(1, 500, self.npcs, outcome_samples={})
+        self.assertEqual(economics.balance("employer"), 40.0)
+        self.assertEqual(economics.balance("household"), 5.0)
+        self.assertEqual(len(households.snapshot()), 1)
+        self.assertEqual(inventory.quantity("npc-a", "meal"), 1.0)
+
+        loop.phase_observer = None
+        retried = loop.run_tick(1, 500, self.npcs, outcome_samples={})
+        self.assertEqual(len(retried.economic_transfers), 1)
+        self.assertEqual(len(retried.action_obligations), 1)
+        self.assertEqual(len(retried.inventory_transfers), 1)
+        self.assertEqual(
+            tuple(item.execution_id for item in retried.action_results),
+            ("execution-effects",),
+        )
+        self.assertEqual(len(economics.snapshot()), 1)
+        self.assertEqual(len(households.snapshot()), 1)
+        self.assertEqual(len(inventory.snapshot()), 1)
 
     def test_untransactional_phase_failure_invalidates_orchestration_cache_for_safe_retry(self):
         event = WorldEventLedger.make_event(
