@@ -336,6 +336,10 @@ class PopulationExecutionLoop:
         for intent in conversations:
             if intent.listener_id not in npcs or intent.speaker_id not in npcs:
                 raise KeyError(f"conversation {intent.conversation_id!r} references an absent NPC")
+        if not isinstance(encounter_opportunities, tuple) or any(not isinstance(item, PresenceEncounterIntent) for item in encounter_opportunities):
+            raise TypeError("encounter_opportunities must be a tuple of PresenceEncounterIntent values")
+        if len({item.encounter_id for item in encounter_opportunities}) != len(encounter_opportunities):
+            raise ValueError("encounter IDs must be unique within a population tick")
         for intent in encounter_opportunities:
             if intent.first_id not in npcs or intent.second_id not in npcs:
                 raise KeyError(f"encounter {intent.encounter_id!r} references an absent NPC")
@@ -381,10 +385,6 @@ class PopulationExecutionLoop:
         sample_values = dict(outcome_samples)
         closed_edges = tuple(sorted(set(closed_edge_ids)))
         multiplier_values = dict(time_multipliers or {})
-        if not isinstance(encounter_opportunities, tuple) or any(not isinstance(item, PresenceEncounterIntent) for item in encounter_opportunities):
-            raise TypeError("encounter_opportunities must be a tuple of PresenceEncounterIntent values")
-        if len({item.encounter_id for item in encounter_opportunities}) != len(encounter_opportunities):
-            raise ValueError("encounter IDs must be unique within a population tick")
         if not isinstance(completed_action_executions, tuple) or any(not isinstance(item, ActionExecution) for item in completed_action_executions):
             raise TypeError("completed_action_executions must be a tuple of ActionExecution values")
         if len({item.execution_id for item in completed_action_executions}) != len(completed_action_executions):
