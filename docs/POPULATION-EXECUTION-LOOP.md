@@ -179,7 +179,7 @@ The transaction coordinator is opt-in for compatibility. A loop without a config
 
 ### Concrete checkpoint participant registration
 
-Use `build_population_transaction_participants(...)` to bind the existing versioned save-state codecs to live objects. It creates participants for NPC state, world events, event-memory replay, social conversation replay, social trust, social beliefs, routine definitions and routine execution history; optional travel/presence, encounters, economics, economic-action replay, household obligations and action execution history are included when their live adapters are supplied.
+Use `build_population_transaction_participants(...)` to bind the existing versioned save-state codecs to live objects. It creates participants for NPC state, world events, event-memory replay, social conversation replay, social trust, social beliefs, routine definitions and routine execution history; optional travel/presence, encounters, economics, economic-action replay, household obligations and action execution history are included when their live adapters are supplied. If the action ledger is connected to a `GoalBook`, the builder also registers `action_goals` so action-driven goal progress is rolled back with the execution record.
 
 The builder restores mutable ledgers in place, preserving references held by adapters. Register order is intentional: world events precede action execution restoration, social trust precedes social beliefs, and economics precedes economic-action replay restoration. The NPC mapping and its instances must remain stable for the coordinator lifetime; changing the roster between durable ticks is rejected during restore.
 
