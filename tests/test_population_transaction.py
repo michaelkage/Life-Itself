@@ -127,5 +127,18 @@ class PopulationTickTransactionTests(unittest.TestCase):
             self.assertEqual(live, {"count": 5})
             self.assertEqual(coordinator.journal_snapshot()[0]["status"], "aborted")
 
+    def test_committed_result_digest_corruption_is_rejected_on_restart(self):
+        with tempfile.TemporaryDirectory() as directory:
+            journal = Path(directory) / "ticks.json"
+            state = {"count": 0}
+            participants = (self.participant("state", state),)
+            coordinator = PopulationTickTransactionCoordinator(journal, participants)
+            coordinator.execute(1, {"tick": 1}, lambda: state.update(count=1))
+            payload = json.loads(journal.read_text(encoding="utf-8"))
+            payload["records"][0]["result_digest"] = "0" * 64
+            journal.write_text(json.dumps(payload), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "result digest mismatch"):
+                PopulationTickTransactionCoordinator(journal, participants)
+
 if __name__ == "__main__":
     unittest.main()
