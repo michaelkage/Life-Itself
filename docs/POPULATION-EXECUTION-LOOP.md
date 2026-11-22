@@ -91,7 +91,8 @@ under deterministic global budgets. Equal scores break by owner ID. It rejects
 missing presence and conflicting tick replays rather than inventing a location.
 
 The scheduler returns stable cell/LOD slices and the selected/deferred owner
-sets. `PopulationSchedule.subsystem_slices(policy)` expands those tier
+sets. A schedule supplied to the population loop must partition the exact live
+NPC roster; missing or extra owners are rejected before any phase executes. `PopulationSchedule.subsystem_slices(policy)` expands those tier
 assignments into stable owner batches for action advancement, decisions, economy,
 event memory, presence, routines, social encounters/conversations and travel.
 The population loop consumes these batches directly:
