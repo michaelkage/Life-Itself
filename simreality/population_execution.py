@@ -21,7 +21,7 @@ from .population_transaction import PopulationTickTransactionCoordinator
 from .action_execution import ActionExecution, ActionExecutionLedger, ActiveActionExecution
 from .action_world_state import ActionWorldState
 from .population_actions import NPCActionDispatch, NPCActionDispatchAdapter
-from .household_economy import EconomicActionAdapter, EconomicTransfer, HouseholdLedger, HouseholdObligation
+from .household_economy import EconomicActionAdapter, EconomicTransfer, HouseholdActionAdapter, HouseholdLedger, HouseholdObligation
 from .simulation_tick import (
     ConversationIntent,
     SimulationTickCoordinator,
@@ -73,6 +73,7 @@ class PopulationTickResult:
     household_obligations: tuple[HouseholdObligation, ...] = ()
     action_dispatches: tuple[NPCActionDispatch, ...] = ()
     action_results: tuple[ActionExecution | ActiveActionExecution, ...] = ()
+    action_obligations: tuple[HouseholdObligation, ...] = ()
 
 
 class PopulationExecutionLoop:
@@ -99,6 +100,7 @@ class PopulationExecutionLoop:
         action_execution_ledger: ActionExecutionLedger | None = None,
         action_dispatch_adapter: NPCActionDispatchAdapter | None = None,
         action_world_state: ActionWorldState | None = None,
+        household_action_adapter: HouseholdActionAdapter | None = None,
     ) -> None:
         if not isinstance(coordinator, SimulationTickCoordinator):
             raise TypeError("coordinator must be a SimulationTickCoordinator")
@@ -154,6 +156,15 @@ class PopulationExecutionLoop:
             raise ValueError("household and action adapters must share the same EconomicLedger")
         self.economic_action_adapter = economic_action_adapter
         self.household_ledger = household_ledger
+        if household_action_adapter is not None and not isinstance(household_action_adapter, HouseholdActionAdapter):
+            raise TypeError("household_action_adapter must be a HouseholdActionAdapter or None")
+        if household_action_adapter is not None and household_ledger is not household_action_adapter.households:
+            raise ValueError("household action adapter must use the configured HouseholdLedger")
+        if household_action_adapter is not None and household_ledger is None:
+            raise ValueError("household action effects require a HouseholdLedger")
+        self.household_action_adapter = household_action_adapter
+        if household_action_adapter is not None and transaction_coordinator is not None and "household_actions" not in transaction_coordinator.participant_names:
+            raise ValueError("transaction coordinator is missing the household_actions participant")
         if action_dispatch_adapter is not None and not isinstance(action_dispatch_adapter, NPCActionDispatchAdapter):
             raise TypeError("action_dispatch_adapter must be an NPCActionDispatchAdapter or None")
         if action_execution_ledger is None and action_dispatch_adapter is not None:
@@ -436,6 +447,11 @@ class PopulationExecutionLoop:
             for item in sorted(economic_inputs.values(), key=lambda value: value.execution_id)
             for transfer in self.economic_action_adapter.apply_all(item, tick)
         ) if self.economic_action_adapter is not None else ()
+        action_obligations = tuple(
+            obligation
+            for item in sorted(economic_inputs.values(), key=lambda value: value.execution_id)
+            for obligation in self.household_action_adapter.apply_all(item, tick)
+        ) if self.household_action_adapter is not None else ()
         household_records = tuple(
             self.household_ledger.add(item)
             for item in sorted(household_obligations, key=lambda value: value.obligation_id)
@@ -457,6 +473,7 @@ class PopulationExecutionLoop:
             household_settlements=household_settlements,
             household_obligations=household_records,
             action_dispatches=action_dispatches,
+            action_obligations=action_obligations,
             action_results=tuple((
                 *advanced_actions,
                 *(item.active for item in action_dispatches if item.active is not None),
