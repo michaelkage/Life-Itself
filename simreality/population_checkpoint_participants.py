@@ -22,6 +22,7 @@ from .routine_save_state import RoutineBookSnapshot
 from .routine_execution_save_state import RoutineExecutionSnapshot
 from .action_execution import ActionExecutionLedger, ActionExecutionSnapshot
 from .action_world_state import ActionWorldState
+from .inventory import ActionInventoryAdapter, InventoryLedger
 from .household_economy import EconomicLedger, EconomicActionAdapter, EconomicTransfer, HouseholdActionAdapter, HouseholdLedger, HouseholdObligation
 from .world_events import WorldEvent, WorldEventLedger
 from .population_transaction import TransactionParticipant
@@ -75,6 +76,8 @@ def build_population_transaction_participants(
     action_ledger: ActionExecutionLedger | None = None,
     action_world_state: ActionWorldState | None = None,
     household_action_adapter: HouseholdActionAdapter | None = None,
+    inventory_ledger: InventoryLedger | None = None,
+    inventory_action_adapter: ActionInventoryAdapter | None = None,
 ) -> tuple[TransactionParticipant, ...]:
     """Build complete participants for the supplied live population loop.
 
@@ -115,6 +118,12 @@ def build_population_transaction_participants(
         raise TypeError("household_action_adapter must be a HouseholdActionAdapter or None")
     if household_action_adapter is not None and household_ledger is not household_action_adapter.households:
         raise ValueError("household action adapter must use the configured HouseholdLedger")
+    if inventory_ledger is not None and not isinstance(inventory_ledger, InventoryLedger):
+        raise TypeError("inventory_ledger must be an InventoryLedger or None")
+    if inventory_action_adapter is not None and not isinstance(inventory_action_adapter, ActionInventoryAdapter):
+        raise TypeError("inventory_action_adapter must be an ActionInventoryAdapter or None")
+    if inventory_action_adapter is not None and inventory_ledger is not inventory_action_adapter.inventory:
+        raise ValueError("inventory action adapter must use the configured InventoryLedger")
     participants = []
 
     def add(name, capture, restore):
@@ -314,6 +323,30 @@ def build_population_transaction_participants(
                 restored[execution_id] = tuple(obligation_ids)
             _replace_mapping(household_action_adapter._applied, restored)
         add("household_actions", capture_household_actions, restore_household_actions)
+
+    if inventory_ledger is not None:
+        add("inventory", inventory_ledger.to_json, inventory_ledger.restore_json)
+    if inventory_action_adapter is not None:
+        def capture_inventory_actions():
+            return _json({"schema_version": 1, "applied": [
+                {"execution_id": execution_id, "transfer_ids": list(transfer_ids)}
+                for execution_id, transfer_ids in sorted(inventory_action_adapter._applied.items())
+            ]})
+        def restore_inventory_actions(payload):
+            raw = json.loads(payload)
+            if not isinstance(raw, dict) or raw.get("schema_version") != 1 or not isinstance(raw.get("applied"), list):
+                raise ValueError("unsupported inventory action participant schema")
+            restored = {}
+            for item in raw["applied"]:
+                execution_id = item["execution_id"]
+                transfer_ids = item["transfer_ids"]
+                if not isinstance(execution_id, str) or not execution_id.strip() or execution_id in restored:
+                    raise ValueError("invalid or duplicate inventory action execution ID")
+                if not isinstance(transfer_ids, list) or any(not isinstance(value, str) or not value.strip() for value in transfer_ids):
+                    raise ValueError("invalid inventory action transfer references")
+                restored[execution_id] = tuple(transfer_ids)
+            _replace_mapping(inventory_action_adapter._applied, restored)
+        add("inventory_actions", capture_inventory_actions, restore_inventory_actions)
 
     if action_world_state is not None:
         add("action_world_state", action_world_state.to_json, action_world_state.restore_json)
