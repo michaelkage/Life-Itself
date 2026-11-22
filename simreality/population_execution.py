@@ -18,7 +18,9 @@ from .travel import TravelTickAdapter, TravelTickResult
 from .presence import PresenceTickAdapter, NPCPresence
 from .presence_encounters import PresenceSocialAdapter, PresenceEncounterResult
 from .population_transaction import PopulationTickTransactionCoordinator
-from .action_execution import ActionExecution, ActionExecutionLedger
+from .action_execution import ActionExecution, ActionExecutionLedger, ActiveActionExecution
+from .action_world_state import ActionWorldState
+from .population_actions import NPCActionDispatch, NPCActionDispatchAdapter
 from .household_economy import EconomicActionAdapter, EconomicTransfer, HouseholdLedger, HouseholdObligation
 from .simulation_tick import (
     ConversationIntent,
@@ -69,6 +71,8 @@ class PopulationTickResult:
     economic_transfers: tuple[EconomicTransfer, ...] = ()
     household_settlements: tuple[HouseholdObligation, ...] = ()
     household_obligations: tuple[HouseholdObligation, ...] = ()
+    action_dispatches: tuple[NPCActionDispatch, ...] = ()
+    action_results: tuple[ActionExecution | ActiveActionExecution, ...] = ()
 
 
 class PopulationExecutionLoop:
@@ -94,6 +98,8 @@ class PopulationExecutionLoop:
         economic_action_adapter: EconomicActionAdapter | None = None,
         household_ledger: HouseholdLedger | None = None,
         action_execution_ledger: ActionExecutionLedger | None = None,
+        action_dispatch_adapter: NPCActionDispatchAdapter | None = None,
+        action_world_state: ActionWorldState | None = None,
     ) -> None:
         if not isinstance(coordinator, SimulationTickCoordinator):
             raise TypeError("coordinator must be a SimulationTickCoordinator")
@@ -154,6 +160,20 @@ class PopulationExecutionLoop:
         if action_execution_ledger is not None and action_execution_ledger.events is not coordinator.events:
             raise ValueError("action execution ledger must share the population world event ledger")
         self.action_execution_ledger = action_execution_ledger
+        if action_dispatch_adapter is not None and not isinstance(action_dispatch_adapter, NPCActionDispatchAdapter):
+            raise TypeError("action_dispatch_adapter must be an NPCActionDispatchAdapter or None")
+        if action_world_state is not None and not isinstance(action_world_state, ActionWorldState):
+            raise TypeError("action_world_state must be an ActionWorldState or None")
+        if (action_dispatch_adapter is None) != (action_world_state is None):
+            raise ValueError("action dispatch adapter and checkpointable action world state must be configured together")
+        if action_dispatch_adapter is not None and action_execution_ledger is not action_dispatch_adapter.executions:
+            raise ValueError("action dispatch adapter must use the configured action execution ledger")
+        if action_dispatch_adapter is not None and action_execution_ledger is None:
+            raise ValueError("action dispatch requires an ActionExecutionLedger")
+        self.action_dispatch_adapter = action_dispatch_adapter
+        self.action_world_state = action_world_state
+        if action_dispatch_adapter is not None and transaction_coordinator is not None and "action_world_state" not in transaction_coordinator.participant_names:
+            raise ValueError("transaction coordinator is missing the action_world_state participant")
         if action_execution_ledger is not None and transaction_coordinator is not None and "action_executions" not in transaction_coordinator.participant_names:
             raise ValueError("transaction coordinator is missing the action_executions participant")
         if action_execution_ledger is not None and action_execution_ledger.goals is not None and transaction_coordinator is not None and "action_goals" not in transaction_coordinator.participant_names:
@@ -341,6 +361,9 @@ class PopulationExecutionLoop:
             if not math.isfinite(sample) or not 0.0 <= sample <= 1.0:
                 raise ValueError(f"outcome sample for {block.routine_id} must be finite and in [0, 1]")
 
+        # Existing actions advance before new decisions so completed effects are
+        # visible to the decision phase in this same population tick.
+        advanced_actions = self.action_dispatch_adapter.advance_active(tick, self.action_world_state) if self.action_dispatch_adapter is not None else ()
         decisions = tuple(
             self.decision_cycle.decide(
                 owner, tick, context.world_facts, context.goal_facts,
@@ -348,6 +371,11 @@ class PopulationExecutionLoop:
             )
             for owner, context in sorted(contexts.items())
         ) if self.decision_cycle is not None else ()
+        action_dispatches = self.action_dispatch_adapter.dispatch(
+            tick, decisions,
+            self.action_world_state.world_facts_by_owner,
+            self.action_world_state.resources_by_owner,
+        ) if self.action_dispatch_adapter is not None else ()
 
         travel_result = None
         presence_records: tuple[NPCPresence, ...] = ()
@@ -389,10 +417,17 @@ class PopulationExecutionLoop:
             outcome_samples=sample_values,
             owner_ids=selected_owners,
         )
+        newly_completed_actions = tuple(
+            item for item in advanced_actions if isinstance(item, ActionExecution) and item.status == "completed"
+        )
+        economic_inputs = {
+            item.execution_id: item
+            for item in (*completed_action_executions, *newly_completed_actions)
+        }
         economic_transfers = tuple(
             transfer for transfer in (
                 self.economic_action_adapter.apply(item, tick)
-                for item in sorted(completed_action_executions, key=lambda value: value.execution_id)
+                for item in sorted(economic_inputs.values(), key=lambda value: value.execution_id)
             ) if transfer is not None
         ) if self.economic_action_adapter is not None else ()
         household_records = tuple(
@@ -415,6 +450,8 @@ class PopulationExecutionLoop:
             economic_transfers=economic_transfers,
             household_settlements=household_settlements,
             household_obligations=household_records,
+            action_dispatches=action_dispatches,
+            action_results=tuple(advanced_actions),
         )
         self._requests[tick] = signature
         self._results[tick] = result
