@@ -50,6 +50,41 @@ class InventoryLedgerTests(unittest.TestCase):
         self.assertEqual(restored.stock_snapshot(), self.inventory.stock_snapshot())
         self.assertEqual(restored.snapshot(), self.inventory.snapshot())
 
+    def test_atomic_batch_nets_same_batch_receipts_before_outgoing_stock(self):
+        inventory = InventoryLedger({
+            ("supplier", "meal"): 5.0,
+            ("store", "meal"): 0.0,
+            ("npc-a", "meal"): 0.0,
+        })
+        adapter = ActionInventoryAdapter(inventory, (
+            ActionInventoryEffect("work", "a-sale", "meal", 4, "store", "npc-a", "sale"),
+            ActionInventoryEffect("work", "z-restock", "meal", 5, "supplier", "store", "restock"),
+        ))
+        execution = ActionExecution(
+            "exec-netted", "npc-a", 1, "work", "completed", "done",
+            (), (), (), (), "event-netted",
+        )
+        applied = adapter.apply_all(execution, 1)
+        self.assertEqual(tuple(item.transfer_id for item in applied), (
+            "action:exec-netted:a-sale", "action:exec-netted:z-restock",
+        ))
+        self.assertEqual(inventory.quantity("supplier", "meal"), 0.0)
+        self.assertEqual(inventory.quantity("store", "meal"), 1.0)
+        self.assertEqual(inventory.quantity("npc-a", "meal"), 4.0)
+
+    def test_conflicting_transfer_replay_preflight_leaves_batch_unchanged(self):
+        inventory = InventoryLedger({("store", "meal"): 5.0, ("npc-a", "meal"): 0.0})
+        original = InventoryTransfer("existing", 1, "store", "npc-a", "meal", 1, "purchase")
+        inventory.apply(original)
+        before_stock = inventory.stock_snapshot()
+        with self.assertRaisesRegex(ValueError, "conflicting inventory transfer replay"):
+            inventory.apply_many((
+                InventoryTransfer("new", 2, "store", "npc-a", "meal", 1, "purchase"),
+                InventoryTransfer("existing", 2, "store", "npc-a", "meal", 2, "different"),
+            ))
+        self.assertEqual(inventory.stock_snapshot(), before_stock)
+        self.assertEqual(tuple(item.transfer_id for item in inventory.snapshot()), ("existing",))
+
     def test_multi_effect_inventory_preflights_all_debits(self):
         adapter = ActionInventoryAdapter(self.inventory, (
             ActionInventoryEffect("work", "one", "meal", 15, "store", "npc-a", "award"),
