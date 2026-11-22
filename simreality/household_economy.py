@@ -285,3 +285,78 @@ class EconomicActionAdapter:
         """Compatibility API returning the first transfer from apply_all."""
         transfers = self.apply_all(execution, tick)
         return transfers[0] if transfers else None
+
+
+@dataclass(frozen=True)
+class ActionHouseholdEffect:
+    """Explicit household obligation created by a completed action."""
+
+    action_id: str
+    effect_id: str
+    household_id: str
+    debtor_account: str
+    creditor_account: str
+    amount: float
+    due_tick_offset: int
+    description: str
+
+    def __post_init__(self):
+        for name in ("action_id", "effect_id", "household_id", "debtor_account", "creditor_account", "description"):
+            value = getattr(self, name)
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError(f"{name} must be non-empty text")
+        _amount(self.amount)
+        if self.debtor_account == self.creditor_account:
+            raise ValueError("household effect must use distinct accounts")
+        if isinstance(self.due_tick_offset, bool) or not isinstance(self.due_tick_offset, int) or self.due_tick_offset < 0:
+            raise ValueError("due_tick_offset must be a non-negative integer")
+
+
+class HouseholdActionAdapter:
+    """Create deterministic household obligations from completed action effects."""
+
+    def __init__(self, households: HouseholdLedger, policies: Iterable[ActionHouseholdEffect]):
+        if not isinstance(households, HouseholdLedger):
+            raise TypeError("households must be a HouseholdLedger")
+        values = tuple(policies)
+        if any(not isinstance(item, ActionHouseholdEffect) for item in values):
+            raise TypeError("policies must contain ActionHouseholdEffect values")
+        if len({(item.action_id, item.effect_id) for item in values}) != len(values):
+            raise ValueError("household effect IDs must be unique per action")
+        for item in values:
+            if item.debtor_account not in households.economics._accounts or item.creditor_account not in households.economics._accounts:
+                raise KeyError("household action effect references an unknown account")
+        self.households = households
+        grouped = {}
+        for item in values:
+            grouped.setdefault(item.action_id, []).append(item)
+        self.policies = {
+            action_id: tuple(sorted(items, key=lambda item: item.effect_id))
+            for action_id, items in grouped.items()
+        }
+        self._applied: dict[str, tuple[HouseholdObligation, ...]] = {}
+
+    def apply_all(self, execution, tick: int) -> tuple[HouseholdObligation, ...]:
+        """Create all configured obligations once for a completed action."""
+        from .action_execution import ActionExecution
+        if not isinstance(execution, ActionExecution):
+            raise TypeError("execution must be an ActionExecution")
+        if isinstance(tick, bool) or not isinstance(tick, int) or tick < 0:
+            raise ValueError("tick must be a non-negative integer")
+        if execution.status != "completed":
+            return ()
+        prior = self._applied.get(execution.execution_id)
+        if prior is not None:
+            return prior
+        created = []
+        for policy in self.policies.get(execution.action_id, ()):
+            obligation = HouseholdObligation(
+                f"action:{execution.execution_id}:{policy.effect_id}",
+                policy.household_id, policy.debtor_account, policy.creditor_account,
+                policy.amount, tick + policy.due_tick_offset, policy.description,
+            )
+            created.append(self.households.add(obligation))
+        result = tuple(created)
+        if result:
+            self._applied[execution.execution_id] = result
+        return result
