@@ -94,12 +94,14 @@ class SimulationTickReplaySnapshot:
                     speaker_id=c["speaker_id"],
                     district_id=c["district_id"],
                 ) for c in item["conversations"])
+                refs = tuple((ref[0], ref[1], ref[2]) for ref in item["memory_refs"])
                 if schema_version == 1:
-                    memory_requests = None
+                    # Legacy requests materialized every witness of each selected event.
+                    memory_requests = tuple((event_id, witness_id) for event_id, witness_id, _ in refs)
                 else:
                     raw_requests = item.get("memory_requests")
                     if raw_requests is None:
-                        memory_requests = None
+                        memory_requests = tuple((event_id, witness_id) for event_id, witness_id, _ in refs)
                     else:
                         if not isinstance(raw_requests, list):
                             raise ValueError("memory_requests must be a list or null")
@@ -112,7 +114,6 @@ class SimulationTickReplaySnapshot:
                             for event_id, witness_id in memory_requests
                         ):
                             raise ValueError("invalid witness-memory request")
-                refs = tuple((ref[0], ref[1], ref[2]) for ref in item["memory_refs"])
                 if any(not isinstance(a, str) or not isinstance(b, str) or not isinstance(n, bool)
                        for a, b, n in refs):
                     raise ValueError("invalid memory replay reference")
