@@ -490,6 +490,11 @@ class PopulationExecutionLoop:
                 raise ValueError("travel_budgets are required when travel integration is configured")
             if not isinstance(travel_budgets, Mapping):
                 raise TypeError("travel_budgets must map owner IDs to travel budgets")
+            for owner, budget in travel_budgets.items():
+                if owner not in npcs:
+                    raise KeyError(f"travel budget owner is absent from population: {owner}")
+                if isinstance(budget, bool) or not isinstance(budget, (int, float)) or not math.isfinite(budget) or budget < 0:
+                    raise ValueError("each travel budget must be finite and non-negative")
             effective_travel_budgets = {
                 owner: budget for owner, budget in travel_budgets.items()
                 if owner in travel_owners
