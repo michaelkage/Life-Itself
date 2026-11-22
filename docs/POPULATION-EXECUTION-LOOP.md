@@ -83,10 +83,12 @@ under deterministic global budgets. Equal scores break by owner ID. It rejects
 missing presence and conflicting tick replays rather than inventing a location.
 
 The scheduler returns stable cell/LOD slices and the selected/deferred owner
-sets. Pass `selected_owner_ids` to `PopulationExecutionLoop.run_tick` as
-`owner_ids` to bound routine execution. LOD is a scheduling decision only:
-the caller remains responsible for selecting which subsystems run at each
-detail tier.
+sets. `PopulationSchedule.subsystem_slices(policy)` expands those tier
+assignments into stable owner batches for each subsystem (decision, economy,
+memory, routine, social and travel), applying each tier's enablement and cadence
+at the schedule tick. The runtime integrator passes each subsystem its own
+owner batch; it must not treat the population-wide selected set as a universal
+work list.
 
 ## Validated action dispatch
 
