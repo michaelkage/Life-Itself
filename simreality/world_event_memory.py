@@ -35,6 +35,24 @@ class WorldEventMemoryAdapter:
         """Return whether this event/witness pair already has a memory record."""
         return (event_id, witness_id) in self._processed
 
+    def is_memory_resolved(self, event_id: str, witness_id: str) -> bool:
+        """Return whether the pair is processed or cannot produce a memory."""
+        if self.has_materialized(event_id, witness_id):
+            return True
+        event = self.events.get(event_id)
+        if witness_id not in event.witnesses:
+            raise ValueError(f"{witness_id!r} is not recorded as a witness to {event_id!r}")
+        attrs = self._attributes(event)
+        raw_tag = attrs.get("action_tag")
+        target_id = attrs.get("target_entity_id")
+        if not isinstance(raw_tag, str) or not isinstance(target_id, str) or not target_id.strip():
+            return True
+        try:
+            ActionTag(raw_tag)
+        except ValueError:
+            return True
+        return False
+
     @staticmethod
     def _attributes(event: WorldEvent) -> dict[str, object]:
         return dict(event.attributes)
