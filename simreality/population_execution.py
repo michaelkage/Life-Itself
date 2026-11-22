@@ -502,6 +502,7 @@ class PopulationExecutionLoop:
                     for item in (
                         *advanced_actions,
                         *tick_action_records,
+                        *completed_action_executions,
                         *(item.active for item in action_dispatches if item.active is not None),
                     )
                 }[execution_id]
@@ -510,6 +511,7 @@ class PopulationExecutionLoop:
                     for item in (
                         *advanced_actions,
                         *tick_action_records,
+                        *completed_action_executions,
                         *(item.active for item in action_dispatches if item.active is not None),
                     )
                 })
