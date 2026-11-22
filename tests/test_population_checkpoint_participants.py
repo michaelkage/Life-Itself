@@ -177,7 +177,7 @@ class PopulationCheckpointParticipantTests(unittest.TestCase):
                     ),
                     lambda: (
                         self.economics.transfer(EconomicTransfer(
-                            f"transfer-{tick}", tick, "employer", "family", 1, "phase-test",
+                            f"transfer-{tick}", tick, "employer", "family", 20, "phase-test",
                         )),
                         self.economic_actions._applied.__setitem__(
                             f"execution-{tick}", self.economics.snapshot()[-1],
