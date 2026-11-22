@@ -230,7 +230,7 @@ class PopulationCheckpointParticipantTests(unittest.TestCase):
             )
             with self.assertRaisesRegex(RuntimeError, "injected after actual routine phase"):
                 failing_loop.run_tick(
-                    1, 500, self.npcs, outcome_samples={"work": 0.4},
+                    1, 500, self.npcs, outcome_samples={"routine-phase": 0.4},
                 )
             self.assertEqual(
                 tuple(item.routine_id for item in self.routines.snapshot()),
@@ -243,7 +243,7 @@ class PopulationCheckpointParticipantTests(unittest.TestCase):
                 transaction_coordinator=transaction,
             )
             retried = retry_loop.run_tick(
-                1, 500, self.npcs, outcome_samples={"work": 0.4},
+                1, 500, self.npcs, outcome_samples={"routine-phase": 0.4},
             )
             self.assertEqual(
                 tuple(item.routine_id for item in retried.routine_executions),
