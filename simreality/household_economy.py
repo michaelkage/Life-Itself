@@ -302,6 +302,10 @@ class EconomicActionAdapter:
         """Return whether all configured effects for an execution were committed."""
         return execution_id in self._applied
 
+    def has_policy(self, action_id: str) -> bool:
+        """Return whether an action has configured economic effects."""
+        return bool(self.policies.get(action_id))
+
     def apply_all(self, execution, tick: int) -> tuple[EconomicTransfer, ...]:
         """Apply all configured effects atomically after a completed action."""
         from .action_execution import ActionExecution
@@ -392,6 +396,10 @@ class HouseholdActionAdapter:
     def has_applied(self, execution_id: str) -> bool:
         """Return whether configured household effects were materialized."""
         return execution_id in self._applied
+
+    def has_policy(self, action_id: str) -> bool:
+        """Return whether an action has configured household effects."""
+        return bool(self.policies.get(action_id))
 
     def apply_all(self, execution, tick: int) -> tuple[HouseholdObligation, ...]:
         """Create all configured obligations once for a completed action."""
