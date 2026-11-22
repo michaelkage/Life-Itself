@@ -519,26 +519,40 @@ class PopulationExecutionLoop:
             owner_ids=selected_owners,
         )
         completed_action_inputs = {}
-        for item in (*completed_action_executions, *completed_tick_actions):
+        ledger_completed_actions = tuple(
+            item for item in self.action_execution_ledger.snapshot()
+            if item.status == "completed"
+        ) if self.action_execution_ledger is not None else ()
+        for item in (*completed_action_executions, *ledger_completed_actions):
             prior = completed_action_inputs.get(item.execution_id)
             if prior is not None and prior != item:
                 raise ValueError(f"conflicting completed action record: {item.execution_id}")
             completed_action_inputs[item.execution_id] = item
+        due_economic_actions = tuple(
+            item for item in sorted(completed_action_inputs.values(), key=lambda value: value.execution_id)
+            if item.owner_id in economy_owners
+        )
         economic_transfers = tuple(
             transfer
-            for item in sorted(completed_action_inputs.values(), key=lambda value: value.execution_id)
+            for item in due_economic_actions
+            if self.economic_action_adapter is not None
+            and not self.economic_action_adapter.has_applied(item.execution_id)
             for transfer in self.economic_action_adapter.apply_all(item, tick)
-        ) if self.economic_action_adapter is not None else ()
+        )
         action_obligations = tuple(
             obligation
-            for item in sorted(completed_action_inputs.values(), key=lambda value: value.execution_id)
+            for item in due_economic_actions
+            if self.household_action_adapter is not None
+            and not self.household_action_adapter.has_applied(item.execution_id)
             for obligation in self.household_action_adapter.apply_all(item, tick)
-        ) if self.household_action_adapter is not None else ()
+        )
         inventory_transfers = tuple(
             transfer
-            for item in sorted(completed_action_inputs.values(), key=lambda value: value.execution_id)
+            for item in due_economic_actions
+            if self.inventory_action_adapter is not None
+            and not self.inventory_action_adapter.has_applied(item.execution_id)
             for transfer in self.inventory_action_adapter.apply_all(item, tick)
-        ) if self.inventory_action_adapter is not None else ()
+        )
         household_records = tuple(
             self.household_ledger.add(item)
             for item in sorted(household_obligations, key=lambda value: value.obligation_id)
