@@ -32,12 +32,10 @@ class PopulationCheckpointParticipantTests(unittest.TestCase):
         self.tick = SimulationTickCoordinator(self.events, self.memory, self.conversations)
         self.routines = RoutineBook()
         self.routine_executions = RoutineExecutionLedger()
-        self.economics = EconomicLedger((
-            EconomicAccount("employer", "company", "business"),
-            EconomicAccount("family", "npc-a", "household"),
-            EconomicAccount("utility", "utility", "provider"),
-        ))
+        self.economics = EconomicLedger()
         self.economics.add_account(EconomicAccount("employer", "company", "business"), 100)
+        self.economics.add_account(EconomicAccount("family", "npc-a", "household"), 0)
+        self.economics.add_account(EconomicAccount("utility", "utility", "provider"), 0)
         self.households = HouseholdLedger(self.economics)
         self.households.add(HouseholdObligation(
             "bill-1", "npc-a", "family", "utility", 15, 1, "utility bill",
