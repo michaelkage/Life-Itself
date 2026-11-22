@@ -452,25 +452,25 @@ class PopulationExecutionLoop:
             outcome_samples=sample_values,
             owner_ids=selected_owners,
         )
-        economic_inputs = {}
+        completed_action_inputs = {}
         for item in (*completed_action_executions, *completed_tick_actions):
-            prior = economic_inputs.get(item.execution_id)
+            prior = completed_action_inputs.get(item.execution_id)
             if prior is not None and prior != item:
                 raise ValueError(f"conflicting completed action record: {item.execution_id}")
-            economic_inputs[item.execution_id] = item
+            completed_action_inputs[item.execution_id] = item
         economic_transfers = tuple(
             transfer
-            for item in sorted(economic_inputs.values(), key=lambda value: value.execution_id)
+            for item in sorted(completed_action_inputs.values(), key=lambda value: value.execution_id)
             for transfer in self.economic_action_adapter.apply_all(item, tick)
         ) if self.economic_action_adapter is not None else ()
         action_obligations = tuple(
             obligation
-            for item in sorted(economic_inputs.values(), key=lambda value: value.execution_id)
+            for item in sorted(completed_action_inputs.values(), key=lambda value: value.execution_id)
             for obligation in self.household_action_adapter.apply_all(item, tick)
         ) if self.household_action_adapter is not None else ()
         inventory_transfers = tuple(
             transfer
-            for item in sorted(economic_inputs.values(), key=lambda value: value.execution_id)
+            for item in sorted(completed_action_inputs.values(), key=lambda value: value.execution_id)
             for transfer in self.inventory_action_adapter.apply_all(item, tick)
         ) if self.inventory_action_adapter is not None else ()
         household_records = tuple(
