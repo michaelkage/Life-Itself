@@ -212,6 +212,45 @@ class PopulationCheckpointParticipantTests(unittest.TestCase):
             self.assertEqual(len(self.npcs["npc-a"].memories), 1)
             self.assertEqual(len(self.memory.snapshot()), 1)
 
+    def test_actual_routine_phase_failure_rolls_back_execution_ledger_and_retries(self):
+        self.routines.add(RoutineBlock(
+            "routine-phase", "npc-a", "work", "office", 480, 600,
+        ))
+        with tempfile.TemporaryDirectory() as directory:
+            transaction = PopulationTickTransactionCoordinator(
+                Path(directory) / "population.json", self.participants,
+            )
+            def fail_after_routines(phase, tick):
+                if phase == "routines":
+                    raise RuntimeError("injected after actual routine phase")
+            failing_loop = PopulationExecutionLoop(
+                self.tick, self.routines, self.routine_executions,
+                transaction_coordinator=transaction,
+                phase_observer=fail_after_routines,
+            )
+            with self.assertRaisesRegex(RuntimeError, "injected after actual routine phase"):
+                failing_loop.run_tick(
+                    1, 500, self.npcs, outcome_samples={"work": 0.4},
+                )
+            self.assertEqual(
+                tuple(item.routine_id for item in self.routines.snapshot()),
+                ("routine-phase",),
+            )
+            self.assertEqual(self.routine_executions.snapshot(), ())
+
+            retry_loop = PopulationExecutionLoop(
+                self.tick, self.routines, self.routine_executions,
+                transaction_coordinator=transaction,
+            )
+            retried = retry_loop.run_tick(
+                1, 500, self.npcs, outcome_samples={"work": 0.4},
+            )
+            self.assertEqual(
+                tuple(item.routine_id for item in retried.routine_executions),
+                ("routine-phase",),
+            )
+            self.assertEqual(len(self.routine_executions.snapshot()), 1)
+
     def test_population_tick_rolls_back_action_dispatch_facts_and_economy_after_failure(self):
         state = self.action_world_state
         dispatch = NPCActionDispatchAdapter(self.action_ledger)
