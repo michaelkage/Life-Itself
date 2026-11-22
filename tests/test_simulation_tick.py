@@ -59,6 +59,37 @@ class TickCoordinatorTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.coordinator.step(3, self.npcs, event_ids=())
 
+    def test_historical_witness_memory_can_be_materialized_when_due(self):
+        self.coordinator.step(3, self.npcs)
+        result = self.coordinator.step(
+            4, self.npcs, memory_requests=(("event-1", "speaker"),),
+        )
+        self.assertEqual(
+            tuple((event_id, witness_id) for event_id, witness_id, memory in result.materialized_memories),
+            (("event-1", "speaker"),),
+        )
+        self.assertEqual(len(self.npcs["speaker"].memories), 1)
+        self.assertEqual(self.npcs["speaker"].memories[0].timestamp_hour, 3.0)
+
+    def test_historical_memory_request_rejects_future_events_and_non_witnesses(self):
+        self.coordinator.step(3, self.npcs)
+        with self.assertRaisesRegex(ValueError, "future event"):
+            self.coordinator.step(4, self.npcs, memory_requests=(("event-1", "speaker"),))
+        # A new coordinator is needed because failed requests must not commit a tick.
+        events = WorldEventLedger((
+            WorldEventLedger.make_event(
+                "future-event", 5, "incident", witnesses=("speaker",),
+                attributes={"action_tag": ActionTag.CRIME_THEFT.value, "target_entity_id": "subject"},
+            ),
+        ))
+        trust = SocialTrustLedger()
+        conversations = SocialConversationAdapter(trust, SocialBeliefSystem(trust))
+        coordinator = SimulationTickCoordinator(events, WorldEventMemoryAdapter(events), conversations)
+        with self.assertRaisesRegex(ValueError, "future event"):
+            coordinator.step(4, self.npcs, memory_requests=(("future-event", "speaker"),))
+        with self.assertRaisesRegex(ValueError, "not recorded as a witness"):
+            coordinator.step(4, self.npcs, memory_requests=(("future-event", "listener"),))
+
     def test_tick_must_increase(self):
         self.coordinator.step(3, self.npcs)
         with self.assertRaises(ValueError):
