@@ -22,7 +22,7 @@ from .routine_save_state import RoutineBookSnapshot
 from .routine_execution_save_state import RoutineExecutionSnapshot
 from .action_execution import ActionExecutionLedger, ActionExecutionSnapshot
 from .action_world_state import ActionWorldState
-from .household_economy import EconomicLedger, EconomicActionAdapter, EconomicTransfer, HouseholdLedger, HouseholdObligation
+from .household_economy import EconomicLedger, EconomicActionAdapter, EconomicTransfer, HouseholdActionAdapter, HouseholdLedger, HouseholdObligation
 from .world_events import WorldEvent, WorldEventLedger
 from .population_transaction import TransactionParticipant
 
@@ -74,6 +74,7 @@ def build_population_transaction_participants(
     household_ledger: HouseholdLedger | None = None,
     action_ledger: ActionExecutionLedger | None = None,
     action_world_state: ActionWorldState | None = None,
+    household_action_adapter: HouseholdActionAdapter | None = None,
 ) -> tuple[TransactionParticipant, ...]:
     """Build complete participants for the supplied live population loop.
 
@@ -110,6 +111,10 @@ def build_population_transaction_participants(
         raise TypeError("action_ledger must be an ActionExecutionLedger or None")
     if action_world_state is not None and not isinstance(action_world_state, ActionWorldState):
         raise TypeError("action_world_state must be an ActionWorldState or None")
+    if household_action_adapter is not None and not isinstance(household_action_adapter, HouseholdActionAdapter):
+        raise TypeError("household_action_adapter must be a HouseholdActionAdapter or None")
+    if household_action_adapter is not None and household_ledger is not household_action_adapter.households:
+        raise ValueError("household action adapter must use the configured HouseholdLedger")
     participants = []
 
     def add(name, capture, restore):
@@ -282,6 +287,31 @@ def build_population_transaction_participants(
             restored = {item["obligation_id"]: HouseholdObligation(**item) for item in raw["obligations"]}
             _replace_mapping(household_ledger._obligations, restored)
         add("households", capture_households, restore_households)
+    if household_action_adapter is not None:
+        def capture_household_actions():
+            return _json({"schema_version": 1, "applied": [
+                {"execution_id": execution_id,
+                 "obligation_ids": [item.obligation_id for item in obligations]}
+                for execution_id, obligations in sorted(household_action_adapter._applied.items())
+            ]})
+        def restore_household_actions(payload):
+            raw = json.loads(payload)
+            if not isinstance(raw, dict) or raw.get("schema_version") != 1 or not isinstance(raw.get("applied"), list):
+                raise ValueError("unsupported household action participant schema")
+            restored = {}
+            for item in raw["applied"]:
+                execution_id = item["execution_id"]
+                if not isinstance(execution_id, str) or not execution_id.strip() or execution_id in restored:
+                    raise ValueError("invalid or duplicate household action execution ID")
+                obligations = []
+                for obligation_id in item["obligation_ids"]:
+                    obligation = household_ledger._obligations.get(obligation_id)
+                    if obligation is None:
+                        raise ValueError("household action checkpoint references a missing obligation")
+                    obligations.append(obligation)
+                restored[execution_id] = tuple(obligations)
+            _replace_mapping(household_action_adapter._applied, restored)
+        add("household_actions", capture_household_actions, restore_household_actions)
 
     if action_world_state is not None:
         add("action_world_state", action_world_state.to_json, action_world_state.restore_json)
