@@ -306,6 +306,14 @@ class EconomicActionAdapter:
         """Return whether an action has configured economic effects."""
         return bool(self.policies.get(action_id))
 
+    def has_applied_at(self, execution_id: str, tick: int) -> bool:
+        """Return whether an economic effect for this execution was posted at tick."""
+        return any(
+            self.economics._transfers.get(transfer_id) is not None
+            and self.economics._transfers[transfer_id].tick == tick
+            for transfer_id in self._applied.get(execution_id, ())
+        )
+
     def apply_all(self, execution, tick: int) -> tuple[EconomicTransfer, ...]:
         """Apply all configured effects atomically after a completed action."""
         from .action_execution import ActionExecution
