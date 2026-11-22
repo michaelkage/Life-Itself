@@ -156,6 +156,8 @@ class PopulationExecutionLoop:
         self.action_execution_ledger = action_execution_ledger
         if action_execution_ledger is not None and transaction_coordinator is not None and "action_executions" not in transaction_coordinator.participant_names:
             raise ValueError("transaction coordinator is missing the action_executions participant")
+        if action_execution_ledger is not None and action_execution_ledger.goals is not None and transaction_coordinator is not None and "action_goals" not in transaction_coordinator.participant_names:
+            raise ValueError("transaction coordinator is missing the action_goals participant")
         self._results: dict[int, PopulationTickResult] = {}
         self._requests: dict[int, tuple[object, ...]] = {}
 
