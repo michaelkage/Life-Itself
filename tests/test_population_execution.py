@@ -360,7 +360,9 @@ class PopulationExecutionLoopTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "untransactional household failure"):
             loop.run_tick(1, 500, self.npcs, outcome_samples={})
         self.assertEqual(economics.balance("employer"), 40.0)
-        self.assertEqual(economics.balance("household"), 5.0)
+        self.assertEqual(economics.balance("household"), 10.0)
+        self.assertEqual(economics.balance("landlord"), 0.0)
+        self.assertEqual(households.snapshot()[0].due_tick, 2)
         self.assertEqual(len(households.snapshot()), 1)
         self.assertEqual(inventory.quantity("npc-a", "meal"), 1.0)
 
