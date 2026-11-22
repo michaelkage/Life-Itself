@@ -120,15 +120,25 @@ class NPCActionDispatchAdapter:
         self._requests[tick] = (signature, result)
         return result
 
-    def advance_active(self, tick: int, world_state):
-        """Advance every active execution in stable ID order against live owner state."""
+    def advance_active(self, tick: int, world_state, *, owner_ids=None):
+        """Advance active executions for the supplied owners in stable ID order."""
         from .action_world_state import ActionWorldState
         if not isinstance(world_state, ActionWorldState):
             raise TypeError("world_state must be an ActionWorldState")
         if isinstance(tick, bool) or not isinstance(tick, int) or tick < 0:
             raise ValueError("tick must be a non-negative integer")
+        if owner_ids is not None:
+            if not isinstance(owner_ids, (tuple, list, set, frozenset)) or any(
+                not isinstance(owner, str) or not owner.strip() for owner in owner_ids
+            ):
+                raise ValueError("owner_ids must contain non-empty owner IDs")
+            selected = frozenset(owner_ids)
+        else:
+            selected = None
         results = []
         for active in self.executions.active():
+            if selected is not None and active.owner_id not in selected:
+                continue
             if active.last_tick >= tick:
                 continue
             facts = world_state.world_facts_by_owner.get(active.owner_id)
