@@ -296,10 +296,10 @@ class PopulationCheckpointParticipantTests(unittest.TestCase):
             self.assertEqual(len(self.action_ledger.active()), 1)
 
             def fail_after_economy(phase, tick):
-                if phase == "economy":
-                    raise RuntimeError("injected after actual economic phase")
+                if phase == "households":
+                    raise RuntimeError("injected after actual household phase")
             restarted_loop.phase_observer = fail_after_economy
-            with self.assertRaisesRegex(RuntimeError, "injected after actual economic phase"):
+            with self.assertRaisesRegex(RuntimeError, "injected after actual household phase"):
                 restarted_loop.run_tick(2, 501, self.npcs, outcome_samples={}, decision_contexts=context)
 
             self.assertEqual(len(self.action_ledger.active()), 1)
@@ -308,6 +308,9 @@ class PopulationCheckpointParticipantTests(unittest.TestCase):
             self.assertEqual(state.resources_by_owner["npc-a"], {"energy": 8.0})
             self.assertEqual(self.economics.balance("employer"), 100.0)
             self.assertEqual(self.economics.snapshot(), ())
+            self.assertEqual(tuple(item.obligation_id for item in self.households.snapshot()), ("bill-1",))
+            self.assertEqual(self.household_actions._applied, {})
+            self.assertEqual(self.inventory_actions._applied, {})
             restarted_loop.phase_observer = None
 
             retried = restarted_loop.run_tick(2, 501, self.npcs, outcome_samples={}, decision_contexts=context)
