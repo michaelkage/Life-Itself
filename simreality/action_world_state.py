@@ -123,11 +123,23 @@ class ActionWorldState:
                 balance_map[name] = amount
             self._validate_resources(balance_map)
             restored[owner] = (set(facts), balance_map)
-        self.world_facts_by_owner.clear()
-        self.resources_by_owner.clear()
+        for owner in tuple(self.world_facts_by_owner):
+            if owner not in restored:
+                del self.world_facts_by_owner[owner]
+                del self.resources_by_owner[owner]
         for owner, (facts, resources) in restored.items():
-            self.world_facts_by_owner[owner] = facts
-            self.resources_by_owner[owner] = resources
+            live_facts = self.world_facts_by_owner.get(owner)
+            live_resources = self.resources_by_owner.get(owner)
+            if live_facts is None:
+                self.world_facts_by_owner[owner] = facts
+            else:
+                live_facts.clear()
+                live_facts.update(facts)
+            if live_resources is None:
+                self.resources_by_owner[owner] = resources
+            else:
+                live_resources.clear()
+                live_resources.update(resources)
 
     @classmethod
     def from_json(cls, payload: str) -> "ActionWorldState":
