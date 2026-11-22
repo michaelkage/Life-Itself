@@ -2,8 +2,8 @@ import unittest
 
 from simreality.action_execution import ActionExecution
 from simreality.household_economy import (
-    ActionEconomicEffect, EconomicAccount, EconomicActionAdapter,
-    EconomicLedger, EconomicTransfer, HouseholdLedger, HouseholdObligation,
+    ActionEconomicEffect, ActionHouseholdEffect, EconomicAccount, EconomicActionAdapter,
+    EconomicLedger, EconomicTransfer, HouseholdActionAdapter, HouseholdLedger, HouseholdObligation,
 )
 
 
@@ -101,6 +101,25 @@ class HouseholdEconomyTests(unittest.TestCase):
             adapter.apply_all(execution, 2)
         self.assertEqual(self.economics.balance("employer"), 100.0)
         self.assertEqual(self.economics.snapshot(), ())
+
+    def test_completed_action_creates_explicit_household_obligations_once(self):
+        households = HouseholdLedger(self.economics)
+        adapter = HouseholdActionAdapter(households, (
+            ActionHouseholdEffect(
+                "work_shift", "rent", "household-1", "home", "rent",
+                12.0, 2, "monthly rent contribution",
+            ),
+        ))
+        execution = ActionExecution(
+            "exec-obligation", "npc-1", 2, "work_shift", "completed", "done",
+            (), (), (), (), "event-obligation",
+        )
+        obligations = adapter.apply_all(execution, 2)
+        self.assertEqual(len(obligations), 1)
+        self.assertEqual(obligations[0].obligation_id, "action:exec-obligation:rent")
+        self.assertEqual(obligations[0].due_tick, 4)
+        self.assertEqual(adapter.apply_all(execution, 2), obligations)
+        self.assertEqual(households.snapshot(), obligations)
 
     def test_noncompleted_action_has_no_economic_effect(self):
         adapter = EconomicActionAdapter(
