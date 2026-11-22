@@ -4,7 +4,7 @@ import json
 import tempfile
 from pathlib import Path
 
-from simreality.model import NPC
+from simreality.model import NPC, ActionTag
 from simreality.action_execution import ActionExecution, ActionExecutionLedger, ActionExecutionPolicy
 from simreality.action_world_state import ActionWorldState
 from simreality.population_actions import NPCActionDispatchAdapter
@@ -180,6 +180,33 @@ class PopulationExecutionLoopTests(unittest.TestCase):
         self.assertEqual(len(later.economic_transfers), 1)
         self.assertEqual(economics.balance("employer"), 40.0)
         self.assertEqual(economics.balance("household"), 10.0)
+
+    def test_untransactional_phase_failure_invalidates_orchestration_cache_for_safe_retry(self):
+        event = WorldEventLedger.make_event(
+            "untransactional-memory", 1, "assault",
+            participants=("npc-b",), witnesses=("npc-a",),
+            attributes={
+                "action_tag": ActionTag.CRIME_ASSAULT.value,
+                "target_entity_id": "npc-b",
+            },
+        )
+        self.events.append(event)
+        loop = PopulationExecutionLoop(
+            self.loop.coordinator, self.book, self.ledger,
+            phase_observer=lambda phase, tick: (
+                (_ for _ in ()).throw(RuntimeError("phase failure"))
+                if phase == "social" else None
+            ),
+        )
+        with self.assertRaisesRegex(RuntimeError, "phase failure"):
+            loop.run_tick(1, 500, self.npcs, event_ids=("untransactional-memory",), outcome_samples={})
+        self.assertEqual(len(self.npcs["npc-a"].memories), 1)
+        loop.phase_observer = None
+        retried = loop.run_tick(
+            1, 500, self.npcs, event_ids=("untransactional-memory",), outcome_samples={},
+        )
+        self.assertEqual(len(self.npcs["npc-a"].memories), 1)
+        self.assertEqual(len(retried.social.materialized_memories), 1)
 
     def test_population_tick_replay_returns_original_result(self):
         request = {"outcome_samples": {"work-a": 0.2, "rest-b": 0.7}}
