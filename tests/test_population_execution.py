@@ -230,6 +230,14 @@ class PopulationExecutionLoopTests(unittest.TestCase):
         self.assertEqual(economics.balance("employer"), 40.0)
         self.assertEqual(economics.balance("household"), 10.0)
 
+        settled_replay = loop.run_tick(
+            8, 500, self.npcs, outcome_samples={},
+            population_schedule=background_schedule(8),
+            lod_policy=default_population_lod_policy(),
+        )
+        self.assertEqual(settled_replay.economic_transfers, ())
+        self.assertEqual(settled_replay.action_results, ())
+
     def test_untransactional_phase_failure_invalidates_orchestration_cache_for_safe_retry(self):
         event = WorldEventLedger.make_event(
             "untransactional-memory", 1, "assault",
