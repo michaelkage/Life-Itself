@@ -15,7 +15,7 @@ class PopulationLODPolicyTests(unittest.TestCase):
                          ("action", "decision", "economy", "memory", "presence", "routine", "social", "travel"))
         self.assertEqual(policy.due_subsystems(PopulationLOD.BACKGROUND, 2),
                          ("action", "presence", "routine", "travel"))
-        self.assertEqual(policy.due_subsystems(PopulationLOD.DORMANT, 3), ("presence", "travel"))
+        self.assertEqual(policy.due_subsystems(PopulationLOD.DORMANT, 3), ("action", "presence", "travel"))
 
     def test_custom_policy_can_disable_individual_subsystems(self):
         from simreality.population_spatial import PopulationLOD
