@@ -31,6 +31,10 @@ class WorldEventMemoryAdapter:
         self.ticks_per_hour = float(ticks_per_hour)
         self._processed: dict[tuple[str, str], NPCMemory] = {}
 
+    def has_materialized(self, event_id: str, witness_id: str) -> bool:
+        """Return whether this event/witness pair already has a memory record."""
+        return (event_id, witness_id) in self._processed
+
     @staticmethod
     def _attributes(event: WorldEvent) -> dict[str, object]:
         return dict(event.attributes)
