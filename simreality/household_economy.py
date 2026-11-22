@@ -207,9 +207,10 @@ class ActionEconomicEffect:
     credit_account: str
     amount: float
     effect_kind: str
+    effect_id: str = "economic"
 
     def __post_init__(self):
-        for name in ("action_id", "debit_account", "credit_account", "effect_kind"):
+        for name in ("action_id", "debit_account", "credit_account", "effect_kind", "effect_id"):
             value = getattr(self, name)
             if not isinstance(value, str) or not value.strip():
                 raise ValueError(f"{name} must be non-empty text")
@@ -219,7 +220,7 @@ class ActionEconomicEffect:
 
 
 class EconomicActionAdapter:
-    """Materialize configured economic effects for completed action records."""
+    """Materialize one or more atomic, configured transfers for completed actions."""
 
     def __init__(self, economics: EconomicLedger, policies: Iterable[ActionEconomicEffect]):
         if not isinstance(economics, EconomicLedger):
@@ -227,29 +228,60 @@ class EconomicActionAdapter:
         values = tuple(policies)
         if any(not isinstance(item, ActionEconomicEffect) for item in values):
             raise TypeError("policies must contain ActionEconomicEffect values")
-        if len({item.action_id for item in values}) != len(values):
-            raise ValueError("one economic effect policy per action is allowed")
+        if len({(item.action_id, item.effect_id) for item in values}) != len(values):
+            raise ValueError("action economic effect IDs must be unique per action")
         for item in values:
             if item.debit_account not in economics._accounts or item.credit_account not in economics._accounts:
                 raise KeyError("economic action policy references an unknown account")
+            if economics._accounts[item.debit_account].currency != economics._accounts[item.credit_account].currency:
+                raise ValueError("economic action policy cannot transfer across currencies")
         self.economics = economics
-        self.policies = {item.action_id: item for item in values}
-        self._applied: dict[str, EconomicTransfer] = {}
+        grouped = {}
+        for item in values:
+            grouped.setdefault(item.action_id, []).append(item)
+        self.policies = {
+            action_id: tuple(sorted(items, key=lambda item: item.effect_id))
+            for action_id, items in grouped.items()
+        }
+        self._applied: dict[str, tuple[EconomicTransfer, ...]] = {}
 
-    def apply(self, execution, tick: int) -> EconomicTransfer | None:
+    def apply_all(self, execution, tick: int) -> tuple[EconomicTransfer, ...]:
+        """Apply all configured effects atomically after a completed action."""
         from .action_execution import ActionExecution
         if not isinstance(execution, ActionExecution):
-            raise TypeError("execution must be a completed ActionExecution")
+            raise TypeError("execution must be an ActionExecution")
+        if isinstance(tick, bool) or not isinstance(tick, int) or tick < 0:
+            raise ValueError("tick must be a non-negative integer")
         if execution.status != "completed":
-            return None
-        policy = self.policies.get(execution.action_id)
-        if policy is None:
-            return None
-        transfer_id = f"action:{execution.execution_id}:economic"
-        transfer = EconomicTransfer(
-            transfer_id, tick, policy.debit_account, policy.credit_account,
+            return ()
+        prior = self._applied.get(execution.execution_id)
+        if prior is not None:
+            return prior
+        policies = self.policies.get(execution.action_id, ())
+        if not policies:
+            return ()
+
+        transfers = tuple(EconomicTransfer(
+            f"action:{execution.execution_id}:{policy.effect_id}",
+            tick, policy.debit_account, policy.credit_account,
             policy.amount, f"action:{execution.execution_id}:{policy.effect_kind}",
-        )
-        result = self.economics.transfer(transfer)
-        self._applied[execution.execution_id] = result
-        return result
+        ) for policy in policies)
+
+        debit_totals = {}
+        for transfer in transfers:
+            debit_totals[transfer.debit_account] = debit_totals.get(transfer.debit_account, 0.0) + transfer.amount
+            existing = self.economics._transfers.get(transfer.transfer_id)
+            if existing is not None and existing != transfer:
+                raise ValueError(f"conflicting transfer replay: {transfer.transfer_id}")
+        for account_id, amount in debit_totals.items():
+            if self.economics.balance(account_id) + 1e-12 < amount:
+                raise ValueError(f"insufficient funds in account: {account_id}")
+
+        applied = tuple(self.economics.transfer(item) for item in transfers)
+        self._applied[execution.execution_id] = applied
+        return applied
+
+    def apply(self, execution, tick: int) -> EconomicTransfer | None:
+        """Compatibility API returning the first transfer from apply_all."""
+        transfers = self.apply_all(execution, tick)
+        return transfers[0] if transfers else None
