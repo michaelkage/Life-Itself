@@ -1039,3 +1039,7 @@ __all__ += ["PresenceEncounterIntent"]
 # Durable cross-subsystem atomicity for population tick execution.
 from .population_transaction import PopulationTickTransactionCoordinator, TransactionParticipant
 __all__ += ["PopulationTickTransactionCoordinator", "TransactionParticipant"]
+
+
+from .population_checkpoint_participants import build_population_transaction_participants
+__all__ += ["build_population_transaction_participants"]
