@@ -27,11 +27,41 @@ class PopulationSlice:
 
 
 @dataclass(frozen=True)
+class PopulationSubsystemSlice:
+    subsystem_id: str
+    owner_ids: tuple[str, ...]
+
+    def __post_init__(self):
+        if not isinstance(self.subsystem_id, str) or not self.subsystem_id.strip():
+            raise ValueError("subsystem_id must be non-empty")
+        if not isinstance(self.owner_ids, tuple) or any(
+            not isinstance(owner, str) or not owner.strip() for owner in self.owner_ids
+        ):
+            raise ValueError("owner_ids must be a tuple of non-empty strings")
+        if tuple(sorted(set(self.owner_ids))) != self.owner_ids:
+            raise ValueError("subsystem owner IDs must be unique and sorted")
+
+
+@dataclass(frozen=True)
 class PopulationSchedule:
     tick: int
     slices: tuple[PopulationSlice, ...]
     selected_owner_ids: tuple[str, ...]
     deferred_owner_ids: tuple[str, ...]
+
+    def subsystem_slices(self, policy) -> tuple[PopulationSubsystemSlice, ...]:
+        """Resolve LOD cadence into stable owner batches for each subsystem."""
+        from .population_lod_policy import PopulationLODPolicy
+        if not isinstance(policy, PopulationLODPolicy):
+            raise TypeError("policy must be a PopulationLODPolicy")
+        owners_by_subsystem = {}
+        for population_slice in self.slices:
+            for subsystem_id in policy.due_subsystems(population_slice.lod, self.tick):
+                owners_by_subsystem.setdefault(subsystem_id, set()).update(population_slice.owner_ids)
+        return tuple(
+            PopulationSubsystemSlice(subsystem_id, tuple(sorted(owner_ids)))
+            for subsystem_id, owner_ids in sorted(owners_by_subsystem.items())
+        )
 
 
 class PopulationSpatialScheduler:
