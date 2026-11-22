@@ -150,6 +150,15 @@ actions with explicit household/account IDs, amounts and due-tick offsets. The
 population transaction factory checkpoints both adapter replay indexes alongside
 the economic and household ledgers.
 
+`InventoryLedger` records owner-scoped stock receipts, transfers and consumption.
+`ActionInventoryAdapter` applies one or more explicit stock effects when an
+action completes, with aggregate source-stock preflight and stable effect IDs.
+Configure vendor-to-household transfers, work-provided goods or consumption
+policies using real owner/item IDs and quantities. Inventory state and the
+adapter's applied-effect index are registered as transaction participants, so
+action completion, wages, household obligations and stock movement can roll
+back together.
+
 ## Transaction boundary status
 
 A durable transaction is available when explicitly configured. It is opt-in
