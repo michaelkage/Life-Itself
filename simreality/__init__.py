@@ -1023,12 +1023,14 @@ from .action_world_state import ActionWorldState
 __all__ += ["ActionWorldState"]
 
 from .household_economy import (
-    ActionEconomicEffect, EconomicAccount, EconomicActionAdapter,
-    EconomicLedger, EconomicTransfer, HouseholdLedger, HouseholdObligation,
+    ActionEconomicEffect, ActionHouseholdEffect, EconomicAccount, EconomicActionAdapter,
+    EconomicLedger, EconomicTransfer, HouseholdActionAdapter, HouseholdLedger,
+    HouseholdObligation,
 )
 __all__ += [
-    "ActionEconomicEffect", "EconomicAccount", "EconomicActionAdapter",
-    "EconomicLedger", "EconomicTransfer", "HouseholdLedger", "HouseholdObligation",
+    "ActionEconomicEffect", "ActionHouseholdEffect", "EconomicAccount",
+    "EconomicActionAdapter", "EconomicLedger", "EconomicTransfer",
+    "HouseholdActionAdapter", "HouseholdLedger", "HouseholdObligation",
 ]
 
 from .population_lod_policy import (
