@@ -39,6 +39,16 @@ class WorldEventMemoryAdapterTests(unittest.TestCase):
         self.assertEqual(memory.description.jacket_colour_weights, {"dark": 0.7})
         self.assertEqual(len(self.npcs["guard"].memories), 1)
 
+    def test_memory_eligibility_requires_supported_action_and_target(self):
+        self.assertTrue(self.adapter.can_materialize("theft-1"))
+        ledger = WorldEventLedger((
+            WorldEventLedger.make_event(
+                "unsupported", 1, "incident", witnesses=("guard",),
+                attributes={"action_tag": "unknown", "target_entity_id": "suspect"},
+            ),
+        ))
+        self.assertFalse(WorldEventMemoryAdapter(ledger).can_materialize("unsupported"))
+
     def test_replay_is_idempotent(self):
         first = self.adapter.materialize("theft-1", "guard", self.npcs)
         second = self.adapter.materialize("theft-1", "guard", self.npcs)
