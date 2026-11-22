@@ -224,6 +224,10 @@ class ActionInventoryAdapter:
         """Return whether configured inventory effects were materialized."""
         return execution_id in self._applied
 
+    def has_policy(self, action_id: str) -> bool:
+        """Return whether an action has configured inventory effects."""
+        return bool(self.policies.get(action_id))
+
     def apply_all(self, execution, tick: int) -> tuple[InventoryTransfer, ...]:
         from .action_execution import ActionExecution
         if not isinstance(execution, ActionExecution):
