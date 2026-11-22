@@ -36,8 +36,8 @@ own replay ledgers. When a `PopulationTickTransactionCoordinator` is supplied,
 the loop executes inside its durable prepare/commit boundary. All mutated
 subsystems must be registered; the participant factory covers NPC state, world
 events, social memory/conversations/trust/beliefs, routines, travel, presence,
-encounters, action ledger and goals, action facts/resources, economics and
-household obligations when configured. On failure, registered participants are
+encounters, action ledger and goals, action facts/resources, economics, household obligations and inventory stock/action
+replay indexes when configured. On failure, registered participants are
 restored and derived per-tick caches are discarded. Without that coordinator,
 the loop remains component-replay-safe but is not globally atomic.
 
