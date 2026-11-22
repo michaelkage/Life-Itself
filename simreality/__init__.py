@@ -1018,6 +1018,10 @@ __all__ += ["PopulationLOD", "PopulationSchedule", "PopulationSlice", "Populatio
 from .population_actions import NPCActionDispatch, NPCActionDispatchAdapter
 __all__ += ["NPCActionDispatch", "NPCActionDispatchAdapter"]
 
+# Checkpointable owner-scoped facts and resources used by action execution.
+from .action_world_state import ActionWorldState
+__all__ += ["ActionWorldState"]
+
 from .household_economy import (
     ActionEconomicEffect, EconomicAccount, EconomicActionAdapter,
     EconomicLedger, EconomicTransfer, HouseholdLedger, HouseholdObligation,
