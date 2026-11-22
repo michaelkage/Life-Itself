@@ -401,6 +401,23 @@ class HouseholdActionAdapter:
         """Return whether an action has configured household effects."""
         return bool(self.policies.get(action_id))
 
+    def has_applied_at(self, execution_id: str, action_id: str, tick: int) -> bool:
+        """Return whether any configured obligation was created at this tick."""
+        for policy in self.policies.get(action_id, ()):
+            obligation = self.households._obligations.get(
+                f"action:{execution_id}:{policy.effect_id}"
+            )
+            if obligation is not None and obligation.due_tick == tick + policy.due_tick_offset:
+                return True
+        return False
+
+    def created_at(self, execution_id: str, action_id: str, obligation: HouseholdObligation, tick: int) -> bool:
+        """Identify action obligations materialized at a particular tick."""
+        for policy in self.policies.get(action_id, ()):
+            if obligation.obligation_id == f"action:{execution_id}:{policy.effect_id}":
+                return obligation.due_tick == tick + policy.due_tick_offset
+        return False
+
     def apply_all(self, execution, tick: int) -> tuple[HouseholdObligation, ...]:
         """Create all configured obligations once for a completed action."""
         from .action_execution import ActionExecution
