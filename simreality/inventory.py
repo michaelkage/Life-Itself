@@ -194,6 +194,8 @@ class ActionInventoryAdapter:
             raise TypeError("execution must be an ActionExecution")
         if isinstance(tick, bool) or not isinstance(tick, int) or tick < 0:
             raise ValueError("tick must be a non-negative integer")
+        if isinstance(execution.tick, bool) or not isinstance(execution.tick, int) or execution.tick < 0 or tick < execution.tick:
+            raise ValueError("inventory effect tick cannot precede action completion")
         if execution.status != "completed":
             return ()
         prior = self._applied.get(execution.execution_id)
