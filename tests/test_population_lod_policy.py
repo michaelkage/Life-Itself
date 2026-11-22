@@ -10,12 +10,12 @@ class PopulationLODPolicyTests(unittest.TestCase):
     def test_default_policy_resolves_subsystem_specific_cadence(self):
         policy = default_population_lod_policy()
         self.assertEqual(policy.due_subsystems(PopulationLOD.FULL, 3),
-                         ("action", "decision", "economy", "memory", "routine", "social", "travel"))
+                         ("action", "decision", "economy", "memory", "presence", "routine", "social", "travel"))
         self.assertEqual(policy.due_subsystems(PopulationLOD.STANDARD, 2),
                          ("action", "decision", "economy", "memory", "routine", "social", "travel"))
         self.assertEqual(policy.due_subsystems(PopulationLOD.BACKGROUND, 2),
-                         ("action", "routine", "travel"))
-        self.assertEqual(policy.due_subsystems(PopulationLOD.DORMANT, 3), ("travel",))
+                         ("action", "presence", "routine", "travel"))
+        self.assertEqual(policy.due_subsystems(PopulationLOD.DORMANT, 3), ("presence", "travel"))
 
     def test_custom_policy_can_disable_individual_subsystems(self):
         from simreality.population_spatial import PopulationLOD
