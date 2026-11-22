@@ -13,7 +13,7 @@ This document distinguishes existing engine capability from application and runt
 - Application shell now reports API connection state and displays revision/day only after receiving a validated snapshot.
 - Documented the HTTP API, command idempotency, SSE behavior, security boundary and missing server-side responsibilities.
 - Added `PopulationExecutionLoop` to compose the existing deterministic event-memory, conversation and routine phases over a stable NPC roster, with owner slicing, input preflight and replay protection; optional read-only NPC goal/plan proposals now run from explicit per-agent fact contexts.
-- Added durable whole-tick transaction coordination with registered participant snapshots, rollback/recovery and replay-cache invalidation; transaction remains opt-in and only covers registered state.\n- Integrated multi-tick NPC action advancement and validated first-step dispatch into the population loop, with checkpointable owner facts/resources and same-tick action completion economic effects.
+- Added durable whole-tick transaction coordination with registered participant snapshots, rollback/recovery and replay-cache invalidation; transaction remains opt-in and only covers registered state.\n- Integrated multi-tick NPC action advancement and validated first-step dispatch into the population loop, with checkpointable owner facts/resources and same-tick multi-transfer economics, action-generated household obligations and inventory receipts/transfers/consumption. All these ledgers and replay indexes can join the opt-in whole-tick transaction.
 - Visual design tokens and responsive layout.
 
 ## Existing engine capability on the base branch
@@ -32,7 +32,7 @@ The following remain substantive engineering projects, not completed features:
 6. Complete birth-to-death generational simulation.
 7. Autonomous family and social-network lifecycle integration.
 8. A fully closed NPC goal-to-action-to-consequence feedback loop across all action types, inventory, purchases, consumption and household lifecycle.
-9. Production economy, labor, businesses, markets and inventory (the current foundation is explicit account transfers and household obligations, not a complete market/inventory simulation).
+9. Production economy, labor, businesses and markets (the current foundation is explicit double-entry transfers, household obligations and owner-scoped inventory movements, not a complete market/pricing/employment simulation).
 10. Housing, property, infrastructure and urban development.
 11. Fully integrated law, government, elections, budgets and public accountability.
 12. Emergent world-event generation and propagation.
