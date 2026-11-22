@@ -39,6 +39,8 @@ class NPCActionDispatchAdapter:
         decisions: tuple[NPCDecision, ...],
         world_facts_by_owner: Mapping[str, set[str]],
         resources_by_owner: Mapping[str, dict[str, float]],
+        *,
+        unavailable_owner_ids: frozenset[str] = frozenset(),
     ) -> tuple[NPCActionDispatch, ...]:
         if isinstance(tick, bool) or not isinstance(tick, int) or tick < 0:
             raise ValueError("tick must be a non-negative integer")
@@ -63,6 +65,7 @@ class NPCActionDispatchAdapter:
                   for d in decisions),
             tuple((owner, tuple(sorted(facts))) for owner, facts in sorted(world_facts_by_owner.items())),
             tuple((owner, tuple(sorted(values.items()))) for owner, values in sorted(resources_by_owner.items())),
+            tuple(sorted(unavailable_owner_ids)),
         )
         prior = self._requests.get(tick)
         if prior is not None:
@@ -81,6 +84,19 @@ class NPCActionDispatchAdapter:
                 ))
                 continue
             owner = decision.owner_id
+            if owner in unavailable_owner_ids:
+                output.append(NPCActionDispatch(
+                    owner, None, None, "completed_this_tick",
+                    "an action completed for this owner earlier in the population tick",
+                ))
+                continue
+            active_for_owner = next((item for item in self.executions.active() if item.owner_id == owner), None)
+            if active_for_owner is not None:
+                output.append(NPCActionDispatch(
+                    owner, active_for_owner.execution_id, active_for_owner.action_id,
+                    "already_active", "owner already has an active action", active_for_owner,
+                ))
+                continue
             if owner not in world_facts_by_owner or owner not in resources_by_owner:
                 raise KeyError(f"missing live action state for NPC: {owner}")
             action_id = decision.plan.actions[0]
@@ -115,6 +131,10 @@ class NPCActionDispatchAdapter:
                 raise KeyError(f"missing live action state for active owner: {active.owner_id}")
             results.append(self.executions.advance(active.execution_id, tick, facts, resources))
         return tuple(results)
+
+    def discard_tick_cache(self, tick: int) -> None:
+        """Discard derived dispatch output after a failed enclosing transaction."""
+        self._requests.pop(tick, None)
 
     def snapshot(self) -> tuple[tuple[int, tuple[NPCActionDispatch, ...]], ...]:
         return tuple((tick, item[1]) for tick, item in sorted(self._requests.items()))
