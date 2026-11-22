@@ -80,8 +80,10 @@ class PopulationExecutionLoopTests(unittest.TestCase):
                 "npc-a": NPCDecisionContext(frozenset({"available"}), {"goal-a": frozenset({"paid"})}),
                 "npc-b": NPCDecisionContext(frozenset({"available"}), {"goal-b": frozenset({"rested"})}),
             },
-            population_schedule=schedule,
-            lod_policy=default_population_lod_policy(),
+            subsystem_owner_ids={
+                item.subsystem_id: item.owner_ids
+                for item in schedule.subsystem_slices(default_population_lod_policy())
+            },
         )
         self.assertEqual(tuple(item.owner_id for item in result.decisions), ("npc-a",))
         self.assertEqual(tuple(item.routine_id for item in result.routine_executions), ("work-a",))
