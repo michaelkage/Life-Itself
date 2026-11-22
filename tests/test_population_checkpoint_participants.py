@@ -165,6 +165,53 @@ class PopulationCheckpointParticipantTests(unittest.TestCase):
             self.assertEqual(self.inventory.quantity("npc-a", "meal"), 0.0)
             self.assertEqual(self.inventory.snapshot(), ())
 
+    def test_actual_social_phase_failure_rolls_back_witness_memory_and_replay_cache(self):
+        event = WorldEventLedger.make_event(
+            "witness-event", 1, "assault",
+            participants=("npc-b",), witnesses=("npc-a",),
+            attributes={
+                "action_tag": ActionTag.CRIME_ASSAULT.value,
+                "target_entity_id": "npc-b",
+                "memory_impact": 0.75,
+            },
+        )
+        self.events.append(event)
+        observed = []
+        def fail_after_social(phase, tick):
+            observed.append((phase, tick))
+            if phase == "social":
+                raise RuntimeError("injected after actual social phase")
+        with tempfile.TemporaryDirectory() as directory:
+            transaction = PopulationTickTransactionCoordinator(
+                Path(directory) / "population.json", self.participants,
+            )
+            failing_loop = PopulationExecutionLoop(
+                self.tick, self.routines, self.routine_executions,
+                transaction_coordinator=transaction,
+                phase_observer=fail_after_social,
+            )
+            with self.assertRaisesRegex(RuntimeError, "injected after actual social phase"):
+                failing_loop.run_tick(
+                    1, 500, self.npcs, event_ids=("witness-event",),
+                    outcome_samples={},
+                )
+            self.assertIn(("social", 1), observed)
+            self.assertEqual(self.npcs["npc-a"].memories, [])
+            self.assertEqual(self.memory.snapshot(), ())
+            self.assertEqual(self.events.get("witness-event"), event)
+
+            retry_loop = PopulationExecutionLoop(
+                self.tick, self.routines, self.routine_executions,
+                transaction_coordinator=transaction,
+            )
+            retried = retry_loop.run_tick(
+                1, 500, self.npcs, event_ids=("witness-event",),
+                outcome_samples={},
+            )
+            self.assertEqual(len(retried.social.materialized_memories), 1)
+            self.assertEqual(len(self.npcs["npc-a"].memories), 1)
+            self.assertEqual(len(self.memory.snapshot()), 1)
+
     def test_population_tick_rolls_back_action_dispatch_facts_and_economy_after_failure(self):
         state = self.action_world_state
         dispatch = NPCActionDispatchAdapter(self.action_ledger)
