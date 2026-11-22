@@ -241,6 +241,11 @@ class PopulationExecutionLoop:
                 raise TypeError("lod_policy must be a PopulationLODPolicy")
             if population_schedule.tick != tick:
                 raise ValueError("population schedule tick must match run_tick tick")
+            if not isinstance(npcs, Mapping):
+                raise TypeError("npcs must be a mapping when a population schedule is supplied")
+            scheduled_owner_ids = set(population_schedule.selected_owner_ids) | set(population_schedule.deferred_owner_ids)
+            if scheduled_owner_ids != set(npcs):
+                raise ValueError("population schedule must partition the exact NPC roster")
             normalized_kwargs["subsystem_owner_ids"] = {
                 item.subsystem_id: item.owner_ids
                 for item in population_schedule.subsystem_slices(lod_policy)
