@@ -64,24 +64,56 @@ class InventoryLedger:
     def quantity(self, owner_id: str, item_id: str) -> float:
         return self._stock.get((owner_id, item_id), 0.0)
 
+    def apply_many(self, transfers: Iterable[InventoryTransfer]) -> tuple[InventoryTransfer, ...]:
+        """Post an inventory batch atomically, including valid same-batch stock flows."""
+        values = tuple(transfers)
+        if any(not isinstance(item, InventoryTransfer) for item in values):
+            raise TypeError("transfers must contain InventoryTransfer values")
+        if len({item.transfer_id for item in values}) != len(values):
+            raise ValueError("inventory transfer IDs must be unique within a batch")
+
+        result = []
+        pending = []
+        for transfer in values:
+            prior = self._transfers.get(transfer.transfer_id)
+            if prior is not None:
+                if prior != transfer:
+                    raise ValueError(f"conflicting inventory transfer replay: {transfer.transfer_id}")
+                result.append(prior)
+            else:
+                pending.append(transfer)
+                result.append(transfer)
+
+        debits = {}
+        credits = {}
+        for transfer in pending:
+            if transfer.source_owner is not None:
+                key = (transfer.source_owner, transfer.item_id)
+                debits[key] = debits.get(key, 0.0) + transfer.quantity
+            if transfer.destination_owner is not None:
+                key = (transfer.destination_owner, transfer.item_id)
+                credits[key] = credits.get(key, 0.0) + transfer.quantity
+
+        final_stock = {}
+        for key in set(debits) | set(credits):
+            quantity = (
+                self._stock.get(key, 0.0)
+                - debits.get(key, 0.0)
+                + credits.get(key, 0.0)
+            )
+            if quantity < -1e-12:
+                raise ValueError(f"insufficient inventory: {key[0]}/{key[1]}")
+            final_stock[key] = max(0.0, quantity)
+
+        self._stock.update(final_stock)
+        for transfer in pending:
+            self._transfers[transfer.transfer_id] = transfer
+        return tuple(result)
+
     def apply(self, transfer: InventoryTransfer) -> InventoryTransfer:
         if not isinstance(transfer, InventoryTransfer):
             raise TypeError("transfer must be an InventoryTransfer")
-        prior = self._transfers.get(transfer.transfer_id)
-        if prior is not None:
-            if prior != transfer:
-                raise ValueError(f"conflicting inventory transfer replay: {transfer.transfer_id}")
-            return prior
-        source_key = None if transfer.source_owner is None else (transfer.source_owner, transfer.item_id)
-        destination_key = None if transfer.destination_owner is None else (transfer.destination_owner, transfer.item_id)
-        if source_key is not None and self._stock.get(source_key, 0.0) + 1e-12 < transfer.quantity:
-            raise ValueError(f"insufficient inventory: {transfer.source_owner}/{transfer.item_id}")
-        if source_key is not None:
-            self._stock[source_key] = self._stock.get(source_key, 0.0) - transfer.quantity
-        if destination_key is not None:
-            self._stock[destination_key] = self._stock.get(destination_key, 0.0) + transfer.quantity
-        self._transfers[transfer.transfer_id] = transfer
-        return transfer
+        return self.apply_many((transfer,))[0]
 
     def receive(self, receipt_id: str, tick: int, owner_id: str, item_id: str,
                 quantity: float, reference: str) -> InventoryTransfer:
@@ -208,25 +240,15 @@ class ActionInventoryAdapter:
         effects = self.policies.get(execution.action_id, ())
         if not effects:
             return ()
-        debits = {}
-        transfers = []
-        for effect in effects:
-            if effect.source_owner is not None:
-                key = (effect.source_owner, effect.item_id)
-                debits[key] = debits.get(key, 0.0) + effect.quantity
-            transfers.append(InventoryTransfer(
+        transfers = tuple(
+            InventoryTransfer(
                 f"action:{execution.execution_id}:{effect.effect_id}",
                 tick, effect.source_owner, effect.destination_owner,
                 effect.item_id, effect.quantity,
                 f"action:{execution.execution_id}:{effect.effect_kind}",
-            ))
-        for (owner, item), quantity in debits.items():
-            if self.inventory.quantity(owner, item) + 1e-12 < quantity:
-                raise ValueError(f"insufficient inventory: {owner}/{item}")
-        for transfer in transfers:
-            prior_transfer = self.inventory._transfers.get(transfer.transfer_id)
-            if prior_transfer is not None and prior_transfer != transfer:
-                raise ValueError(f"conflicting inventory transfer replay: {transfer.transfer_id}")
-        applied = tuple(self.inventory.apply(item) for item in transfers)
+            )
+            for effect in effects
+        )
+        applied = self.inventory.apply_many(transfers)
         self._applied[execution.execution_id] = tuple(item.transfer_id for item in applied)
         return applied
