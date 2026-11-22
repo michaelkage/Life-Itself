@@ -243,7 +243,7 @@ class EconomicActionAdapter:
             action_id: tuple(sorted(items, key=lambda item: item.effect_id))
             for action_id, items in grouped.items()
         }
-        self._applied: dict[str, tuple[EconomicTransfer, ...]] = {}
+        self._applied: dict[str, tuple[str, ...]] = {}
 
     def apply_all(self, execution, tick: int) -> tuple[EconomicTransfer, ...]:
         """Apply all configured effects atomically after a completed action."""
@@ -256,6 +256,8 @@ class EconomicActionAdapter:
             return ()
         prior = self._applied.get(execution.execution_id)
         if prior is not None:
+            if isinstance(prior, EconomicTransfer):
+                return (prior,)
             if all(isinstance(item, str) for item in prior):
                 return tuple(self.economics._transfers[item] for item in prior)
             return tuple(prior)
@@ -336,7 +338,7 @@ class HouseholdActionAdapter:
             action_id: tuple(sorted(items, key=lambda item: item.effect_id))
             for action_id, items in grouped.items()
         }
-        self._applied: dict[str, tuple[HouseholdObligation, ...]] = {}
+        self._applied: dict[str, tuple[str, ...]] = {}
 
     def apply_all(self, execution, tick: int) -> tuple[HouseholdObligation, ...]:
         """Create all configured obligations once for a completed action."""
