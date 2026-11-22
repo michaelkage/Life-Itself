@@ -41,6 +41,14 @@ household obligations when configured. On failure, registered participants are
 restored and derived per-tick caches are discarded. Without that coordinator,
 the loop remains component-replay-safe but is not globally atomic.
 
+An optional `phase_observer(phase, tick)` callback receives deterministic
+post-phase notifications for decisions, actions, travel, presence, encounters,
+social, routines, economy, inventory and household settlement. It is suitable
+for metrics and tracing; raising from the observer aborts the current tick.
+With the durable transaction enabled, registered participant state is restored
+and orchestration replay caches are invalidated. Without the transaction, an
+observer exception does not imply rollback.
+
 ## Intentional non-goals
 
 The loop does not synthesize world facts, desired goal facts, event witnesses,
