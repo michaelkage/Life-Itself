@@ -124,15 +124,19 @@ class PopulationExecutionLoopTests(unittest.TestCase):
             )
         first = loop.run_tick(
             1, 500, self.npcs, outcome_samples={},
-            population_schedule=background_schedule(1),
-            lod_policy=default_population_lod_policy(),
+            subsystem_owner_ids={
+                item.subsystem_id: item.owner_ids
+                for item in background_schedule(1).subsystem_slices(default_population_lod_policy())
+            },
         )
         self.assertEqual(first.economic_transfers, ())
         self.assertEqual(economics.balance("employer"), 50.0)
         later = loop.run_tick(
             4, 500, self.npcs, outcome_samples={},
-            population_schedule=background_schedule(4),
-            lod_policy=default_population_lod_policy(),
+            subsystem_owner_ids={
+                item.subsystem_id: item.owner_ids
+                for item in background_schedule(4).subsystem_slices(default_population_lod_policy())
+            },
         )
         self.assertEqual(len(later.economic_transfers), 1)
         self.assertEqual(economics.balance("employer"), 40.0)
