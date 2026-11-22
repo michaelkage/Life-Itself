@@ -66,7 +66,7 @@ class PopulationCheckpointParticipantTests(unittest.TestCase):
                 npc.personal_stress = 8.5
                 npc.remember(NPCMemory(
                     "npc-a", "npc-b", 0.8, 0.9, 12.0,
-                    ActionTag.ASSAULT, Description(),
+                    ActionTag.CRIME_ASSAULT, Description(),
                 ))
                 self.events.append(WorldEventLedger.make_event(
                     "event-1", 1, "test_event", participants=("npc-a",),
