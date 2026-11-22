@@ -27,7 +27,7 @@ from simreality.presence import PresenceLedger, PresenceTickAdapter
 from simreality.presence_encounters import PresenceSocialAdapter
 from simreality.household_economy import (
     EconomicAccount, EconomicLedger, EconomicTransfer, EconomicActionAdapter,
-    ActionEconomicEffect, HouseholdLedger, HouseholdObligation,
+    ActionEconomicEffect, ActionHouseholdEffect, HouseholdActionAdapter, HouseholdLedger, HouseholdObligation,
 )
 
 
@@ -70,6 +70,12 @@ class PopulationCheckpointParticipantTests(unittest.TestCase):
         self.economic_actions = EconomicActionAdapter(self.economics, (
             ActionEconomicEffect("work", "employer", "family", 20, "wage"),
         ))
+        self.household_actions = HouseholdActionAdapter(self.households, (
+            ActionHouseholdEffect(
+                "work", "rent-contribution", "npc-a", "family", "utility",
+                5.0, 1, "action-generated utility contribution",
+            ),
+        ))
         self.participants = build_population_transaction_participants(
             self.npcs, self.tick, self.routines, self.routine_executions,
             travel_adapter=self.travel_adapter,
@@ -79,6 +85,7 @@ class PopulationCheckpointParticipantTests(unittest.TestCase):
             household_ledger=self.households,
             action_ledger=self.action_ledger,
             action_world_state=self.action_world_state,
+            household_action_adapter=self.household_actions,
         )
 
     def test_concrete_participants_restore_npc_social_event_routine_and_economy_state(self):
@@ -91,7 +98,7 @@ class PopulationCheckpointParticipantTests(unittest.TestCase):
                 "npcs", "world_events", "event_memory", "social_conversations",
                 "social_trust", "social_beliefs", "routine_book", "routine_executions",
                 "travel", "presence", "encounters", "action_executions", "action_goals",
-                "economics", "economic_actions", "households", "action_world_state",
+                "economics", "economic_actions", "households", "action_world_state", "household_actions",
             } <= before_names)
 
             def partially_apply_then_fail():
@@ -156,6 +163,7 @@ class PopulationCheckpointParticipantTests(unittest.TestCase):
                 action_execution_ledger=self.action_ledger,
                 action_dispatch_adapter=dispatch,
                 action_world_state=state,
+                household_action_adapter=self.household_actions,
             )
             context = {"npc-a": NPCDecisionContext(
                 frozenset(), {"goal-work": frozenset({"done"})},
@@ -185,6 +193,8 @@ class PopulationCheckpointParticipantTests(unittest.TestCase):
             self.assertEqual(self.economics.balance("employer"), 80.0)
             self.assertEqual(self.economics.balance("family"), 20.0)
             self.assertEqual(len(retried.economic_transfers), 1)
+            self.assertEqual(len(retried.action_obligations), 1)
+            self.assertEqual(retried.action_obligations[0].obligation_id, "action:action:npc:npc-a:tick:1:step:0:rent-contribution")
 
     def test_action_execution_ledger_and_its_world_events_rollback_together(self):
         with tempfile.TemporaryDirectory() as directory:
