@@ -1022,6 +1022,10 @@ __all__ += ["NPCActionDispatch", "NPCActionDispatchAdapter"]
 from .action_world_state import ActionWorldState
 __all__ += ["ActionWorldState"]
 
+# Owner-scoped stock, transfers, consumption and action-linked inventory effects.
+from .inventory import ActionInventoryAdapter, ActionInventoryEffect, InventoryLedger, InventoryTransfer
+__all__ += ["ActionInventoryAdapter", "ActionInventoryEffect", "InventoryLedger", "InventoryTransfer"]
+
 from .household_economy import (
     ActionEconomicEffect, ActionHouseholdEffect, EconomicAccount, EconomicActionAdapter,
     EconomicLedger, EconomicTransfer, HouseholdActionAdapter, HouseholdLedger,
