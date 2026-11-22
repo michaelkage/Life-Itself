@@ -275,7 +275,9 @@ class PopulationCheckpointParticipantTests(unittest.TestCase):
                 item for item in self.economics.snapshot()
                 if item.transfer_id.startswith("action:execution-ledgers:")
             ))
-            self.assertEqual(self.household_actions.apply_all(execution, 1), obligations[1:])
+            self.assertEqual(self.household_actions.apply_all(execution, 1), tuple(
+                item for item in obligations if item.obligation_id.startswith("action:")
+            ))
             self.assertEqual(self.inventory_actions.apply_all(execution, 1), tuple(
                 item for item in self.inventory.snapshot()
                 if item.transfer_id.startswith("action:execution-ledgers:")
