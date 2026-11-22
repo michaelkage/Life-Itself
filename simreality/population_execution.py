@@ -626,8 +626,8 @@ class PopulationExecutionLoop:
             transfer
             for item in due_economic_actions
             if self.economic_action_adapter is not None
-            and not self.economic_action_adapter.has_applied(item.execution_id)
             for transfer in self.economic_action_adapter.apply_all(item, tick)
+            if transfer.tick == tick
         )
         self._phase_completed("economy", tick)
         action_obligations = tuple(
@@ -641,8 +641,8 @@ class PopulationExecutionLoop:
             transfer
             for item in due_economic_actions
             if self.inventory_action_adapter is not None
-            and not self.inventory_action_adapter.has_applied(item.execution_id)
             for transfer in self.inventory_action_adapter.apply_all(item, tick)
+            if transfer.tick == tick
         )
         self._phase_completed("inventory", tick)
         household_records = tuple(
