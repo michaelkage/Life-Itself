@@ -389,15 +389,27 @@ class HouseholdActionAdapter:
             if all(isinstance(item, str) for item in prior):
                 return tuple(self.households._obligations[item] for item in prior)
             return tuple(prior)
-        created = []
-        for policy in self.policies.get(execution.action_id, ()):
-            obligation = HouseholdObligation(
+        obligations = tuple(
+            HouseholdObligation(
                 f"action:{execution.execution_id}:{policy.effect_id}",
                 policy.household_id, policy.debtor_account, policy.creditor_account,
                 policy.amount, tick + policy.due_tick_offset, policy.description,
             )
-            created.append(self.households.add(obligation))
-        result = tuple(created)
+            for policy in self.policies.get(execution.action_id, ())
+        )
+        # Preflight every generated obligation before mutating the ledger. This
+        # keeps a multi-effect action from leaving a partially created household
+        # bill set if a later ID conflicts or an account has been removed.
+        for obligation in obligations:
+            if (
+                obligation.debtor_account not in self.households.economics._accounts
+                or obligation.creditor_account not in self.households.economics._accounts
+            ):
+                raise KeyError("household action effect references an unknown account")
+            prior_obligation = self.households._obligations.get(obligation.obligation_id)
+            if prior_obligation is not None and prior_obligation != obligation:
+                raise ValueError(f"conflicting household obligation replay: {obligation.obligation_id}")
+        result = tuple(self.households.add(item) for item in obligations)
         if result:
             self._applied[execution.execution_id] = tuple(item.obligation_id for item in result)
         return result
