@@ -487,6 +487,7 @@ class PopulationExecutionLoop:
             )
             for owner, context in sorted(contexts.items()) if owner in decision_owners
         ) if self.decision_cycle is not None else ()
+        self._phase_completed("decisions", tick)
         action_dispatches = self.action_dispatch_adapter.dispatch(
             tick, tuple(item for item in decisions if item.owner_id in action_owners),
             self.action_world_state.world_facts_by_owner,
@@ -496,6 +497,7 @@ class PopulationExecutionLoop:
                 | {item.owner_id for item in completed_action_executions if item.status == "completed"}
             ),
         ) if self.action_dispatch_adapter is not None else ()
+        self._phase_completed("actions", tick)
 
         travel_result = None
         presence_records: tuple[NPCPresence, ...] = ()
@@ -525,6 +527,8 @@ class PopulationExecutionLoop:
             presence_records = self.presence_adapter.synchronize(
                 tick, self.travel_adapter.ledger, events=self.coordinator.events,
             )
+            self._phase_completed("travel", tick)
+            self._phase_completed("presence", tick)
 
         encounter_results = []
         generated_event_ids = []
@@ -540,6 +544,7 @@ class PopulationExecutionLoop:
             if result is not None:
                 encounter_results.append(result)
                 generated_event_ids.append(f"npc_encounter:{intent.encounter_id}")
+        self._phase_completed("encounters", tick)
         memory_event_ids = []
         for event_id in event_ids:
             event = self.coordinator.events.get(event_id)
@@ -557,12 +562,14 @@ class PopulationExecutionLoop:
             tick, npcs, event_ids=tuple(sorted(set(memory_event_ids))),
             conversations=social_conversations,
         )
+        self._phase_completed("social", tick)
         executions = self.coordinator.execute_routines(
             tick, minute_of_day, self.routine_book, self.routine_ledger,
             disruptions=disruption_values,
             outcome_samples=sample_values,
             owner_ids=selected_owners,
         )
+        self._phase_completed("routines", tick)
         completed_action_inputs = {}
         ledger_completed_actions = tuple(
             item for item in self.action_execution_ledger.snapshot()
@@ -584,6 +591,7 @@ class PopulationExecutionLoop:
             and not self.economic_action_adapter.has_applied(item.execution_id)
             for transfer in self.economic_action_adapter.apply_all(item, tick)
         )
+        self._phase_completed("economy", tick)
         action_obligations = tuple(
             obligation
             for item in due_economic_actions
@@ -598,6 +606,7 @@ class PopulationExecutionLoop:
             and not self.inventory_action_adapter.has_applied(item.execution_id)
             for transfer in self.inventory_action_adapter.apply_all(item, tick)
         )
+        self._phase_completed("inventory", tick)
         household_records = tuple(
             self.household_ledger.add(item)
             for item in sorted(household_obligations, key=lambda value: value.obligation_id)
@@ -606,6 +615,7 @@ class PopulationExecutionLoop:
             self.household_ledger.settle(obligation_id, tick)
             for obligation_id in sorted(household_settlement_ids)
         ) if self.household_ledger is not None else ()
+        self._phase_completed("households", tick)
         action_result_by_id = {}
         for item in (
             *advanced_actions,
