@@ -407,7 +407,7 @@ class PopulationExecutionLoop:
             self.action_world_state.world_facts_by_owner,
             self.action_world_state.resources_by_owner,
             unavailable_owner_ids=frozenset(
-                {item.owner_id for item in completed_tick_actions}
+                {item.owner_id for item in tick_action_records}
                 | {item.owner_id for item in completed_action_executions if item.status == "completed"}
             ),
         ) if self.action_dispatch_adapter is not None else ()
