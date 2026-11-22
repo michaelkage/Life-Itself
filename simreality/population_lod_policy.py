@@ -58,6 +58,7 @@ def default_population_lod_policy() -> PopulationLODPolicy:
     """Balanced defaults; callers may replace them with measured workload policy."""
     return PopulationLODPolicy({
         PopulationLOD.FULL: (
+            SubsystemLODPolicy("action", 1),
             SubsystemLODPolicy("decision", 1),
             SubsystemLODPolicy("economy", 1),
             SubsystemLODPolicy("memory", 1),
@@ -66,6 +67,7 @@ def default_population_lod_policy() -> PopulationLODPolicy:
             SubsystemLODPolicy("travel", 1),
         ),
         PopulationLOD.STANDARD: (
+            SubsystemLODPolicy("action", 1),
             SubsystemLODPolicy("decision", 1),
             SubsystemLODPolicy("economy", 2),
             SubsystemLODPolicy("memory", 1),
@@ -74,6 +76,7 @@ def default_population_lod_policy() -> PopulationLODPolicy:
             SubsystemLODPolicy("travel", 1),
         ),
         PopulationLOD.BACKGROUND: (
+            SubsystemLODPolicy("action", 1),
             SubsystemLODPolicy("decision", 4),
             SubsystemLODPolicy("economy", 4),
             SubsystemLODPolicy("memory", 4),
@@ -82,6 +85,7 @@ def default_population_lod_policy() -> PopulationLODPolicy:
             SubsystemLODPolicy("travel", 1),
         ),
         PopulationLOD.DORMANT: (
+            SubsystemLODPolicy("action", 1),
             SubsystemLODPolicy("decision", 1, False),
             SubsystemLODPolicy("economy", 1, False),
             SubsystemLODPolicy("memory", 1, False),
