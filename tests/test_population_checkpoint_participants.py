@@ -194,7 +194,7 @@ class PopulationCheckpointParticipantTests(unittest.TestCase):
             self.assertEqual(self.economics.balance("family"), 20.0)
             self.assertEqual(len(retried.economic_transfers), 1)
             self.assertEqual(len(retried.action_obligations), 1)
-            self.assertEqual(retried.action_obligations[0].obligation_id, "action:action:npc:npc-a:tick:1:step:0:rent-contribution")
+            self.assertEqual(retried.action_obligations[0].obligation_id, "action:npc:npc-a:tick:1:step:0:rent-contribution")
 
     def test_action_execution_ledger_and_its_world_events_rollback_together(self):
         with tempfile.TemporaryDirectory() as directory:
