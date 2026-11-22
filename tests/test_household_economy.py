@@ -35,6 +35,29 @@ class HouseholdEconomyTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "cross-currency"):
             self.economics.transfer(EconomicTransfer("fx", 1, "employer", "foreign", 1, "unsupported"))
 
+    def test_transfer_many_nets_valid_same_batch_cash_flows_atomically(self):
+        self.economics._balances["employer"] = 100.0
+        self.economics._balances["worker"] = 0.0
+        transfers = self.economics.transfer_many((
+            EconomicTransfer("batch-wage", 1, "employer", "worker", 20.0, "wage"),
+            EconomicTransfer("batch-spend", 1, "worker", "rent", 12.0, "rent"),
+        ))
+        self.assertEqual(len(transfers), 2)
+        self.assertEqual(self.economics.balance("employer"), 80.0)
+        self.assertEqual(self.economics.balance("worker"), 8.0)
+        self.assertEqual(self.economics.balance("rent"), 12.0)
+        self.assertEqual(self.economics.transfer_many(transfers), transfers)
+
+    def test_transfer_many_rejects_insufficient_net_balance_without_partial_posting(self):
+        before = self.economics.account_snapshot()
+        with self.assertRaisesRegex(ValueError, "insufficient funds"):
+            self.economics.transfer_many((
+                EconomicTransfer("batch-valid", 1, "employer", "worker", 8.0, "wage"),
+                EconomicTransfer("batch-invalid", 1, "employer", "rent", 95.0, "rent"),
+            ))
+        self.assertEqual(self.economics.account_snapshot(), before)
+        self.assertEqual(self.economics.snapshot(), ())
+
     def test_household_obligation_settlement_posts_transfer_once(self):
         household = HouseholdLedger(self.economics)
         obligation = HouseholdObligation("rent-apr", "household-1", "home", "rent", 30, 4, "monthly rent")
@@ -102,6 +125,30 @@ class HouseholdEconomyTests(unittest.TestCase):
             adapter.apply_all(execution, 2)
         self.assertEqual(self.economics.balance("employer"), 10.0)
         self.assertEqual(self.economics.snapshot(), ())
+
+    def test_household_action_effects_preflight_all_obligation_ids(self):
+        households = HouseholdLedger(self.economics)
+        households._obligations["action:exec-conflict:second"] = HouseholdObligation(
+            "action:exec-conflict:second", "household-1", "home", "rent",
+            99.0, 5, "conflicting prior obligation",
+        )
+        adapter = HouseholdActionAdapter(households, (
+            ActionHouseholdEffect(
+                "work_shift", "first", "household-1", "home", "rent",
+                5.0, 1, "first obligation",
+            ),
+            ActionHouseholdEffect(
+                "work_shift", "second", "household-1", "home", "rent",
+                7.0, 1, "second obligation",
+            ),
+        ))
+        execution = ActionExecution(
+            "exec-conflict", "npc-1", 2, "work_shift", "completed", "done",
+            (), (), (), (), "event-conflict",
+        )
+        with self.assertRaisesRegex(ValueError, "conflicting household obligation"):
+            adapter.apply_all(execution, 2)
+        self.assertNotIn("action:exec-conflict:first", households._obligations)
 
     def test_completed_action_creates_explicit_household_obligations_once(self):
         households = HouseholdLedger(self.economics)
