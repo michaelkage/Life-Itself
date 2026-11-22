@@ -73,6 +73,12 @@ class PopulationExecutionLoopTests(unittest.TestCase):
             ),
             ("npc-a",), ("npc-b",),
         )
+        subsystem_plan = {
+            item.subsystem_id: item.owner_ids
+            for item in schedule.subsystem_slices(default_population_lod_policy())
+        }
+        self.assertEqual(subsystem_plan["decision"], ("npc-a",))
+        self.assertEqual(subsystem_plan["routine"], ("npc-a",))
         result = loop.run_tick(
             1, 500, self.npcs,
             outcome_samples={"work-a": 0.2},
@@ -80,10 +86,7 @@ class PopulationExecutionLoopTests(unittest.TestCase):
                 "npc-a": NPCDecisionContext(frozenset({"available"}), {"goal-a": frozenset({"paid"})}),
                 "npc-b": NPCDecisionContext(frozenset({"available"}), {"goal-b": frozenset({"rested"})}),
             },
-            subsystem_owner_ids={
-                item.subsystem_id: item.owner_ids
-                for item in schedule.subsystem_slices(default_population_lod_policy())
-            },
+            subsystem_owner_ids=subsystem_plan,
         )
         self.assertEqual(tuple(item.owner_id for item in result.decisions), ("npc-a",))
         self.assertEqual(tuple(item.routine_id for item in result.routine_executions), ("work-a",))
