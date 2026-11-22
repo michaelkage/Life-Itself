@@ -12,7 +12,7 @@ class PopulationLODPolicyTests(unittest.TestCase):
         self.assertEqual(policy.due_subsystems(PopulationLOD.FULL, 3),
                          ("action", "decision", "economy", "memory", "routine", "social", "travel"))
         self.assertEqual(policy.due_subsystems(PopulationLOD.STANDARD, 2),
-                         ("decision", "economy", "memory", "routine", "social", "travel"))
+                         ("action", "decision", "economy", "memory", "routine", "social", "travel"))
         self.assertEqual(policy.due_subsystems(PopulationLOD.BACKGROUND, 2),
                          ("action", "routine", "travel"))
         self.assertEqual(policy.due_subsystems(PopulationLOD.DORMANT, 3), ("travel",))
