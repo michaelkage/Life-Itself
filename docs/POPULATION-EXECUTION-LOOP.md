@@ -7,27 +7,33 @@ logic.
 
 ## Tick phases
 
-1. Capture and validate a stable, sorted NPC roster for the request.
-2. Validate the selected routine-owner slice, disruption IDs and required
-   outcome samples for all routine blocks active at the supplied minute.
-3. Advance active multi-tick actions against checkpointable owner-scoped action
-   facts/resources, then evaluate explicit `NPCDecisionContext` inputs in stable
-   owner-ID order.
-4. Revalidate and dispatch the first action step for each actionable decision.
-   An owner with an active action or one completed earlier in the same tick is
-   not dispatched again.
-5. Advance travel and synchronize presence, then resolve evidence-backed
-   encounters before event-memory and conversation processing.
-6. Resolve due routines, apply configured economic effects for action completions,
-   add explicit household obligations and settle requested obligations.
-7. Return immutable phase outputs, including action dispatches and action
-   advancement records.
+1. Capture and validate the stable NPC roster, the exact-roster LOD schedule
+   (when supplied), subsystem owner batches, disruption IDs and required
+   outcome samples.
+2. Advance active multi-tick actions for the action subsystem batch, then
+   evaluate explicit decision contexts for the decision batch in stable owner
+   order.
+3. Revalidate and dispatch the first action step for actionable decisions whose
+   owners are also due for action execution. An owner with an active action or
+   one finalized earlier in the same tick is not dispatched again.
+4. Advance travel for the travel batch and synchronize authoritative presence
+   for the complete roster. Partial presence synchronization is rejected.
+5. Resolve encounter opportunities for the social batch, then process only
+   events whose witnesses are due for event memory and conversations whose two
+   participants are due for social processing.
+6. Execute routines for the routine batch.
+7. Apply completed-action economic, household and inventory effects only when
+   the action owner is in the economy batch. Effects skipped by a cadence remain
+   pending in the action ledger and are applied on a later due economy tick.
+8. Add explicit household obligations, settle requested obligations and return
+   immutable phase outputs, including action, travel, presence, social, routine
+   and ledger effects.
 
-Routine owners default to the full roster. A caller may pass `owner_ids` to
-execute a deterministic subset, enabling an external population manager to
-spread routine work across bounded slices. The result records the full roster
-snapshot; it does not imply that all NPCs had a routine due in that slice.
-
+Without an LOD schedule, subsystem batches default to the full roster, preserving
+the direct population-loop behavior. A caller may still pass `owner_ids` to
+bound routine execution. With a schedule, each subsystem uses its own owner
+batch; the population-wide selected/deferred sets are not interchangeable with
+those batches.
 ## Replay and failure semantics
 
 The loop rejects conflicting replay inputs and returns the original successful
