@@ -1107,4 +1107,49 @@ Negotiation SimulationWorld::approach_fixer(
     return result;
 }
 
+
+void SimulationWorld::set_npc_spatial_state(
+    const EntityId& npc_id, SpatialPoint position, SpatialPoint forward) {
+    (void)find_npc(npc_id);
+    SpatialPartition::validate_point(position);
+    SpatialPartition::validate_point(forward);
+    if (std::hypot(forward.x, forward.y, forward.z) <= 1e-12) {
+        throw std::invalid_argument("NPC forward vector must be non-zero");
+    }
+    spatial_index_.upsert(npc_id, position);
+    npc_forward_[npc_id] = forward;
+}
+
+bool SimulationWorld::remove_npc_spatial_state(const EntityId& npc_id) {
+    npc_forward_.erase(npc_id);
+    return spatial_index_.erase(npc_id);
+}
+
+std::vector<EntityId> SimulationWorld::nearby_npcs(
+    SpatialPoint center, double radius) const {
+    return spatial_index_.query_radius(center, radius);
+}
+
+std::vector<EntityId> SimulationWorld::visible_npcs(
+    SpatialPoint target_position, double maximum_range,
+    double field_of_view_radians, const std::set<EntityId>& occluded_npcs) const {
+    SpatialPartition::validate_point(target_position);
+    const std::vector<EntityId> candidates = spatial_index_.query_radius(
+        target_position, maximum_range);
+    std::vector<EntityId> visible;
+    visible.reserve(candidates.size());
+    for (const EntityId& npc_id : candidates) {
+        if (occluded_npcs.contains(npc_id)) continue;
+        const auto forward = npc_forward_.find(npc_id);
+        if (forward == npc_forward_.end()) {
+            throw std::logic_error("spatial NPC is missing its forward vector: " + npc_id);
+        }
+        const VisionAssessment assessment = assess_vision(
+            spatial_index_.position(npc_id), forward->second, target_position,
+            maximum_range, field_of_view_radians, false);
+        if (assessment.visible) visible.push_back(npc_id);
+    }
+    return visible;
+}
+
 } // namespace simreality
