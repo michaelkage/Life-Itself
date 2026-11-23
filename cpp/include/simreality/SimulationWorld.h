@@ -64,6 +64,13 @@ public:
     [[nodiscard]] WorldAdvanceReport advance(
         double elapsed_hours, Weather visibility_weather = Weather::Clear,
         double weather_severity = 0.0);
+
+    // Host-frame entry point: real time advances independently while the
+    // simulation rate may be zero (paused) or scaled.
+    [[nodiscard]] WorldAdvanceReport advance_frame(
+        double elapsed_real_seconds, double simulation_hours_per_real_second,
+        Weather visibility_weather = Weather::Clear,
+        double weather_severity = 0.0);
     [[nodiscard]] GhostInfluenceResult attempt_ghost_influence(
         const EntityId& ghost_id, const EntityId& npc_id,
         const std::string& action, double hour_of_day);
@@ -101,6 +108,9 @@ public:
 private:
     [[nodiscard]] NPC& find_npc(const EntityId& entity_id);
     [[nodiscard]] const NPC& find_npc(const EntityId& entity_id) const;
+    [[nodiscard]] WorldAdvanceReport advance_ticks(
+        std::vector<ScheduledTick> ticks, Weather visibility_weather,
+        double weather_severity);
 
     WorldState state_{};
     std::vector<FixerNetwork> fixer_networks_{};
