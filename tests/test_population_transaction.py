@@ -127,6 +127,52 @@ class PopulationTickTransactionTests(unittest.TestCase):
             self.assertEqual(live, {"count": 5})
             self.assertEqual(coordinator.journal_snapshot()[0]["status"], "aborted")
 
+    def test_independent_coordinators_reload_journal_under_shared_process_lock(self):
+        with tempfile.TemporaryDirectory() as directory:
+            journal = Path(directory) / "ticks.json"
+            first_state = {"events": [], "balance": 0}
+            second_state = {"events": [], "balance": 0}
+            first = PopulationTickTransactionCoordinator(
+                journal, (self.participant("world", first_state),),
+            )
+            second = PopulationTickTransactionCoordinator(
+                journal, (self.participant("world", second_state),),
+            )
+            first.execute(1, {"event": "first"}, lambda: (
+                first_state["events"].append("first"),
+                first_state.update(balance=first_state["balance"] + 10),
+            ))
+            second.execute(2, {"event": "second"}, lambda: (
+                second_state["events"].append("second"),
+                second_state.update(balance=second_state["balance"] + 5),
+            ))
+            records = first.journal_snapshot()
+            self.assertEqual(tuple(item["tick"] for item in records), (1, 2))
+            self.assertEqual(first_state, {"events": ["first", "second"], "balance": 15})
+            self.assertEqual(second_state, first_state)
+
+    def test_journal_lock_timeout_is_bounded(self):
+        import fcntl
+        import threading
+        import time
+
+        if fcntl is None:
+            self.skipTest("POSIX flock timeout test")
+        with tempfile.TemporaryDirectory() as directory:
+            journal = Path(directory) / "ticks.json"
+            coordinator = PopulationTickTransactionCoordinator(
+                journal, (self.participant("state", {"value": 0}),),
+                lock_timeout_seconds=0.1,
+            )
+            lock_path = journal.with_name(journal.name + ".lock")
+            with open(lock_path, "a+b") as stream:
+                fcntl.flock(stream.fileno(), fcntl.LOCK_EX)
+                started = time.monotonic()
+                with self.assertRaisesRegex(TimeoutError, "population journal lock"):
+                    coordinator.execute(1, {}, lambda: None)
+                self.assertLess(time.monotonic() - started, 1.0)
+                fcntl.flock(stream.fileno(), fcntl.LOCK_UN)
+
     def test_committed_result_digest_corruption_is_rejected_on_restart(self):
         with tempfile.TemporaryDirectory() as directory:
             journal = Path(directory) / "ticks.json"
