@@ -19,7 +19,7 @@ struct DualClockAdvance {
 // Domain systems will be connected here after their C++ ports have parity tests.
 class SimulationRuntime {
 public:
-    explicit SimulationRuntime(double initial_hour = 0.0);
+    explicit SimulationRuntime(double initial_hour = 0.0, double initial_real_time_seconds = 0.0);
 
     [[nodiscard]] double total_hours() const noexcept { return clock_.total_hours(); }
     [[nodiscard]] double real_time_seconds() const noexcept { return real_time_seconds_; }
