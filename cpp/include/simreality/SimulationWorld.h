@@ -53,6 +53,7 @@ public:
         return fixer_networks_;
     }
     [[nodiscard]] double total_hours() const noexcept { return runtime_.total_hours(); }
+    [[nodiscard]] double real_time_seconds() const noexcept { return runtime_.real_time_seconds(); }
     [[nodiscard]] std::uint64_t day_index() const noexcept { return runtime_.day_index(); }
     [[nodiscard]] RandomStream& random_stream() noexcept { return random_; }
     [[nodiscard]] LifeCoordinator& life_system() noexcept { return life_; }
