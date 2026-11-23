@@ -50,6 +50,7 @@ public:
         SpatialPoint minimum, SpatialPoint maximum) const;
     [[nodiscard]] std::size_t size() const noexcept { return positions_.size(); }
     [[nodiscard]] double cell_size() const noexcept { return cell_size_; }
+    static void validate_point(SpatialPoint point);
 
 private:
     struct Cell {
@@ -60,7 +61,6 @@ private:
     };
 
     [[nodiscard]] Cell cell_for(SpatialPoint point) const;
-    static void validate_point(SpatialPoint point);
 
     double cell_size_{1.0};
     std::map<EntityId, SpatialPoint> positions_{};
