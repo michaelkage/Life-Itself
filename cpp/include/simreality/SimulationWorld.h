@@ -125,6 +125,10 @@ public:
         SpatialPoint target_position, double maximum_range,
         double field_of_view_radians,
         const std::set<EntityId>& occluded_npcs = {}) const;
+    [[nodiscard]] std::vector<EntityId> audible_npcs(
+        SpatialPoint source_position, double source_power,
+        double maximum_range, double ambient_noise,
+        const std::map<EntityId, double>& occlusion_attenuation = {}) const;
     [[nodiscard]] std::size_t record_spatially_witnessed_action(
         const EntityId& actor_id, ActionTag action_tag, Description description,
         double maximum_range, double field_of_view_radians,
