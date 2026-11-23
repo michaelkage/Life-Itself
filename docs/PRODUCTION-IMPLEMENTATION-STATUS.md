@@ -32,7 +32,7 @@ The following remain substantive engineering projects, not completed features:
 1. Unified domain/API integration across Python, C++, Unreal and the web application (web transport contract and client adapter added; authoritative cross-runtime implementation remains outstanding).
 2. Full C++ behavioral parity with the Python reference.
 3. Autonomous population runtime that discovers and schedules world activity (partial foundation: explicit roster/tick orchestration and routine-owner slicing; automatic activity discovery and transaction registration for every runtime-owned mutable subsystem remain outstanding).
-4. Full population-scale simulation LOD and spatial partitioning (partial foundation: deterministic spatial partitions, budgeted tiers and runtime per-subsystem cadence/enablement dispatch; measured-cost EWMA adaptive budgets and deterministic weighted-fair allocation are implemented; dynamic spatial indexing and large-world partition maintenance remain outstanding).
+4. Full population-scale simulation LOD and spatial partitioning (partial foundation: deterministic spatial partitions, budgeted tiers and runtime per-subsystem cadence/enablement dispatch; measured-cost EWMA adaptive budgets and deterministic weighted-fair allocation are implemented, with the cost model checkpointable in whole-tick transactions; dynamic spatial indexing and large-world partition maintenance remain outstanding).
 5. End-to-end social knowledge transmission integrated into actual encounters.
 6. Complete birth-to-death generational simulation.
 7. Autonomous family and social-network lifecycle integration.
