@@ -79,7 +79,7 @@ class PopulationBudgetController:
             raise ValueError("utilization_target must be finite and in (0, 1]")
         if isinstance(ewma_alpha, bool) or not isinstance(ewma_alpha, (int, float)) or not math.isfinite(ewma_alpha) or not 0 < ewma_alpha <= 1:
             raise ValueError("ewma_alpha must be finite and in (0, 1]")
-        weights = tier_weights or {
+        weights = tier_weights if tier_weights is not None else {
             PopulationLOD.FULL: 4.0,
             PopulationLOD.STANDARD: 2.0,
             PopulationLOD.BACKGROUND: 1.0,
@@ -168,13 +168,13 @@ class PopulationBudgetController:
             PopulationLOD.FULL, PopulationLOD.STANDARD, PopulationLOD.BACKGROUND,
         )
         tier_costs = {}
+        due_by_tier = {}
         for tier in active_tiers:
             subsystem_ids = policy.due_subsystems(tier, tick)
+            due_by_tier[tier] = subsystem_ids
             tier_costs[tier] = sum(
                 self.subsystem_cost_ms(subsystem_id) for subsystem_id in subsystem_ids
-            )
-            if tier_costs[tier] <= 0:
-                tier_costs[tier] = 1e-9
+            ) or self.default_subsystem_cost_ms
 
         capacity = self.target_tick_ms * self.utilization_target
         budgets = {tier: 0 for tier in active_tiers}
@@ -182,7 +182,8 @@ class PopulationBudgetController:
         while sum(budgets.values()) < max_total_owners:
             candidates = [
                 tier for tier in active_tiers
-                if budgets[tier] < counts[tier]
+                if due_by_tier[tier]
+                and budgets[tier] < counts[tier]
                 and estimated + tier_costs[tier] <= capacity + 1e-12
             ]
             if not candidates:
