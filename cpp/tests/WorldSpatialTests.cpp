@@ -47,6 +47,21 @@ int main() {
     assert(occluded.size() == 1U);
     assert(occluded[0] == "forward-observer");
 
+    const auto audible = world.audible_npcs(
+        {0.0, 0.0, 0.0}, 100.0, 10.0, 1.0,
+        {{"blocked-observer", 0.01}});
+    assert(audible.size() == 2U);
+    assert(audible[0] == "forward-observer");
+    assert(audible[1] == "rear-observer");
+
+    bool rejected_invalid_sound_without_candidates = false;
+    try {
+        (void)world.audible_npcs({1000.0, 1000.0, 1000.0}, -1.0, 1.0, 0.0);
+    } catch (const std::invalid_argument&) {
+        rejected_invalid_sound_without_candidates = true;
+    }
+    assert(rejected_invalid_sound_without_candidates);
+
     world.set_npc_spatial_state("actor", {5.0, 0.0, 0.0},
                                 {-1.0, 0.0, 0.0});
     Description witnessed_description;
