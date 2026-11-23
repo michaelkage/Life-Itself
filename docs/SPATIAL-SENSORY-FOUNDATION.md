@@ -40,11 +40,26 @@ a steering primitive, not a complete traffic-lane or pedestrian navigation
 solver; lane topology, collision constraints, velocities, and right-of-way
 remain world-driver inputs.
 
+`compute_lane_following` projects an agent onto an ordered 3D lane centerline,
+selects a deterministic look-ahead target measured along the polyline, computes
+a desired velocity, and returns a force-limited steering correction. Degenerate
+segments are skipped, fully degenerate centerlines are rejected, and ties resolve
+to the earliest segment. The function is stateless: lane occupancy, collision
+avoidance, traffic priority, and vehicle integration remain world-driver duties.
+
 ## Verification
 
-The C++ core test target covers stable radius/AABB queries, entity movement and
-removal, invalid coordinates, field-of-view and occlusion behavior, acoustic
-attenuation, and bounded separation force.
+The C++ tests cover stable radius/AABB queries, entity movement and removal,
+invalid coordinates, field-of-view and occlusion behavior, acoustic attenuation,
+bounded separation force, lane look-ahead and steering limits, and world-level
+NPC registration, nearby queries, facing direction, and occlusion filtering.
+
+`SimulationWorld::set_npc_spatial_state` registers an existing NPC's position
+and facing vector in a derived spatial index. `nearby_npcs` provides deterministic
+radius queries, while `visible_npcs` first broadphases by range and then applies
+each registered NPC's facing direction, field of view, and caller-supplied
+occlusion set. Spatial state is deliberately not added to the durable NPC schema
+yet; hosts must restore or rebuild these derived positions when loading a world.
 
 ```bash
 cmake -S cpp -B build -DCMAKE_BUILD_TYPE=Debug
