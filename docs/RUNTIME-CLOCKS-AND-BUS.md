@@ -51,3 +51,11 @@ cmake -S cpp -B build -DCMAKE_BUILD_TYPE=Debug
 cmake --build build --parallel 2
 ctest --test-dir build --output-on-failure
 ```
+
+## Save compatibility
+
+World save schema v11 persists both simulation hours and accumulated real-time
+seconds. Loading schema versions 5 through 10 remains supported; those legacy
+saves initialize the new real-time clock to zero because they did not contain
+that field. A v11 save/load round trip preserves both clocks and allows the
+scheduler to continue from the next unprocessed simulation-hour boundary.
