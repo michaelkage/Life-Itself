@@ -1134,6 +1134,14 @@ std::vector<EntityId> SimulationWorld::visible_npcs(
     SpatialPoint target_position, double maximum_range,
     double field_of_view_radians, const std::set<EntityId>& occluded_npcs) const {
     SpatialPartition::validate_point(target_position);
+    if (!std::isfinite(maximum_range) || maximum_range < 0.0) {
+        throw std::invalid_argument("visibility range must be finite and non-negative");
+    }
+    constexpr double full_circle = 6.28318530717958647692;
+    if (!std::isfinite(field_of_view_radians) || field_of_view_radians < 0.0
+        || field_of_view_radians > full_circle) {
+        throw std::invalid_argument("field of view must be finite and in [0, 2*pi]");
+    }
     const std::vector<EntityId> candidates = spatial_index_.query_radius(
         target_position, maximum_range);
     std::vector<EntityId> visible;
