@@ -61,8 +61,8 @@ void SpatialPartition::upsert(const EntityId& entity_id, SpatialPoint position_v
     }
     const Cell next_cell = cell_for(position_value);
     const auto previous = entity_cells_.find(entity_id);
-    if (previous != entity_cells_.end() && previous->second < next_cell == false
-        && next_cell < previous->second == false) {
+    if (previous != entity_cells_.end() && !(previous->second < next_cell)
+        && !(next_cell < previous->second)) {
         positions_[entity_id] = position_value;
         return;
     }
