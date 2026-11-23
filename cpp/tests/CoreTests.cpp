@@ -13,6 +13,7 @@
 #include "simreality/RandomStream.h"
 #include "simreality/Reputation.h"
 #include "simreality/SimulationClock.h"
+#include "simreality/SpscRingBuffer.h"
 #include "simreality/SimulationRuntime.h"
 #include "simreality/SimulationScheduler.h"
 #include "simreality/SimulationWorld.h"
@@ -62,6 +63,56 @@ int main() {
         rejected_zero = true;
     }
     assert(rejected_zero);
+
+    SimulationRuntime dual_runtime;
+    const auto frame_one = dual_runtime.advance_frame(0.5, 2.0);
+    assert(std::abs(frame_one.previous_real_seconds - 0.0) < 1e-9);
+    assert(std::abs(frame_one.current_real_seconds - 0.5) < 1e-9);
+    assert(std::abs(frame_one.elapsed_simulation_hours - 1.0) < 1e-9);
+    assert(frame_one.simulation_ticks.size() == 1U);
+    assert(std::abs(dual_runtime.total_hours() - 1.0) < 1e-9);
+    const auto paused_frame = dual_runtime.advance_frame(2.0, 0.0);
+    assert(paused_frame.simulation_ticks.empty());
+    assert(std::abs(dual_runtime.real_time_seconds() - 2.5) < 1e-9);
+    assert(std::abs(dual_runtime.total_hours() - 1.0) < 1e-9);
+    const auto resumed_frame = dual_runtime.advance_frame(0.5, 2.0);
+    assert(resumed_frame.simulation_ticks.size() == 1U);
+    assert(std::abs(dual_runtime.total_hours() - 2.0) < 1e-9);
+
+    bool rejected_negative_frame_delta = false;
+    try {
+        (void)dual_runtime.advance_frame(-0.1, 1.0);
+    } catch (const std::invalid_argument&) {
+        rejected_negative_frame_delta = true;
+    }
+    assert(rejected_negative_frame_delta);
+    bool rejected_invalid_simulation_rate = false;
+    try {
+        (void)dual_runtime.advance_frame(0.1, std::numeric_limits<double>::infinity());
+    } catch (const std::invalid_argument&) {
+        rejected_invalid_simulation_rate = true;
+    }
+    assert(rejected_invalid_simulation_rate);
+
+    SimulationCommandBus<std::uint32_t, 4U> command_bus;
+    std::uint32_t command = 0U;
+    assert(command_bus.empty());
+    assert(!command_bus.try_pop(command));
+    assert(command_bus.try_push(11U));
+    assert(command_bus.try_push(22U));
+    assert(command_bus.try_push(33U));
+    assert(!command_bus.try_push(44U));
+    assert(command_bus.size_approx() == 3U);
+    assert(command_bus.try_pop(command) && command == 11U);
+    assert(command_bus.try_pop(command) && command == 22U);
+    assert(command_bus.try_pop(command) && command == 33U);
+    assert(command_bus.empty());
+
+    SimulationSnapshotBus<std::uint64_t, 8U> snapshot_bus;
+    assert(snapshot_bus.capacity() == 7U);
+    assert(snapshot_bus.try_push(0x1234U));
+    std::uint64_t snapshot_value = 0U;
+    assert(snapshot_bus.try_pop(snapshot_value) && snapshot_value == 0x1234U);
 
     NPCMemory memory;
     memory.witness_id = "witness-1";
