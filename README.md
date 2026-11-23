@@ -539,3 +539,13 @@ Regression coverage: tests/test_campaign_lifecycle.py and tests/test_world_check
 
 
 NPC knowledge acquisition now has an explicit bridge: `SocialBeliefSystem.learn_campaign_evidence(observer_id, campaign.shared_knowledge, claim_id)` imports a selected campaign claim into one NPC's private belief ledger, weighted by that NPC's trust in the original sources. No automatic broadcast occurs. Imported beliefs use the existing social-belief persistence codec and checkpoint pipeline.
+
+
+## Atomic world tick integration
+
+`SimulationWorldTickPipeline` now connects travel advancement, physical-presence
+synchronization, explicitly confirmed encounters, and social event processing in
+one ordered transaction. Failed phases roll back their event, movement, presence,
+encounter, memory, trust, belief, and replay mutations; identical requests replay
+idempotently. See [the world tick pipeline guide](docs/WORLD-TICK-PIPELINE.md)
+and `tests/test_world_tick_pipeline.py`.
