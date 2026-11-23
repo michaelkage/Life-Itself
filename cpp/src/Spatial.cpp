@@ -295,16 +295,23 @@ LaneFollowingResult compute_lane_following(
         const SpatialPoint start = lane_centerline[i];
         const SpatialPoint end = lane_centerline[i + 1U];
         const SpatialPoint delta{end.x - start.x, end.y - start.y, end.z - start.z};
-        const double length_squared = delta.x * delta.x
-            + delta.y * delta.y + delta.z * delta.z;
-        if (length_squared <= 1e-24) continue;
-        const double length = std::sqrt(length_squared);
+        const double length = std::hypot(delta.x, delta.y, delta.z);
+        if (!std::isfinite(length)) {
+            throw std::overflow_error("lane segment length is not representable");
+        }
+        if (length <= 1e-12) continue;
+        const double length_squared = length * length;
+        if (!std::isfinite(length_squared)) {
+            throw std::overflow_error("lane segment projection is not representable");
+        }
         const SpatialPoint offset{
             position.x - start.x, position.y - start.y, position.z - start.z};
-        const double t = std::clamp(
-            (offset.x * delta.x + offset.y * delta.y + offset.z * delta.z)
-                / length_squared,
-            0.0, 1.0);
+        const double projection = offset.x * delta.x
+            + offset.y * delta.y + offset.z * delta.z;
+        if (!std::isfinite(projection)) {
+            throw std::overflow_error("lane segment projection is not representable");
+        }
+        const double t = std::clamp(projection / length_squared, 0.0, 1.0);
         const SpatialPoint projection{
             start.x + delta.x * t,
             start.y + delta.y * t,
@@ -321,6 +328,9 @@ LaneFollowingResult compute_lane_following(
             best_progress = traversed + length * t;
         }
         traversed += length;
+        if (!std::isfinite(traversed)) {
+            throw std::overflow_error("lane centerline length is not representable");
+        }
     }
     if (!found_segment) {
         throw std::invalid_argument("lane centerline must contain a non-degenerate segment");
@@ -364,8 +374,14 @@ LaneFollowingResult compute_lane_following(
         desired_velocity.x - current_velocity.x,
         desired_velocity.y - current_velocity.y,
         desired_velocity.z - current_velocity.z};
+    if (!std::isfinite(force.x) || !std::isfinite(force.y) || !std::isfinite(force.z)) {
+        throw std::overflow_error("lane steering force is not representable");
+    }
     const double force_magnitude = std::hypot(force.x, force.y, force.z);
-    if (force_magnitude > maximum_force && force_magnitude > 0.0) {
+    if (!std::isfinite(force_magnitude)) {
+        throw std::overflow_error("lane steering force magnitude is not representable");
+    }
+    if (force_magnitude > maximum_force && force_magnitude > 0.0)
         const double scale = maximum_force / force_magnitude;
         force.x *= scale;
         force.y *= scale;
