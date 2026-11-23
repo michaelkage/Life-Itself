@@ -229,7 +229,11 @@ class PopulationBudgetController:
     def from_json(cls, payload: str) -> "PopulationBudgetController":
         try:
             raw = json.loads(payload)
-            if not isinstance(raw, dict) or raw.get("schema_version") != cls.SCHEMA_VERSION:
+            if (
+                not isinstance(raw, dict)
+                or isinstance(raw.get("schema_version"), bool)
+                or raw.get("schema_version") != cls.SCHEMA_VERSION
+            ):
                 raise ValueError("unsupported population budget snapshot schema")
             config = raw["config"]
             if not isinstance(config, dict) or not isinstance(config.get("tier_weights"), dict):
