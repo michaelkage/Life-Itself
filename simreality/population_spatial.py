@@ -190,5 +190,51 @@ class PopulationSpatialScheduler:
         self._history[tick] = (signature, result)
         return result
 
+    def schedule_adaptive(
+        self,
+        tick: int,
+        owner_ids: tuple[str, ...],
+        importance: Mapping[str, float],
+        *,
+        budget_controller,
+        lod_policy,
+    ):
+        """Build a spatial schedule from measured subsystem execution costs.
+
+        The controller receives the full roster as the total work ceiling; it
+        apportions that ceiling across active LOD tiers. The resulting budgets
+        are still passed through the same canonical schedule validation and
+        replay-signature checks as explicitly configured budgets.
+        """
+        from .population_budget import PopulationBudgetController
+        from .population_lod_policy import PopulationLODPolicy
+        if not isinstance(budget_controller, PopulationBudgetController):
+            raise TypeError("budget_controller must be a PopulationBudgetController")
+        if not isinstance(lod_policy, PopulationLODPolicy):
+            raise TypeError("lod_policy must be a PopulationLODPolicy")
+        if not isinstance(owner_ids, tuple):
+            raise TypeError("owner_ids must be a tuple")
+        roster_size = len(owner_ids)
+        allocation = budget_controller.allocate(
+            tick,
+            {
+                PopulationLOD.FULL: roster_size,
+                PopulationLOD.STANDARD: roster_size,
+                PopulationLOD.BACKGROUND: roster_size,
+                PopulationLOD.DORMANT: 0,
+            },
+            lod_policy,
+            max_total_owners=roster_size,
+        )
+        schedule = self.schedule(
+            tick,
+            owner_ids,
+            importance,
+            full_budget=allocation.full_budget,
+            standard_budget=allocation.standard_budget,
+            background_budget=allocation.background_budget,
+        )
+        return schedule, allocation
+
     def snapshot(self) -> tuple[PopulationSchedule, ...]:
         return tuple(self._history[tick][1] for tick in sorted(self._history))
