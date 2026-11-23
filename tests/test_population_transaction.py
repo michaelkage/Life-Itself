@@ -152,11 +152,10 @@ class PopulationTickTransactionTests(unittest.TestCase):
             self.assertEqual(second_state, first_state)
 
     def test_journal_lock_timeout_is_bounded(self):
-        import fcntl
-        import threading
         import time
-
-        if fcntl is None:
+        try:
+            import fcntl
+        except ImportError:
             self.skipTest("POSIX flock timeout test")
         with tempfile.TemporaryDirectory() as directory:
             journal = Path(directory) / "ticks.json"
