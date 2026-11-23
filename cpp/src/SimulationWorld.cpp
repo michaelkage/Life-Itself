@@ -1172,6 +1172,7 @@ LaneFollowingResult SimulationWorld::advance_npc_on_lane(
     SpatialPartition::validate_point(next_position);
     spatial_index_.upsert(npc_id, next_position);
     npc_velocity_[npc_id] = next_velocity;
+    if (speed > 1e-12) npc_forward_[npc_id] = next_velocity;
     return steering;
 }
 
