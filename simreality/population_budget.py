@@ -112,7 +112,7 @@ class PopulationBudgetController:
             raise ValueError("owner_count must be a non-negative integer")
         if owner_count == 0:
             return
-        observed = float(elapsed_ms) / owner_count
+        observed = max(float(elapsed_ms) / owner_count, 1e-9)
         prior = self._subsystem_costs.get(subsystem_id)
         self._subsystem_costs[subsystem_id] = (
             observed if prior is None
@@ -130,6 +130,8 @@ class PopulationBudgetController:
         tick: int,
         population_counts: Mapping[PopulationLOD, int],
         policy: PopulationLODPolicy,
+        *,
+        max_total_owners: int | None = None,
     ) -> PopulationBudgetAllocation:
         """Allocate owner slots under the measured tick-time budget.
 
@@ -150,6 +152,12 @@ class PopulationBudgetController:
             counts[tier] = count
         if not isinstance(policy, PopulationLODPolicy):
             raise TypeError("policy must be a PopulationLODPolicy")
+        if max_total_owners is None:
+            max_total_owners = sum(counts.values())
+        if isinstance(max_total_owners, bool) or not isinstance(max_total_owners, int) or max_total_owners < 0:
+            raise ValueError("max_total_owners must be a non-negative integer")
+        if max_total_owners > sum(counts.values()):
+            raise ValueError("max_total_owners cannot exceed the sum of tier capacities")
 
         active_tiers = (
             PopulationLOD.FULL, PopulationLOD.STANDARD, PopulationLOD.BACKGROUND,
@@ -166,7 +174,7 @@ class PopulationBudgetController:
         capacity = self.target_tick_ms * self.utilization_target
         budgets = {tier: 0 for tier in active_tiers}
         estimated = 0.0
-        while True:
+        while sum(budgets.values()) < max_total_owners:
             candidates = [
                 tier for tier in active_tiers
                 if budgets[tier] < counts[tier]
@@ -236,7 +244,9 @@ class PopulationBudgetController:
             for subsystem_id, cost in costs.items():
                 if not isinstance(subsystem_id, str) or not subsystem_id.strip():
                     raise ValueError("invalid subsystem cost key")
-                cls._finite_positive(f"cost for {subsystem_id}", cost)
+                if isinstance(cost, bool) or not isinstance(cost, (int, float)) or not math.isfinite(cost) or cost <= 0:
+                    raise ValueError(f"cost for {subsystem_id} must be finite and positive")
+                cost = float(cost)
                 sample_count = counts[subsystem_id]
                 if isinstance(sample_count, bool) or not isinstance(sample_count, int) or sample_count < 1:
                     raise ValueError("sample counts must be positive integers")
