@@ -172,6 +172,32 @@ class PopulationTickTransactionTests(unittest.TestCase):
             self.assertEqual(first_state, {"events": ["first", "second"], "balance": 15})
             self.assertEqual(second_state, first_state)
 
+    def test_journal_retains_bounded_replay_window_and_latest_recovery_checkpoint(self):
+        with tempfile.TemporaryDirectory() as directory:
+            journal = Path(directory) / "ticks.json"
+            state = {"value": 0}
+            participant = self.participant("state", state)
+            coordinator = PopulationTickTransactionCoordinator(
+                journal, (participant,), history_limit=2,
+            )
+            for tick in (1, 2, 3):
+                coordinator.execute(
+                    tick, {"tick": tick},
+                    lambda tick=tick: state.update(value=tick),
+                )
+            records = coordinator.journal_snapshot()
+            self.assertEqual(tuple(item["tick"] for item in records), (2, 3))
+            with self.assertRaisesRegex(ValueError, "strictly increasing"):
+                coordinator.execute(1, {"tick": 1}, lambda: None)
+
+            restarted_state = {"value": -1}
+            restarted = PopulationTickTransactionCoordinator(
+                journal, (self.participant("state", restarted_state),),
+                history_limit=2,
+            )
+            self.assertEqual(restarted_state["value"], 3)
+            self.assertEqual(tuple(item["tick"] for item in restarted.journal_snapshot()), (2, 3))
+
     def test_journal_lock_serializes_independent_processes(self):
         context = multiprocessing.get_context("spawn")
         with tempfile.TemporaryDirectory() as directory:
