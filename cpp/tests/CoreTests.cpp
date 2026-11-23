@@ -114,6 +114,16 @@ int main() {
     std::uint64_t snapshot_value = 0U;
     assert(snapshot_bus.try_pop(snapshot_value) && snapshot_value == 0x1234U);
 
+    SimulationWorld frame_world;
+    const auto world_frame = frame_world.advance_frame(1.0, 1.0);
+    assert(world_frame.ticks.size() == 1U);
+    assert(std::abs(frame_world.total_hours() - 1.0) < 1e-9);
+    assert(std::abs(frame_world.real_time_seconds() - 1.0) < 1e-9);
+    const auto world_pause = frame_world.advance_frame(2.0, 0.0);
+    assert(world_pause.ticks.empty());
+    assert(std::abs(frame_world.total_hours() - 1.0) < 1e-9);
+    assert(std::abs(frame_world.real_time_seconds() - 3.0) < 1e-9);
+
     NPCMemory memory;
     memory.witness_id = "witness-1";
     memory.target_entity_id = "target-1";
