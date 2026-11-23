@@ -284,7 +284,7 @@ LaneFollowingResult compute_lane_following(
         SpatialPartition::validate_point(point);
     }
 
-    double best_distance_squared = std::numeric_limits<double>::infinity();
+    double best_distance = std::numeric_limits<double>::infinity();
     double best_progress = 0.0;
     std::size_t best_segment = 0U;
     SpatialPoint best_projection{};
@@ -319,10 +319,13 @@ LaneFollowingResult compute_lane_following(
         const double dx = position.x - projection.x;
         const double dy = position.y - projection.y;
         const double dz = position.z - projection.z;
-        const double distance_squared = dx * dx + dy * dy + dz * dz;
-        if (!found_segment || distance_squared < best_distance_squared) {
+        const double distance = std::hypot(dx, dy, dz);
+        if (!std::isfinite(distance)) {
+            throw std::overflow_error("lane projection distance is not representable");
+        }
+        if (!found_segment || distance < best_distance) {
             found_segment = true;
-            best_distance_squared = distance_squared;
+            best_distance = distance;
             best_segment = i;
             best_projection = projection;
             best_progress = traversed + length * t;
@@ -388,7 +391,7 @@ LaneFollowingResult compute_lane_following(
         force.z *= scale;
     }
     return {target, desired_velocity, force,
-            std::sqrt(best_distance_squared), best_progress, best_segment};
+            best_distance, best_progress, best_segment};
 }
 
 } // namespace simreality
