@@ -42,4 +42,8 @@ if(SIMREALITY_BUILD_TESTS)
     add_executable(simreality_fluid_backend_tests tests/FluidBackendTests.cpp)
     target_link_libraries(simreality_fluid_backend_tests PRIVATE simreality_core)
     add_test(NAME simreality_fluid_backend_tests COMMAND simreality_fluid_backend_tests)
+
+    add_executable(simreality_spatial_tests tests/SpatialTests.cpp)
+    target_link_libraries(simreality_spatial_tests PRIVATE simreality_core)
+    add_test(NAME simreality_spatial_tests COMMAND simreality_spatial_tests)
 endif()
