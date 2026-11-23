@@ -57,6 +57,18 @@ class PopulationBudgetAllocation:
         for tier, cost in self.tier_costs_ms:
             if isinstance(cost, bool) or not isinstance(cost, (int, float)) or not math.isfinite(cost) or cost <= 0:
                 raise ValueError(f"{tier.name} tier cost must be finite and positive")
+        budgets = {
+            PopulationLOD.FULL: self.full_budget,
+            PopulationLOD.STANDARD: self.standard_budget,
+            PopulationLOD.BACKGROUND: self.background_budget,
+        }
+        expected_cost = sum(
+            budgets[tier] * cost for tier, cost in self.tier_costs_ms
+        )
+        if not math.isclose(expected_cost, self.estimated_tick_ms, rel_tol=1e-9, abs_tol=1e-9):
+            raise ValueError("estimated_tick_ms does not match tier budgets and costs")
+        if self.estimated_tick_ms > self.target_tick_ms * self.utilization_target + 1e-9:
+            raise ValueError("allocation exceeds the configured tick-time budget")
 
 
 class PopulationBudgetController:
