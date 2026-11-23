@@ -16,7 +16,9 @@ int main() {
     rear.entity_id = "rear-observer";
     NPC blocked;
     blocked.entity_id = "blocked-observer";
-    state.npcs = {forward, rear, blocked};
+    NPC actor;
+    actor.entity_id = "actor";
+    state.npcs = {forward, rear, blocked, actor};
     SimulationWorld world(std::move(state));
 
     world.set_npc_spatial_state("forward-observer", {0.0, 0.0, 0.0},
@@ -25,6 +27,8 @@ int main() {
                                 {1.0, 0.0, 0.0});
     world.set_npc_spatial_state("blocked-observer", {4.0, 1.0, 0.0},
                                 {1.0, 0.0, 0.0});
+    world.set_npc_spatial_state("actor", {5.0, 0.0, 0.0},
+                                {-1.0, 0.0, 0.0});
 
     const auto nearby = world.nearby_npcs({0.0, 0.0, 0.0}, 5.0);
     assert(nearby.size() == 2U);
@@ -41,6 +45,28 @@ int main() {
         3.14159265358979323846, {"blocked-observer"});
     assert(occluded.size() == 1U);
     assert(occluded[0] == "forward-observer");
+
+    Description witnessed_description;
+    witnessed_description.height_m = 1.8;
+    assert(world.record_spatially_witnessed_action(
+        "actor", ActionTag::CrimeTheft, witnessed_description, 10.0,
+        3.14159265358979323846, {"blocked-observer"}) == 1U);
+    assert(world.state().npcs[0].memories.size() == 1U);
+    assert(world.state().npcs[0].memories[0].target_entity_id == "actor");
+    assert(world.state().npcs[2].memories.empty());
+    assert(world.state().ongoing_events.size() == 1U);
+    assert(world.state().ongoing_events[0].witness_ids.size() == 1U);
+    assert(world.state().ongoing_events[0].witness_ids[0] == "forward-observer");
+
+    bool rejected_unregistered_actor = false;
+    try {
+        (void)world.record_spatially_witnessed_action(
+            "rear-observer", ActionTag::CrimeTheft, witnessed_description,
+            10.0, 3.14159265358979323846);
+    } catch (const std::logic_error&) {
+        rejected_unregistered_actor = true;
+    }
+    assert(rejected_unregistered_actor);
 
     bool rejected_unknown_npc = false;
     try {
