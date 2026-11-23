@@ -50,8 +50,8 @@ class PopulationBudgetAllocation:
             raise ValueError("utilization_target must be in (0, 1]")
         if not isinstance(self.tier_costs_ms, tuple):
             raise TypeError("tier_costs_ms must be a tuple")
-        if tuple(tier for tier, _ in self.tier_costs_ms) != tuple(
-            tier for tier in PopulationLOD if tier != PopulationLOD.DORMANT
+        if tuple(tier for tier, _ in self.tier_costs_ms) != (
+            PopulationLOD.FULL, PopulationLOD.STANDARD, PopulationLOD.BACKGROUND,
         ):
             raise ValueError("tier costs must list active tiers in canonical order")
         for tier, cost in self.tier_costs_ms:
