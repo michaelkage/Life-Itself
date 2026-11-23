@@ -120,6 +120,11 @@ public:
         SpatialPoint target_position, double maximum_range,
         double field_of_view_radians,
         const std::set<EntityId>& occluded_npcs = {}) const;
+    [[nodiscard]] std::size_t record_spatially_witnessed_action(
+        const EntityId& actor_id, ActionTag action_tag, Description description,
+        double maximum_range, double field_of_view_radians,
+        const std::set<EntityId>& occluded_npcs = {},
+        const EntityId& victim_id = {});
 
 private:
     [[nodiscard]] NPC& find_npc(const EntityId& entity_id);
