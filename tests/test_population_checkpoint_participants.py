@@ -6,6 +6,7 @@ from pathlib import Path
 from simreality.model import NPC, NPCMemory, ActionTag, Description
 from simreality.population_checkpoint_participants import build_population_transaction_participants
 from simreality.population_transaction import PopulationTickTransactionCoordinator
+from simreality.population_budget import PopulationBudgetController
 from simreality.action_execution import ActionExecution, ActionExecutionLedger, ActionExecutionPolicy
 from simreality.action_world_state import ActionWorldState
 from simreality.inventory import ActionInventoryAdapter, ActionInventoryEffect, InventoryLedger
@@ -84,6 +85,8 @@ class PopulationCheckpointParticipantTests(unittest.TestCase):
                 5.0, 1, "action-generated utility contribution",
             ),
         ))
+        self.budget_controller = PopulationBudgetController(16.0)
+        self.budget_controller.record_phase_sample("social", 8.0, 4)
         self.participants = build_population_transaction_participants(
             self.npcs, self.tick, self.routines, self.routine_executions,
             travel_adapter=self.travel_adapter,
@@ -96,6 +99,7 @@ class PopulationCheckpointParticipantTests(unittest.TestCase):
             household_action_adapter=self.household_actions,
             inventory_ledger=self.inventory,
             inventory_action_adapter=self.inventory_actions,
+            population_budget_controller=self.budget_controller,
         )
 
     def test_concrete_participants_restore_npc_social_event_routine_and_economy_state(self):
@@ -108,7 +112,7 @@ class PopulationCheckpointParticipantTests(unittest.TestCase):
                 "npcs", "world_events", "event_memory", "social_conversations",
                 "social_trust", "social_beliefs", "routine_book", "routine_executions",
                 "travel", "presence", "encounters", "action_executions", "action_goals",
-                "economics", "economic_actions", "households", "action_world_state", "household_actions", "inventory", "inventory_actions",
+                "economics", "economic_actions", "households", "action_world_state", "household_actions", "inventory", "inventory_actions", "population_budget",
             } <= before_names)
 
             def partially_apply_then_fail():
@@ -137,6 +141,7 @@ class PopulationCheckpointParticipantTests(unittest.TestCase):
                 self.households.settle("bill-1", 1)
                 self.action_facts.add("mutated")
                 self.action_resources["energy"] = 0.0
+                self.budget_controller.record_phase_sample("social", 80.0, 1)
                 self.inventory_actions.apply_all(ActionExecution(
                     "inventory-test", "npc-a", 1, "work", "completed", "done",
                     (), (), (), (), "inventory-event",
