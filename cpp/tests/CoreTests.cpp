@@ -174,7 +174,7 @@ int main() {
         2.0, 0.5);
     assert(separation.contributing_neighbors == 1U);
     assert(std::abs(separation.magnitude - 0.5) < 1e-9);
-    assert(separation.direction.x > 0.0);
+    assert(separation.direction.x < 0.0);
 
     NPCMemory memory;
     memory.witness_id = "witness-1";
