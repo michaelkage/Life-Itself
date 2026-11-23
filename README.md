@@ -564,7 +564,8 @@ support. A bounded lock-free SPSC command/snapshot transport is available in
 
 The C++ core now includes a deterministic 3D uniform-grid broadphase, exact
 radius/AABB queries, range-and-FOV vision assessment, attenuated acoustic
-assessment, and bounded crowd-separation steering. See
+assessment, bounded crowd-separation steering, and stateless lane-centerline
+following with arc-length look-ahead and force-limited velocity correction. See
 [the spatial and sensory foundation guide](docs/SPATIAL-SENSORY-FOUNDATION.md).
 
 
