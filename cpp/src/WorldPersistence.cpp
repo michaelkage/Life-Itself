@@ -19,6 +19,7 @@ constexpr std::array<char, 8> kMagicV7{{'S', 'R', 'E', 'C', 'O', 'R', 'E', '7'}}
 constexpr std::array<char, 8> kMagicV8{{'S', 'R', 'E', 'C', 'O', 'R', 'E', '8'}};
 constexpr std::array<char, 8> kMagicV9{{'S', 'R', 'E', 'C', 'O', 'R', 'E', '9'}};
 constexpr std::array<char, 8> kMagicV10{{'S', 'R', 'E', 'C', 'O', 'R', 'E', 'A'}};
+constexpr std::array<char, 8> kMagicV11{{'S', 'R', 'E', 'C', 'O', 'R', 'E', 'B'}};
 constexpr std::uint32_t kMaxCollectionItems = 1'000'000;
 constexpr std::uint32_t kMaxStringBytes = 16U * 1024U * 1024U;
 static_assert(sizeof(double) == sizeof(std::uint64_t));
@@ -623,10 +624,11 @@ void read_life_state(std::istream& in, LifeCoordinator& life, std::uint32_t vers
 } // namespace
 
 void save_world(const SimulationWorld& world, std::ostream& output) {
-    output.write(kMagicV10.data(), static_cast<std::streamsize>(kMagicV10.size()));
+    output.write(kMagicV11.data(), static_cast<std::streamsize>(kMagicV11.size()));
     if (!output) throw std::runtime_error("failed writing world snapshot header");
     write_u32(output, kWorldSaveVersion);
     write_double(output, world.total_hours());
+    write_double(output, world.real_time_seconds());
     write_u64(output, world.random_state());
     write_world_state(output, world.state());
     write_count(output, world.fixer_networks().size());
@@ -644,18 +646,21 @@ SimulationWorld load_world(std::istream& input) {
     const bool is_v8 = magic == kMagicV8;
     const bool is_v9 = magic == kMagicV9;
     const bool is_v10 = magic == kMagicV10;
-    if (!is_v5 && !is_v6 && !is_v7 && !is_v8 && !is_v9 && !is_v10) throw std::runtime_error("invalid world snapshot magic");
+    const bool is_v11 = magic == kMagicV11;
+    if (!is_v5 && !is_v6 && !is_v7 && !is_v8 && !is_v9 && !is_v10 && !is_v11) throw std::runtime_error("invalid world snapshot magic");
     const std::uint32_t version = read_u32(input);
     if ((version == 5U && !is_v5) || (version == 6U && !is_v6)
         || (version == 7U && !is_v7) || (version == 8U && !is_v8)
-        || (version == 9U && !is_v9) || (version == 10U && !is_v10)
+        || (version == 9U && !is_v9) || (version == 10U && !is_v10) || (version == 11U && !is_v11)
         || (version != 5U && version != 6U && version != 7U && version != 8U
-            && version != 9U && version != 10U)) {
+            && version != 9U && version != 10U && version != 11U)) {
         throw std::runtime_error("unsupported world snapshot version");
     }
 
     const double total_hours = read_double(input);
     if (total_hours < 0.0) throw std::runtime_error("snapshot has negative simulation time");
+    const double real_time_seconds = version >= 11U ? read_double(input) : 0.0;
+    if (real_time_seconds < 0.0) throw std::runtime_error("snapshot has negative real time");
     const std::uint64_t random_state = read_u64(input);
     WorldState state = read_world_state(input, version);
     const std::uint32_t networks = read_count(input);
@@ -665,7 +670,7 @@ SimulationWorld load_world(std::istream& input) {
         fixer_networks.push_back(read_network(input));
     }
 
-    SimulationWorld world(std::move(state), total_hours, random_state);
+    SimulationWorld world(std::move(state), total_hours, random_state, real_time_seconds);
     world.fixer_networks() = std::move(fixer_networks);
     if (version >= 6U) read_life_state(input, world.life_system(), version);
     return world;
