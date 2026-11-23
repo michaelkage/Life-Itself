@@ -1012,6 +1012,8 @@ __all__ += ["NPCDecisionContext", "PopulationExecutionLoop", "PopulationTickResu
 # Deterministic spatial partitioning and budgeted population simulation detail.
 from .population_spatial import PopulationLOD, PopulationSchedule, PopulationSlice, PopulationSpatialScheduler, PopulationSubsystemSlice
 __all__ += ["PopulationLOD", "PopulationSchedule", "PopulationSlice", "PopulationSpatialScheduler", "PopulationSubsystemSlice"]
+from .population_budget import PopulationBudgetAllocation, PopulationBudgetController
+__all__ += ["PopulationBudgetAllocation", "PopulationBudgetController"]
 
 
 # Live-state validation bridge from NPC proposals into replay-safe execution.
