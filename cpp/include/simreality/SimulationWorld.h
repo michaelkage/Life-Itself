@@ -112,10 +112,15 @@ public:
     // Optional spatial registration keeps physical coordinates separate from
     // the durable NPC schema while enabling deterministic nearby/perception queries.
     void set_npc_spatial_state(
-        const EntityId& npc_id, SpatialPoint position, SpatialPoint forward);
+        const EntityId& npc_id, SpatialPoint position, SpatialPoint forward,
+        SpatialPoint velocity = {});
     [[nodiscard]] bool remove_npc_spatial_state(const EntityId& npc_id);
     [[nodiscard]] std::vector<EntityId> nearby_npcs(
         SpatialPoint center, double radius) const;
+    [[nodiscard]] LaneFollowingResult advance_npc_on_lane(
+        const EntityId& npc_id, const std::vector<SpatialPoint>& lane_centerline,
+        double elapsed_seconds, double lookahead_distance,
+        double desired_speed, double maximum_acceleration);
     [[nodiscard]] std::vector<EntityId> visible_npcs(
         SpatialPoint target_position, double maximum_range,
         double field_of_view_radians,
@@ -140,6 +145,7 @@ private:
     LifeCoordinator life_{};
     SpatialPartition spatial_index_{10.0};
     std::map<EntityId, SpatialPoint> npc_forward_{};
+    std::map<EntityId, SpatialPoint> npc_velocity_{};
 };
 
 } // namespace simreality
