@@ -81,6 +81,22 @@ class WorldTickPipelineTests(unittest.TestCase):
         self.assertEqual(recovered.travel.journeys[0].edge_progress, 0.75)
         self.assertEqual(presence.get("a").status, "travelling")
 
+
+    def test_social_phase_failure_rolls_back_travel_presence_and_events(self):
+        pipeline, _, npcs, events, travel, presence, encounters = self.make_pipeline()
+        with self.assertRaises(KeyError):
+            pipeline.step(
+                1, npcs, travel_budgets={"a": 0.5},
+                event_ids=("missing-authoritative-event",),
+            )
+        self.assertEqual(travel.ledger.tick_snapshot(), ())
+        self.assertEqual(presence.tick_snapshot(), ())
+        self.assertEqual(encounters.ledger.tick_snapshot(), ())
+        self.assertEqual(events.snapshot(), ())
+        self.assertEqual(pipeline.coordinator.snapshot(), ())
+        result = pipeline.step(1, npcs, travel_budgets={"a": 0.5})
+        self.assertEqual(result.travel.journeys[0].edge_progress, 0.5)
+
     def test_unconfirmed_opportunity_does_not_create_encounter(self):
         pipeline, _, npcs, events, _, _, encounters = self.make_pipeline()
         result = pipeline.step(
