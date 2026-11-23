@@ -151,6 +151,40 @@ class PopulationTickTransactionTests(unittest.TestCase):
             self.assertEqual(first_state, {"events": ["first", "second"], "balance": 15})
             self.assertEqual(second_state, first_state)
 
+    def test_commit_fsync_failure_requires_recovery_without_rolling_back_durable_commit(self):
+        with tempfile.TemporaryDirectory() as directory:
+            journal = Path(directory) / "ticks.json"
+            state = {"balance": 0}
+            coordinator = PopulationTickTransactionCoordinator(
+                journal, (self.participant("economy", state),),
+            )
+            persist = coordinator._persist
+            calls = 0
+
+            def persist_then_fail_commit():
+                nonlocal calls
+                calls += 1
+                persist()
+                if calls == 2:
+                    raise OSError("simulated directory fsync failure after atomic replace")
+
+            coordinator._persist = persist_then_fail_commit
+            with self.assertRaisesRegex(OSError, "directory fsync failure"):
+                coordinator.execute(
+                    1, {"wage": 20},
+                    lambda: state.update(balance=state["balance"] + 20),
+                )
+            self.assertEqual(state["balance"], 20)
+            with self.assertRaisesRegex(RuntimeError, "requires journal recovery"):
+                coordinator.execute(2, {}, lambda: None)
+
+            recovered_state = {"balance": -1}
+            recovered = PopulationTickTransactionCoordinator(
+                journal, (self.participant("economy", recovered_state),),
+            )
+            self.assertEqual(recovered_state["balance"], 20)
+            self.assertEqual(recovered.journal_snapshot()[0]["status"], "committed")
+
     def test_journal_lock_timeout_is_bounded(self):
         import time
         try:
