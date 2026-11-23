@@ -134,8 +134,21 @@ GhostInfluenceResult SimulationWorld::attempt_ghost_influence(
 
 WorldAdvanceReport SimulationWorld::advance(
     double elapsed_hours, Weather visibility_weather, double weather_severity) {
+    return advance_ticks(runtime_.advance(elapsed_hours), visibility_weather, weather_severity);
+}
+
+WorldAdvanceReport SimulationWorld::advance_frame(
+    double elapsed_real_seconds, double simulation_hours_per_real_second,
+    Weather visibility_weather, double weather_severity) {
+    DualClockAdvance frame = runtime_.advance_frame(
+        elapsed_real_seconds, simulation_hours_per_real_second);
+    return advance_ticks(std::move(frame.simulation_ticks), visibility_weather, weather_severity);
+}
+
+WorldAdvanceReport SimulationWorld::advance_ticks(
+    std::vector<ScheduledTick> ticks, Weather visibility_weather, double weather_severity) {
     WorldAdvanceReport report;
-    report.ticks = runtime_.advance(elapsed_hours);
+    report.ticks = std::move(ticks);
 
     for (const ScheduledTick& tick : report.ticks) {
         const auto hour = static_cast<std::uint8_t>(
