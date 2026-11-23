@@ -1002,3 +1002,13 @@ __all__ += ["LifeSimulationSnapshot"]
 # Campaign-scoped evidence ledger shared across life timelines.
 from .campaign_knowledge import CampaignKnowledgeLedger
 __all__ += ["CampaignKnowledgeLedger"]
+
+
+# Atomic integration of travel, physical presence, encounters, and social ticks.
+from .world_tick_pipeline import (
+    PresenceEncounterIntent, SimulationWorldTickPipeline, WorldTickPipelineResult,
+)
+__all__ += [
+    "PresenceEncounterIntent", "SimulationWorldTickPipeline",
+    "WorldTickPipelineResult",
+]
