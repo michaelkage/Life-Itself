@@ -1207,6 +1207,35 @@ std::vector<EntityId> SimulationWorld::visible_npcs(
 }
 
 
+std::vector<EntityId> SimulationWorld::audible_npcs(
+    SpatialPoint source_position, double source_power,
+    double maximum_range, double ambient_noise,
+    const std::map<EntityId, double>& occlusion_attenuation) const {
+    SpatialPartition::validate_point(source_position);
+    if (!std::isfinite(source_power) || source_power < 0.0
+        || !std::isfinite(maximum_range) || maximum_range < 0.0
+        || !std::isfinite(ambient_noise) || ambient_noise < 0.0) {
+        throw std::invalid_argument(
+            "sound power, range, and ambient noise must be finite and non-negative");
+    }
+    const std::vector<EntityId> candidates = spatial_index_.query_radius(
+        source_position, maximum_range);
+    std::vector<EntityId> audible;
+    audible.reserve(candidates.size());
+    for (const EntityId& npc_id : candidates) {
+        const auto attenuation = occlusion_attenuation.find(npc_id);
+        const double factor = attenuation == occlusion_attenuation.end()
+            ? 1.0 : attenuation->second;
+        const AcousticAssessment assessment = assess_sound(
+            source_position, spatial_index_.position(npc_id), source_power,
+            maximum_range, ambient_noise, factor);
+        if (assessment.audible) audible.push_back(npc_id);
+    }
+    return audible;
+}
+
+
+
 std::size_t SimulationWorld::record_spatially_witnessed_action(
     const EntityId& actor_id, ActionTag action_tag, Description description,
     double maximum_range, double field_of_view_radians,
