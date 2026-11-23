@@ -178,7 +178,6 @@ class PopulationTickTransactionCoordinator:
         # restart recovery. Ticks older than this window are rejected as stale.
         if len(self._records) > self.history_limit:
             retained_ticks = sorted(self._records)[-self.history_limit:]
-            retained = set(retained_ticks)
             self._records = {
                 tick: self._records[tick]
                 for tick in retained_ticks
