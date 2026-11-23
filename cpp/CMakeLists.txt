@@ -46,4 +46,8 @@ if(SIMREALITY_BUILD_TESTS)
     add_executable(simreality_spatial_tests tests/SpatialTests.cpp)
     target_link_libraries(simreality_spatial_tests PRIVATE simreality_core)
     add_test(NAME simreality_spatial_tests COMMAND simreality_spatial_tests)
+
+    add_executable(simreality_world_spatial_tests tests/WorldSpatialTests.cpp)
+    target_link_libraries(simreality_world_spatial_tests PRIVATE simreality_core)
+    add_test(NAME simreality_world_spatial_tests COMMAND simreality_world_spatial_tests)
 endif()
