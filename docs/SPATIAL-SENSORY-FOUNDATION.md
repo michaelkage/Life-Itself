@@ -53,13 +53,16 @@ The C++ tests cover stable radius/AABB queries, entity movement and removal,
 invalid coordinates, field-of-view and occlusion behavior, acoustic attenuation,
 bounded separation force, lane look-ahead and steering limits, world-level
 NPC registration, nearby queries, facing direction, occlusion filtering,
-spatially discovered witness evidence, and lane-driven movement updates.
+spatially discovered witness evidence, acoustic reach/occlusion queries, and
+lane-driven movement updates.
 
 `SimulationWorld::set_npc_spatial_state` registers an existing NPC's position
 and facing vector in a derived spatial index. `nearby_npcs` provides deterministic
 radius queries, while `visible_npcs` first broadphases by range and then applies
 each registered NPC's facing direction, field of view, and caller-supplied
-occlusion set. `record_spatially_witnessed_action` uses the actor's registered
+occlusion set. `audible_npcs` uses the same broadphase and applies inverse-square
+sound attenuation, ambient-noise thresholding, and per-NPC occlusion factors.
+`record_spatially_witnessed_action` uses the actor's registered
 position to discover witnesses, excludes the actor, and passes only visible,
 non-occluded NPCs into the existing witnessed-action evidence pipeline. This
 connects physical perception to durable NPC memories and event witness lists
