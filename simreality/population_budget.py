@@ -54,6 +54,9 @@ class PopulationBudgetAllocation:
             tier for tier in PopulationLOD if tier != PopulationLOD.DORMANT
         ):
             raise ValueError("tier costs must list active tiers in canonical order")
+        for tier, cost in self.tier_costs_ms:
+            if isinstance(cost, bool) or not isinstance(cost, (int, float)) or not math.isfinite(cost) or cost <= 0:
+                raise ValueError(f"{tier.name} tier cost must be finite and positive")
 
 
 class PopulationBudgetController:
@@ -87,6 +90,8 @@ class PopulationBudgetController:
             raise ValueError("tier_weights must define FULL, STANDARD and BACKGROUND")
         normalized = {}
         for tier, weight in weights.items():
+            if not isinstance(tier, PopulationLOD) or tier == PopulationLOD.DORMANT:
+                raise ValueError("tier weights may only define active PopulationLOD tiers")
             self._finite_positive(f"{tier.name} tier weight", weight)
             normalized[tier] = float(weight)
         self.target_tick_ms = float(target_tick_ms)
@@ -226,6 +231,8 @@ class PopulationBudgetController:
             if not isinstance(raw, dict) or raw.get("schema_version") != cls.SCHEMA_VERSION:
                 raise ValueError("unsupported population budget snapshot schema")
             config = raw["config"]
+            if not isinstance(config, dict) or not isinstance(config.get("tier_weights"), dict):
+                raise ValueError("invalid population budget controller configuration")
             weights = {
                 PopulationLOD[name]: value
                 for name, value in config["tier_weights"].items()
@@ -255,5 +262,5 @@ class PopulationBudgetController:
             return controller
         except ValueError:
             raise
-        except (TypeError, KeyError, json.JSONDecodeError) as exc:
+        except (TypeError, KeyError, IndexError, AttributeError, json.JSONDecodeError) as exc:
             raise ValueError("invalid population budget controller snapshot") from exc
