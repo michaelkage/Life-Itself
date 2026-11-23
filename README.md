@@ -568,9 +568,10 @@ assessment, bounded crowd-separation steering, and stateless lane-centerline
 following with arc-length look-ahead and force-limited velocity correction. The
 world coordinator also exposes derived NPC position/facing registration,
 deterministic nearby queries, and range/FOV/occlusion-filtered visibility
-queries. Spatially discovered witnesses now feed directly into the durable
-witness-memory/event pipeline. Spatial positions remain host-restored derived
-state, not durable NPC fields. See
+queries. Lane-driven NPC movement updates velocity, facing, and indexed
+position; spatially discovered witnesses feed directly into the durable
+witness-memory/event pipeline. Spatial positions, facing, and velocity remain
+host-restored derived state, not durable NPC fields. See
 [the spatial and sensory foundation guide](docs/SPATIAL-SENSORY-FOUNDATION.md).
 
 
