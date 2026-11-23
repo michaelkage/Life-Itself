@@ -77,6 +77,14 @@ int main() {
     }
     assert(rejected_unknown_npc);
 
+    bool rejected_invalid_fov_without_candidates = false;
+    try {
+        (void)world.visible_npcs({1000.0, 1000.0, 1000.0}, 1.0, 7.0);
+    } catch (const std::invalid_argument&) {
+        rejected_invalid_fov_without_candidates = true;
+    }
+    assert(rejected_invalid_fov_without_candidates);
+
     bool rejected_zero_forward = false;
     try {
         world.set_npc_spatial_state("forward-observer", {0.0, 0.0, 0.0}, {});
