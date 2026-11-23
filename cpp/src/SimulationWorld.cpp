@@ -1152,4 +1152,22 @@ std::vector<EntityId> SimulationWorld::visible_npcs(
     return visible;
 }
 
+
+std::size_t SimulationWorld::record_spatially_witnessed_action(
+    const EntityId& actor_id, ActionTag action_tag, Description description,
+    double maximum_range, double field_of_view_radians,
+    const std::set<EntityId>& occluded_npcs, const EntityId& victim_id) {
+    (void)find_npc(actor_id);
+    if (!spatial_index_.contains(actor_id)) {
+        throw std::logic_error("actor has no registered spatial position: " + actor_id);
+    }
+    std::vector<EntityId> witnesses = visible_npcs(
+        spatial_index_.position(actor_id), maximum_range,
+        field_of_view_radians, occluded_npcs);
+    witnesses.erase(std::remove(witnesses.begin(), witnesses.end(), actor_id),
+                    witnesses.end());
+    return record_witnessed_action(
+        actor_id, action_tag, std::move(description), witnesses, victim_id);
+}
+
 } // namespace simreality
