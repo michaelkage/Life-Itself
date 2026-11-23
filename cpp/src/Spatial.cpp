@@ -381,7 +381,7 @@ LaneFollowingResult compute_lane_following(
     if (!std::isfinite(force_magnitude)) {
         throw std::overflow_error("lane steering force magnitude is not representable");
     }
-    if (force_magnitude > maximum_force && force_magnitude > 0.0)
+    if (force_magnitude > maximum_force && force_magnitude > 0.0) {
         const double scale = maximum_force / force_magnitude;
         force.x *= scale;
         force.y *= scale;
