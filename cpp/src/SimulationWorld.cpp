@@ -1109,25 +1109,70 @@ Negotiation SimulationWorld::approach_fixer(
 
 
 void SimulationWorld::set_npc_spatial_state(
-    const EntityId& npc_id, SpatialPoint position, SpatialPoint forward) {
+    const EntityId& npc_id, SpatialPoint position, SpatialPoint forward,
+    SpatialPoint velocity) {
     (void)find_npc(npc_id);
     SpatialPartition::validate_point(position);
     SpatialPartition::validate_point(forward);
+    SpatialPartition::validate_point(velocity);
     if (std::hypot(forward.x, forward.y, forward.z) <= 1e-12) {
         throw std::invalid_argument("NPC forward vector must be non-zero");
     }
     spatial_index_.upsert(npc_id, position);
     npc_forward_[npc_id] = forward;
+    npc_velocity_[npc_id] = velocity;
 }
 
 bool SimulationWorld::remove_npc_spatial_state(const EntityId& npc_id) {
     npc_forward_.erase(npc_id);
+    npc_velocity_.erase(npc_id);
     return spatial_index_.erase(npc_id);
 }
 
 std::vector<EntityId> SimulationWorld::nearby_npcs(
     SpatialPoint center, double radius) const {
     return spatial_index_.query_radius(center, radius);
+}
+
+LaneFollowingResult SimulationWorld::advance_npc_on_lane(
+    const EntityId& npc_id, const std::vector<SpatialPoint>& lane_centerline,
+    double elapsed_seconds, double lookahead_distance,
+    double desired_speed, double maximum_acceleration) {
+    (void)find_npc(npc_id);
+    if (!spatial_index_.contains(npc_id)) {
+        throw std::logic_error("NPC has no registered spatial position: " + npc_id);
+    }
+    if (!std::isfinite(elapsed_seconds) || elapsed_seconds < 0.0) {
+        throw std::invalid_argument("movement delta must be finite and non-negative");
+    }
+    const SpatialPoint position = spatial_index_.position(npc_id);
+    const SpatialPoint velocity = npc_velocity_.at(npc_id);
+    const LaneFollowingResult steering = compute_lane_following(
+        position, velocity, lane_centerline, lookahead_distance,
+        desired_speed, maximum_acceleration);
+    SpatialPoint next_velocity{
+        velocity.x + steering.steering_force.x * elapsed_seconds,
+        velocity.y + steering.steering_force.y * elapsed_seconds,
+        velocity.z + steering.steering_force.z * elapsed_seconds};
+    const double speed = std::hypot(
+        next_velocity.x, next_velocity.y, next_velocity.z);
+    if (!std::isfinite(speed)) {
+        throw std::overflow_error("NPC movement speed is not representable");
+    }
+    if (speed > desired_speed && speed > 0.0) {
+        const double scale = desired_speed / speed;
+        next_velocity.x *= scale;
+        next_velocity.y *= scale;
+        next_velocity.z *= scale;
+    }
+    const SpatialPoint next_position{
+        position.x + next_velocity.x * elapsed_seconds,
+        position.y + next_velocity.y * elapsed_seconds,
+        position.z + next_velocity.z * elapsed_seconds};
+    SpatialPartition::validate_point(next_position);
+    spatial_index_.upsert(npc_id, next_position);
+    npc_velocity_[npc_id] = next_velocity;
+    return steering;
 }
 
 std::vector<EntityId> SimulationWorld::visible_npcs(
