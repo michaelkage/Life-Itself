@@ -5,6 +5,7 @@
 #include <set>
 #include <stdexcept>
 #include <utility>
+#include <vector>
 
 using namespace simreality;
 
@@ -18,7 +19,9 @@ int main() {
     blocked.entity_id = "blocked-observer";
     NPC actor;
     actor.entity_id = "actor";
-    state.npcs = {forward, rear, blocked, actor};
+    NPC unregistered;
+    unregistered.entity_id = "unregistered";
+    state.npcs = {forward, rear, blocked, actor, unregistered};
     SimulationWorld world(std::move(state));
 
     world.set_npc_spatial_state("forward-observer", {0.0, 0.0, 0.0},
@@ -72,7 +75,7 @@ int main() {
     bool rejected_unregistered_actor = false;
     try {
         (void)world.record_spatially_witnessed_action(
-            "rear-observer", ActionTag::CrimeTheft, witnessed_description,
+            "unregistered", ActionTag::CrimeTheft, witnessed_description,
             10.0, 3.14159265358979323846);
     } catch (const std::logic_error&) {
         rejected_unregistered_actor = true;
