@@ -50,8 +50,8 @@ boundaries without duplicating already materialized memories. When a `Population
 the loop executes inside its durable prepare/commit boundary. All mutated
 subsystems must be registered; the participant factory covers NPC state, world
 events, social memory/conversations/trust/beliefs, routines, travel, presence,
-encounters, action ledger and goals, action facts/resources, economics, household obligations and inventory stock/action
-replay indexes when configured. On failure, registered participants are
+encounters, action ledger and goals, action facts/resources, economics, household obligations, inventory stock/action
+replay indexes, and the measured LOD budget controller when configured. On failure, registered participants are
 restored and derived per-tick caches are discarded. Without that coordinator,
 the loop remains component-replay-safe but is not globally atomic.
 
@@ -111,7 +111,9 @@ FULL/STANDARD/BACKGROUND owner budgets under a target tick-time envelope using
 deterministic weighted fairness. `schedule_adaptive` applies those budgets
 through the same spatial scheduler and replay validation as explicit budgets.
 The controller exposes a versioned JSON snapshot so its measured cost model can
-be persisted between runtime sessions. A schedule supplied to the population
+be persisted between runtime sessions; pass it as `population_budget_controller`
+to `build_population_transaction_participants` when its measurements are
+updated inside the transactional runtime. A schedule supplied to the population
 loop must partition the exact live NPC roster; missing or extra owners are
 rejected before any phase executes. `PopulationSchedule.subsystem_slices(policy)` expands those tier
 assignments into stable owner batches for action advancement, decisions, economy,
