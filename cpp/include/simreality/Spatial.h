@@ -82,4 +82,22 @@ private:
     SpatialPoint origin, const std::vector<SpatialPoint>& neighbors,
     double preferred_distance, double maximum_force);
 
+
+struct LaneFollowingResult {
+    SpatialPoint target{};
+    SpatialPoint desired_velocity{};
+    SpatialPoint steering_force{};
+    double nearest_distance{0.0};
+    double lane_progress{0.0};
+    std::size_t segment_index{0};
+};
+
+// Follows an ordered lane centerline. The closest point is projected onto every
+// non-degenerate segment; ties resolve to the earliest segment. Look-ahead is
+// measured along the polyline, not as a straight-line radius.
+[[nodiscard]] LaneFollowingResult compute_lane_following(
+    SpatialPoint position, SpatialPoint current_velocity,
+    const std::vector<SpatialPoint>& lane_centerline,
+    double lookahead_distance, double desired_speed, double maximum_force);
+
 } // namespace simreality
