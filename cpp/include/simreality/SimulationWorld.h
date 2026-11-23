@@ -10,10 +10,13 @@
 #include "simreality/RandomStream.h"
 #include "simreality/Reputation.h"
 #include "simreality/SimulationRuntime.h"
+#include "simreality/Spatial.h"
 #include "simreality/Trauma.h"
 
 #include <cstddef>
 #include <cstdint>
+#include <map>
+#include <set>
 #include <vector>
 
 namespace simreality {
@@ -106,6 +109,18 @@ public:
         const DistrictId& district_id, const EntityId& player_id,
         const EntityId& fixer_id, double bribe, const CriminalFile* criminal_file = nullptr);
 
+    // Optional spatial registration keeps physical coordinates separate from
+    // the durable NPC schema while enabling deterministic nearby/perception queries.
+    void set_npc_spatial_state(
+        const EntityId& npc_id, SpatialPoint position, SpatialPoint forward);
+    [[nodiscard]] bool remove_npc_spatial_state(const EntityId& npc_id);
+    [[nodiscard]] std::vector<EntityId> nearby_npcs(
+        SpatialPoint center, double radius) const;
+    [[nodiscard]] std::vector<EntityId> visible_npcs(
+        SpatialPoint target_position, double maximum_range,
+        double field_of_view_radians,
+        const std::set<EntityId>& occluded_npcs = {}) const;
+
 private:
     [[nodiscard]] NPC& find_npc(const EntityId& entity_id);
     [[nodiscard]] const NPC& find_npc(const EntityId& entity_id) const;
@@ -118,6 +133,8 @@ private:
     SimulationRuntime runtime_;
     RandomStream random_;
     LifeCoordinator life_{};
+    SpatialPartition spatial_index_{10.0};
+    std::map<EntityId, SpatialPoint> npc_forward_{};
 };
 
 } // namespace simreality
