@@ -146,6 +146,7 @@ class PopulationTickTransactionTests(unittest.TestCase):
                 second_state["events"].append("second"),
                 second_state.update(balance=second_state["balance"] + 5),
             ))
+            first.recover()
             records = first.journal_snapshot()
             self.assertEqual(tuple(item["tick"] for item in records), (1, 2))
             self.assertEqual(first_state, {"events": ["first", "second"], "balance": 15})
