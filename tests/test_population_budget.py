@@ -58,6 +58,16 @@ class PopulationBudgetControllerTests(unittest.TestCase):
         self.assertEqual(restored.to_json(), self.controller.to_json())
         self.assertAlmostEqual(restored.subsystem_cost_ms("full"), 2.5)
 
+    def test_restore_json_preserves_controller_identity_and_replaces_measurements(self):
+        reference = self.controller
+        other = PopulationBudgetController(5.0, utilization_target=0.5)
+        other.record_phase_sample("social", 6.0, 2)
+        self.controller.restore_json(other.to_json())
+        self.assertIs(reference, self.controller)
+        self.assertEqual(self.controller.target_tick_ms, 5.0)
+        self.assertEqual(self.controller.subsystem_cost_ms("social"), 3.0)
+        self.assertEqual(self.controller.to_json(), other.to_json())
+
     def test_empty_phase_sample_does_not_change_cost_estimate(self):
         before = self.controller.subsystem_cost_ms("full")
         self.controller.record_phase_sample("full", 100.0, 0)
