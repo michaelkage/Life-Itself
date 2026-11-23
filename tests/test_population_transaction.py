@@ -11,16 +11,16 @@ from simreality.population_transaction import (
 )
 
 
-
-
-
 def _hold_population_journal_lock(journal_path, ready_event, release_event):
     state = {"value": 0}
-    participant = TransactionParticipant(
-        "state",
-        lambda: json.dumps(state, sort_keys=True),
-        lambda payload: (state.clear(), state.update(json.loads(payload))),
-    )
+    def capture():
+        return json.dumps(state, sort_keys=True)
+
+    def restore(payload):
+        state.clear()
+        state.update(json.loads(payload))
+
+    participant = TransactionParticipant("state", capture, restore)
     coordinator = PopulationTickTransactionCoordinator(
         journal_path, (participant,), lock_timeout_seconds=5.0,
     )
