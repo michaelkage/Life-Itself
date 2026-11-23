@@ -85,6 +85,7 @@ class PopulationTickTransactionCoordinator:
         participants: Iterable[TransactionParticipant],
         *,
         lock_timeout_seconds: float = 30.0,
+        history_limit: int = 64,
     ):
         self.path = Path(journal_path)
         self.lock_path = self.path.with_name(self.path.name + ".lock")
@@ -99,6 +100,9 @@ class PopulationTickTransactionCoordinator:
         if not float(lock_timeout_seconds) < float("inf"):
             raise ValueError("lock_timeout_seconds must be finite")
         self.lock_timeout_seconds = float(lock_timeout_seconds)
+        if isinstance(history_limit, bool) or not isinstance(history_limit, int) or history_limit < 1:
+            raise ValueError("history_limit must be a positive integer")
+        self.history_limit = history_limit
         self._lock = RLock()
         self._records: dict[int, dict] = {}
         self._needs_recovery = False
@@ -169,6 +173,16 @@ class PopulationTickTransactionCoordinator:
             participant.restore(checkpoints[participant.name])
 
     def _persist(self) -> None:
+        # Keep a bounded replay window. The newest record always retains a full
+        # post-checkpoint, so older committed snapshots are not needed for
+        # restart recovery. Ticks older than this window are rejected as stale.
+        if len(self._records) > self.history_limit:
+            retained_ticks = sorted(self._records)[-self.history_limit:]
+            retained = set(retained_ticks)
+            self._records = {
+                tick: self._records[tick]
+                for tick in retained_ticks
+            }
         payload = json.dumps({
             "schema_version": self.SCHEMA_VERSION,
             "records": [self._records[tick] for tick in sorted(self._records)],
