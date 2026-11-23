@@ -558,3 +558,11 @@ clocks through `SimulationWorld::advance_frame`, including pause and time-scale
 support. A bounded lock-free SPSC command/snapshot transport is available in
 `cpp/include/simreality/SpscRingBuffer.h`. See
 [the runtime clocks and bus guide](docs/RUNTIME-CLOCKS-AND-BUS.md).
+
+
+## Spatial and sensory primitives
+
+The C++ core now includes a deterministic 3D uniform-grid broadphase, exact
+radius/AABB queries, range-and-FOV vision assessment, attenuated acoustic
+assessment, and bounded crowd-separation steering. See
+[the spatial and sensory foundation guide](docs/SPATIAL-SENSORY-FOUNDATION.md).
