@@ -51,8 +51,9 @@ avoidance, traffic priority, and vehicle integration remain world-driver duties.
 
 The C++ tests cover stable radius/AABB queries, entity movement and removal,
 invalid coordinates, field-of-view and occlusion behavior, acoustic attenuation,
-bounded separation force, lane look-ahead and steering limits, and world-level
-NPC registration, nearby queries, facing direction, and occlusion filtering.
+bounded separation force, lane look-ahead and steering limits, world-level
+NPC registration, nearby queries, facing direction, occlusion filtering,
+spatially discovered witness evidence, and lane-driven movement updates.
 
 `SimulationWorld::set_npc_spatial_state` registers an existing NPC's position
 and facing vector in a derived spatial index. `nearby_npcs` provides deterministic
@@ -64,8 +65,16 @@ non-occluded NPCs into the existing witnessed-action evidence pipeline. This
 connects physical perception to durable NPC memories and event witness lists
 without requiring callers to manually assemble witness IDs.
 
+`advance_npc_on_lane` runs the lane-following steering primitive against an
+NPC's registered position and velocity, integrates the force-limited velocity
+over a host-supplied frame delta, clamps speed to the requested maximum, updates
+the spatial index, and turns the NPC's facing vector toward its movement
+direction. It is an explicit host-frame operation rather than an implicit
+simulation-hour side effect; callers choose which NPCs to advance at each LOD.
+
 Spatial state is deliberately not added to the durable NPC schema yet; hosts
-must restore or rebuild these derived positions when loading a world.
+must restore or rebuild these derived positions, facing vectors, and velocities
+when loading a world.
 
 ```bash
 cmake -S cpp -B build -DCMAKE_BUILD_TYPE=Debug
