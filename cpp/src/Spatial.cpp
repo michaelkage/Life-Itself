@@ -46,8 +46,10 @@ SpatialPartition::Cell SpatialPartition::cell_for(SpatialPoint point) const {
     const auto coordinate = [this](double value) {
         const long double index = std::floor(
             static_cast<long double>(value) / static_cast<long double>(cell_size_));
-        if (index < static_cast<long double>(std::numeric_limits<std::int64_t>::min())
-            || index > static_cast<long double>(std::numeric_limits<std::int64_t>::max())) {
+        const long double minimum_index =
+            static_cast<long double>(std::numeric_limits<std::int64_t>::min());
+        const long double maximum_exclusive = -minimum_index;
+        if (index < minimum_index || index >= maximum_exclusive) {
             throw std::out_of_range("spatial coordinate exceeds grid index range");
         }
         return static_cast<std::int64_t>(index);
