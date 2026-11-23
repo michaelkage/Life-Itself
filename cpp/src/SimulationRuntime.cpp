@@ -6,8 +6,15 @@
 
 namespace simreality {
 
-SimulationRuntime::SimulationRuntime(double initial_hour)
-    : clock_(initial_hour), scheduler_(initial_hour) {}
+SimulationRuntime::SimulationRuntime(
+    double initial_hour, double initial_real_time_seconds)
+    : clock_(initial_hour), scheduler_(initial_hour),
+      real_time_seconds_(initial_real_time_seconds) {
+    if (!std::isfinite(initial_real_time_seconds) || initial_real_time_seconds < 0.0) {
+        throw std::invalid_argument(
+            "initial real-time seconds must be finite and non-negative");
+    }
+}
 
 std::vector<ScheduledTick> SimulationRuntime::advance(double elapsed_hours) {
     const ClockAdvance clock_advance = clock_.advance(elapsed_hours);
