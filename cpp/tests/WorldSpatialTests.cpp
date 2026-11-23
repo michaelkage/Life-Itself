@@ -27,8 +27,6 @@ int main() {
                                 {1.0, 0.0, 0.0});
     world.set_npc_spatial_state("blocked-observer", {4.0, 1.0, 0.0},
                                 {1.0, 0.0, 0.0});
-    world.set_npc_spatial_state("actor", {5.0, 0.0, 0.0},
-                                {-1.0, 0.0, 0.0});
 
     const auto nearby = world.nearby_npcs({0.0, 0.0, 0.0}, 5.0);
     assert(nearby.size() == 2U);
@@ -46,6 +44,8 @@ int main() {
     assert(occluded.size() == 1U);
     assert(occluded[0] == "forward-observer");
 
+    world.set_npc_spatial_state("actor", {5.0, 0.0, 0.0},
+                                {-1.0, 0.0, 0.0});
     Description witnessed_description;
     witnessed_description.height_m = 1.8;
     assert(world.record_spatially_witnessed_action(
