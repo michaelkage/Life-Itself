@@ -42,7 +42,7 @@ class SimulationWorld {
 public:
     explicit SimulationWorld(
         WorldState initial_state = {}, double initial_hour = 0.0,
-        std::uint64_t random_seed = 1U);
+        std::uint64_t random_seed = 1U, double initial_real_time_seconds = 0.0);
 
     [[nodiscard]] WorldState& state() noexcept { return state_; }
     [[nodiscard]] const WorldState& state() const noexcept { return state_; }
