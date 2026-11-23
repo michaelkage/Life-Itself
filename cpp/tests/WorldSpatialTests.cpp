@@ -22,7 +22,7 @@ int main() {
     world.set_npc_spatial_state("forward-observer", {0.0, 0.0, 0.0},
                                 {1.0, 0.0, 0.0});
     world.set_npc_spatial_state("rear-observer", {8.0, 0.0, 0.0},
-                                {-1.0, 0.0, 0.0});
+                                {1.0, 0.0, 0.0});
     world.set_npc_spatial_state("blocked-observer", {4.0, 1.0, 0.0},
                                 {1.0, 0.0, 0.0});
 
