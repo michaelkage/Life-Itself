@@ -225,6 +225,19 @@ class PopulationBudgetController:
         }
         return json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False)
 
+    def restore_json(self, payload: str) -> None:
+        """Restore a checkpoint in place so schedulers retain this controller."""
+        restored = type(self).from_json(payload)
+        self.target_tick_ms = restored.target_tick_ms
+        self.utilization_target = restored.utilization_target
+        self.ewma_alpha = restored.ewma_alpha
+        self.tier_weights = dict(restored.tier_weights)
+        self.default_subsystem_cost_ms = restored.default_subsystem_cost_ms
+        self._subsystem_costs.clear()
+        self._subsystem_costs.update(restored._subsystem_costs)
+        self._sample_counts.clear()
+        self._sample_counts.update(restored._sample_counts)
+
     @classmethod
     def from_json(cls, payload: str) -> "PopulationBudgetController":
         try:
