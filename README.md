@@ -549,3 +549,12 @@ one ordered transaction. Failed phases roll back their event, movement, presence
 encounter, memory, trust, belief, and replay mutations; identical requests replay
 idempotently. See [the world tick pipeline guide](docs/WORLD-TICK-PIPELINE.md)
 and `tests/test_world_tick_pipeline.py`.
+
+
+## Host-frame runtime and thread boundary
+
+The portable C++ runtime now exposes independent real-time and simulation-time
+clocks through `SimulationWorld::advance_frame`, including pause and time-scale
+support. A bounded lock-free SPSC command/snapshot transport is available in
+`cpp/include/simreality/SpscRingBuffer.h`. See
+[the runtime clocks and bus guide](docs/RUNTIME-CLOCKS-AND-BUS.md).
