@@ -76,6 +76,32 @@ class PopulationBudgetControllerTests(unittest.TestCase):
                 max_total_owners=5,
             )
 
+    def test_tiers_with_no_due_subsystems_receive_no_owner_budget(self):
+        policy = PopulationLODPolicy({
+            PopulationLOD.FULL: (SubsystemLODPolicy("disabled", 1, False),),
+            PopulationLOD.STANDARD: (SubsystemLODPolicy("standard", 1),),
+            PopulationLOD.BACKGROUND: (),
+            PopulationLOD.DORMANT: (),
+        })
+        allocation = self.controller.allocate(
+            1,
+            {
+                PopulationLOD.FULL: 10,
+                PopulationLOD.STANDARD: 10,
+                PopulationLOD.BACKGROUND: 10,
+                PopulationLOD.DORMANT: 0,
+            },
+            policy,
+            max_total_owners=10,
+        )
+        self.assertEqual(allocation.full_budget, 0)
+        self.assertGreater(allocation.standard_budget, 0)
+        self.assertEqual(allocation.background_budget, 0)
+
+    def test_empty_tier_weights_are_rejected(self):
+        with self.assertRaises(ValueError):
+            PopulationBudgetController(10.0, tier_weights={})
+
     def test_adaptive_spatial_schedule_uses_measured_budget(self):
         presence = PresenceLedger(tuple(
             NPCPresence(owner, "at_location", "district-a", None, None, 0.0, 0)
