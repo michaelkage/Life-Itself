@@ -306,12 +306,12 @@ LaneFollowingResult compute_lane_following(
         }
         const SpatialPoint offset{
             position.x - start.x, position.y - start.y, position.z - start.z};
-        const double projection = offset.x * delta.x
+        const double projection_dot = offset.x * delta.x
             + offset.y * delta.y + offset.z * delta.z;
-        if (!std::isfinite(projection)) {
+        if (!std::isfinite(projection_dot)) {
             throw std::overflow_error("lane segment projection is not representable");
         }
-        const double t = std::clamp(projection / length_squared, 0.0, 1.0);
+        const double t = std::clamp(projection_dot / length_squared, 0.0, 1.0);
         const SpatialPoint projection{
             start.x + delta.x * t,
             start.y + delta.y * t,
