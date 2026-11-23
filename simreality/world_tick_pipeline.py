@@ -8,6 +8,7 @@ from __future__ import annotations
 from copy import deepcopy
 from dataclasses import dataclass
 import json
+import math
 from typing import Mapping
 
 from .model import NPC
@@ -63,6 +64,13 @@ class PresenceEncounterIntent:
             value is not None for value in (self.conversation_id, self.listener_id, self.speaker_id)
         ):
             raise ValueError("dialogue IDs require conversation=True")
+        if not isinstance(self.trust_context, str) or not self.trust_context.strip():
+            raise ValueError("trust_context must be a non-empty string")
+        if (isinstance(self.trust_strength, bool)
+                or not isinstance(self.trust_strength, (int, float))
+                or not math.isfinite(self.trust_strength)
+                or not 0.0 <= self.trust_strength <= 1.0):
+            raise ValueError("trust_strength must be finite and in [0, 1]")
         if self.trust_directions is not None and (
             not isinstance(self.trust_directions, tuple)
             or len(self.trust_directions) != 2
