@@ -58,6 +58,17 @@ int main() {
     assert(world.state().ongoing_events[0].witness_ids.size() == 1U);
     assert(world.state().ongoing_events[0].witness_ids[0] == "forward-observer");
 
+    const std::vector<SpatialPoint> straight_lane{
+        {0.0, 0.0, 0.0}, {100.0, 0.0, 0.0}};
+    const auto first_motion = world.advance_npc_on_lane(
+        "forward-observer", straight_lane, 1.0, 2.0, 3.0, 10.0);
+    assert(std::abs(first_motion.target.x - 2.0) < 1e-9);
+    assert(world.nearby_npcs({3.0, 0.0, 0.0}, 0.01).size() == 1U);
+    assert(world.nearby_npcs({3.0, 0.0, 0.0}, 0.01)[0] == "forward-observer");
+    (void)world.advance_npc_on_lane(
+        "forward-observer", straight_lane, 1.0, 2.0, 3.0, 10.0);
+    assert(world.nearby_npcs({6.0, 0.0, 0.0}, 0.01).size() == 1U);
+
     bool rejected_unregistered_actor = false;
     try {
         (void)world.record_spatially_witnessed_action(
