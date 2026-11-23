@@ -1,5 +1,6 @@
 """Durable whole-tick transaction journal tests."""
 import json
+import multiprocessing
 import tempfile
 import unittest
 from pathlib import Path
@@ -8,6 +9,25 @@ from simreality.population_transaction import (
     PopulationTickTransactionCoordinator,
     TransactionParticipant,
 )
+
+
+
+
+
+def _hold_population_journal_lock(journal_path, ready_event, release_event):
+    state = {"value": 0}
+    participant = TransactionParticipant(
+        "state",
+        lambda: json.dumps(state, sort_keys=True),
+        lambda payload: (state.clear(), state.update(json.loads(payload))),
+    )
+    coordinator = PopulationTickTransactionCoordinator(
+        journal_path, (participant,), lock_timeout_seconds=5.0,
+    )
+    with coordinator._journal_lock():
+        ready_event.set()
+        if not release_event.wait(5.0):
+            raise RuntimeError("test did not release population journal lock")
 
 
 class PopulationTickTransactionTests(unittest.TestCase):
@@ -151,6 +171,36 @@ class PopulationTickTransactionTests(unittest.TestCase):
             self.assertEqual(tuple(item["tick"] for item in records), (1, 2))
             self.assertEqual(first_state, {"events": ["first", "second"], "balance": 15})
             self.assertEqual(second_state, first_state)
+
+    def test_journal_lock_serializes_independent_processes(self):
+        context = multiprocessing.get_context("spawn")
+        with tempfile.TemporaryDirectory() as directory:
+            journal = Path(directory) / "ticks.json"
+            state = {"value": 0}
+            coordinator = PopulationTickTransactionCoordinator(
+                journal, (self.participant("state", state),),
+                lock_timeout_seconds=0.15,
+            )
+            ready = context.Event()
+            release = context.Event()
+            process = context.Process(
+                target=_hold_population_journal_lock,
+                args=(str(journal), ready, release),
+            )
+            process.start()
+            try:
+                self.assertTrue(ready.wait(5.0), "child process did not acquire journal lock")
+                with self.assertRaisesRegex(TimeoutError, "population journal lock"):
+                    coordinator.execute(1, {"value": 1}, lambda: state.update(value=1))
+            finally:
+                release.set()
+                process.join(5.0)
+                if process.is_alive():
+                    process.terminate()
+                    process.join(5.0)
+            self.assertEqual(process.exitcode, 0)
+            coordinator.execute(1, {"value": 1}, lambda: state.update(value=1))
+            self.assertEqual(state["value"], 1)
 
     def test_commit_fsync_failure_requires_recovery_without_rolling_back_durable_commit(self):
         with tempfile.TemporaryDirectory() as directory:
