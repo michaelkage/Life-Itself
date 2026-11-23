@@ -124,6 +124,16 @@ int main() {
     assert(world_pause.ticks.empty());
     assert(std::abs(frame_world.total_hours() - 1.0) < 1e-9);
     assert(std::abs(frame_world.real_time_seconds() - 3.0) < 1e-9);
+    std::stringstream dual_clock_save(std::ios::in | std::ios::out | std::ios::binary);
+    save_world(frame_world, dual_clock_save);
+    dual_clock_save.seekg(0);
+    SimulationWorld dual_clock_restored = load_world(dual_clock_save);
+    assert(std::abs(dual_clock_restored.total_hours() - 1.0) < 1e-9);
+    assert(std::abs(dual_clock_restored.real_time_seconds() - 3.0) < 1e-9);
+    const auto restored_frame = dual_clock_restored.advance_frame(0.5, 2.0);
+    assert(restored_frame.ticks.size() == 1U);
+    assert(std::abs(dual_clock_restored.total_hours() - 2.0) < 1e-9);
+    assert(std::abs(dual_clock_restored.real_time_seconds() - 3.5) < 1e-9);
 
     SpatialPartition spatial(10.0);
     spatial.upsert("npc-b", {9.0, 0.0, 0.0});
