@@ -58,8 +58,14 @@ NPC registration, nearby queries, facing direction, and occlusion filtering.
 and facing vector in a derived spatial index. `nearby_npcs` provides deterministic
 radius queries, while `visible_npcs` first broadphases by range and then applies
 each registered NPC's facing direction, field of view, and caller-supplied
-occlusion set. Spatial state is deliberately not added to the durable NPC schema
-yet; hosts must restore or rebuild these derived positions when loading a world.
+occlusion set. `record_spatially_witnessed_action` uses the actor's registered
+position to discover witnesses, excludes the actor, and passes only visible,
+non-occluded NPCs into the existing witnessed-action evidence pipeline. This
+connects physical perception to durable NPC memories and event witness lists
+without requiring callers to manually assemble witness IDs.
+
+Spatial state is deliberately not added to the durable NPC schema yet; hosts
+must restore or rebuild these derived positions when loading a world.
 
 ```bash
 cmake -S cpp -B build -DCMAKE_BUILD_TYPE=Debug
