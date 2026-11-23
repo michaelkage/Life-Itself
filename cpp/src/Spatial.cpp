@@ -267,4 +267,112 @@ SeparationResult compute_separation(
     return {force, std::min(magnitude, maximum_force), contributors};
 }
 
+
+LaneFollowingResult compute_lane_following(
+    SpatialPoint position, SpatialPoint current_velocity,
+    const std::vector<SpatialPoint>& lane_centerline,
+    double lookahead_distance, double desired_speed, double maximum_force) {
+    SpatialPartition::validate_point(position);
+    SpatialPartition::validate_point(current_velocity);
+    validate_non_negative("lane look-ahead distance", lookahead_distance);
+    validate_non_negative("lane desired speed", desired_speed);
+    validate_non_negative("lane maximum force", maximum_force);
+    if (lane_centerline.size() < 2U) {
+        throw std::invalid_argument("lane centerline must contain at least two points");
+    }
+    for (const SpatialPoint point : lane_centerline) {
+        SpatialPartition::validate_point(point);
+    }
+
+    double best_distance_squared = std::numeric_limits<double>::infinity();
+    double best_progress = 0.0;
+    std::size_t best_segment = 0U;
+    SpatialPoint best_projection{};
+    double traversed = 0.0;
+    bool found_segment = false;
+
+    for (std::size_t i = 0U; i + 1U < lane_centerline.size(); ++i) {
+        const SpatialPoint start = lane_centerline[i];
+        const SpatialPoint end = lane_centerline[i + 1U];
+        const SpatialPoint delta{end.x - start.x, end.y - start.y, end.z - start.z};
+        const double length_squared = delta.x * delta.x
+            + delta.y * delta.y + delta.z * delta.z;
+        if (length_squared <= 1e-24) continue;
+        const double length = std::sqrt(length_squared);
+        const SpatialPoint offset{
+            position.x - start.x, position.y - start.y, position.z - start.z};
+        const double t = std::clamp(
+            (offset.x * delta.x + offset.y * delta.y + offset.z * delta.z)
+                / length_squared,
+            0.0, 1.0);
+        const SpatialPoint projection{
+            start.x + delta.x * t,
+            start.y + delta.y * t,
+            start.z + delta.z * t};
+        const double dx = position.x - projection.x;
+        const double dy = position.y - projection.y;
+        const double dz = position.z - projection.z;
+        const double distance_squared = dx * dx + dy * dy + dz * dz;
+        if (!found_segment || distance_squared < best_distance_squared) {
+            found_segment = true;
+            best_distance_squared = distance_squared;
+            best_segment = i;
+            best_projection = projection;
+            best_progress = traversed + length * t;
+        }
+        traversed += length;
+    }
+    if (!found_segment) {
+        throw std::invalid_argument("lane centerline must contain a non-degenerate segment");
+    }
+
+    SpatialPoint target = best_projection;
+    double remaining = lookahead_distance;
+    for (std::size_t i = best_segment; i + 1U < lane_centerline.size(); ++i) {
+        const SpatialPoint end = lane_centerline[i + 1U];
+        const SpatialPoint delta{
+            end.x - target.x, end.y - target.y, end.z - target.z};
+        const double length = std::hypot(delta.x, delta.y, delta.z);
+        if (length <= 1e-12) {
+            target = end;
+            continue;
+        }
+        if (remaining <= length) {
+            const double fraction = remaining / length;
+            target = {target.x + delta.x * fraction,
+                      target.y + delta.y * fraction,
+                      target.z + delta.z * fraction};
+            remaining = 0.0;
+            break;
+        }
+        remaining -= length;
+        target = end;
+    }
+
+    const SpatialPoint direction_delta{
+        target.x - position.x, target.y - position.y, target.z - position.z};
+    const double direction_length = std::hypot(
+        direction_delta.x, direction_delta.y, direction_delta.z);
+    SpatialPoint desired_velocity{};
+    if (direction_length > 1e-12 && desired_speed > 0.0) {
+        const double scale = desired_speed / direction_length;
+        desired_velocity = {direction_delta.x * scale,
+                            direction_delta.y * scale,
+                            direction_delta.z * scale};
+    }
+    SpatialPoint force{
+        desired_velocity.x - current_velocity.x,
+        desired_velocity.y - current_velocity.y,
+        desired_velocity.z - current_velocity.z};
+    const double force_magnitude = std::hypot(force.x, force.y, force.z);
+    if (force_magnitude > maximum_force && force_magnitude > 0.0) {
+        const double scale = maximum_force / force_magnitude;
+        force.x *= scale;
+        force.y *= scale;
+        force.z *= scale;
+    }
+    return {target, desired_velocity, force,
+            std::sqrt(best_distance_squared), best_progress, best_segment};
+}
+
 } // namespace simreality
