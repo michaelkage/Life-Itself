@@ -263,7 +263,7 @@ class PopulationTickTransactionCoordinator:
                     raise ValueError("aborted transaction cannot contain post-checkpoints")
             records[tick] = item
         self._records = records
-        if legacy:
+        if legacy or len(self._records) > self.history_limit:
             self._persist()
 
     def _recover_locked(self) -> tuple[int, ...]:
