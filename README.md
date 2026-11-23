@@ -566,3 +566,7 @@ The C++ core now includes a deterministic 3D uniform-grid broadphase, exact
 radius/AABB queries, range-and-FOV vision assessment, attenuated acoustic
 assessment, and bounded crowd-separation steering. See
 [the spatial and sensory foundation guide](docs/SPATIAL-SENSORY-FOUNDATION.md).
+
+
+World save schema v11 preserves both runtime clocks; versions 5–10 remain readable
+and initialize the new wall-clock field to zero.
