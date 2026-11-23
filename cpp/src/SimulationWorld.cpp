@@ -15,9 +15,10 @@
 namespace simreality {
 
 SimulationWorld::SimulationWorld(
-    WorldState initial_state, double initial_hour, std::uint64_t random_seed)
+    WorldState initial_state, double initial_hour, std::uint64_t random_seed,
+    double initial_real_time_seconds)
     : state_(std::move(initial_state)),
-      runtime_(initial_hour),
+      runtime_(initial_hour, initial_real_time_seconds),
       random_(random_seed) {}
 
 GhostInfluenceResult SimulationWorld::attempt_ghost_influence(
