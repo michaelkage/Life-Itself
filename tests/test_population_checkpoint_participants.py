@@ -167,9 +167,6 @@ class PopulationCheckpointParticipantTests(unittest.TestCase):
             self.assertEqual(self.action_facts, {"available"})
             self.assertEqual(self.action_resources, {"energy": 8.0})
             self.assertEqual(self.budget_controller.subsystem_cost_ms("social"), 2.0)
-            self.assertEqual(self.budget_controller.to_json(), PopulationBudgetController(
-                16.0,
-            ).to_json() if False else self.budget_controller.to_json())
             self.assertEqual(self.inventory.quantity("store", "meal"), 20.0)
             self.assertEqual(self.inventory.quantity("npc-a", "meal"), 0.0)
             self.assertEqual(self.inventory.snapshot(), ())
