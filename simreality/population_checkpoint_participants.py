@@ -26,6 +26,7 @@ from .inventory import ActionInventoryAdapter, InventoryLedger
 from .household_economy import EconomicLedger, EconomicActionAdapter, EconomicTransfer, HouseholdActionAdapter, HouseholdLedger, HouseholdObligation
 from .world_events import WorldEvent, WorldEventLedger
 from .population_transaction import TransactionParticipant
+from .population_budget import PopulationBudgetController
 
 
 def _json(value) -> str:
@@ -78,6 +79,7 @@ def build_population_transaction_participants(
     household_action_adapter: HouseholdActionAdapter | None = None,
     inventory_ledger: InventoryLedger | None = None,
     inventory_action_adapter: ActionInventoryAdapter | None = None,
+    population_budget_controller: PopulationBudgetController | None = None,
 ) -> tuple[TransactionParticipant, ...]:
     """Build complete participants for the supplied live population loop.
 
@@ -124,6 +126,8 @@ def build_population_transaction_participants(
         raise TypeError("inventory_action_adapter must be an ActionInventoryAdapter or None")
     if inventory_action_adapter is not None and inventory_ledger is not inventory_action_adapter.inventory:
         raise ValueError("inventory action adapter must use the configured InventoryLedger")
+    if population_budget_controller is not None and not isinstance(population_budget_controller, PopulationBudgetController):
+        raise TypeError("population_budget_controller must be a PopulationBudgetController or None")
     participants = []
 
     def add(name, capture, restore):
@@ -395,6 +399,13 @@ def build_population_transaction_participants(
         def restore_actions(payload):
             action_ledger.restore_snapshot(ActionExecutionSnapshot.from_json(payload))
         add("action_executions", capture_actions, restore_actions)
+
+    if population_budget_controller is not None:
+        add(
+            "population_budget",
+            population_budget_controller.to_json,
+            population_budget_controller.restore_json,
+        )
 
     return tuple(participants)
 
