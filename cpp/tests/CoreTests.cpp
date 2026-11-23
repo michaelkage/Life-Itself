@@ -14,6 +14,7 @@
 #include "simreality/Reputation.h"
 #include "simreality/SimulationClock.h"
 #include "simreality/SpscRingBuffer.h"
+#include "simreality/Spatial.h"
 #include "simreality/SimulationRuntime.h"
 #include "simreality/SimulationScheduler.h"
 #include "simreality/SimulationWorld.h"
@@ -123,6 +124,57 @@ int main() {
     assert(world_pause.ticks.empty());
     assert(std::abs(frame_world.total_hours() - 1.0) < 1e-9);
     assert(std::abs(frame_world.real_time_seconds() - 3.0) < 1e-9);
+
+    SpatialPartition spatial(10.0);
+    spatial.upsert("npc-b", {9.0, 0.0, 0.0});
+    spatial.upsert("npc-a", {0.0, 0.0, 0.0});
+    spatial.upsert("npc-c", {25.0, 0.0, 0.0});
+    assert(spatial.size() == 3U);
+    assert((spatial.query_radius({0.0, 0.0, 0.0}, 10.0)
+        == std::vector<EntityId>{"npc-a", "npc-b"}));
+    assert((spatial.query_aabb({-1.0, -1.0, -1.0}, {10.0, 1.0, 1.0})
+        == std::vector<EntityId>{"npc-a", "npc-b"}));
+    spatial.upsert("npc-b", {50.0, 0.0, 0.0});
+    assert((spatial.query_radius({0.0, 0.0, 0.0}, 10.0)
+        == std::vector<EntityId>{"npc-a"}));
+    assert(spatial.erase("npc-c"));
+    assert(!spatial.erase("npc-missing"));
+    bool rejected_bad_spatial_coordinate = false;
+    try {
+        spatial.upsert("invalid", {std::numeric_limits<double>::quiet_NaN(), 0.0, 0.0});
+    } catch (const std::invalid_argument&) {
+        rejected_bad_spatial_coordinate = true;
+    }
+    assert(rejected_bad_spatial_coordinate);
+
+    constexpr double half_pi = 1.57079632679489661923;
+    const auto visible = assess_vision(
+        {0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}, {5.0, 0.0, 0.0},
+        10.0, half_pi);
+    assert(visible.visible);
+    const auto outside_fov = assess_vision(
+        {0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}, {0.0, 5.0, 0.0},
+        10.0, half_pi);
+    assert(!outside_fov.visible);
+    const auto occluded_view = assess_vision(
+        {0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}, {5.0, 0.0, 0.0},
+        10.0, half_pi, true);
+    assert(!occluded_view.visible);
+
+    const auto audible = assess_sound(
+        {0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}, 10.0, 5.0, 1.0);
+    assert(audible.audible);
+    assert(std::abs(audible.received_intensity - 5.0) < 1e-9);
+    const auto sound_blocked = assess_sound(
+        {0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}, 10.0, 5.0, 0.0, 0.0);
+    assert(!sound_blocked.audible);
+
+    const auto separation = compute_separation(
+        {0.0, 0.0, 0.0}, {{1.0, 0.0, 0.0}, {0.0, 3.0, 0.0}},
+        2.0, 0.5);
+    assert(separation.contributing_neighbors == 1U);
+    assert(std::abs(separation.magnitude - 0.5) < 1e-9);
+    assert(separation.direction.x > 0.0);
 
     NPCMemory memory;
     memory.witness_id = "witness-1";
