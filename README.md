@@ -587,4 +587,6 @@ lane-capacity admission. It resolves simultaneous pedestrian/vehicle requests by
 authored priority, accumulated wait credit, and stable entity-ID tie-breaks;
 reservations expire on simulation ticks and can be released on lane exit. This is
 a reservation/admission layer, not a substitute for geometric collision or
-intersection resolution. See [docs/LANE-TRAFFIC.md](docs/LANE-TRAFFIC.md).
+intersection resolution. `SimulationWorld` enforces a live reservation before
+its reserved-lane movement entry point will advance an NPC. See
+[docs/LANE-TRAFFIC.md](docs/LANE-TRAFFIC.md).
