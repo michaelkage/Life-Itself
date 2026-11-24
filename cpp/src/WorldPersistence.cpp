@@ -159,9 +159,10 @@ void write_memory(std::ostream& out, const NPCMemory& value) {
     write_double(out, value.timestamp_hour);
     write_u8(out, static_cast<std::uint8_t>(value.action_tag));
     write_description(out, value.description);
+    write_string(out, value.root_evidence_id);
 }
 
-NPCMemory read_memory(std::istream& in) {
+NPCMemory read_memory(std::istream& in, std::uint32_t version) {
     NPCMemory value;
     value.witness_id = read_string(in);
     value.target_entity_id = read_string(in);
@@ -170,6 +171,7 @@ NPCMemory read_memory(std::istream& in) {
     value.timestamp_hour = read_double(in);
     value.action_tag = read_enum<ActionTag>(in, 8U, "action tag");
     value.description = read_description(in);
+    if (version >= 12U) value.root_evidence_id = read_string(in);
     return value;
 }
 
@@ -274,7 +276,7 @@ NPC read_npc(std::istream& in, std::uint32_t version) {
     value.personal_stress = read_double(in);
     const std::uint32_t memories = read_count(in);
     value.memories.reserve(memories);
-    for (std::uint32_t i = 0; i < memories; ++i) value.memories.push_back(read_memory(in));
+    for (std::uint32_t i = 0; i < memories; ++i) value.memories.push_back(read_memory(in, version));
     value.district_id = read_string(in);
     value.home_id = read_string(in); value.job_id = read_string(in);
     value.current_activity = read_enum<DailyActivity>(in, 7U, "daily activity");
