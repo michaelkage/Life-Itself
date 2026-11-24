@@ -41,6 +41,31 @@ struct WorldAdvanceReport {
     std::size_t memories_swept{0};
 };
 
+struct RouteSegmentRequest {
+    std::string source_lane_id{};
+    std::string destination_lane_id{};
+    std::string entry_intersection_id{};
+    std::string entry_movement_id{};
+    std::string cleared_intersection_id{};
+    std::string cleared_movement_id{};
+    std::vector<SpatialPoint> lane_centerline{};
+    double elapsed_seconds{0.0};
+    double lookahead_distance{0.0};
+    double desired_speed{0.0};
+    double lane_maximum_acceleration{0.0};
+    double collision_radius{0.5};
+    double neighbor_collision_radius{0.5};
+    double prediction_horizon_seconds{1.0};
+    double maximum_avoidance_acceleration{0.0};
+    double broadphase_radius{0.0};
+};
+
+struct RouteSegmentAdvanceResult {
+    LaneFollowingResult movement{};
+    bool source_lane_released{false};
+    bool cleared_intersection_released{false};
+};
+
 // Portable coordinator for deterministic, simulation-time-driven world updates.
 // Unreal-facing code should consume snapshots/reports rather than enter this core.
 class SimulationWorld {
@@ -135,6 +160,11 @@ public:
         const std::vector<IntersectionTrafficRequest>& requests);
     [[nodiscard]] bool release_intersection_reservation(
         const std::string& intersection_id, const EntityId& npc_id);
+    // Advances one route segment under destination-lane admission and optional
+    // intersection entry/clearance grants. Old occupancy is released only after
+    // collision-aware movement succeeds, preventing reservation gaps.
+    [[nodiscard]] RouteSegmentAdvanceResult advance_npc_on_reserved_route_segment(
+        const EntityId& npc_id, const RouteSegmentRequest& request);
     [[nodiscard]] LaneFollowingResult advance_npc_on_reserved_intersection_movement(
         const EntityId& npc_id, const std::string& intersection_id,
         const std::string& movement_id,
