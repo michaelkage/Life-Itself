@@ -46,6 +46,7 @@ public:
     [[nodiscard]] std::vector<LaneReservation> reservations(
         const std::string& lane_id) const;
     [[nodiscard]] std::size_t available_capacity(const std::string& lane_id) const;
+    [[nodiscard]] std::map<std::string, std::size_t> occupancy_snapshot() const;
     [[nodiscard]] std::uint64_t current_tick() const noexcept { return current_tick_; }
 
 private:
