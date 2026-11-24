@@ -642,3 +642,12 @@ The route planner can now read a deterministic snapshot of active lane reservati
 ## Durable traffic planning and recovery
 
 Route planning now accounts for live intersection conflict-zone pressure as well as lane admission congestion. Resource-aware deadlock proposals identify blocked resources and candidate replacement grants without revoking current occupancy. A versioned traffic recovery checkpoint persists coordinator reservations, journey occupancy, route progress, and wait-for edges for deterministic continuation. See [docs/DURABLE-TRAFFIC-RECOVERY.md](docs/DURABLE-TRAFFIC-RECOVERY.md).
+
+
+## 2026-11-24 — production, traffic, and provenance consolidation
+
+- Merged PR #29: atomic world tick integration, dual-clock runtime and SPSC transport, spatial/sensory primitives, lane and intersection reservation, collision-aware route handoff, deterministic route planning, live lane/intersection pressure, journey lease renewal, resource-aware deadlock proposals, and durable traffic recovery checkpoints.
+- Merged PR #30: deterministic population execution and subsystem LOD/budget policies, population transaction/checkpoint participants, travel/presence/encounter integration, action-linked inventory and household/economic ledgers, and the React/Vite application/API foundation.
+- Merged PR #32: append-only C++/Python information provenance, root evidence lineage across NPC relays, belief revision history, recipient-local investigation views, explainable moral choice scoring, persistent decision-time context, and world save schema v12 while retaining schema v11 dual-clock state and v5–v11 readers.
+- Replaced the running README changelog with an architecture overview, quick-start commands, implementation boundaries, and links to focused subsystem guides. Historical implementation notes are preserved here.
+- Added [the remote branch and PR consolidation audit](docs/BRANCH-CONSOLIDATION-AUDIT.md).
