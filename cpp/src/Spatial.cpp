@@ -322,9 +322,16 @@ CollisionAvoidanceResult compute_collision_avoidance(
             + relative_velocity.z * relative_velocity.z;
         double time = 0.0;
         if (speed_squared > 1e-18) {
-            const double projected = -(relative_position.x * relative_velocity.x
+            const double projection = relative_position.x * relative_velocity.x
                 + relative_position.y * relative_velocity.y
-                + relative_position.z * relative_velocity.z) / speed_squared;
+                + relative_position.z * relative_velocity.z;
+            if (!std::isfinite(speed_squared) || !std::isfinite(projection)) {
+                throw std::overflow_error("collision prediction is not representable");
+            }
+            const double projected = -projection / speed_squared;
+            if (!std::isfinite(projected)) {
+                throw std::overflow_error("collision prediction time is not representable");
+            }
             time = std::clamp(projected, 0.0, prediction_horizon_seconds);
         }
         const SpatialPoint closest{
@@ -333,6 +340,9 @@ CollisionAvoidanceResult compute_collision_avoidance(
             relative_position.z + relative_velocity.z * time};
         const double distance = std::hypot(closest.x, closest.y, closest.z);
         const double required = subject_radius + body.collision_radius;
+        if (!std::isfinite(distance) || !std::isfinite(required)) {
+            throw std::overflow_error("collision distance or radius is not representable");
+        }
         if (distance >= required) continue;
 
         ++conflicts;
@@ -346,7 +356,8 @@ CollisionAvoidanceResult compute_collision_avoidance(
         if (away_length <= 1e-12) {
             // Stable ID-derived axis for coincident, stationary bodies.
             std::uint64_t hash = 1469598103934665603ULL;
-            for (const unsigned char ch : body.entity_id) {
+            for (const char raw_ch : body.entity_id) {
+                const auto ch = static_cast<unsigned char>(raw_ch);
                 hash ^= static_cast<std::uint64_t>(ch);
                 hash *= 1099511628211ULL;
             }
@@ -367,6 +378,10 @@ CollisionAvoidanceResult compute_collision_avoidance(
         accumulated.x += away.x / away_length * strength;
         accumulated.y += away.y / away_length * strength;
         accumulated.z += away.z / away_length * strength;
+        if (!std::isfinite(accumulated.x) || !std::isfinite(accumulated.y)
+            || !std::isfinite(accumulated.z)) {
+            throw std::overflow_error("collision avoidance force is not representable");
+        }
     }
 
     double magnitude = std::hypot(accumulated.x, accumulated.y, accumulated.z);
