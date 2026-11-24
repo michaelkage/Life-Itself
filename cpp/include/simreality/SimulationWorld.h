@@ -6,6 +6,7 @@
 #include "simreality/Fixers.h"
 #include "simreality/Gossip.h"
 #include "simreality/LifeSystems.h"
+#include "simreality/LaneTraffic.h"
 #include "simreality/Justice.h"
 #include "simreality/RandomStream.h"
 #include "simreality/Reputation.h"
@@ -117,6 +118,19 @@ public:
     [[nodiscard]] bool remove_npc_spatial_state(const EntityId& npc_id);
     [[nodiscard]] std::vector<EntityId> nearby_npcs(
         SpatialPoint center, double radius) const;
+
+    // Lane admission is advanced on an explicit monotonic simulation tick.
+    void configure_traffic_lane(const std::string& lane_id, std::size_t capacity);
+    void advance_traffic_tick(std::uint64_t tick);
+    [[nodiscard]] LaneTrafficResolution resolve_lane_traffic(
+        const std::vector<LaneTrafficRequest>& requests);
+    [[nodiscard]] bool release_lane_reservation(
+        const std::string& lane_id, const EntityId& npc_id);
+    [[nodiscard]] LaneFollowingResult advance_npc_on_reserved_lane(
+        const EntityId& npc_id, const std::string& lane_id,
+        const std::vector<SpatialPoint>& lane_centerline,
+        double elapsed_seconds, double lookahead_distance,
+        double desired_speed, double maximum_acceleration);
     [[nodiscard]] LaneFollowingResult advance_npc_on_lane(
         const EntityId& npc_id, const std::vector<SpatialPoint>& lane_centerline,
         double elapsed_seconds, double lookahead_distance,
@@ -148,6 +162,7 @@ private:
     RandomStream random_;
     LifeCoordinator life_{};
     SpatialPartition spatial_index_{10.0};
+    LaneTrafficCoordinator lane_traffic_{};
     std::map<EntityId, SpatialPoint> npc_forward_{};
     std::map<EntityId, SpatialPoint> npc_velocity_{};
 };
