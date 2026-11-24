@@ -47,3 +47,29 @@ cmake -S cpp -B build
 cmake --build build
 ctest --test-dir build --output-on-failure
 ```
+
+
+## Coordinated route-segment handoff
+
+For a lane/intersection transition, call
+`SimulationWorld::advance_npc_on_reserved_route_segment` with a
+`RouteSegmentRequest`:
+
+1. Resolve and acquire the destination lane reservation while retaining the
+   source lane reservation.
+2. Acquire the next intersection movement reservation, if the segment enters
+   a conflict area, while retaining the previous intersection grant.
+3. Submit the route-segment operation. It validates every required token
+   before moving and uses predictive collision avoidance for the physical
+   step.
+4. Only after the movement step succeeds does it release the source lane and
+   the explicitly cleared intersection reservation. Destination tokens remain
+   live for the next segment.
+
+The method rejects incomplete intersection ID pairs, missing or mismatched
+reservations, missing source/destination lane grants, and attempts to enter
+and clear the same movement in one segment. It does not infer that an NPC has
+physically cleared a conflict zone: the route planner must submit the
+clearance transition only when its geometry/occupancy policy confirms that
+condition. Hosts must serialize world mutations and renew leases while
+occupancy persists.
