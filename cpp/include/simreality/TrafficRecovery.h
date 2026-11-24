@@ -77,6 +77,7 @@ struct TrafficRecoveryCheckpoint {
     std::uint64_t progress_stall_threshold{3U};
     std::vector<RouteProgressCheckpoint> route_progress{};
     std::vector<WaitForResourceEdge> pending_wait_edges{};
+    std::vector<DeadlockResolutionProposal> pending_proposals{};
 };
 
 class TrafficDeadlockDetector {
