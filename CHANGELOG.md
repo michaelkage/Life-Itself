@@ -1,0 +1,644 @@
+# Changelog and historical implementation notes
+
+> Archived from `README.md` on 2026-11-24. This preserves the project's detailed running implementation notes. The current project overview and getting-started instructions are maintained in `README.md`.
+
+**Life Itself** is the game and product. **Simulated Reality Engine (SRE)** is its technical engine name: a persistent, systemic open-world life simulation where people remember, forget, talk, react, build reputations, experience trauma, navigate justice, and make deals. The long-term ambition is a grounded, reactive open world with the freedom and systemic depth of a real-life crime sandbox, while keeping everyday life—not just crime—at the centre.
+
+The engine is designed for continuous simulation: dynamic NPC memory decay, mutating rumour networks, district-level pressure, personal stress, local reputation, justice, fixer networks, deterministic world stepping, utility-based fallback activity selection, read-only world diagnostics, and save/load continuation.
+
+**Development status: simulation core in progress.** The Python reference models the
+engine-independent systems; the portable C++20 implementation ports them into a
+standalone C++20 library and adds a world coordinator. Unreal presentation,
+animation, physics, and asset integration are not implemented.
+
+## Product and technical naming
+
+- **Product/game:** Life Itself
+- **Engine / code name:** Simulated Reality Engine (SRE)
+- **Python package and C++ namespace:** `simreality` (kept stable for code compatibility)
+- **Repository:** `michaelkage/Life-Itself`; product and technical naming are kept distinct.
+
+## Running it
+
+```
+python -m pytest -q
+```
+
+The Python simulation package uses only the standard library; the regression suite uses `pytest`. Install it with `python -m pip install pytest`. Python 3.10+ is required (the code uses `X | Y` type syntax).
+
+For the portable C++ core:
+
+```
+cmake -S cpp -B build
+cmake --build build
+ctest --test-dir build --output-on-failure
+```
+
+C++20 and CMake 3.20+ are required.
+
+## What's here
+
+Engine-independent Python reference systems:
+
+| Module | Brief section | What it does |
+| --- | --- | --- |
+| `simreality/model.py` | — | Shared data records and tuning constants. The C++ port contract |
+| `simreality/fluid.py` | SRE-Fluid | Packed 48-byte-per-agent GPU input contract and deterministic CPU reference for parallel pressure, trauma-tier, and rumour-gating evaluation |
+| `simreality/fluid_social.py` | SRE-Fluid | Canonically ordered, packed per-claim evidence gather with a CPU reference matching the belief ledger's sequential confidence recurrence |
+| `simreality/decay.py` | 1.A Memory Decay | Exponential decay with situational modifiers |
+| `simreality/gossip.py` | 1.B Gossip Network | Rumour mutation through social contact |
+| `simreality/ecosystem.py` | 1.C Desperation Matrix | Environmental pressure and behavioural status flips |
+| `simreality/districts.py` | 1.C, 2.B City Scars | Macro dynamics over time, scar hysteresis |
+| `simreality/trauma.py` | 4.A Trauma Levels | Personal stress accumulation, behavioural tiers |
+| `simreality/justice.py` | 2.A Legal | Evidence, charges, plea bargaining |
+| `simreality/fixers.py` | 4.B Fixers | Fixer incentives, betrayal, network propagation |
+| `simreality/reputation.py` | 4.A, 4.B | Local reputation from witness memories and convictions |
+| `simreality/goals.py` | NPC autonomy | Deterministic goal tracking, prerequisite checks, deadline urgency, and stable priority selection |
+| `simreality/npc_goal_emergence.py` | NPC goal evolution | Read-only, deterministic goal proposals from explicit need/emotion/stress/experience rules, plus append-only lifecycle rationale |
+| `simreality/goal_lifecycle_save_state.py` | NPC goal persistence | Canonical lifecycle snapshots, explicit abandoned-goal reopening, and composite world-checkpoint validation |
+| `simreality/identity_evolution.py` | NPC identity evolution | Deterministic, read-only proposals for gradual, individual-specific changes to configurable long-term traits; bounded per-event effects and explicit event policies |
+| `simreality/identity_interpretation.py` | NPC identity interpretation | Applies each NPC’s own belief confidence to an event proposal through explicit, inspectable rules; preserves caps and requires a separate accept/reject decision |
+| `simreality/world_checkpoint.py` | Identity-goal review persistence | Saves goal review decisions with identity and goal state; validates accepted identity provenance, source event role, ownership, and chronology on capture and restore |
+| `simreality/identity_goal_alignment.py` | Identity-to-goal alignment | Accepted identity changes produce read-only goal proposals; each goal adjustment requires separate NPC acceptance, stale-state checks, exactly-once application, and canonical decision snapshots |
+| `simreality/identity_decisions.py` | NPC identity decisions | Append-only acceptance/rejection decisions; accepted changes update durable traits exactly once, rejected changes remain history; canonical snapshots and world-checkpoint integration |
+| `simreality/emotional_scar_identity.py` | Emotional scars + identity | Maps active, accepted, recovered scar severity through explicit cue/axis policies into bounded identity-change proposals; never changes traits or bypasses NPC acceptance/rejection |
+| `simreality/goal_review.py` | NPC goal evolution | Converts explicit life events into deterministic persist, reprioritize, pause, reframe, or abandon proposals without silently changing NPC intentions |
+| `simreality/goal_review_decisions.py` | NPC goal decision history | Records explicit accepted/rejected goal-review proposals as an append-only, idempotent ledger; `goal_review_decisions_save_state.py` provides canonical persistence |
+| `simreality/planning.py` | NPC autonomy | Bounded symbolic action planning with preconditions, effects, costs, and deterministic tie-breaking |
+| `simreality/routines.py` | Persistent NPC routines | Time-windowed routines resolved against explicit disruptions; intended plans can be delayed, redirected, or missed with deterministic replay inputs |
+| `simreality/route_planning.py` | NPC navigation | Deterministic personal route selection over explicit road edges, including closed-road exclusion and memory-derived location avoidance |
+| `simreality/travel.py` | NPC travel execution | Advances journeys across simulation ticks with explicit time budgets, road closures, travel-time multipliers, junction-aware rerouting, and arrival world events |
+| `simreality/travel_save_state.py` | NPC travel persistence | Canonical journey and tick-replay snapshot, including partial edge progress and routine intent for save/load continuation |
+| `simreality/routine_travel.py` | Routine-to-travel bridge | Starts journeys toward active scheduled routine destinations and carries routine IDs through arrival events |
+| `simreality/routine_arrival.py` | Arrival-gated routine execution | Executes scheduled activities only after arrival, accounts for lateness and missed appointments, and prevents duplicate journey execution |
+| `simreality/presence.py` | Physical NPC presence | Tracks NPC location, active road edge, and partial movement; provides authoritative location-occupancy queries |
+| `simreality/presence_save_state.py` | Physical presence persistence | Saves current locations, edge progress, and replay history; integrated with composite world checkpoints |
+| `simreality/presence_encounters.py` | Presence-gated social encounters | Requires two NPCs to be physically co-located and an explicit interaction opportunity; optionally invokes actual conversation and caller-defined asymmetric trust effects |
+| `simreality/presence_encounter_save_state.py` | Social encounter persistence | Saves encounter history and per-tick replay signatures; integrated into composite world checkpoints |
+| `simreality/presence_witnesses.py` | Witness eligibility | Requires recorded co-location and an explicit observation opportunity before a candidate can be named as a witness |
+| `simreality/social_familiarity.py` | NPC familiarity and recognition | Builds directional familiarity from explicit encounter exposure; recognition also requires an explicit identity cue; remains separate from trust |
+| `simreality/social_relationships.py` | NPC relationship evolution | Tracks independent directed warmth, resentment, rivalry, obligation, dependence, respect, fear, and comfort facets from explicit event-linked evidence; supports coexistence and replay-safe persistence |
+| `simreality/relationship_interpretation.py` | Individual event interpretation | Converts each observer's explicit value impacts, bias cues, and observer-specific claim confidence into relationship changes; different NPCs can react oppositely to the same event |
+| `simreality/routine_tick.py` | Routine tick adapter | Selects active routines for an explicit tick, scopes supplied disruptions per NPC, and records replay-safe executions using explicit samples; called by the coordinator's named routine phase |
+| `simreality/npc_autonomy.py` | NPC autonomy | Read-only decision cycle that connects selected goals to explicit desired facts and bounded plans |
+| `simreality/appraisal.py` | NPC values and bias | Transparent value-weighted choice appraisal; different NPCs can rank the same hard choice differently |
+| `simreality/beliefs.py` | NPC beliefs | Deterministic confidence updates from explicit supporting and contradictory evidence |
+| `simreality/belief_appraisal.py` | NPC beliefs + choices | Explicitly maps claim confidence into choice impacts or bias cues, with inspectable contributions |
+| `simreality/social_trust.py` | NPC relationships | Tracks observer-specific trust from deterministic interaction history; can supply a trust-based reliability input |
+| `simreality/social_beliefs.py` | NPC relationships + beliefs | Uses source trust and transmitted rumour retention to update observer-specific beliefs |
+| `simreality/social_decisions.py` | NPC social decision-making | Ranks choices using an NPC's own trust-weighted beliefs, values and explicit belief-effect mappings |
+| `simreality/social_consequences.py` | NPC social consequences | Turns an observer's interpretation of a witnessed action into trust changes and claim evidence, with replay-safe event IDs |
+| `simreality/world_events.py` | World event journal | Append-only deterministic event history with stable replay, snapshot restoration, and participant/witness queries |
+| `simreality/world_event_social.py` | World event + social bridge | Validates event participants/witnesses and applies independent, explicit interpretations to NPC trust and beliefs |
+| `simreality/world_event_memory.py` | World event + memory bridge | Creates deterministic witness-specific NPC memories from explicitly recorded event details |
+| `simreality/memory_rumours.py` | Memory + gossip bridge | Prepares deterministic decay snapshots and rumours from each NPC's own memories; preserves attribution-loss rules |
+| `simreality/social_conversations.py` | NPC conversation integration | Runs actual memory transfer and updates each listener's beliefs using their own trust in the speaker |
+| `simreality/simulation_tick.py` | Deterministic tick orchestration | Applies explicitly scheduled event memories before explicitly scheduled conversations; enforces stable order and same-tick replay rules |
+| `simreality/save_state.py` | Versioned save boundary | Canonical JSON envelope for simulation tick, authoritative world events, and scalar metadata; explicitly scopes what is not yet restored |
+| `simreality/npc_save_state.py` | NPC/social persistence | Versioned canonical snapshots for NPC identity, held witness memories, and trust priors plus interaction history |
+| `simreality/social_belief_save_state.py` | Belief persistence | Saves claim priors, effective evidence histories, observer-specific beliefs, and original replay inputs |
+| `simreality/adapter_replay_state.py` | Adapter replay persistence | Saves processed event/witness memory keys and requires matching restored NPC memories |
+| `simreality/social_replay_save_state.py` | Social adapter replay persistence | Saves conversation signatures/results and witnessed-consequence inputs/results so identical replays return recorded outcomes |
+| `simreality/tick_replay_save_state.py` | Simulation tick replay persistence | Saves completed tick request history and cached-result references; restore requires the world, NPCs, memory adapter, and conversation adapter to be restored first |
+| `simreality/world_checkpoint.py` | Composite world checkpoint | Combines event, NPC, trust, belief, memory, conversation and tick replay snapshots, plus optional routines, travel journeys, physical NPC presence, witnessed-consequence replay, campaign lifecycle, and institutional histories in one canonical JSON checkpoint |
+| `simreality/misconduct_save_state.py` | Accountability persistence | Saves reports and append-only review decisions canonically; validates incident references against the authoritative world-event ledger on restore |
+
+| `simreality/institutional_dynamics.py` | Institutional decision dynamics | Ranks feasible institutional options using leadership and department priorities, resource pressure, accountability, evidence, employee traits, favouritism, and explicit signed bias cues; does not execute decisions |
+
+The optional GPU compute foundation is documented in [docs/SRE-FLUID.md](docs/SRE-FLUID.md). Its initial agent kernel is [shaders/sre_fluid_agent.wgsl](shaders/sre_fluid_agent.wgsl), and the ordered social-evidence gather is [shaders/sre_fluid_rumour_gather.wgsl](shaders/sre_fluid_rumour_gather.wgsl). Both have CPU reference contracts; neither is yet connected to a production GPU runtime.
+| `simreality/personality_emotion.py` | Personality and emotional memory | Applies explicit signed personality-trait modifiers to cue-triggered emotional memory responses; bounded, attributable, read-only appraisal |
+
+The authoritative world event journal is documented in [docs/WORLD-EVENT-LEDGER.md](docs/WORLD-EVENT-LEDGER.md); it is deliberately separate from observer-specific beliefs and consequences. The per-witness social integration is described in [docs/WORLD-EVENT-SOCIAL-INTEGRATION.md](docs/WORLD-EVENT-SOCIAL-INTEGRATION.md), and the event-to-memory bridge in [docs/WORLD-EVENT-MEMORY.md](docs/WORLD-EVENT-MEMORY.md).
+
+`simreality/model.py` is the contract for the existing C++ domain port — it holds records and
+constants only, no behaviour. The new NPC goal and planning modules are currently Python-only; their implementation boundaries and regression coverage are documented in [docs/NPC-GOALS-IMPLEMENTATION.md](docs/NPC-GOALS-IMPLEMENTATION.md) and [docs/NPC-PLANNING-IMPLEMENTATION.md](docs/NPC-PLANNING-IMPLEMENTATION.md).
+
+The C++ library under `cpp/` now includes the portable data model, deterministic
+clock/scheduler/RNG, memory decay, gossip, environmental pressure and district
+scars, trauma, legal evidence and plea calculations, local reputation, fixer
+networks, and a `SimulationWorld` coordinator for hourly/daily updates and
+event-driven conversations, witness memories, arrests, fixer approaches, and
+versioned world snapshots that preserve simulation time and RNG state.
+
+### A rumour, end to end
+
+The mechanic the whole design hangs on, running as a test:
+
+```
+Crime committed → witness memory → told to a friend → 3 more hops →
+description drifts → name lost → police stop the wrong person
+```
+
+At 2 in-game hours per hop, the target's ID survives about 3 hops, then the
+rumour degrades to an appearance and travels roughly 10 more. A patrol receiving it
+acts on `stop and search matching tall-ish, black jacket, masked` — for someone
+who only ever saw a silhouette, or was wearing a coat they did not choose to wear.
+
+That same rumour, when it reaches police as an *actionable* memory, does build a
+charge. `tests/test_integration.py` runs both paths end to end.
+
+## Model corrections
+
+The brief's equations and prose do not always do what they say. The first fourteen
+issues below are documented with derivations and measured numbers in
+[docs/MATH-NOTES.md](docs/MATH-NOTES.md).
+
+In the original design:
+
+1. **λ can go negative** — the Trauma modifier is subtracted, so a petty-theft
+   memory *strengthens* with age instead of fading.
+2. **Permanent memories are impossible** — any λ > 0 reaches zero; armed assault
+   was "forgotten" after about a year. Now decays toward a permanent floor.
+3. **DI and MoralShackle were on different scales** — DI ranged 0–4.6 against a
+   shackle of 0.2–0.95, so moderate pressure criminalised the whole city on day
+   one and both ends of the shackle range were indistinguishable.
+4. **The telephone effect was inert** — at the specified rate, retention never
+   fell below the transmission threshold, so rumours stayed precise accusations
+   forever and never morphed.
+5. **`DescriptionDelta` as a `FVector` cannot hold a rumour** — merging witnesses
+   needs per-trait uncertainty; a point value makes corroboration *widen*
+   uncertainty instead of sharpening it.
+6. **Age compounds across hops** — an emergent consequence, not a decision: crimes
+   witnessed by elderly citizens travel far enough to go effectively unreported.
+7. **One witnessed armed assault made a vigilante** — brief 4.A's tiers mix
+   personal and environmental causes in the same row, so a linear impact-to-tier
+   mapping reached "zero law presence" off a single crime.
+8. **The city was frozen** — brief 1.C gives DI a daily cycle but no dynamics for
+   any input, so nothing could ever change and the city-scar trigger in 2.B could
+   never fire.
+9. **City scars flickered** — a strict `>` test with no hysteresis strobed the
+   entire city between clean and ruined on alternate days.
+10. **Arrests outran their evidence** — a rumour that has lost its subject can
+    produce a stop but the brief's loop treated that as an arrest, so charges
+    accumulated against a predicate fact naming nobody.
+11. **Corruption collapsed the legal system** — as a multiplier, a corrupt
+    district left a 0.01% chance of any arrest, so the city stopped having one.
+12. **Fixer betrayal was strictly dominant** — keeping the bribe, clearing your
+    warrants, and removing the witness costs nothing, so a rational fixer betrays
+    100% of the time and "might betray" was a guaranteed ambush.
+
+Found while building:
+
+13. **The tuning knob was welded shut** — `lambda_base` defaulted to the module
+    constant, which Python binds at definition time, so rebinding it at runtime
+    did nothing.
+14. **A reordered field silently captured the wrong argument** — a mid-list
+    defaulted dataclass field bound a colour dict to `observations`, with no
+    error raised.
+15. **Reputation had no source** — a stored default never changed and memory-only
+    reputation disappeared as evidence decayed. Local reputation now derives from
+    actionable accusations and durable conviction records.
+16. **Connected fixers never betrayed** — exposure outweighed betrayal incentives
+    across the useful range. The exposure weight now modulates rather than blocks
+    betrayal.
+17. **Fixer standing did not propagate** — networks now share standing changes,
+    recover gradually, and have a pressure-dependent trust ceiling.
+18. **Burned fixers can become more likely to squeal** — this is a feedback
+    consequence of the incentive model, not an implementation defect; regression
+    tests preserve it intentionally.
+
+## Where this is going
+
+The simulation core is the part of this project that is interesting and the part
+that needs no renderer. It is written to run on a background thread behind
+Unreal's render loop, which is what the brief asks for and what makes it testable
+without an engine. Nothing in it may touch a UObject or a game thread.
+
+Not yet built, all of it engine-dependent:
+
+- **Arrest and legal loop** (brief 2.A) — the arithmetic is done; what remains is
+  physical custody, Chaos Vehicles, World Partition streaming, and the LLM-driven
+  plea dialogue that `PleaOffer` grounds
+- **Procedural scene assembly** (brief 2.B) — `ScarState` is built and exposes
+  `boarded_windows`, `derelict_facades`, and police posture; the Material
+  Parameter Collections that consume it do not exist
+- **Trauma-driven NPC schedules** (brief 4.A) — the tiers exist as data; the
+  behaviour trees that consume them do not
+- **Unreal adapter** — the C++ core is portable, but no Unreal worker lifecycle,
+  command queue, or immutable game-thread snapshots have been implemented
+- **Blender → Unreal pipeline** (brief 3) — zero-point pivots, vertex-colour wear
+  masks
+
+### Constraints to resolve before installing the engine
+
+- **Disk.** This needs a separate drive. Unreal 5 alone is 100+ GB, before Visual
+  Studio, before a single world partition cell.
+- **Build order.** Keep the C++ core portable and continue porting one system at a
+  time with regression tests against Python. Install Unreal only when the portable
+  systems and hardware/storage plan are ready; Python remains the behavioral
+  reference until differential parity is established.
+
+### Decision-making and world diagnostics
+
+Unscheduled NPC hours now use a deterministic utility-based activity selector. It
+considers time of day, employment, transport reliability, stress, social need,
+isolation, available shops, service capacity and trusted local contacts. Explicit
+schedule entries still take precedence. The selected activity includes a score
+and human-readable reason for debugging and future tooling.
+
+The portable diagnostics module provides read-only world metrics (housing,
+employment, resident and business cash, stock, unresolved events and average
+wellbeing proxies) plus invariant checks for duplicate IDs, broken district/home
+references, housing capacity, numeric ranges and business inventory. These tools
+are intended for regression tests, scenario telemetry and a future Unreal adapter;
+they do not mutate authoritative world state.
+
+Daily work hours and commute disruption are reset after the daily payroll and
+resident update, preventing yesterday's attendance from being counted again on
+subsequent days.
+
+
+NPC choice appraisal is documented in [docs/NPC-CHOICE-APPRAISAL.md](docs/NPC-CHOICE-APPRAISAL.md). It scores caller-supplied impacts and bias cues against an individual NPC's value profile, reports per-axis contributions, and avoids a universal good/bad label. Regression tests are in `tests/test_appraisal.py`.
+
+
+The belief-conditioned [NPC identity interpretation](docs/NPC-IDENTITY-INTERPRETATION.md) can now consume either direct belief ledgers or observer-specific `SocialBeliefSystem` snapshots, retaining each NPC’s sampled source trust. Explicit `IdentityMemoryAssociation` links now let retained personal memories influence matching event interpretations without guessing relevance. See `tests/test_identity_interpretation.py` and `docs/NPC-IDENTITY-INTERPRETATION.md`.
+
+The [NPC Belief Ledger](docs/NPC-BELIEF-LEDGER.md) records evidence provenance and reproducible confidence updates. It is a transparent heuristic, not a claim to determine objective truth.
+
+
+Belief-aware choice appraisal is documented in [docs/NPC-BELIEF-AWARE-APPRAISAL.md](docs/NPC-BELIEF-AWARE-APPRAISAL.md) with regression coverage in `tests/test_belief_appraisal.py`. Claim-to-impact mappings remain explicit inputs; the system does not infer objective truth or silently assign moral labels.
+
+
+Observer-specific trust is documented in [docs/NPC-SOCIAL-TRUST.md](docs/NPC-SOCIAL-TRUST.md), with regression tests in `tests/test_social_trust.py`. Trust remains distinct from objective truth and global reputation.
+
+Directional familiarity and cue-gated recognition are documented in [docs/NPC-FAMILIARITY.md](docs/NPC-FAMILIARITY.md), with regression tests in `tests/test_social_familiarity.py`. Independent, observer-specific relationship facets are documented in [docs/NPC-RELATIONSHIPS.md](docs/NPC-RELATIONSHIPS.md), with regression tests in `tests/test_social_relationships.py`. Individual event interpretation is documented in [docs/NPC-RELATIONSHIP-INTERPRETATION.md](docs/NPC-RELATIONSHIP-INTERPRETATION.md), with regression tests in `tests/test_relationship_interpretation.py`.
+
+
+Trust-aware belief integration is documented in [docs/NPC-SOCIAL-BELIEFS.md](docs/NPC-SOCIAL-BELIEFS.md), with regression coverage in `tests/test_social_beliefs.py`. Trust is sampled when an NPC hears a report; later trust changes do not silently rewrite past beliefs.
+
+The [social belief-aware decision adapter](docs/NPC-SOCIAL-DECISIONS.md) connects observer-specific beliefs to choice ranking, preserving each NPC's individual value profile and keeping claim-to-effect mappings explicit. See `tests/test_social_decisions.py` for regression coverage.
+
+The [witnessed social consequence recorder](docs/NPC-SOCIAL-CONSEQUENCES.md) begins the next loop: a witnessed action can change the observer's trust in its actor and update explicit claims from that event. Identical event replay is idempotent; different observers can interpret the same world event differently. See `tests/test_social_consequences.py`.
+
+
+The [memory-to-rumour adapter](docs/MEMORY-TO-RUMOUR-ADAPTER.md) calculates decay from original memory impact and event time, then reuses the existing rumour transmission rules. It is read-only: only memories already held by that NPC can become rumours, and actual transfer still requires the existing conversation system. Regression coverage is in `tests/test_memory_rumours.py`.
+
+
+The [social conversation adapter](docs/NPC-SOCIAL-CONVERSATIONS.md) connects real gossip transfer to observer-specific belief updates. Conversation IDs make replay idempotent, and appearance-only rumours remain unattributed. Tests are in `tests/test_social_conversations.py`.
+
+
+The [simulation tick coordinator](docs/SIMULATION-TICK-COORDINATOR.md) now provides a small, deterministic scheduling boundary: explicitly selected event memories are materialized before explicitly selected conversations at the same tick. It does not invent visibility, proximity, or NPC schedules. See `tests/test_simulation_tick.py`.
+
+
+The [versioned simulation save envelope](docs/SIMULATION-SAVE-STATE.md) persists the authoritative event timeline and current tick as canonical JSON. It is the first save boundary, not yet a full restore of all NPC and adapter internals; see `tests/test_save_state.py`.
+
+
+NPC model persistence is documented in [docs/NPC-STATE-SNAPSHOT.md](docs/NPC-STATE-SNAPSHOT.md). It restores current NPC fields and held memories, and restores trust by replaying the saved relationship interactions; evidence histories and adapter replay indexes remain separate.
+
+
+Belief history persistence is documented in [docs/BELIEF-HISTORY-PERSISTENCE.md](docs/BELIEF-HISTORY-PERSISTENCE.md), including sampled trust reliability and the remaining adapter-restoration boundaries.
+
+
+The coordinator replay codec is documented in [docs/TICK-REPLAY-PERSISTENCE.md](docs/TICK-REPLAY-PERSISTENCE.md). It restores cached tick results only after the referenced adapter state is restored; it is not a single-file full-world checkpoint.
+
+
+The composite [world checkpoint](docs/WORLD-CHECKPOINT.md) joins the event journal, NPC state, social trust and beliefs, adapter replay indexes, and coordinator replay history into one canonical JSON boundary. An optional witnessed-consequence recorder and `LifeItselfCampaign` lifecycle can also be captured and restored; campaign snapshots preserve death/spectator/ghost state and archived timelines. Integration and corruption tests are in `tests/test_world_checkpoint.py`. Capture is not yet a cross-component atomic operation.
+
+
+The first [persistent NPC routine slice](docs/NPC-ROUTINES.md) treats routines as intentions, not guaranteed presence. Traffic, weather, failed alarms, low motivation, unexpected events, illness, social obligations, and remembered-location avoidance can alter a planned activity. Routine definitions now persist through `RoutineBookSnapshot` and an optional `routines` section in the composite checkpoint. Routine executions now have a standalone tick adapter that selects active schedules and records replay-safe results from explicit disruptions and samples. It is not yet wired automatically into the main world tick coordinator; route simulation and C++ runtime integration remain pending.
+
+
+Routine outcomes can also be evaluated by [explicit routine consequence policies](docs/NPC-ROUTINES.md): configured activity/location rules can emit late-arrival or missed-appointment events without assuming a universal punishment. These consequences remain world events and are idempotent on replay; a full workplace or appointment-provider simulation is still future work.
+
+
+The [misconduct reporting system](docs/MISCONDUCT-REPORTING.md) records allegations of discrimination, racial discrimination, corruption, abuse of authority, bribery, favouritism, and neglect of duty with evidence references and an append-only review history. Filing is not a verdict; review outcomes distinguish substantiated, not substantiated, and insufficient evidence. Reports and review history can now be included in the composite checkpoint, and every cited incident must exist in the authoritative event journal. An in-game UI and a separate evidence registry are not implemented.
+
+
+The [routine institution ledger](docs/NPC-ROUTINES.md) accumulates explicit workplace lateness and missed-appointment events into per-person, per-institution records, with replay-safe event handling. It is not yet included in world checkpoints or connected to employment termination, wages, or appointment scheduling.
+
+
+Institutional routine records can now be included in `SimulationWorldCheckpoint` via `routine_institutions=...`; restored worlds expose `RestoredSimulation.routine_institutions`, including replay-protection signatures.
+
+
+
+The new [context-aware institutional review evaluator](docs/INSTITUTIONAL-REVIEW.md) turns accumulated late-arrival, missed-appointment and delay records into a transparent review recommendation. Explicit context signals can raise or lower review pressure without erasing recorded history; it never automatically fires, punishes, or judges an NPC. Regression tests are in `tests/test_institutional_review.py`.
+
+
+Institutional review can now be followed by a separate [institution-specific response planner](docs/INSTITUTIONAL-RESPONSE.md). It exposes configured options such as check-ins, fact-finding, schedule review, and accommodations without choosing or executing an action. This keeps institutional decisions distinct from accumulated history and review recommendations.
+
+| `simreality/institutional_resources.py` | Institutional resource allocation | Ranks department requests by configured leadership priorities, service impact, urgency, and influence; allocates constrained budget and staffing with transparent partial-fulfilment results |
+
+
+The [institutional political history ledger](docs/INSTITUTIONAL-POLITICAL-HISTORY.md) records explicit changes in departmental influence, signed inter-department relationships (alliances and rivalries), and leadership priorities. Its canonical event replay is append-order independent and snapshot-restorable, and it can be included in `SimulationWorldCheckpoint` with `institutional_politics=...` and restored through `RestoredSimulation.institutional_politics`. Regression coverage is in `tests/test_institutional_politics.py`.
+
+
+The [institutional lobbying system](docs/INSTITUTIONAL-LOBBYING.md) lets departments explicitly lobby leadership, with evidence, service value, transparency, urgency, public pressure, personal advantage, influence, and named allies or opponents shaping transparent approve/defer/reject outcomes. Committed results become replay-safe institutional political events and are preserved by world checkpoints. Tests: `tests/test_institutional_lobbying.py`.
+
+
+The [institutional outcome adapter](docs/INSTITUTIONAL-OUTCOMES.md) converts
+explicitly classified project successes, scandals, public complaints, and
+leadership changes into policy-configured political-history events. Allegations
+are not findings: only an exact outcome-type/finding-status rule can change
+influence, inter-department relationships, or leadership priorities. Evidence
+IDs are retained as provenance labels; review and evidence verification remain
+separate systems. Tests: `tests/test_institutional_outcomes.py`.
+
+
+The [misconduct-to-politics bridge](docs/MISCONDUCT-POLITICAL-INTEGRATION.md)
+translates filed reports and each later review decision into separate,
+replay-safe institutional outcomes. Subject-to-department mapping is explicit;
+filing remains an allegation, and only configured finding-status rules can
+change political influence. Tests: `tests/test_misconduct_politics.py`.
+
+
+The [goal progress event bridge](docs/GOAL-EVENT-INTEGRATION.md) connects the authoritative world-event journal to active NPC goals through explicit event-type, goal-category, and attribute policies. Only participant-owned goals advance; witnesses do not count as actors. Progress is capped and deterministic, with event replay protection persisted in the composite checkpoint. Tests: `tests/test_goal_events.py` and `tests/test_world_checkpoint.py`.
+
+
+The [NPC goal persistence layer](docs/GOAL-PERSISTENCE.md) adds canonical, versioned component snapshots for goal books and goal-event replay indexes, now integrated into `SimulationWorldCheckpoint` with `goal_book=...` and `goal_event_adapter=...`. Restored worlds expose `RestoredSimulation.goals` and the replay snapshot as `RestoredSimulation.goal_event_replay`; callers reattach their configured policies before resuming event processing. Replay entries are cross-checked against the authoritative world-event journal. Tests: `tests/test_goal_save_state.py`, `tests/test_goal_events_save_state.py`, and `tests/test_world_checkpoint.py`.
+
+
+The new [goal-aware daily routine bridge](docs/GOAL-AWARE-ROUTINES.md) connects explicit NPC goal categories to matching routine activities. Goal priority, confidence, discretionary time/resources, stress, obligations, social support, and recent setbacks shape transparent routine-priority proposals. The adapter is read-only: it does not execute plans, spend resources, mutate routines, or auto-complete goals. Tests: `tests/test_goal_life.py`.
+
+
+The [NPC identity interpretation layer](docs/NPC-IDENTITY-INTERPRETATION.md) now combines explicit belief, personal-memory, and observer-to-target trust inputs when interpreting identity-change proposals. Each input is attributable and bounded; unknown beliefs, memories, or trust pairs are neutral, and an interpreted proposal still requires an explicit decision. Tests: `tests/test_identity_interpretation.py`.
+
+
+The NPC identity interpretation layer also supports explicit personality-axis effects: caller-defined traits such as fearfulness, confidence, stubbornness, and openness can influence matching event interpretations through bounded, inspectable policy rules. Missing profiles and axes are neutral, and proposals still require a separate decision. See `docs/NPC-IDENTITY-INTERPRETATION.md` and `tests/test_identity_interpretation.py`.
+
+
+A unified `interpret_comprehensively` pass now combines belief, explicitly linked memory, relationship-trust, and personality inputs against one original identity proposal. It reports each contribution separately and applies the policy cap to the combined result; interpretation still does not auto-accept an identity change. Regression tests: `tests/test_identity_interpretation.py`.
+
+
+The unified NPC identity appraisal now also accepts individual value priorities through `NPCIdentityValues` and `IdentityValueRule`, keeping value influence explicit, inspectable, and policy-specific.
+
+
+Presence-gated social encounters now connect physical location to social life. Co-location alone never forces NPCs to notice, approach, or talk to each other: the world driver must confirm an interaction opportunity. Actual conversation is opt-in and uses the existing memory-transfer/belief pipeline; trust effects require explicit per-person directions and strength. Encounter history and replay state can be included in the composite world checkpoint.
+
+
+Witness eligibility now has a physical-presence gate. A candidate must be at the event's explicit location and the world driver must confirm an observation opportunity. This prevents NPCs who are elsewhere or travelling from becoming witnesses merely because they exist in the simulation. The adapter returns assessments without mutating the objective event; the world driver uses the eligible list when creating the event's witness record.
+
+
+NPC familiarity and recognition are now modeled separately from trust. Confirmed encounters can contribute different exposure strengths in each direction, allowing one NPC to remember a meeting more strongly than the other. Repeated exposure compounds into familiarity; recognition still requires an explicit identity cue. The history is persisted in composite world checkpoints and never automatically changes trust, affection, or agreement. See [docs/NPC-FAMILIARITY.md](docs/NPC-FAMILIARITY.md). NPC relationship evolution now uses separate directed facets for warmth, resentment, rivalry, obligation, dependence, respect, fear, and comfort. The facets can coexist, update only from explicit event-linked evidence, and persist with source validation in world checkpoints. See [docs/NPC-RELATIONSHIPS.md](docs/NPC-RELATIONSHIPS.md). Each observer now has a separate interpretation profile mapping value impacts, bias cues, and personal claim confidence into relationship facets, allowing opposite reactions to the same event without assigning universal moral meaning. See [docs/NPC-RELATIONSHIP-INTERPRETATION.md](docs/NPC-RELATIONSHIP-INTERPRETATION.md).
+
+
+The [NPC emotional event persistence codec](docs/NPC-EMOTIONAL-EVENT-PERSISTENCE.md) adds canonical, versioned component snapshots for transient emotion intensities, source event facts, and event/rule replay signatures. Restored ledgers can safely reject duplicate emotional impulses; authored event and decay rules are reattached by the simulation. This is currently a component-level codec and is not yet part of the composite world checkpoint. Tests: `tests/test_emotional_events_save_state.py`.
+
+
+NPC emotional state is now part of the composite world checkpoint. Pass `emotions=...` to `SimulationWorldCheckpoint.capture`; restored worlds expose `RestoredSimulation.emotions`. The checkpoint cross-validates saved emotional source events and replay ownership against the authoritative world journal and NPC roster. Emotional rules remain authored configuration and must be reattached after loading. See [docs/NPC-EMOTIONS-WORLD-CHECKPOINT.md](docs/NPC-EMOTIONS-WORLD-CHECKPOINT.md). Tests: `tests/test_world_checkpoint.py`.
+
+
+The emotional regulation layer separates felt intensity from outward expression and decision influence. Per-NPC suppression profiles can conceal emotion without changing the underlying state; explicit emotion-to-consideration rules provide transparent, bounded decision contributions without selecting actions. See [docs/NPC-EMOTIONAL-REGULATION.md](docs/NPC-EMOTIONAL-REGULATION.md) and `tests/test_emotional_regulation.py`.
+
+
+NPC stress is now tracked independently from emotion and identity. Individual coping profiles model reappraisal, distraction, support-seeking, suppression costs, resilience, recovery, exhaustion thresholds, and breaking-point assessments. Canonical snapshots preserve stress and replay history. See [docs/NPC-EMOTIONAL-STRESS.md](docs/NPC-EMOTIONAL-STRESS.md) and `tests/test_emotional_stress.py`.
+
+
+NPC stress now participates in composite world checkpoints. Stress ledgers are validated against the authoritative event journal and NPC roster, survive save/restore with replay history, and remain optional for older checkpoints. Coping profiles are authored configuration and are reattached after loading. See [docs/NPC-EMOTIONAL-STRESS-CHECKPOINT.md](docs/NPC-EMOTIONAL-STRESS-CHECKPOINT.md) and `tests/test_emotional_stress_checkpoint.py`.
+
+
+Stress-driven behavioral adaptation now projects individual stress and exhaustion sensitivity into explicit decision considerations for social engagement, work performance, sleep priority, risk tolerance, routine flexibility, and conflict sensitivity. It is read-only and does not force behavior. See [docs/NPC-STRESS-BEHAVIOR-ADAPTATION.md](docs/NPC-STRESS-BEHAVIOR-ADAPTATION.md) and `tests/test_stress_behavior_adaptation.py`.
+
+
+NPC psychological conditioning records owner-specific associations between explicit cues and experienced outcomes. Reinforcement, extinction, gradual weakening, replay protection, and canonical persistence are available through `NPCConditioningLedger`; the system returns approach/avoidance signals without forcing actions. See [docs/NPC-PSYCHOLOGICAL-CONDITIONING.md](docs/NPC-PSYCHOLOGICAL-CONDITIONING.md) and `tests/test_npc_conditioning.py`.
+
+
+NPC psychological conditioning is also integrated into `SimulationWorldCheckpoint`: pass `conditioning=...` when capturing and retrieve `RestoredSimulation.conditioning` after loading. Learning records are validated against the authoritative event journal and NPC roster; the section remains optional for older checkpoints. See `tests/test_emotional_stress_checkpoint.py`.
+
+
+Context-sensitive psychological triggers now activate an NPC's learned associations only when explicitly observed cues and authored context requirements match. NPC-specific context exclusions allow similar situations to be interpreted differently. Trigger evaluation is read-only and never forces a reaction. See [docs/NPC-PSYCHOLOGICAL-TRIGGERS.md](docs/NPC-PSYCHOLOGICAL-TRIGGERS.md) and `tests/test_psychological_triggers.py`.
+
+
+NPCs can now interpret the same authoritative event differently through owner-specific `NPCInterpretationProfile` rules. The interpreter emits reviewable learning proposals rather than silently mutating conditioning, preserving the distinction between what happened and what an NPC believes happened. See [docs/NPC-EVENT-INTERPRETATION.md](docs/NPC-EVENT-INTERPRETATION.md) and `tests/test_npc_event_interpretation.py`.
+
+
+Learned psychological associations now feed into explicit candidate-choice appraisal through `PsychologicalDecisionAdapter`. NPC-specific cue sensitivities and caller-supplied cue exposure can change how options are ranked while preserving the base value score and a transparent per-cue breakdown. The adapter is deterministic, read-only, and does not execute choices. See [docs/NPC-PSYCHOLOGICAL-DECISIONS.md](docs/NPC-PSYCHOLOGICAL-DECISIONS.md) and `tests/test_psychological_decisions.py`.
+
+
+NPCs can now explicitly accept or reject observer-specific psychological learning proposals. Accepted proposals apply one replay-safe conditioning record; rejected proposals and rationales remain in history without changing associations. Later contradictory experiences can gradually revise a learned association. See [docs/NPC-PSYCHOLOGICAL-LEARNING-DECISIONS.md](docs/NPC-PSYCHOLOGICAL-LEARNING-DECISIONS.md) and tests/test_psychological_learning_decisions.py.
+
+
+Integrated psychological decisions now combine observer-specific social beliefs, stable value/bias profiles, and individually learned cue associations in one transparent read-only ranking pass. Claim effects and cue exposures remain explicitly authored; per-source contributions are retained for inspection. See [docs/NPC-INTEGRATED-DECISIONS.md](docs/NPC-INTEGRATED-DECISIONS.md) and `tests/test_integrated_decisions.py`.
+
+
+NPC cognitive dissonance is now tracked as explicit owner-specific conflict history. Belief contradictions and commitment/action mismatches receive bounded assessments; NPCs can explicitly rationalize, avoid, seek evidence, acknowledge, or reconsider without silently changing beliefs or identity. Canonical snapshots preserve the conflict and response history. See [docs/NPC-COGNITIVE-DISSONANCE.md](docs/NPC-COGNITIVE-DISSONANCE.md) and `tests/test_cognitive_dissonance.py`.
+
+Repeated unresolved psychological conflicts can now generate small, bounded identity-change proposals through explicit author-defined mappings. The bridge aggregates repeated dissonance, preserves the NPC's ability to refuse change, and routes proposals through the existing replay-safe identity decision ledger. See [docs/NPC-DISSONANCE-IDENTITY-EVOLUTION.md](docs/NPC-DISSONANCE-IDENTITY-EVOLUTION.md) and `tests/test_dissonance_identity.py`.
+
+The [NPC autobiographical life history](docs/NPC-LIFE-HISTORY.md) preserves observer-specific interpretations of authoritative events, turning points, and links to conflicts and accepted/rejected learning decisions. Retrieval salience can fade without deleting the memory. Forgiveness and reconciliation are distinct append-only choices; neither erases history nor automatically restores trust. Pass `life_history=...` to `SimulationWorldCheckpoint.capture` to persist it with source-event and NPC-roster validation. Tests: `tests/test_npc_life_history.py` and `tests/test_world_checkpoint.py`.
+
+
+NPC autobiographical memory formation now has an explicit event bridge: authored per-NPC rules turn only observed world events into observer-specific memories with different interpretations, emotional and identity impacts, and optional turning-point status. Stable event/observer/rule IDs make replay safe; changed historical interpretations are rejected. Optional conflict and learning-decision references are preserved. See [docs/NPC-MEMORY-FORMATION.md](docs/NPC-MEMORY-FORMATION.md) and `tests/test_npc_memory_formation.py`.
+
+
+The [NPC autobiographical memory recall layer](docs/NPC-MEMORY-RECALL.md) retrieves owner-specific memories from explicitly observed cues and authored associations. Salience, emotional weighting, thresholds, and top-K selection shape deterministic recall without altering memories or forcing behavior. Tests: `tests/test_npc_memory_recall.py`.
+
+
+NPC memories can now be reinterpreted over time without rewriting the original account. The [memory reflection ledger](docs/NPC-MEMORY-REFLECTION.md) stores owner-specific, append-only interpretation changes with chronological validation and a canonical component snapshot. Reflection history is now included in `SimulationWorldCheckpoint` through `memory_reflections=...` and restored as `RestoredSimulation.memory_reflections`; capture requires the matching autobiographical life-history ledger and validates reflection owners and ticks. Older checkpoints without reflections remain valid. The [cue-driven recall layer](docs/NPC-MEMORY-RECALL.md) retrieves matching memories using authored cue associations, salience, and optional emotional weighting. Tests: `tests/test_npc_memory_reflection.py`, `tests/test_npc_memory_recall.py`, and `tests/test_world_checkpoint.py`.
+
+
+The [memory-driven decision layer](docs/MEMORY-DRIVEN-DECISIONS.md) translates explicitly associated recalled experiences into bounded choice-appraisal signals. It can feed the integrated belief/value/conditioning decision ranker while preserving NPC agency: it influences scores but never executes or forces a choice. Tests: `tests/test_memory_decisions.py` and the memory-influence cases in `tests/test_integrated_decisions.py`.
+
+The new [cue-triggered emotional memory layer](docs/EMOTIONAL-MEMORY.md) connects explicit observations—such as a person's presence, a location, a sound, or a situation—to an NPC's own autobiographical memories. Per-owner associations map remembered experiences to separate emotion axes, allowing affection and resentment to coexist when different memories are activated by the same cue. Exposure, memory salience, and authored sensitivity produce bounded, attributable response strengths. Evaluation is deterministic and read-only; it does not mutate the emotional ledger or infer what a cue means. Tests: `tests/test_emotional_memory.py`.
+
+The new [memory-grounded personality adaptation layer](docs/NPC-PERSONALITY-ADAPTATION.md) turns repeated autobiographical experiences into small, attributable proposals against explicitly named personality axes. Memory identity impact is weighted by salience and accumulated under authored tag-to-axis rules with minimum-evidence thresholds and strict per-proposal caps. Proposals require explicit acceptance or rejection through the existing `IdentityDecisionLedger`, so rejected changes remain in history without altering traits. Tests: `tests/test_personality_adaptation.py`.
+
+
+The [long-term emotional scar ledger](docs/NPC-EMOTIONAL-SCARS.md) stores persistent owner-specific imprints linked to authoritative events and autobiographical memories. Exact observed cues can reactivate bounded emotion-axis responses; explicit recovery actions gradually reduce severity without erasing the scar or its history. Canonical component snapshots preserve scar and recovery records. Composite world-checkpoint integration now persists and restores scars alongside autobiographical history, validating NPC ownership, authoritative event provenance, matching source memory, and checkpoint chronology. Scar formation is now evidence-grounded: strong cue-triggered autobiographical-memory responses generate proposals, and each NPC explicitly accepts or rejects a proposal before any scar is created. Rejections remain in the append-only decision history. Decision-level snapshots preserve both choices and accepted scar state. Both accepted and rejected proposals now persist in `SimulationWorldCheckpoint` through `emotional_scar_decisions=...`, with source-event, owner, autobiographical-memory, chronology, and scar-ledger consistency validation; restored worlds expose `RestoredSimulation.emotional_scar_decisions`. Older checkpoints remain compatible. Tests: `tests/test_emotional_scars.py` and `tests/test_world_checkpoint.py`.
+
+
+Scar-informed identity proposals now retain their exact source scar, authored policy, cue, severity, and evaluation tick in `ScarIdentityProposalLedger`. Include `scar_identity_proposals=...` with the scar and identity decision ledgers in `SimulationWorldCheckpoint.capture` to preserve proposal provenance and validate any later accepted or rejected decision on restore. See `docs/NPC-IDENTITY-EVOLUTION.md` and `tests/test_scar_identity_proposals.py`.
+
+
+`IdentityEvolutionAuditTrail` provides a read-only join from authoritative experience and owner-specific autobiographical memory through accepted scar, exact identity proposal, NPC consent decision, and resulting trait value. Rebuild it from the restored event, life-history, scar, proposal, and identity-decision ledgers. See `docs/NPC-IDENTITY-EVOLUTION.md` and `tests/test_identity_evolution_audit.py`.
+
+
+`IdentityEvolutionAuditTrail.build(events, life_history, scars, proposals, decisions)` provides a read-only join from authoritative experience and owner-specific autobiographical memory through accepted scar, exact identity proposal, NPC consent decision, and resulting trait value. Rebuild it from the restored event, life-history, scar, proposal, and identity-decision ledgers. See `docs/NPC-IDENTITY-EVOLUTION.md` and `tests/test_identity_evolution_audit.py`.
+
+
+The [NPC action execution and recovery layer](docs/NPC-ACTION-EXECUTION.md) takes explicit steps from an approved plan, rechecks live preconditions, supports multi-tick work with resource reservations, resumes active progress from canonical snapshots, and releases reservations on interruption or cancellation. Completed actions can advance explicitly mapped GoalBook progress. Execution is journaled and replay-safe; the world driver still owns replanning; `SimulationWorldCheckpoint` can atomically persist facts, resources, execution progress, and the event journal. Tests: `tests/test_action_execution.py`.
+
+
+NPC action execution state can be included in `SimulationWorldCheckpoint` with `action_executions`, `action_world_facts`, and `action_resources`. Restore the checkpoint, then call `RestoredSimulation.restore_action_execution_ledger(planner, policies)` to resume active actions against the restored world event journal and resource/fact state.
+
+The [NPC action replanning coordinator](docs/NPC-ACTION-EXECUTION.md) connects
+live world facts, current GoalBook priorities, symbolic planning, resource
+feasibility checks, and the persistent action executor. Explicit replanning
+after interruptions or changed priorities cancels obsolete active work,
+preserves execution history, and starts the first action of a feasible
+replacement plan. Replan requests are replay-safe and journaled. Tests:
+`tests/test_npc_action_replanning.py`.
+
+
+Autonomous NPC replanning history is now part of the composite world checkpoint. The saved request signatures, selected goals, plan results, outcomes, and journal references restore alongside action execution state. Reconstruct the execution ledger first, then rebind the NPCActionReplanningCoordinator to the restored GoalBook and shared event journal; replaying an identical request will not duplicate an action. See the action execution and replanning guide (docs/NPC-ACTION-EXECUTION.md).
+
+
+NPC action outcomes can be evaluated against immutable execution records and the authoritative event journal with `ActionPlanEvaluationLedger`. It compares declared effects, resource costs, and duration with observed terminal results, retains evidence event IDs, and exposes a bounded per-action reliability estimate only after a configurable minimum sample count. Learning is a separate projection: it never rewrites prior plans, decisions, or execution history. See [docs/NPC-ACTION-EVALUATION.md](docs/NPC-ACTION-EVALUATION.md) and `tests/test_action_evaluation.py`.
+
+
+Action evaluation history and its bounded reliability projection are also persisted by `SimulationWorldCheckpoint` using `action_evaluations=...`. Restore the execution ledger first, then call `RestoredSimulation.restore_action_evaluation_ledger(executions)`, and pass that ledger to `restore_action_replanning_coordinator(decisions, executions, evaluations)`. The checkpoint validates each evaluation against its terminal execution record, evaluation journal event, and evidence event IDs. Older checkpoints without evaluation state remain compatible. See [docs/NPC-ACTION-EVALUATION.md](docs/NPC-ACTION-EVALUATION.md).
+
+
+Multi-step NPC plans now receive aggregate outcome assessments in addition to per-action evaluations. The aggregate records the goal facts expected by the selected plan, which were actually observed at its terminal step, incomplete goal facts, completed/failed steps, and evidence-linked action deviations. Access the result through `NPCActionProgression.plan_evaluation`; the append-only history is available from `ActionPlanEvaluationLedger.plan_history` and is included in evaluation snapshots and world checkpoints.
+
+
+NPC replanning now incorporates evidence-bounded learning. Once enough terminal observations exist, action reliability adjusts proposal costs without changing declared action costs. Aggregate plan reliability is learned separately for each goal and ordered action sequence, allowing previously unreliable routes to receive a bounded risk premium. Unobserved interruptions do not become fabricated plan outcome samples. Both projections persist with action-evaluation snapshots and world checkpoints.
+
+
+NPC strategic experience transfer is now available as a provenance-safe component in `simreality/npc_experience_transfer.py`. A recipient stores a reported account—not a personal memory—with links to the source autobiographical memory, original event, source role, and later communication event. Transfers are idempotent and component snapshots revalidate their evidence chain. Decision-time retrieval weights personal participation at 1.0, witnessed events at 0.6, and reported accounts at 0.35 multiplied by report confidence. The optional transfer component now persists in composite world checkpoints alongside its required autobiographical history and event journal. See `docs/NPC-EXPERIENCE-TRANSFER.md`, `tests/test_npc_experience_transfer.py`, and `tests/test_world_checkpoint.py`.
+
+
+Experience-aware NPC replanning can now optionally use autobiographical and transferred experience. Actions declare exact `experience_tags`; only matching memories with explicit `outcome:success` or `outcome:failure` tags affect bounded action guidance. Personal, witnessed, and reported evidence retain distinct weights, repeated reports of one event are deduplicated, and the selected decision preserves evidence IDs. See [docs/NPC-EXPERIENCE-TRANSFER.md](docs/NPC-EXPERIENCE-TRANSFER.md) and [tests/test_experience_guided_planning.py](tests/test_experience_guided_planning.py).
+
+
+NPC goal selection can also consume explicit goal-outcome memories. Goals opt in with `metadata["experience_tags"]`; only matching memories tagged `goal:success` or `goal:failure` adjust their evaluated score, within a ±25% bound. Stored goal priority and progress remain unchanged. See [the experience-transfer guide](docs/NPC-EXPERIENCE-TRANSFER.md) and the goal-priority regression tests.
+
+
+The unified [NPC motivational projection](docs/NPC-MOTIVATIONAL-SYSTEM.md) combines explicit emotional-axis rules, stress-adaptation channels, and optional strategic experience into bounded, temporary goal-ranking modifiers. It is read-only and can be supplied to both the decision cycle and adaptive replanning. Tests: `tests/test_npc_motivation.py`.
+
+See [NPC goal lifecycle persistence](docs/NPC-GOAL-LIFECYCLE-PERSISTENCE.md) for adoption, retirement, reopening, and save/load invariants.
+
+## Goal reassessment application
+
+- `simreality/goal_review_application.py` — explicit, stale-state-checked application of accepted goal reviews with replay protection.
+- `simreality/goal_review_application_save_state.py` — canonical persistence for applied review decisions.
+- `docs/GOAL-REASSESSMENT.md` — review proposal, decision, application, and checkpoint lifecycle.
+
+- `simreality/goal_recovery.py` — deterministic, circumstance-fingerprinted proposals to reopen abandoned intentions after explicit need/world-fact recovery.
+- `tests/test_goal_recovery.py` — recovery gating, stale-context rejection, and lifecycle reopening coverage.
+
+- `GoalRecoveryReplanningAdapter` — explicit recovery-to-action bridge: reopens a viable intention, cancels superseded active work when requested, and replans from live world state without erasing execution history.
+- `tests/test_goal_recovery_replanning.py` — replacement action selection, cancellation, and replay-safe recovery integration coverage.
+
+
+Persistent goal execution health is assessed by GoalExecutionHealthEvaluator. Consecutive terminal plan failures only generate read-only review proposals after configurable failure-count and observation-window thresholds; successful plans reset the streak, while replanning is not misclassified as failure. Full action-evidence event IDs remain attached to the assessment, and accepted changes still use the established goal-review decision/application pipeline. See docs/GOAL-EXECUTION-HEALTH.md and tests/test_goal_execution_health.py.
+
+
+Alternative NPC intentions are generated read-only from authored goal-emergence rules and current need, emotion, stress, or experience evidence. Explicit adoption creates a distinct goal with lifecycle provenance while leaving the source intention unchanged; obsolescence remains governed by authored world-event review policies. See docs/NPC-ALTERNATIVE-INTENTIONS.md and tests/test_goal_alternatives.py.
+
+
+NPC intention arbitration now compares currently actionable ambitions using existing priority and deadline pressure alongside explicitly authored need alignment, emotional importance, personal-value alignment, and resource feasibility. An explicit commitment selects one goal while deferring competing ambitions without abandoning or mutating them. NPCDecisionCycle and NPCActionReplanningCoordinator can enforce that commitment without silently falling back to a deferred goal. The append-only commitment ledger prevents conflicting commitments for one NPC in the same tick and is persisted atomically with the GoalBook by SimulationWorldCheckpoint. See docs/NPC-GOAL-ARBITRATION.md and tests/test_goal_arbitration.py.
+
+
+Interrupted NPC actions can now resume from their persisted plan cursor through `NPCActionReplanningCoordinator.resume_interrupted`. Resumption preserves the original terminal execution record, rechecks live preconditions and resource feasibility, starts a deterministic continuation identity, and skips already completed plan steps. See docs/NPC-ACTION-EXECUTION.md and tests/test_npc_action_replanning.py.
+
+
+NPC long-term intention memory now preserves why an ambition was adopted or reopened, which goal was committed to, which competing intentions were deferred, and the observed outcomes of its plans. `GoalIntentionMemoryAdapter` builds these memories only from exact lifecycle, commitment, plan-evaluation, and autobiographical evidence references; it never fabricates motives or semantically guesses which experiences matter. Canonical snapshots preserve the immutable cross-reference history, and the optional component is validated and restored by `SimulationWorldCheckpoint` alongside its source ledgers. See [docs/NPC-GOAL-INTENTION-MEMORY.md](docs/NPC-GOAL-INTENTION-MEMORY.md) and `tests/test_goal_intention_memory.py`.
+
+
+**Reflective NPC goal arbitration:** NPCs can now recall provenance-linked autobiographical experiences when reconsidering long-term intentions. Authored per-goal memory weights decay over time, are strictly bounded, and are included in deterministic arbitration identity; remembered failures influence priorities without permanently locking goals. See [docs/NPC-GOAL-INTENTION-MEMORY.md](docs/NPC-GOAL-INTENTION-MEMORY.md) and `tests/test_goal_intention_recall.py`.
+
+
+Reflective goal reconsideration also integrates the existing strategic experience-transfer ledger: exact goal-tagged memories retain distinct personal, witnessed, and confidence-discounted reported source classes. Reported experiences influence appraisal without becoming autobiographical memories, and overlapping first-hand evidence is deduplicated per goal. See [the intention-memory guide](docs/NPC-GOAL-INTENTION-MEMORY.md).
+
+
+NPCs can now reflect on terminal plan outcomes through exact, authored causal mappings and deterministic counterfactual planning. The read-only reasoner distinguishes candidate causes such as an NPC's own decision, measured resource shortage, another NPC's participation, and changed circumstances only when the corresponding evidence is present. It can compare bounded alternatives by excluding authored actions and rerunning the symbolic planner; hypothetical alternatives never rewrite history or prove causality. See docs/NPC-GOAL-REFLECTION.md and tests/test_npc_goal_reflection.py.
+
+
+NPC strategy beliefs now form from repeated, comparable terminal plan outcomes. Reliability is owner-, goal-, strategy-, and context-specific; replanned or unobserved outcomes are neutral. Bayesian-style evidence aggregation emits proposals only after a minimum sample and meaningful confidence shift, and NPCs explicitly accept or reject each proposal. Accepted beliefs can feed the existing planner's bounded risk premium without changing authored action costs. Strategy observations and decisions persist through SimulationWorldCheckpoint with source-plan and event-provenance validation. See docs/NPC-STRATEGY-BELIEFS.md and tests/test_npc_strategy_beliefs.py.
+
+## Campaign life continuity
+
+Campaign transitions can now carry the complete LifeSimulation service state alongside each world timeline. LifeItselfCampaign.record_death(..., life_simulation=...) resolves outstanding responsibilities before the world is frozen; continue_as_ghost(..., life_simulation=...) validates service ownership; and start_fresh_life(...) archives the old service snapshot before returning a new service bound to the fresh world.
+
+Archived service snapshots are keyed by the timeline's death-archive ID and stored with the campaign JSON. visit_archive_runtime(archive_id) returns a detached archived world and, when one was captured, a restored LifeSimulation bound to that exact world. Old campaign payloads without archived service snapshots remain supported. Composite SimulationWorldCheckpoint persistence includes this campaign data and separately stores the active service snapshot.
+
+Regression coverage: tests/test_campaign_lifecycle.py and tests/test_world_checkpoint.py.
+
+
+## Cross-life campaign knowledge
+
+`CampaignKnowledgeLedger` preserves attributed world evidence across lives without transferring a previous character's private memories, personality, or personal relationships. Query shared claims with provenance through `LifeItselfCampaign.shared_belief()` and `shared_evidence_for()`. Evidence remains source-attributed and confidence is not treated as objective truth. See [the cross-life knowledge guide](docs/CROSS-LIFE-CAMPAIGN-KNOWLEDGE.md).
+
+
+NPC knowledge acquisition now has an explicit bridge: `SocialBeliefSystem.learn_campaign_evidence(observer_id, campaign.shared_knowledge, claim_id)` imports a selected campaign claim into one NPC's private belief ledger, weighted by that NPC's trust in the original sources. No automatic broadcast occurs. Imported beliefs use the existing social-belief persistence codec and checkpoint pipeline.
+
+
+## Atomic world tick integration
+
+`SimulationWorldTickPipeline` now connects travel advancement, physical-presence
+synchronization, explicitly confirmed encounters, and social event processing in
+one ordered transaction. Failed phases roll back their event, movement, presence,
+encounter, memory, trust, belief, and replay mutations; identical requests replay
+idempotently. See [the world tick pipeline guide](docs/WORLD-TICK-PIPELINE.md)
+and `tests/test_world_tick_pipeline.py`.
+
+
+## Host-frame runtime and thread boundary
+
+The portable C++ runtime now exposes independent real-time and simulation-time
+clocks through `SimulationWorld::advance_frame`, including pause and time-scale
+support. A bounded lock-free SPSC command/snapshot transport is available in
+`cpp/include/simreality/SpscRingBuffer.h`. See
+[the runtime clocks and bus guide](docs/RUNTIME-CLOCKS-AND-BUS.md).
+
+
+## Spatial and sensory primitives
+
+The C++ core now includes a deterministic 3D uniform-grid broadphase, exact
+radius/AABB queries, range-and-FOV vision assessment, attenuated acoustic
+assessment, bounded crowd-separation steering, and stateless lane-centerline
+following with arc-length look-ahead and force-limited velocity correction. The
+world coordinator also exposes derived NPC position/facing registration,
+deterministic nearby queries, and range/FOV/occlusion-filtered visibility
+queries, inverse-square acoustic reach/occlusion queries, and predictive
+closest-approach collision avoidance integrated into lane-following movement. Lane-driven NPC
+movement updates velocity, facing, and indexed
+position; spatially discovered witnesses feed directly into the durable
+witness-memory/event pipeline. Spatial positions, facing, and velocity remain
+host-restored derived state, not durable NPC fields. See
+[the spatial and sensory foundation guide](docs/SPATIAL-SENSORY-FOUNDATION.md).
+
+
+World save schema v11 preserves both runtime clocks; versions 5–10 remain readable
+and initialize the new wall-clock field to zero.
+
+
+## Coordinated lane traffic
+
+The C++ core also provides `LaneTrafficCoordinator` for deterministic, tick-based
+lane-capacity admission. It resolves simultaneous pedestrian/vehicle requests by
+authored priority, accumulated wait credit, and stable entity-ID tie-breaks;
+reservations expire on simulation ticks and can be released on lane exit. This is
+a reservation/admission layer, not a substitute for geometric collision or
+intersection resolution. `SimulationWorld` enforces a live reservation before
+its reserved-lane movement entry point will advance an NPC. See
+[docs/LANE-TRAFFIC.md](docs/LANE-TRAFFIC.md).
+
+
+## Deterministic intersection right-of-way
+
+The C++ runtime now includes `IntersectionTrafficCoordinator`: authored
+intersection movements claim complete sets of conflict zones atomically.
+Simultaneous non-conflicting movements can proceed together; overlapping
+movements are arbitrated by authored priority, accumulated wait credit, and
+stable entity identity. Reservations renew and expire on explicit simulation
+ticks, and the world refuses intersection-entry movement without the matching
+live movement grant. Conflict-zone geometry and movement definitions remain
+host-authored. See [docs/INTERSECTION-TRAFFIC.md](docs/INTERSECTION-TRAFFIC.md).
+
+
+## Transactional route-segment handoff
+
+`SimulationWorld::advance_npc_on_reserved_route_segment` joins lane admission,
+intersection grants, and predictive collision-aware movement. The destination
+lane and any entered intersection must already be reserved. The source lane
+and any cleared intersection remain reserved during movement and are released
+only after the movement step commits. The returned result reports which
+occupancy tokens were released. This is a single-threaded world-operation
+transaction; hosts must serialize world mutation and continue renewing leases
+while entities physically occupy their lanes or conflict zones.
+
+## Deterministic route planning and recovery
+
+The C++ core now includes `TrafficRoutePlanner`, a directed lane-graph planner
+with deterministic shortest-path selection, lexicographic path tie-breaking,
+and caller-supplied congestion and hazard costs. Its reservation look-ahead
+method emits the next lane and intersection requests for the existing lane and
+conflict-zone coordinators; it does not grant reservations itself.
+
+`RouteProgressMonitor` detects consecutive simulation ticks without measured
+progress and emits a replan request. It never teleports an entity or releases
+its current occupancy tokens. A host must calculate a replacement route,
+acquire its next lane/intersection reservations while retaining current
+occupancy, and then use
+`SimulationWorld::advance_npc_on_reserved_route_segment` for the safe handoff.
+See [docs/ROUTE-PLANNING-AND-RECOVERY.md](docs/ROUTE-PLANNING-AND-RECOVERY.md).
+
+## Live traffic and journey recovery
+
+The route planner can now read a deterministic snapshot of active lane reservations via TrafficRoutePlanner::plan_live. JourneyReservationManager renews current lane and intersection leases across multi-segment journeys, while TrafficDeadlockDetector identifies wait-for cycles as advisory recovery candidates. Neither tracking nor deadlock detection releases physical occupancy; replacement grants and guarded route handoff are required before clearance. See [the traffic recovery guide](docs/TRAFFIC-RECOVERY.md).
+
+
+## Durable traffic planning and recovery
+
+Route planning now accounts for live intersection conflict-zone pressure as well as lane admission congestion. Resource-aware deadlock proposals identify blocked resources and candidate replacement grants without revoking current occupancy. A versioned traffic recovery checkpoint persists coordinator reservations, journey occupancy, route progress, and wait-for edges for deterministic continuation. See [docs/DURABLE-TRAFFIC-RECOVERY.md](docs/DURABLE-TRAFFIC-RECOVERY.md).
