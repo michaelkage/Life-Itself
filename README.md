@@ -578,3 +578,13 @@ host-restored derived state, not durable NPC fields. See
 
 World save schema v11 preserves both runtime clocks; versions 5–10 remain readable
 and initialize the new wall-clock field to zero.
+
+
+## Coordinated lane traffic
+
+The C++ core also provides `LaneTrafficCoordinator` for deterministic, tick-based
+lane-capacity admission. It resolves simultaneous pedestrian/vehicle requests by
+authored priority, accumulated wait credit, and stable entity-ID tie-breaks;
+reservations expire on simulation ticks and can be released on lane exit. This is
+a reservation/admission layer, not a substitute for geometric collision or
+intersection resolution. See [docs/LANE-TRAFFIC.md](docs/LANE-TRAFFIC.md).
