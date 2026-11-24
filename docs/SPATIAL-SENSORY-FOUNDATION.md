@@ -100,3 +100,15 @@ intersection solver. Hosts should combine it with lane reservations, right-of-wa
 rules, vehicle dimensions, braking envelopes, and authoritative collision
 resolution. The caller owns broadphase selection and must provide all relevant
 moving bodies within the prediction horizon.
+
+
+## World-integrated collision-aware lane movement
+
+`SimulationWorld::advance_npc_on_lane_avoiding_collisions` gathers registered
+moving NPCs from a caller-sized spatial broadphase, computes lane-following
+steering and predictive closest-approach avoidance, combines both accelerations,
+clamps speed, and updates the derived spatial transform. Collision radii,
+prediction horizon, avoidance acceleration cap, and broadphase radius are
+explicit host policy inputs. The host must choose a broadphase radius large
+enough to include every relevant body over the horizon; this API does not claim
+global collision completeness or replace intersection/right-of-way arbitration.
