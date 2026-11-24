@@ -130,21 +130,28 @@ RouteLookaheadIntents TrafficRoutePlanner::reservation_lookahead(
     const RoutePlan& route, std::size_t current_step_index,
     const std::string& entity_id, std::int32_t priority,
     std::size_t lookahead_segments) const {
-    if (entity_id.empty() || route.steps.empty()
+    if (entity_id.empty() || route.source_lane_id.empty()
+        || route.destination_lane_id.empty() || route.steps.empty()
         || current_step_index >= route.steps.size() || lookahead_segments == 0U) {
         throw std::invalid_argument("route look-ahead arguments are invalid");
     }
-    if (route.steps.front().lane_id != route.source_lane_id
+    if (route.steps.front().lane_id.empty()
+        || route.steps.front().lane_id != route.source_lane_id
         || route.steps.back().lane_id != route.destination_lane_id
         || !route.steps.front().entry_intersection_id.empty()
         || !route.steps.front().entry_movement_id.empty()) {
         throw std::invalid_argument("route plan endpoints or first step are inconsistent");
     }
+    std::set<std::string> visited_lanes;
+    for (const RouteStep& step : route.steps) {
+        if (step.lane_id.empty() || !visited_lanes.insert(step.lane_id).second) {
+            throw std::invalid_argument("route plan contains an empty or repeated lane");
+        }
+    }
     for (std::size_t i = 1U; i < route.steps.size(); ++i) {
         const RouteStep& previous = route.steps[i - 1U];
         const RouteStep& step = route.steps[i];
-        if (step.lane_id.empty()
-            || (step.entry_intersection_id.empty() != step.entry_movement_id.empty())) {
+        if (step.entry_intersection_id.empty() != step.entry_movement_id.empty()) {
             throw std::invalid_argument("route plan contains an incomplete transition");
         }
         const auto edge = edges_.find({previous.lane_id, step.lane_id});
