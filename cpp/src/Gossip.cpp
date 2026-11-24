@@ -122,6 +122,7 @@ Rumour corroborate(const Rumour& a, const Rumour& b) {
     out.timestamp_hour = std::max(a.timestamp_hour, b.timestamp_hour);
     out.source_entity_id = b.source_entity_id;
     out.source_reliability = b.source_reliability;
+    out.root_evidence_id = b.root_evidence_id;
     return out;
 }
 
@@ -137,6 +138,11 @@ std::optional<Rumour> retell(const NPCMemory& memory) {
     out.timestamp_hour = memory.timestamp_hour;
     out.source_entity_id = memory.witness_id;
     out.source_reliability = 1.0;
+    out.root_evidence_id = memory.root_evidence_id.empty()
+        ? "evidence:" + memory.witness_id + ":" + memory.target_entity_id
+            + ":action:" + std::to_string(static_cast<unsigned int>(memory.action_tag))
+            + ":" + std::to_string(std::llround(memory.timestamp_hour * 1000.0))
+        : memory.root_evidence_id;
     return out;
 }
 
@@ -175,6 +181,7 @@ Conversation converse(NPC& listener, const NPC& speaker, const DistrictId& distr
             updated.timestamp_hour = memory.timestamp_hour;
             updated.action_tag = memory.action_tag;
             updated.description = rumour.description;
+            updated.root_evidence_id = rumour.root_evidence_id;
             listener.memories[*match] = updated;
         } else {
             NPCMemory received;
@@ -185,6 +192,7 @@ Conversation converse(NPC& listener, const NPC& speaker, const DistrictId& distr
             received.timestamp_hour = memory.timestamp_hour;
             received.action_tag = memory.action_tag;
             received.description = rumour.description;
+            received.root_evidence_id = rumour.root_evidence_id;
             listener.memories.push_back(received);
         }
         conversation.transferred.push_back(rumour);
