@@ -135,6 +135,13 @@ public:
         const EntityId& npc_id, const std::vector<SpatialPoint>& lane_centerline,
         double elapsed_seconds, double lookahead_distance,
         double desired_speed, double maximum_acceleration);
+    [[nodiscard]] LaneFollowingResult advance_npc_on_lane_avoiding_collisions(
+        const EntityId& npc_id, const std::vector<SpatialPoint>& lane_centerline,
+        double elapsed_seconds, double lookahead_distance,
+        double desired_speed, double lane_maximum_acceleration,
+        double collision_radius, double neighbor_collision_radius,
+        double prediction_horizon_seconds, double maximum_avoidance_acceleration,
+        double broadphase_radius);
     [[nodiscard]] std::vector<EntityId> visible_npcs(
         SpatialPoint target_position, double maximum_range,
         double field_of_view_radians,
