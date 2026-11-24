@@ -79,5 +79,22 @@ int main() {
     try { IntersectionTrafficCoordinator invalid(0U); (void)invalid; }
     catch (const std::invalid_argument&) { threw = true; }
     assert(threw);
+    // Equal-priority wait credit overcomes the stable ID tie-break after release.
+    IntersectionTrafficCoordinator fairness(3U);
+    fairness.configure_movement({"fair", "a-move", {"shared"}});
+    fairness.configure_movement({"fair", "z-move", {"shared"}});
+    fairness.advance_tick(1U);
+    const auto fair_first = fairness.resolve({
+        {"fair", "z-move", "z-entity", 0},
+        {"fair", "a-move", "a-entity", 0}});
+    assert((fair_first.granted_entity_ids == std::vector<std::string>{"a-entity"}));
+    assert((fair_first.denied_entity_ids == std::vector<std::string>{"z-entity"}));
+    fairness.release("fair", "a-entity");
+    fairness.advance_tick(2U);
+    const auto fair_second = fairness.resolve({
+        {"fair", "a-move", "a-entity", 0},
+        {"fair", "z-move", "z-entity", 0}});
+    assert((fair_second.granted_entity_ids == std::vector<std::string>{"z-entity"}));
+    assert((fair_second.denied_entity_ids == std::vector<std::string>{"a-entity"}));
     return 0;
 }
