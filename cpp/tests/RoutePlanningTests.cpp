@@ -23,6 +23,16 @@ int main() {
     assert(uncongested_alternate.steps[1].lane_id == "C");
     assert(uncongested_alternate.total_cost == 4.0);
 
+    LaneTrafficCoordinator live_traffic(3U);
+    live_traffic.configure_lane("B", 2U);
+    live_traffic.configure_lane("C", 2U);
+    live_traffic.advance_tick(1U);
+    const auto live_admission = live_traffic.resolve({
+        {"B", "occupant-1", 0}, {"B", "occupant-2", 0}});
+    assert(live_admission.granted_entity_ids.size() == 2U);
+    const auto live_route = planner.plan_live("A", "D", live_traffic);
+    assert(live_route.steps[1].lane_id == "C");
+
     TrafficRoutePlanner ties;
     ties.upsert_edge({"S", "Z", {}, {}, 1.0, 0.0, 0.0});
     ties.upsert_edge({"Z", "T", {}, {}, 1.0, 0.0, 0.0});
