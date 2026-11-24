@@ -39,7 +39,7 @@ handoff, and release old resources only after confirmed clearance.
   wait credits;
 - journey-scoped physical occupancy renewals;
 - route-progress observations, stall counters and the configured threshold;
-- pending resource-aware wait-for edges.
+- pending resource-aware wait-for edges and the exact deterministic recovery proposals, including participants, contested resource owners, and replacement reservation requests.
 
 `save_traffic_recovery_checkpoint` and
 `load_traffic_recovery_checkpoint` use a versioned, fixed-width little-endian
