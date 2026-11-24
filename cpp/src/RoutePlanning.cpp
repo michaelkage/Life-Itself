@@ -20,6 +20,8 @@ void TrafficRoutePlanner::upsert_edge(RouteEdgeDefinition edge) {
         || !std::isfinite(edge.traversal_cost) || edge.traversal_cost < 0.0
         || !std::isfinite(edge.congestion_cost_per_occupant)
         || edge.congestion_cost_per_occupant < 0.0
+        || !std::isfinite(edge.conflict_pressure_cost_per_reservation)
+        || edge.conflict_pressure_cost_per_reservation < 0.0
         || !std::isfinite(edge.hazard_penalty) || edge.hazard_penalty < 0.0
         || (edge.intersection_id.empty() != edge.movement_id.empty())) {
         throw std::invalid_argument("route edge contains invalid identifiers or costs");
@@ -35,7 +37,8 @@ bool TrafficRoutePlanner::erase_edge(
 RoutePlan TrafficRoutePlanner::plan(
     const std::string& source_lane_id,
     const std::string& destination_lane_id,
-    const std::map<std::string, std::size_t>& lane_occupancy) const {
+    const std::map<std::string, std::size_t>& lane_occupancy,
+    const std::map<std::pair<std::string, std::string>, std::size_t>& conflict_pressure) const {
     if (source_lane_id.empty() || destination_lane_id.empty()) {
         throw std::invalid_argument("route endpoints must not be empty");
     }
@@ -84,9 +87,13 @@ RoutePlan TrafficRoutePlanner::plan(
             const auto occupancy = lane_occupancy.find(key.destination);
             const double occupied = occupancy == lane_occupancy.end()
                 ? 0.0 : static_cast<double>(occupancy->second);
+            const auto pressure = conflict_pressure.find({edge.intersection_id, edge.movement_id});
+            const double conflicts = pressure == conflict_pressure.end()
+                ? 0.0 : static_cast<double>(pressure->second);
             const double edge_cost = edge.traversal_cost
                 + edge.hazard_penalty
-                + edge.congestion_cost_per_occupant * occupied;
+                + edge.congestion_cost_per_occupant * occupied
+                + edge.conflict_pressure_cost_per_reservation * conflicts;
             const double candidate_cost = selected->second.cost + edge_cost;
             if (!std::isfinite(candidate_cost)) {
                 throw std::overflow_error("route cost is not representable");
@@ -131,6 +138,14 @@ RoutePlan TrafficRoutePlanner::plan_live(
     const std::string& source_lane_id, const std::string& destination_lane_id,
     const LaneTrafficCoordinator& live_lanes) const {
     return plan(source_lane_id, destination_lane_id, live_lanes.occupancy_snapshot());
+}
+
+RoutePlan TrafficRoutePlanner::plan_live(
+    const std::string& source_lane_id, const std::string& destination_lane_id,
+    const LaneTrafficCoordinator& live_lanes,
+    const IntersectionTrafficCoordinator& live_intersections) const {
+    return plan(source_lane_id, destination_lane_id, live_lanes.occupancy_snapshot(),
+        live_intersections.conflict_pressure_snapshot());
 }
 
 RouteLookaheadIntents TrafficRoutePlanner::reservation_lookahead(
