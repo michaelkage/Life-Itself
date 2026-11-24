@@ -40,6 +40,43 @@ int main() {
     assert(stationary.desired_velocity.x == 0.0);
     assert(stationary.steering_force.x == 0.0);
 
+    const std::vector<MovingBody> crossing{
+        {"pedestrian-b", {5.0, -2.0, 0.0}, {0.0, 2.0, 0.0}, 0.5},
+        {"vehicle-a", {5.0, 3.0, 0.0}, {0.0, -2.0, 0.0}, 1.0}};
+    const auto avoidance = compute_collision_avoidance(
+        "subject", {0.0, 0.0, 0.0}, {2.0, 0.0, 0.0}, 0.5,
+        crossing, 3.0, 4.0);
+    assert(avoidance.predicted_conflicts == 2U);
+    assert(avoidance.magnitude > 0.0 && avoidance.magnitude <= 4.0);
+    assert(avoidance.earliest_conflict_seconds > 0.0);
+    const auto reordered = compute_collision_avoidance(
+        "subject", {0.0, 0.0, 0.0}, {2.0, 0.0, 0.0}, 0.5,
+        {crossing[1], crossing[0]}, 3.0, 4.0);
+    assert(avoidance.acceleration.x == reordered.acceleration.x);
+    assert(avoidance.acceleration.y == reordered.acceleration.y);
+    assert(avoidance.acceleration.z == reordered.acceleration.z);
+
+    const auto separated = compute_collision_avoidance(
+        "subject", {0.0, 0.0, 0.0}, {}, 0.5,
+        {{"far", {10.0, 0.0, 0.0}, {}, 0.5}}, 2.0, 3.0);
+    assert(separated.predicted_conflicts == 0U);
+    assert(separated.magnitude == 0.0);
+
+    const auto overlap = compute_collision_avoidance(
+        "subject", {}, {}, 0.5,
+        {{"coincident", {}, {}, 0.5}}, 1.0, 2.0);
+    assert(overlap.predicted_conflicts == 1U);
+    assert(std::abs(overlap.magnitude - 1.0) < 1e-9);
+
+    bool rejected_duplicate_body = false;
+    try {
+        (void)compute_collision_avoidance("subject", {}, {}, 0.5,
+            {{"same", {}, {}, 0.5}, {"same", {}, {}, 0.5}}, 1.0, 1.0);
+    } catch (const std::invalid_argument&) {
+        rejected_duplicate_body = true;
+    }
+    assert(rejected_duplicate_body);
+
     bool rejected_degenerate_lane = false;
     try {
         (void)compute_lane_following({0.0, 0.0, 0.0}, {}, {{1.0, 1.0, 1.0},
