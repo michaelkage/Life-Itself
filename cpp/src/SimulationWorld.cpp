@@ -21,6 +21,246 @@ SimulationWorld::SimulationWorld(
       runtime_(initial_hour, initial_real_time_seconds),
       random_(random_seed) {}
 
+std::vector<BeliefRevision> SimulationWorld::belief_history_for(
+    const EntityId& npc_id, const EntityId& target_id) const {
+    const auto npc = std::find_if(
+        state_.npcs.begin(), state_.npcs.end(),
+        [&npc_id](const NPC& candidate) { return candidate.entity_id == npc_id; });
+    if (npc == state_.npcs.end()) return {};
+
+    std::vector<BeliefRevision> history;
+    history.reserve(npc->belief_revision_history.size());
+    for (const BeliefRevision& revision : npc->belief_revision_history) {
+        if (target_id.empty() || revision.target_entity_id == target_id) {
+            history.push_back(revision);
+        }
+    }
+    std::stable_sort(history.begin(), history.end(),
+        [](const BeliefRevision& left, const BeliefRevision& right) {
+            if (left.recorded_hour != right.recorded_hour)
+                return left.recorded_hour < right.recorded_hour;
+            return left.event_timestamp_hour < right.event_timestamp_hour;
+        });
+    return history;
+}
+
+std::vector<BeliefRevisionExplanation> SimulationWorld::belief_explanations_for(
+    const EntityId& npc_id, const EntityId& target_id) const {
+    const std::vector<BeliefRevision> history = belief_history_for(npc_id, target_id);
+    std::vector<BeliefRevisionExplanation> explanations;
+    explanations.reserve(history.size());
+    for (const BeliefRevision& revision : history) {
+        BeliefRevisionExplanation explanation;
+        explanation.revision = revision;
+        explanation.confidence_delta =
+            revision.revised_confidence - revision.previous_confidence;
+        explanation.evidence_claims.reserve(revision.evidence_claim_ids.size());
+        for (const std::string& claim_id : revision.evidence_claim_ids) {
+            BeliefEvidenceClaimExplanation linked_claim;
+            linked_claim.requested_claim_id = claim_id;
+            if (const InformationClaim* claim = information_.find(claim_id)) {
+                linked_claim.resolved = true;
+                linked_claim.claim = *claim;
+                linked_claim.lineage = information_.lineage_for_claim(claim_id);
+            }
+            explanation.evidence_claims.push_back(std::move(linked_claim));
+        }
+        explanations.push_back(std::move(explanation));
+    }
+    return explanations;
+}
+
+std::vector<NPCBelief> SimulationWorld::beliefs_about_event(
+    const EntityId& npc_id, const EntityId& target_id,
+    SimulationHour event_timestamp_hour) const {
+    if (target_id.empty() || !std::isfinite(event_timestamp_hour)) return {};
+    const auto npc = std::find_if(
+        state_.npcs.begin(), state_.npcs.end(),
+        [&npc_id](const NPC& candidate) { return candidate.entity_id == npc_id; });
+    if (npc == state_.npcs.end()) return {};
+
+    std::vector<NPCBelief> accounts;
+    for (const NPCBelief& belief : npc->beliefs) {
+        if (belief.target_entity_id == target_id
+            && belief.timestamp_hour == event_timestamp_hour) {
+            accounts.push_back(belief);
+        }
+    }
+    // Canonical ordering is for deterministic display only, not a truth ranking.
+    std::stable_sort(accounts.begin(), accounts.end(),
+        [](const NPCBelief& left, const NPCBelief& right) {
+            if (left.action_tag != right.action_tag)
+                return left.action_tag < right.action_tag;
+            return left.source_entity_id < right.source_entity_id;
+        });
+    return accounts;
+}
+
+
+std::vector<BeliefAccountExplanation> SimulationWorld::belief_account_explanations_for(
+    const EntityId& npc_id, const EntityId& target_id,
+    SimulationHour event_timestamp_hour) const {
+    const std::vector<NPCBelief> accounts =
+        beliefs_about_event(npc_id, target_id, event_timestamp_hour);
+    std::vector<BeliefAccountExplanation> explanations;
+    explanations.reserve(accounts.size());
+    if (accounts.empty()) return explanations;
+
+    const std::vector<BeliefRevisionExplanation> history =
+        belief_explanations_for(npc_id, target_id);
+    for (const NPCBelief& account : accounts) {
+        BeliefAccountExplanation explanation;
+        explanation.current_belief = account;
+        for (const BeliefRevisionExplanation& revision : history) {
+            if (revision.revision.target_entity_id == account.target_entity_id
+                && revision.revision.action_tag == account.action_tag
+                && revision.revision.event_timestamp_hour == account.timestamp_hour) {
+                explanation.revisions.push_back(revision);
+            }
+        }
+        explanations.push_back(std::move(explanation));
+    }
+    // Account order follows beliefs_about_event; each account's revisions retain
+    // the chronological ordering supplied by belief_explanations_for.
+    return explanations;
+}
+
+NPCInvestigationView SimulationWorld::investigation_view_for(
+    const EntityId& npc_id, const EntityId& target_id) const {
+    NPCInvestigationView view;
+    view.npc_id = npc_id;
+
+    const auto npc = std::find_if(
+        state_.npcs.begin(), state_.npcs.end(),
+        [&npc_id](const NPC& candidate) { return candidate.entity_id == npc_id; });
+    if (npc == state_.npcs.end()) return view;
+
+    for (InvestigationGroup& group :
+        information_.investigation_groups_for(npc_id)) {
+        if (target_id.empty() || group.subject_key == target_id) {
+            view.received_information.push_back(std::move(group));
+        }
+    }
+
+    for (const NPCBelief& belief : npc->beliefs) {
+        if (target_id.empty() || belief.target_entity_id == target_id) {
+            view.current_beliefs.push_back(belief);
+        }
+    }
+    // Stable display order is not a confidence or truth ranking.
+    std::stable_sort(view.current_beliefs.begin(), view.current_beliefs.end(),
+        [](const NPCBelief& left, const NPCBelief& right) {
+            if (left.timestamp_hour != right.timestamp_hour)
+                return left.timestamp_hour < right.timestamp_hour;
+            if (left.action_tag != right.action_tag)
+                return left.action_tag < right.action_tag;
+            return left.source_entity_id < right.source_entity_id;
+        });
+
+    view.belief_history = belief_explanations_for(npc_id, target_id);
+
+    // Build account-local timelines from the same chronological history. Match
+    // the exact target, action interpretation, and event timestamp so revisions
+    // for a competing account are never presented as if they explained this one.
+    for (const NPCBelief& belief : view.current_beliefs) {
+        BeliefAccountExplanation account;
+        account.current_belief = belief;
+        for (const BeliefRevisionExplanation& revision : view.belief_history) {
+            if (revision.revision.target_entity_id == belief.target_entity_id
+                && revision.revision.action_tag == belief.action_tag
+                && revision.revision.event_timestamp_hour == belief.timestamp_hour) {
+                account.revisions.push_back(revision);
+            }
+        }
+        view.belief_accounts.push_back(std::move(account));
+    }
+
+    return view;
+}
+
+NPCDecisionContextExplanation SimulationWorld::decision_context_for(
+    const EntityId& npc_id, const std::vector<MoralChoiceOption>& options,
+    const EntityId& target_id) const {
+    NPCDecisionContextExplanation context;
+    context.npc_id = npc_id;
+    context.observed_at_hour = runtime_.total_hours();
+    context.investigation = investigation_view_for(npc_id, target_id);
+
+    const auto npc = std::find_if(
+        state_.npcs.begin(), state_.npcs.end(),
+        [&npc_id](const NPC& candidate) { return candidate.entity_id == npc_id; });
+    if (npc == state_.npcs.end()) return context;
+
+    context.relationships = npc->relationships;
+    context.option_explanations.reserve(options.size());
+    for (const MoralChoiceOption& option : options) {
+        context.option_explanations.push_back(explain_moral_choice(*npc, option));
+    }
+    return context;
+}
+
+MoralChoiceResolution SimulationWorld::record_moral_choice(
+    const EntityId& npc_id, const std::string& scenario_id,
+    const std::vector<MoralChoiceOption>& options,
+    const std::vector<MoralChoiceConsequence>& consequences) {
+    if (scenario_id.empty()) {
+        throw std::invalid_argument("recorded moral choice requires a scenario ID");
+    }
+    const auto npc = std::find_if(
+        state_.npcs.begin(), state_.npcs.end(),
+        [&npc_id](const NPC& candidate) { return candidate.entity_id == npc_id; });
+    if (npc == state_.npcs.end()) {
+        throw std::invalid_argument("recorded moral choice references an unknown NPC");
+    }
+
+    // Capture only information already delivered to this NPC before applying effects.
+    NPCDecisionRecord record;
+    record.recorded_hour = runtime_.total_hours();
+    record.scenario_id = scenario_id;
+    record.relationship_snapshot = npc->relationships;
+    record.loyalty_bias = npc->loyalty_bias;
+    record.skepticism = npc->skepticism;
+    record.compassion = npc->compassion;
+    record.fairness_value = npc->fairness_value;
+    record.safety_value = npc->safety_value;
+    record.freedom_value = npc->freedom_value;
+    record.self_interest_value = npc->self_interest_value;
+
+    for (const InvestigationGroup& group : information_.investigation_groups_for(npc_id)) {
+        for (const InvestigationEntry& entry : group.entries) {
+            record.evidence_claim_ids.push_back(entry.claim.claim_id);
+            if (std::find(record.evidence_root_ids.begin(), record.evidence_root_ids.end(),
+                    entry.claim.root_evidence_id) == record.evidence_root_ids.end()) {
+                record.evidence_root_ids.push_back(entry.claim.root_evidence_id);
+            }
+        }
+    }
+    std::sort(record.evidence_claim_ids.begin(), record.evidence_claim_ids.end());
+    std::sort(record.evidence_root_ids.begin(), record.evidence_root_ids.end());
+
+    const MoralChoiceResolution resolution =
+        simreality::resolve_moral_choice(*npc, options, consequences);
+    record.selected_option_id = resolution.choice.option_id;
+    record.selected_score = resolution.choice.score;
+    for (const MoralChoiceOption& option : options) {
+        record.option_scores.emplace(
+            option.option_id, evaluate_moral_choice(*npc, option).score);
+    }
+    // Scoring depends on stable value traits, which consequences do not mutate.
+    npc->decision_history.push_back(std::move(record));
+    return resolution;
+}
+
+std::vector<NPCDecisionRecord> SimulationWorld::decision_history_for(
+    const EntityId& npc_id) const {
+    const auto npc = std::find_if(
+        state_.npcs.begin(), state_.npcs.end(),
+        [&npc_id](const NPC& candidate) { return candidate.entity_id == npc_id; });
+    if (npc == state_.npcs.end()) return {};
+    return npc->decision_history;
+}
+
+
 GhostInfluenceResult SimulationWorld::attempt_ghost_influence(
     const EntityId& ghost_id, const EntityId& npc_id,
     const std::string& action, double hour_of_day) {
@@ -662,6 +902,43 @@ Conversation SimulationWorld::talk(
             if (rumour.action_tag == "Crime.Vandalism") return ActionTag::CrimeVandalism;
             return ActionTag::InteractionPolite;
         }();
+        const std::int64_t claim_tick = static_cast<std::int64_t>(
+            std::llround(std::max(0.0, runtime_.total_hours()) * 1000.0));
+        const std::string proposition = "action:" + std::to_string(static_cast<unsigned int>(believed_action));
+        const std::string root_source = rumour.source_entity_id.empty()
+            ? speaker_id : rumour.source_entity_id;
+        const std::string root_evidence = rumour.root_evidence_id.empty()
+            ? "evidence:" + root_source + ":" + rumour.target_entity_id + ":"
+                + proposition + ":" + std::to_string(std::llround(rumour.timestamp_hour * 1000.0))
+            : rumour.root_evidence_id;
+        std::string parent_claim_id;
+        for (const InformationClaim& received : information_.claims_received_by(speaker_id)) {
+            if (received.subject_key == rumour.target_entity_id
+                && received.proposition_key == proposition
+                && received.root_evidence_id == root_evidence) {
+                parent_claim_id = received.claim_id;
+            }
+        }
+        const std::string claim_id = "claim:" + speaker_id + ":" + listener_id + ":"
+            + root_evidence + ":" + std::to_string(claim_tick) + ":"
+            + std::to_string(information_.size());
+        if (!parent_claim_id.empty()) {
+            (void)information_.relay(parent_claim_id, claim_id, speaker_id, listener_id,
+                claim_tick, std::clamp(rumour.retention, 0.0, 1.0));
+        } else {
+            InformationClaim claim;
+            claim.claim_id = claim_id;
+            claim.subject_key = rumour.target_entity_id;
+            claim.proposition_key = proposition;
+            claim.root_evidence_id = root_evidence;
+            claim.source_entity_id = speaker_id;
+            claim.recipient_entity_id = listener_id;
+            claim.created_tick = claim_tick;
+            claim.confidence = std::clamp(rumour.retention, 0.0, 1.0);
+            claim.kind = root_source == speaker_id
+                ? InformationKind::Observation : InformationKind::Report;
+            (void)information_.record(claim);
+        }
         double source_reliability = 0.5;
         if (!speaker.beliefs.empty()) {
             double total = 0.0;
@@ -712,9 +989,27 @@ Conversation SimulationWorld::talk(
                     || prior.timestamp_hour != rumour.timestamp_hour
                     || prior.action_tag == believed_action) continue;
                 contradicted = true;
+                const double previous_confidence = prior.confidence;
                 prior.confidence = std::clamp(
                     prior.confidence - 0.20 * account_confidence, 0.0, 1.0);
                 ++prior.contradictions;
+                BeliefRevision revision;
+                revision.target_entity_id = prior.target_entity_id;
+                revision.action_tag = prior.action_tag;
+                revision.event_timestamp_hour = prior.timestamp_hour;
+                revision.previous_confidence = previous_confidence;
+                revision.revised_confidence = prior.confidence;
+                revision.reason = BeliefRevisionReason::Contradiction;
+                revision.source_entity_id = speaker_id;
+                revision.recorded_hour = runtime_.total_hours();
+                revision.source_reliability = source_reliability;
+                revision.loyalty_factor = loyalty_factor;
+                revision.compassion_factor = compassion_factor;
+                revision.skepticism_factor = skepticism_factor;
+                revision.evidence_factor = account_confidence;
+                revision.evidence_claim_ids.push_back(claim_id);
+                revision.evidence_root_ids.push_back(root_evidence);
+                listener.belief_revision_history.push_back(std::move(revision));
             }
         }
         if (belief == listener.beliefs.end()) {
@@ -725,10 +1020,28 @@ Conversation SimulationWorld::talk(
             // A first-hand belief keeps its provenance. Only a distinct source
             // can strengthen an existing second-hand account.
             if (!belief->directly_observed && !repeated_source_report) {
+                const double previous_confidence = belief->confidence;
                 belief->confidence = std::clamp(belief->confidence
                     + (1.0 - belief->confidence) * account_confidence * 0.25, 0.0, 1.0);
                 belief->source_entity_id = speaker_id;
                 ++belief->corroborations;
+                BeliefRevision revision;
+                revision.target_entity_id = belief->target_entity_id;
+                revision.action_tag = belief->action_tag;
+                revision.event_timestamp_hour = belief->timestamp_hour;
+                revision.previous_confidence = previous_confidence;
+                revision.revised_confidence = belief->confidence;
+                revision.reason = BeliefRevisionReason::IndependentEvidence;
+                revision.source_entity_id = speaker_id;
+                revision.recorded_hour = runtime_.total_hours();
+                revision.source_reliability = source_reliability;
+                revision.loyalty_factor = loyalty_factor;
+                revision.compassion_factor = compassion_factor;
+                revision.skepticism_factor = skepticism_factor;
+                revision.evidence_factor = account_confidence;
+                revision.evidence_claim_ids.push_back(claim_id);
+                revision.evidence_root_ids.push_back(root_evidence);
+                listener.belief_revision_history.push_back(std::move(revision));
             }
             if (contradicted) ++belief->contradictions;
         }
@@ -879,7 +1192,27 @@ std::size_t SimulationWorld::record_witnessed_action(
         memory.timestamp_hour = runtime_.total_hours();
         memory.action_tag = action_tag;
         memory.description = description;
+        const auto observed_tick = static_cast<std::int64_t>(
+            std::llround(std::max(0.0, runtime_.total_hours()) * 1000.0));
+        const std::string observed_proposition = "action:" + std::to_string(static_cast<unsigned int>(action_tag));
+        const std::string observed_root = "evidence:" + witness->entity_id + ":"
+            + actor_id + ":" + observed_proposition + ":"
+            + std::to_string(std::llround(runtime_.total_hours() * 1000.0));
+        memory.root_evidence_id = observed_root;
         witness->memories.push_back(memory);
+        const std::string observed_claim_id = "observation:" + observed_root + ":"
+            + std::to_string(information_.size());
+        InformationClaim observed_claim;
+        observed_claim.claim_id = observed_claim_id;
+        observed_claim.subject_key = actor_id;
+        observed_claim.proposition_key = observed_proposition;
+        observed_claim.root_evidence_id = observed_root;
+        observed_claim.source_entity_id = witness->entity_id;
+        observed_claim.recipient_entity_id = witness->entity_id;
+        observed_claim.created_tick = observed_tick;
+        observed_claim.confidence = 1.0;
+        observed_claim.kind = InformationKind::Observation;
+        (void)information_.record(observed_claim);
         // A first-hand observation is strong counter-evidence to a different
         // account about the same target and event hour. Preserve both interpretations,
         // but weaken the conflicting hearsay and record that it was challenged.
@@ -889,8 +1222,23 @@ std::size_t SimulationWorld::record_witnessed_action(
                 || prior.action_tag == action_tag) {
                 continue;
             }
+            const double previous_confidence = prior.confidence;
             prior.confidence = std::clamp(prior.confidence * 0.75, 0.0, 1.0);
             ++prior.contradictions;
+            BeliefRevision revision;
+            revision.target_entity_id = prior.target_entity_id;
+            revision.action_tag = prior.action_tag;
+            revision.event_timestamp_hour = prior.timestamp_hour;
+            revision.previous_confidence = previous_confidence;
+            revision.revised_confidence = prior.confidence;
+            revision.reason = BeliefRevisionReason::Contradiction;
+            revision.source_entity_id = witness->entity_id;
+            revision.recorded_hour = runtime_.total_hours();
+            revision.source_reliability = 1.0;
+            revision.evidence_factor = 1.0;
+            revision.evidence_claim_ids.push_back(observed_claim_id);
+            revision.evidence_root_ids.push_back(observed_root);
+            witness->belief_revision_history.push_back(std::move(revision));
         }
         const auto existing_belief = std::find_if(witness->beliefs.begin(), witness->beliefs.end(),
             [&actor_id, action_tag, this](const NPCBelief& belief) {
@@ -901,9 +1249,24 @@ std::size_t SimulationWorld::record_witnessed_action(
             witness->beliefs.push_back(NPCBelief{actor_id, action_tag, runtime_.total_hours(),
                 1.0, witness->entity_id, true, 1U, 0U});
         } else {
+            const double previous_confidence = existing_belief->confidence;
             existing_belief->confidence = 1.0;
             existing_belief->directly_observed = true;
             ++existing_belief->corroborations;
+            BeliefRevision revision;
+            revision.target_entity_id = existing_belief->target_entity_id;
+            revision.action_tag = existing_belief->action_tag;
+            revision.event_timestamp_hour = existing_belief->timestamp_hour;
+            revision.previous_confidence = previous_confidence;
+            revision.revised_confidence = 1.0;
+            revision.reason = BeliefRevisionReason::IndependentEvidence;
+            revision.source_entity_id = witness->entity_id;
+            revision.recorded_hour = runtime_.total_hours();
+            revision.source_reliability = 1.0;
+            revision.evidence_factor = 1.0;
+            revision.evidence_claim_ids.push_back(observed_claim_id);
+            revision.evidence_root_ids.push_back(observed_root);
+            witness->belief_revision_history.push_back(std::move(revision));
         }
         (void)absorb(*witness, action_tag, witness->entity_id == victim_id);
     }
