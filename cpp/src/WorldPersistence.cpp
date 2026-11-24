@@ -880,6 +880,8 @@ void save_traffic_recovery_checkpoint(
             || !std::is_sorted(proposal.participants.begin(), proposal.participants.end())
             || std::adjacent_find(proposal.participants.begin(), proposal.participants.end())
                 != proposal.participants.end()
+            || std::any_of(proposal.participants.begin(), proposal.participants.end(),
+                [](const std::string& participant) { return participant.empty(); })
             || !std::binary_search(proposal.participants.begin(), proposal.participants.end(),
                 proposal.yielding_entity_id))
             throw std::invalid_argument("invalid pending deadlock proposal identity");
@@ -1100,12 +1102,26 @@ TrafficRecoveryCheckpoint load_traffic_recovery_checkpoint(std::istream& input) 
     for (const auto& proposal : result.pending_proposals) {
         if (proposal.participants.empty() || proposal.yielding_entity_id.empty()
             || !std::is_sorted(proposal.participants.begin(), proposal.participants.end())
-            || !std::binary_search(proposal.participants.begin(), proposal.participants.end(), proposal.yielding_entity_id))
+            || std::adjacent_find(proposal.participants.begin(), proposal.participants.end())
+                != proposal.participants.end()
+            || std::any_of(proposal.participants.begin(), proposal.participants.end(),
+                [](const std::string& participant) { return participant.empty(); })
+            || !std::binary_search(proposal.participants.begin(), proposal.participants.end(),
+                proposal.yielding_entity_id))
             throw std::runtime_error("invalid durable deadlock proposal identity");
+        for (const auto& resource : proposal.blocking_resources) {
+            if (resource.resource_id.empty() || resource.current_owner_id.empty()
+                || (resource.kind != BlockedResourceKind::Lane
+                    && resource.kind != BlockedResourceKind::Intersection))
+                throw std::runtime_error("invalid durable deadlock blocking resource");
+        }
         for (const auto& request : proposal.replacement_lane_requests)
-            if (request.entity_id != proposal.yielding_entity_id || request.lane_id.empty()) throw std::runtime_error("invalid durable replacement lane request");
+            if (request.entity_id != proposal.yielding_entity_id || request.lane_id.empty())
+                throw std::runtime_error("invalid durable replacement lane request");
         for (const auto& request : proposal.replacement_intersection_requests)
-            if (request.entity_id != proposal.yielding_entity_id || request.intersection_id.empty() || request.movement_id.empty()) throw std::runtime_error("invalid durable replacement intersection request");
+            if (request.entity_id != proposal.yielding_entity_id || request.intersection_id.empty()
+                || request.movement_id.empty())
+                throw std::runtime_error("invalid durable replacement intersection request");
     }
     return result;
 }
