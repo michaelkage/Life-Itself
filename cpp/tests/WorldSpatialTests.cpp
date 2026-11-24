@@ -88,16 +88,17 @@ int main() {
     assert(world.nearby_npcs({6.0, 0.0, 0.0}, 0.01).size() == 1U);
 
     // Predictive avoidance is integrated into the world movement step.
-    world.set_npc_spatial_state("actor", {5.0, -3.0, 0.0}, {0.0, 1.0, 0.0},
+    world.set_npc_spatial_state("actor", {6.0, -1.0, 0.0}, {0.0, 1.0, 0.0},
                                 {0.0, 2.0, 0.0});
-    world.set_npc_spatial_state("blocked-observer", {5.0, 3.0, 0.0},
+    world.set_npc_spatial_state("blocked-observer", {50.0, 30.0, 0.0},
                                 {0.0, -1.0, 0.0}, {0.0, -2.0, 0.0});
     const auto collision_aware = world.advance_npc_on_lane_avoiding_collisions(
         "forward-observer", straight_lane, 0.25, 2.0, 3.0, 10.0,
         0.5, 0.5, 3.0, 4.0, 10.0);
     (void)collision_aware;
-    assert(world.nearby_npcs(world.state().npcs.empty()
-        ? SpatialPoint{} : SpatialPoint{0.5, 0.0, 0.0}, 10.0).size() >= 2U);
+    const auto collision_aware_position = world.nearby_npcs({6.0, 0.1, 0.0}, 0.5);
+    assert(std::find(collision_aware_position.begin(), collision_aware_position.end(),
+        "forward-observer") != collision_aware_position.end());
 
     world.configure_traffic_lane("main-road", 1U);
     world.advance_traffic_tick(1U);
