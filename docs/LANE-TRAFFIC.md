@@ -12,7 +12,8 @@ while this subsystem arbitrates admission to finite lane capacity.
 - Call `advance_tick` with a strictly increasing simulation tick. Reservations
   whose exclusive expiry tick has arrived are removed before new requests.
 - Submit all simultaneous requests for a tick together through `resolve`.
-  Arbitration is per lane and deterministic: higher authored priority first,
+  An entity may request only one lane in a tick, keeping grant/denial identities
+  unambiguous during a lane transition. Arbitration is per lane and deterministic: higher authored priority first,
   then longer consecutive wait, then lexicographically smaller entity ID.
 - Successful grants occupy capacity for a bounded lease. Renewing an existing
   reservation is idempotent and refreshes its priority; callers should continue
