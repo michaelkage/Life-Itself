@@ -1,4 +1,5 @@
 import unittest
+import json
 
 from simreality import (
     ActionTag, NPC, NPCCollectionSnapshot, SocialBeliefSnapshot,
@@ -64,6 +65,57 @@ class SimulationTickReplayPersistenceTests(unittest.TestCase):
         self.assertEqual(restored_npcs["listener"].memories, before_listener_memories)
         self.assertEqual(len(restored_npcs["speaker"].memories), 1)
         self.assertEqual(SimulationTickReplaySnapshot.capture(restored_coordinator).to_json(), tick_payload)
+
+    def test_round_trip_preserves_deferred_historical_memory_request(self):
+        events = self.make_events()
+        trust = SocialTrustLedger()
+        beliefs = SocialBeliefSystem(trust)
+        memory_adapter = WorldEventMemoryAdapter(events)
+        conversations = SocialConversationAdapter(trust, beliefs)
+        coordinator = SimulationTickCoordinator(events, memory_adapter, conversations)
+        npcs = {"speaker": NPC("speaker"), "listener": NPC("listener")}
+        coordinator.step(3, npcs)
+        request = {"memory_requests": (("event-1", "speaker"),)}
+        original = coordinator.step(4, npcs, **request)
+
+        tick_payload = SimulationTickReplaySnapshot.capture(coordinator).to_json()
+        npc_payload = NPCCollectionSnapshot.capture(list(npcs.values())).to_json()
+        memory_payload = WorldEventMemoryReplaySnapshot.capture(memory_adapter).to_json()
+        restored_events = events.from_snapshot(events.snapshot())
+        restored_npcs = NPCCollectionSnapshot.from_json(npc_payload).restore()
+        restored_memory = WorldEventMemoryAdapter(restored_events)
+        WorldEventMemoryReplaySnapshot.from_json(memory_payload).restore(restored_memory, restored_npcs)
+        restored_trust = SocialTrustLedger()
+        restored_beliefs = SocialBeliefSystem(restored_trust)
+        restored_conversations = SocialConversationAdapter(restored_trust, restored_beliefs)
+        restored_coordinator = SimulationTickCoordinator(
+            restored_events, restored_memory, restored_conversations,
+        )
+        SimulationTickReplaySnapshot.from_json(tick_payload).restore(restored_coordinator)
+
+        replay = restored_coordinator.step(4, restored_npcs, **request)
+        self.assertEqual(replay, original)
+        self.assertEqual(len(restored_npcs["speaker"].memories), 1)
+        self.assertEqual(restored_coordinator._last_tick, 4)
+
+    def test_legacy_v1_tick_replay_snapshot_migrates_all_witness_memory_refs(self):
+        events = self.make_events()
+        trust = SocialTrustLedger()
+        beliefs = SocialBeliefSystem(trust)
+        conversations = SocialConversationAdapter(trust, beliefs)
+        coordinator = SimulationTickCoordinator(
+            events, WorldEventMemoryAdapter(events), conversations,
+        )
+        coordinator.step(3, {"speaker": NPC("speaker"), "listener": NPC("listener")}, event_ids=("event-1",))
+        raw = json.loads(SimulationTickReplaySnapshot.capture(coordinator).to_json())
+        raw["schema_version"] = 1
+        for entry in raw["entries"]:
+            entry.pop("memory_requests")
+        migrated = SimulationTickReplaySnapshot.from_json(json.dumps(raw))
+        self.assertEqual(
+            migrated.entries[0].memory_requests,
+            (("event-1", "speaker"),),
+        )
 
     def test_unknown_schema_rejected(self):
         with self.assertRaises(ValueError):
