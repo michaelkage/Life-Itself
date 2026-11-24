@@ -1,7 +1,10 @@
 #include "simreality/TrafficRecovery.h"
+#include "simreality/RoutePlanning.h"
+#include "simreality/WorldPersistence.h"
 
 #include <cassert>
 #include <stdexcept>
+#include <sstream>
 #include <vector>
 
 using namespace simreality;
@@ -56,6 +59,46 @@ int main() {
     assert(proposals.front().blocking_resources.size() == 3U);
     assert(proposals.front().replacement_lane_requests.size() == 1U);
     assert(proposals.front().replacement_intersection_requests.size() == 1U);
+
+    RouteProgressMonitor progress_monitor(3U);
+    (void)progress_monitor.observe("npc-a", 10U, 0.0);
+    (void)progress_monitor.observe("npc-a", 11U, 0.0);
+    TrafficRecoveryCheckpoint checkpoint;
+    checkpoint.lanes = lanes.snapshot();
+    checkpoint.intersections = intersections.snapshot();
+    checkpoint.journey_occupancy = journey.snapshot();
+    checkpoint.progress_stall_threshold = progress_monitor.stalled_tick_threshold();
+    checkpoint.route_progress = progress_monitor.snapshot();
+    checkpoint.pending_wait_edges = {
+        {"npc-a", "npc-b", BlockedResourceKind::Lane, "L1"},
+        {"npc-b", "npc-a", BlockedResourceKind::Intersection, "J1"}};
+    std::stringstream checkpoint_bytes(std::ios::in | std::ios::out | std::ios::binary);
+    save_traffic_recovery_checkpoint(checkpoint, checkpoint_bytes);
+    const std::string durable_bytes = checkpoint_bytes.str();
+    checkpoint_bytes.seekg(0);
+    const auto restored_checkpoint = load_traffic_recovery_checkpoint(checkpoint_bytes);
+    assert(restored_checkpoint.lanes.reservations.size() == checkpoint.lanes.reservations.size());
+    assert(restored_checkpoint.intersections.reservations.size() == checkpoint.intersections.reservations.size());
+    assert(restored_checkpoint.journey_occupancy.size() == 1U);
+    assert(restored_checkpoint.route_progress.front().stalled_ticks == 1U);
+    assert(restored_checkpoint.pending_wait_edges.size() == 2U);
+
+    LaneTrafficCoordinator restored_lanes;
+    restored_lanes.restore(restored_checkpoint.lanes);
+    IntersectionTrafficCoordinator restored_intersections;
+    restored_intersections.restore(restored_checkpoint.intersections);
+    JourneyReservationManager restored_journey;
+    restored_journey.restore(restored_checkpoint.journey_occupancy);
+    RouteProgressMonitor restored_progress(restored_checkpoint.progress_stall_threshold);
+    restored_progress.restore(restored_checkpoint.route_progress);
+    const auto resumed = restored_journey.advance_and_renew(
+        12U, restored_lanes, restored_intersections);
+    assert(resumed.lanes.granted_entity_ids == std::vector<std::string>{"npc-a"});
+    assert(resumed.intersections.granted_entity_ids == std::vector<std::string>{"npc-a"});
+    assert(restored_progress.observe("npc-a", 12U, 0.0).stalled_ticks == 2U);
+    std::stringstream resaved(std::ios::in | std::ios::out | std::ios::binary);
+    save_traffic_recovery_checkpoint(restored_checkpoint, resaved);
+    assert(resaved.str() == durable_bytes);
 
     bool malformed_rejected = false;
     try { journey.track({"npc-b", "L2", "J2", {}}); }
