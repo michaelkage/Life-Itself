@@ -615,3 +615,19 @@ only after the movement step commits. The returned result reports which
 occupancy tokens were released. This is a single-threaded world-operation
 transaction; hosts must serialize world mutation and continue renewing leases
 while entities physically occupy their lanes or conflict zones.
+
+## Deterministic route planning and recovery
+
+The C++ core now includes `TrafficRoutePlanner`, a directed lane-graph planner
+with deterministic shortest-path selection, lexicographic path tie-breaking,
+and caller-supplied congestion and hazard costs. Its reservation look-ahead
+method emits the next lane and intersection requests for the existing lane and
+conflict-zone coordinators; it does not grant reservations itself.
+
+`RouteProgressMonitor` detects consecutive simulation ticks without measured
+progress and emits a replan request. It never teleports an entity or releases
+its current occupancy tokens. A host must calculate a replacement route,
+acquire its next lane/intersection reservations while retaining current
+occupancy, and then use
+`SimulationWorld::advance_npc_on_reserved_route_segment` for the safe handoff.
+See [docs/ROUTE-PLANNING-AND-RECOVERY.md](docs/ROUTE-PLANNING-AND-RECOVERY.md).
