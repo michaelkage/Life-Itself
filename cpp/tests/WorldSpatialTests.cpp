@@ -1,5 +1,6 @@
 #include "simreality/SimulationWorld.h"
 
+#include <algorithm>
 #include <cassert>
 #include <cmath>
 #include <set>
