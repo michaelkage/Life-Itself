@@ -92,4 +92,4 @@ The browser contracts are defined in `src/types/domain-contracts.ts`. The API ad
 
 ## Contributing and implementation history
 
-Use the focused architecture guides under `docs/` for subsystem contracts and invariants. Historical implementation notes and the former running README changelog are preserved in [CHANGELOG.md](CHANGELOG.md).
+Use the focused architecture guides under `docs/` for subsystem contracts and invariants. Historical implementation notes and the former running README changelog are preserved in [CHANGELOG.md](CHANGELOG.md). The remote branch and pull-request disposition is documented in the [branch consolidation audit](docs/BRANCH-CONSOLIDATION-AUDIT.md).
