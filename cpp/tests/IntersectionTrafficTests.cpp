@@ -24,6 +24,13 @@ int main() {
     assert((first.granted_entity_ids == std::vector<std::string>{"npc-a", "npc-c", "npc-d"}));
     assert((first.denied_entity_ids == std::vector<std::string>{"npc-b"}));
     assert(traffic.has_reservation("cross", "east-west", "npc-a"));
+    bool protected_active_definition = false;
+    try {
+        traffic.configure_movement({"cross", "east-west", {"replacement-zone"}});
+    } catch (const std::logic_error&) {
+        protected_active_definition = true;
+    }
+    assert(protected_active_definition);
     assert(traffic.has_reservation("cross", "north-right", "npc-c"));
 
     // Higher priority wins a contested zone after the existing lease expires.
