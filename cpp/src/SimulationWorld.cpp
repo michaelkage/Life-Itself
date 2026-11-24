@@ -1176,6 +1176,38 @@ LaneFollowingResult SimulationWorld::advance_npc_on_lane(
     return steering;
 }
 
+void SimulationWorld::configure_traffic_lane(
+    const std::string& lane_id, std::size_t capacity) {
+    lane_traffic_.configure_lane(lane_id, capacity);
+}
+
+void SimulationWorld::advance_traffic_tick(std::uint64_t tick) {
+    lane_traffic_.advance_tick(tick);
+}
+
+LaneTrafficResolution SimulationWorld::resolve_lane_traffic(
+    const std::vector<LaneTrafficRequest>& requests) {
+    return lane_traffic_.resolve(requests);
+}
+
+bool SimulationWorld::release_lane_reservation(
+    const std::string& lane_id, const EntityId& npc_id) {
+    return lane_traffic_.release(lane_id, npc_id);
+}
+
+LaneFollowingResult SimulationWorld::advance_npc_on_reserved_lane(
+    const EntityId& npc_id, const std::string& lane_id,
+    const std::vector<SpatialPoint>& lane_centerline,
+    double elapsed_seconds, double lookahead_distance,
+    double desired_speed, double maximum_acceleration) {
+    (void)find_npc(npc_id);
+    if (!lane_traffic_.has_reservation(lane_id, npc_id)) {
+        throw std::logic_error("NPC must hold a live lane reservation before movement");
+    }
+    return advance_npc_on_lane(npc_id, lane_centerline, elapsed_seconds,
+        lookahead_distance, desired_speed, maximum_acceleration);
+}
+
 std::vector<EntityId> SimulationWorld::visible_npcs(
     SpatialPoint target_position, double maximum_range,
     double field_of_view_radians, const std::set<EntityId>& occluded_npcs) const {
