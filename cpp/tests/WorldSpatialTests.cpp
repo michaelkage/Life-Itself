@@ -97,7 +97,7 @@ int main() {
         "forward-observer", straight_lane, 0.25, 2.0, 3.0, 10.0,
         0.5, 0.5, 3.0, 4.0, 10.0);
     (void)collision_aware;
-    const auto collision_aware_position = world.nearby_npcs({6.0, 0.1, 0.0}, 0.5);
+    const auto collision_aware_position = world.nearby_npcs({6.75, 0.0, 0.0}, 0.5);
     assert(std::find(collision_aware_position.begin(), collision_aware_position.end(),
         "forward-observer") != collision_aware_position.end());
 
