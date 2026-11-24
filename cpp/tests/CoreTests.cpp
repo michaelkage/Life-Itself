@@ -2201,5 +2201,18 @@ int main() {
     assert(!listener_revisions.empty());
     assert(!relay_world.belief_explanations_for("relay-listener", "relay-actor").front().evidence_claims.empty());
 
+    std::stringstream relay_save(std::ios::in | std::ios::out | std::ios::binary);
+    save_world(relay_world, relay_save);
+    relay_save.seekg(0);
+    SimulationWorld relay_resumed = load_world(relay_save);
+    const auto resumed_listener_memories = std::find_if(
+        relay_resumed.state().npcs.begin(), relay_resumed.state().npcs.end(),
+        [](const NPC& npc) { return npc.entity_id == "relay-listener"; });
+    assert(resumed_listener_memories != relay_resumed.state().npcs.end());
+    assert(!resumed_listener_memories->memories.empty());
+    assert(!resumed_listener_memories->memories.front().root_evidence_id.empty());
+    assert(relay_resumed.information_ledger().lineage_for_claim(
+        received_claims.front().claim_id).size() == 3U);
+
 return 0;
 }
