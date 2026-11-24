@@ -87,6 +87,31 @@ int main() {
         "forward-observer", straight_lane, 1.0, 2.0, 3.0, 10.0);
     assert(world.nearby_npcs({6.0, 0.0, 0.0}, 0.01).size() == 1U);
 
+    world.configure_traffic_lane("main-road", 1U);
+    world.advance_traffic_tick(1U);
+    const auto traffic = world.resolve_lane_traffic({
+        {"main-road", "forward-observer", 0},
+        {"main-road", "actor", 0}});
+    assert((traffic.granted_entity_ids == std::vector<std::string>{"actor"}));
+    assert((traffic.denied_entity_ids == std::vector<std::string>{"forward-observer"}));
+    bool movement_denied_without_reservation = false;
+    try {
+        (void)world.advance_npc_on_reserved_lane(
+            "forward-observer", "main-road", straight_lane, 1.0, 2.0, 3.0, 10.0);
+    } catch (const std::logic_error&) {
+        movement_denied_without_reservation = true;
+    }
+    assert(movement_denied_without_reservation);
+    (void)world.advance_npc_on_reserved_lane(
+        "actor", "main-road", straight_lane, 1.0, 2.0, 3.0, 10.0);
+    assert(world.release_lane_reservation("main-road", "actor"));
+    world.advance_traffic_tick(2U);
+    const auto next_traffic = world.resolve_lane_traffic({
+        {"main-road", "forward-observer", 0}});
+    assert((next_traffic.granted_entity_ids == std::vector<std::string>{"forward-observer"}));
+    (void)world.advance_npc_on_reserved_lane(
+        "forward-observer", "main-road", straight_lane, 1.0, 2.0, 3.0, 10.0);
+
     bool rejected_unregistered_actor = false;
     try {
         (void)world.record_spatially_witnessed_action(
