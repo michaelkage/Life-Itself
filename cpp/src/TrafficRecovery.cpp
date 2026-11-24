@@ -139,6 +139,7 @@ std::vector<DeadlockResolutionProposal> TrafficDeadlockDetector::propose_resolut
     std::vector<WaitForEdge> graph_edges;
     graph_edges.reserve(edges.size());
     std::set<std::tuple<std::string, std::string, BlockedResourceKind, std::string>> unique;
+    std::set<std::pair<std::string, std::string>> graph_unique;
     for (const auto& edge : edges) {
         if (edge.waiter_id.empty() || edge.blocker_id.empty()
             || edge.waiter_id == edge.blocker_id || edge.resource_id.empty()
@@ -150,7 +151,8 @@ std::vector<DeadlockResolutionProposal> TrafficDeadlockDetector::propose_resolut
                 edge.resource_kind, edge.resource_id).second) {
             throw std::invalid_argument("duplicate resource wait edge");
         }
-        graph_edges.push_back({edge.waiter_id, edge.blocker_id});
+        if (graph_unique.emplace(edge.waiter_id, edge.blocker_id).second)
+            graph_edges.push_back({edge.waiter_id, edge.blocker_id});
     }
     const auto cycles = detect(graph_edges);
     std::vector<DeadlockResolutionProposal> proposals;
