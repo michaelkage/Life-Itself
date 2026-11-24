@@ -31,6 +31,7 @@ int main() {
     // Forgetting tracking is deliberately not a release operation.
     assert(lanes.has_reservation("L1", "npc-a"));
     assert(intersections.has_reservation("J1", "M1", "npc-a"));
+    journey.track({"npc-a", "L1", "J1", "M1"});
 
     TrafficDeadlockDetector detector;
     const auto cycles = detector.detect({
