@@ -25,6 +25,7 @@ add_library(simreality_core
     src/LaneTraffic.cpp
     src/IntersectionTraffic.cpp
     src/RoutePlanning.cpp
+    src/TrafficRecovery.cpp
 )
 target_include_directories(simreality_core PUBLIC include)
 target_compile_features(simreality_core PUBLIC cxx_std_20)
