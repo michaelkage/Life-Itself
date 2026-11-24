@@ -631,3 +631,7 @@ acquire its next lane/intersection reservations while retaining current
 occupancy, and then use
 `SimulationWorld::advance_npc_on_reserved_route_segment` for the safe handoff.
 See [docs/ROUTE-PLANNING-AND-RECOVERY.md](docs/ROUTE-PLANNING-AND-RECOVERY.md).
+
+## Live traffic and journey recovery
+
+The route planner can now read a deterministic snapshot of active lane reservations via TrafficRoutePlanner::plan_live. JourneyReservationManager renews current lane and intersection leases across multi-segment journeys, while TrafficDeadlockDetector identifies wait-for cycles as advisory recovery candidates. Neither tracking nor deadlock detection releases physical occupancy; replacement grants and guarded route handoff are required before clearance. See [the traffic recovery guide](docs/TRAFFIC-RECOVERY.md).
