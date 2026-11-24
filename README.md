@@ -635,3 +635,8 @@ See [docs/ROUTE-PLANNING-AND-RECOVERY.md](docs/ROUTE-PLANNING-AND-RECOVERY.md).
 ## Live traffic and journey recovery
 
 The route planner can now read a deterministic snapshot of active lane reservations via TrafficRoutePlanner::plan_live. JourneyReservationManager renews current lane and intersection leases across multi-segment journeys, while TrafficDeadlockDetector identifies wait-for cycles as advisory recovery candidates. Neither tracking nor deadlock detection releases physical occupancy; replacement grants and guarded route handoff are required before clearance. See [the traffic recovery guide](docs/TRAFFIC-RECOVERY.md).
+
+
+## Durable traffic planning and recovery
+
+Route planning now accounts for live intersection conflict-zone pressure as well as lane admission congestion. Resource-aware deadlock proposals identify blocked resources and candidate replacement grants without revoking current occupancy. A versioned traffic recovery checkpoint persists coordinator reservations, journey occupancy, route progress, and wait-for edges for deterministic continuation. See [docs/DURABLE-TRAFFIC-RECOVERY.md](docs/DURABLE-TRAFFIC-RECOVERY.md).
