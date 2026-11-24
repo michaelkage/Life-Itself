@@ -55,7 +55,7 @@ The C++ decision layer also exposes `explain_moral_choice(npc, option)`. It retu
 
 This is an explanation of how a supplied option scores under the NPC's current value priorities. It is not a historical record of a decision, does not capture which information the NPC had at an earlier time, and does not classify the selected option as objectively good or bad. Relationship values and evidence provenance are intentionally not presented as score factors because this scoring function does not currently use them. A later historical decision-context API should capture those inputs at the time of choice rather than reconstructing them from current world state.
 
-For choices that should be part of the durable simulation history, `SimulationWorld::record_moral_choice(npc_id, scenario_id, options, consequences)` captures the choice time, scenario ID, selected option and score, competing option scores, the NPC's relationship map and value traits at the time, and the IDs of claims/root evidence delivered to that NPC. It then applies the selected option's scenario-authored consequences and appends the record to that NPC's decision history. `decision_history_for(npc_id)` returns copied records in recorded order. This is a historical snapshot of the context the API captured, not proof that each saved claim was consciously considered or that the choice was objectively right. The record is persisted in snapshot version 15; versions 5–14 remain readable, with no decision records in older snapshots.
+For choices that should be part of the durable simulation history, `SimulationWorld::record_moral_choice(npc_id, scenario_id, options, consequences)` captures the choice time, scenario ID, selected option and score, competing option scores, the NPC's relationship map and value traits at the time, and the IDs of claims/root evidence delivered to that NPC. It then applies the selected option's scenario-authored consequences and appends the record to that NPC's decision history. `decision_history_for(npc_id)` returns copied records in recorded order. This is a historical snapshot of the context the API captured, not proof that each saved claim was consciously considered or that the choice was objectively right. The record is persisted in world snapshot version 12; versions 5–11 remain readable with neutral defaults and no historical decision records.
 
 ## Current NPC decision context
 
@@ -85,3 +85,12 @@ cmake -S cpp -B build
 cmake --build build --parallel 2
 ctest --test-dir build --output-on-failure
 ```
+
+
+## World integration and replay
+
+The world owns the append-only ledger. Directly witnessed actions create recipient-local observation claims. NPC conversations relay claims while preserving the original `root_evidence_id`; a retelling therefore adds lineage but never creates independent corroboration. NPC memories persist that root ID so a chain survives subsequent conversations and save/load.
+
+Belief confidence changes caused by contradiction or distinct-source corroboration append `BeliefRevision` records with the previous/new confidence, interpretation factors, and the exact claim/root IDs available at the time. `investigation_view_for` joins only claims delivered to the selected NPC with current beliefs and revision histories. `record_moral_choice` captures the selected and competing scores, relationship/value snapshots, and delivered evidence IDs before/while applying authored consequences.
+
+World save schema v12 appends memory root evidence IDs, belief revision histories, moral decision records, and the deterministic information ledger while preserving schema v11 dual-clock fields. Schemas 5–11 remain readable. Information claims are written parent-first (hop count, then claim ID) so validation reconstructs the same lineage; world snapshots round-trip byte-identically in regression coverage.
