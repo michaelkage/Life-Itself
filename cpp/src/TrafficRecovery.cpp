@@ -1,4 +1,5 @@
 #include "simreality/TrafficRecovery.h"
+#include "simreality/RoutePlanning.h"
 
 #include <algorithm>
 #include <functional>
@@ -23,6 +24,28 @@ void JourneyReservationManager::track(JourneyOccupancy occupancy) {
             "journey occupancy changes require confirmed clearance and explicit retracking");
     }
     tracked_[occupancy.entity_id] = std::move(occupancy);
+}
+
+
+std::vector<JourneyOccupancy> JourneyReservationManager::snapshot() const {
+    std::vector<JourneyOccupancy> result;
+    result.reserve(tracked_.size());
+    for (const auto& [entity_id, occupancy] : tracked_) {
+        (void)entity_id; result.push_back(occupancy);
+    }
+    return result;
+}
+
+void JourneyReservationManager::restore(const std::vector<JourneyOccupancy>& value) {
+    std::map<std::string, JourneyOccupancy> restored;
+    for (const auto& occupancy : value) {
+        if (occupancy.entity_id.empty() || occupancy.lane_id.empty()
+            || (occupancy.intersection_id.empty() != occupancy.movement_id.empty())
+            || !restored.emplace(occupancy.entity_id, occupancy).second) {
+            throw std::invalid_argument("invalid or duplicate journey occupancy checkpoint");
+        }
+    }
+    tracked_ = std::move(restored);
 }
 
 bool JourneyReservationManager::forget_after_clearance(const std::string& entity_id) {
