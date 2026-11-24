@@ -135,8 +135,9 @@ RouteLookaheadIntents TrafficRoutePlanner::reservation_lookahead(
         throw std::invalid_argument("route look-ahead arguments are invalid");
     }
     RouteLookaheadIntents result;
-    const std::size_t end = std::min(
-        route.steps.size(), current_step_index + lookahead_segments + 1U);
+    const std::size_t remaining = route.steps.size() - current_step_index - 1U;
+    const std::size_t count = std::min(lookahead_segments, remaining);
+    const std::size_t end = current_step_index + 1U + count;
     for (std::size_t i = current_step_index + 1U; i < end; ++i) {
         const RouteStep& step = route.steps[i];
         result.lane_requests.push_back({step.lane_id, entity_id, priority});
