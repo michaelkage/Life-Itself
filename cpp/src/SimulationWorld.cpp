@@ -907,9 +907,10 @@ Conversation SimulationWorld::talk(
         const std::string proposition = "action:" + std::to_string(static_cast<unsigned int>(believed_action));
         const std::string root_source = rumour.source_entity_id.empty()
             ? speaker_id : rumour.source_entity_id;
-        const std::string root_evidence = "evidence:" + root_source + ":"
-            + rumour.target_entity_id + ":" + proposition + ":"
-            + std::to_string(std::llround(rumour.timestamp_hour * 1000.0));
+        const std::string root_evidence = rumour.root_evidence_id.empty()
+            ? "evidence:" + root_source + ":" + rumour.target_entity_id + ":"
+                + proposition + ":" + std::to_string(std::llround(rumour.timestamp_hour * 1000.0))
+            : rumour.root_evidence_id;
         std::string parent_claim_id;
         for (const InformationClaim& received : information_.claims_received_by(speaker_id)) {
             if (received.subject_key == rumour.target_entity_id
@@ -1191,13 +1192,14 @@ std::size_t SimulationWorld::record_witnessed_action(
         memory.timestamp_hour = runtime_.total_hours();
         memory.action_tag = action_tag;
         memory.description = description;
-        witness->memories.push_back(memory);
         const auto observed_tick = static_cast<std::int64_t>(
             std::llround(std::max(0.0, runtime_.total_hours()) * 1000.0));
         const std::string observed_proposition = "action:" + std::to_string(static_cast<unsigned int>(action_tag));
         const std::string observed_root = "evidence:" + witness->entity_id + ":"
             + actor_id + ":" + observed_proposition + ":"
             + std::to_string(std::llround(runtime_.total_hours() * 1000.0));
+        memory.root_evidence_id = observed_root;
+        witness->memories.push_back(memory);
         const std::string observed_claim_id = "observation:" + observed_root + ":"
             + std::to_string(information_.size());
         InformationClaim observed_claim;
