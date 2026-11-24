@@ -904,7 +904,7 @@ Conversation SimulationWorld::talk(
         }();
         const std::int64_t claim_tick = static_cast<std::int64_t>(
             std::llround(std::max(0.0, runtime_.total_hours()) * 1000.0));
-        const std::string proposition = "action:" + expected_action;
+        const std::string proposition = "action:" + std::to_string(static_cast<unsigned int>(believed_action));
         const std::string root_source = rumour.source_entity_id.empty()
             ? speaker_id : rumour.source_entity_id;
         const std::string root_evidence = "evidence:" + root_source + ":"
@@ -1195,7 +1195,7 @@ std::size_t SimulationWorld::record_witnessed_action(
         const auto observed_tick = static_cast<std::int64_t>(
             std::llround(std::max(0.0, runtime_.total_hours()) * 1000.0));
         const std::string observed_proposition = "action:" + std::to_string(static_cast<unsigned int>(action_tag));
-        const std::string observed_root = "witnessed:" + witness->entity_id + ":"
+        const std::string observed_root = "evidence:" + witness->entity_id + ":"
             + actor_id + ":" + observed_proposition + ":"
             + std::to_string(std::llround(runtime_.total_hours() * 1000.0));
         const std::string observed_claim_id = "observation:" + observed_root + ":"
