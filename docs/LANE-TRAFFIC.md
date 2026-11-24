@@ -37,3 +37,15 @@ cmake -S cpp -B build
 cmake --build build
 ctest --test-dir build --output-on-failure
 ```
+
+
+## SimulationWorld integration
+
+`SimulationWorld` owns a coordinator and exposes lane configuration, explicit
+traffic-tick advancement, batch request resolution, and reservation release.
+`advance_npc_on_reserved_lane` refuses to move an NPC unless it holds a live
+reservation for the requested lane, then delegates to the existing lane-following
+integrator. Hosts should batch all requests for a tick before advancing agents,
+and release reservations immediately on lane exit or route change. This makes
+capacity admission an enforced movement precondition without claiming that a
+reservation alone resolves geometric collisions.
