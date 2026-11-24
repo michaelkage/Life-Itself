@@ -718,10 +718,59 @@ void read_life_state(std::istream& in, LifeCoordinator& life, std::uint32_t vers
     life.restore_snapshot(std::move(characters), std::move(obligations), std::move(windows));
 }
 
+
+void write_information_claim(std::ostream& out, const InformationClaim& claim) {
+    write_string(out, claim.claim_id); write_string(out, claim.subject_key);
+    write_string(out, claim.proposition_key); write_string(out, claim.root_evidence_id);
+    write_string(out, claim.parent_claim_id); write_string(out, claim.source_entity_id);
+    write_string(out, claim.recipient_entity_id);
+    if (claim.created_tick < 0) throw std::invalid_argument("negative information claim tick");
+    write_u64(out, static_cast<std::uint64_t>(claim.created_tick));
+    write_double(out, claim.confidence); write_u32(out, claim.hop_count);
+    write_u8(out, static_cast<std::uint8_t>(claim.kind));
+}
+
+InformationClaim read_information_claim(std::istream& in) {
+    InformationClaim claim;
+    claim.claim_id=read_string(in); claim.subject_key=read_string(in);
+    claim.proposition_key=read_string(in); claim.root_evidence_id=read_string(in);
+    claim.parent_claim_id=read_string(in); claim.source_entity_id=read_string(in);
+    claim.recipient_entity_id=read_string(in);
+    const auto tick=read_u64(in);
+    if (tick > static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max()))
+        throw std::runtime_error("information claim tick out of range");
+    claim.created_tick=static_cast<std::int64_t>(tick);
+    claim.confidence=read_double(in); claim.hop_count=read_u32(in);
+    claim.kind=read_enum<InformationKind>(in,3U,"information kind");
+    return claim;
+}
+
+void write_information_ledger(std::ostream& out, const InformationLedger& ledger) {
+    std::vector<InformationClaim> claims;
+    claims.reserve(ledger.size());
+    for (const auto& [id, claim] : ledger.claims()) { (void)id; claims.push_back(claim); }
+    std::sort(claims.begin(), claims.end(), [](const auto& a, const auto& b) {
+        if (a.hop_count != b.hop_count) return a.hop_count < b.hop_count;
+        return a.claim_id < b.claim_id;
+    });
+    write_count(out, claims.size());
+    for (const auto& claim : claims) write_information_claim(out, claim);
+}
+
+void read_information_ledger(std::istream& in, InformationLedger& ledger) {
+    const auto count=read_count(in);
+    for (std::uint32_t i=0; i<count; ++i) {
+        const auto claim=read_information_claim(in);
+        const auto result=ledger.record(claim);
+        if (!result.accepted)
+            throw std::runtime_error("invalid information ledger snapshot: "+result.error);
+    }
+}
+
 } // namespace
 
 void save_world(const SimulationWorld& world, std::ostream& output) {
-    output.write(kMagicV11.data(), static_cast<std::streamsize>(kMagicV11.size()));
+    output.write(kMagicV12.data(), static_cast<std::streamsize>(kMagicV12.size()));
     if (!output) throw std::runtime_error("failed writing world snapshot header");
     write_u32(output, kWorldSaveVersion);
     write_double(output, world.total_hours());
@@ -731,6 +780,7 @@ void save_world(const SimulationWorld& world, std::ostream& output) {
     write_count(output, world.fixer_networks().size());
     for (const FixerNetwork& network : world.fixer_networks()) write_network(output, network);
     write_life_state(output, world.life_system());
+    write_information_ledger(output, world.information_ledger());
 }
 
 SimulationWorld load_world(std::istream& input) {
@@ -744,13 +794,14 @@ SimulationWorld load_world(std::istream& input) {
     const bool is_v9 = magic == kMagicV9;
     const bool is_v10 = magic == kMagicV10;
     const bool is_v11 = magic == kMagicV11;
-    if (!is_v5 && !is_v6 && !is_v7 && !is_v8 && !is_v9 && !is_v10 && !is_v11) throw std::runtime_error("invalid world snapshot magic");
+    const bool is_v12 = magic == kMagicV12;
+    if (!is_v5 && !is_v6 && !is_v7 && !is_v8 && !is_v9 && !is_v10 && !is_v11 && !is_v12) throw std::runtime_error("invalid world snapshot magic");
     const std::uint32_t version = read_u32(input);
     if ((version == 5U && !is_v5) || (version == 6U && !is_v6)
         || (version == 7U && !is_v7) || (version == 8U && !is_v8)
-        || (version == 9U && !is_v9) || (version == 10U && !is_v10) || (version == 11U && !is_v11)
+        || (version == 9U && !is_v9) || (version == 10U && !is_v10) || (version == 11U && !is_v11) || (version == 12U && !is_v12)
         || (version != 5U && version != 6U && version != 7U && version != 8U
-            && version != 9U && version != 10U && version != 11U)) {
+            && version != 9U && version != 10U && version != 11U && version != 12U)) {
         throw std::runtime_error("unsupported world snapshot version");
     }
 
@@ -770,6 +821,7 @@ SimulationWorld load_world(std::istream& input) {
     SimulationWorld world(std::move(state), total_hours, random_state, real_time_seconds);
     world.fixer_networks() = std::move(fixer_networks);
     if (version >= 6U) read_life_state(input, world.life_system(), version);
+    if (version >= 12U) read_information_ledger(input, world.information_ledger());
     return world;
 }
 
