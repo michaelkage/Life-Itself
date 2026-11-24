@@ -269,6 +269,118 @@ SeparationResult compute_separation(
 }
 
 
+CollisionAvoidanceResult compute_collision_avoidance(
+    const EntityId& subject_id, SpatialPoint subject_position,
+    SpatialPoint subject_velocity, double subject_radius,
+    const std::vector<MovingBody>& neighbors,
+    double prediction_horizon_seconds, double maximum_acceleration) {
+    if (subject_id.empty()) {
+        throw std::invalid_argument("collision subject ID must not be empty");
+    }
+    SpatialPartition::validate_point(subject_position);
+    SpatialPartition::validate_point(subject_velocity);
+    if (!std::isfinite(subject_radius) || subject_radius <= 0.0) {
+        throw std::invalid_argument("subject collision radius must be finite and positive");
+    }
+    validate_non_negative("collision prediction horizon", prediction_horizon_seconds);
+    validate_non_negative("maximum collision acceleration", maximum_acceleration);
+
+    std::vector<MovingBody> ordered = neighbors;
+    std::sort(ordered.begin(), ordered.end(),
+        [](const MovingBody& left, const MovingBody& right) {
+            return left.entity_id < right.entity_id;
+        });
+    for (std::size_t i = 0U; i < ordered.size(); ++i) {
+        const MovingBody& body = ordered[i];
+        if (body.entity_id.empty() || body.entity_id == subject_id) {
+            throw std::invalid_argument("collision neighbors need distinct non-subject IDs");
+        }
+        if (i > 0U && ordered[i - 1U].entity_id == body.entity_id) {
+            throw std::invalid_argument("duplicate collision neighbor ID");
+        }
+        SpatialPartition::validate_point(body.position);
+        SpatialPartition::validate_point(body.velocity);
+        if (!std::isfinite(body.collision_radius) || body.collision_radius <= 0.0) {
+            throw std::invalid_argument("neighbor collision radius must be finite and positive");
+        }
+    }
+
+    SpatialPoint accumulated{};
+    std::size_t conflicts = 0U;
+    double earliest = std::numeric_limits<double>::infinity();
+    for (const MovingBody& body : ordered) {
+        const SpatialPoint relative_position{
+            body.position.x - subject_position.x,
+            body.position.y - subject_position.y,
+            body.position.z - subject_position.z};
+        const SpatialPoint relative_velocity{
+            body.velocity.x - subject_velocity.x,
+            body.velocity.y - subject_velocity.y,
+            body.velocity.z - subject_velocity.z};
+        const double speed_squared = relative_velocity.x * relative_velocity.x
+            + relative_velocity.y * relative_velocity.y
+            + relative_velocity.z * relative_velocity.z;
+        double time = 0.0;
+        if (speed_squared > 1e-18) {
+            const double projected = -(relative_position.x * relative_velocity.x
+                + relative_position.y * relative_velocity.y
+                + relative_position.z * relative_velocity.z) / speed_squared;
+            time = std::clamp(projected, 0.0, prediction_horizon_seconds);
+        }
+        const SpatialPoint closest{
+            relative_position.x + relative_velocity.x * time,
+            relative_position.y + relative_velocity.y * time,
+            relative_position.z + relative_velocity.z * time};
+        const double distance = std::hypot(closest.x, closest.y, closest.z);
+        const double required = subject_radius + body.collision_radius;
+        if (distance >= required) continue;
+
+        ++conflicts;
+        earliest = std::min(earliest, time);
+        SpatialPoint away{-closest.x, -closest.y, -closest.z};
+        double away_length = std::hypot(away.x, away.y, away.z);
+        if (away_length <= 1e-12) {
+            away = {-relative_velocity.x, -relative_velocity.y, -relative_velocity.z};
+            away_length = std::hypot(away.x, away.y, away.z);
+        }
+        if (away_length <= 1e-12) {
+            // Stable ID-derived axis for coincident, stationary bodies.
+            std::uint64_t hash = 1469598103934665603ULL;
+            for (const unsigned char ch : body.entity_id) {
+                hash ^= static_cast<std::uint64_t>(ch);
+                hash *= 1099511628211ULL;
+            }
+            switch (hash % 6U) {
+                case 0U: away = {1.0, 0.0, 0.0}; break;
+                case 1U: away = {-1.0, 0.0, 0.0}; break;
+                case 2U: away = {0.0, 1.0, 0.0}; break;
+                case 3U: away = {0.0, -1.0, 0.0}; break;
+                case 4U: away = {0.0, 0.0, 1.0}; break;
+                default: away = {0.0, 0.0, -1.0}; break;
+            }
+            away_length = 1.0;
+        }
+        const double urgency = (required - distance) / required;
+        const double time_weight = prediction_horizon_seconds > 0.0
+            ? 1.0 - 0.5 * (time / prediction_horizon_seconds) : 1.0;
+        const double strength = urgency * time_weight;
+        accumulated.x += away.x / away_length * strength;
+        accumulated.y += away.y / away_length * strength;
+        accumulated.z += away.z / away_length * strength;
+    }
+
+    double magnitude = std::hypot(accumulated.x, accumulated.y, accumulated.z);
+    if (magnitude > maximum_acceleration && magnitude > 0.0) {
+        const double scale = maximum_acceleration / magnitude;
+        accumulated.x *= scale;
+        accumulated.y *= scale;
+        accumulated.z *= scale;
+        magnitude = maximum_acceleration;
+    }
+    return {accumulated, magnitude, conflicts,
+        conflicts == 0U ? 0.0 : earliest};
+}
+
 LaneFollowingResult compute_lane_following(
     SpatialPoint position, SpatialPoint current_velocity,
     const std::vector<SpatialPoint>& lane_centerline,
