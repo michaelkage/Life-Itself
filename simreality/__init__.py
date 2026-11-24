@@ -1050,3 +1050,8 @@ from .population_transaction import PopulationTickTransactionCoordinator, Transa
 __all__ += ["PopulationTickTransactionCoordinator", "TransactionParticipant"]
 from .population_checkpoint_participants import build_population_transaction_participants
 __all__ += ["build_population_transaction_participants"]
+
+
+# Append-only provenance for claims, relays, and recipient-local investigations.
+from .information import ClaimResult, InformationClaim, InformationKind, InformationLedger, InvestigationEntry, InvestigationGroup
+__all__ += ["ClaimResult", "InformationClaim", "InformationKind", "InformationLedger", "InvestigationEntry", "InvestigationGroup"]
