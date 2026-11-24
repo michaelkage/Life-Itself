@@ -260,4 +260,78 @@ IntersectionTrafficCoordinator::conflict_pressure_snapshot() const {
     return result;
 }
 
+IntersectionTrafficSnapshot IntersectionTrafficCoordinator::snapshot() const {
+    IntersectionTrafficSnapshot result;
+    result.lease_ticks = lease_ticks_;
+    result.current_tick = current_tick_;
+    result.tick_initialized = tick_initialized_;
+    for (const auto& [key, definition] : movements_) {
+        (void)key; result.movements.push_back(definition);
+    }
+    for (const auto& [intersection, entries] : reservations_) {
+        (void)intersection;
+        for (const auto& [entity, reservation] : entries) {
+            (void)entity; result.reservations.push_back(reservation);
+        }
+    }
+    for (const auto& [key, ticks] : waiting_)
+        result.waiting.push_back({key.intersection_id, key.entity_id, ticks});
+    return result;
+}
+
+void IntersectionTrafficCoordinator::restore(const IntersectionTrafficSnapshot& value) {
+    if (value.lease_ticks == 0U || (!value.tick_initialized
+        && (!value.reservations.empty() || !value.waiting.empty()))) {
+        throw std::invalid_argument("intersection traffic snapshot clock or lease is invalid");
+    }
+    std::map<MovementKey, IntersectionMovementDefinition> movements;
+    for (const auto& definition : value.movements) {
+        if (definition.intersection_id.empty() || definition.movement_id.empty()
+            || definition.conflict_zone_ids.empty()
+            || std::any_of(definition.conflict_zone_ids.begin(), definition.conflict_zone_ids.end(),
+                [](const std::string& zone) { return zone.empty(); })
+            || !movements.emplace(MovementKey{definition.intersection_id, definition.movement_id},
+                definition).second) {
+            throw std::invalid_argument("invalid or duplicate intersection movement snapshot");
+        }
+    }
+    std::map<std::string, std::map<std::string, IntersectionReservation>> reservations;
+    for (const auto& reservation : value.reservations) {
+        const MovementKey key{reservation.intersection_id, reservation.movement_id};
+        if (reservation.intersection_id.empty() || reservation.movement_id.empty()
+            || reservation.entity_id.empty() || !movements.contains(key)
+            || (value.tick_initialized && reservation.expires_at_tick <= value.current_tick)
+            || !reservations[reservation.intersection_id].emplace(
+                reservation.entity_id, reservation).second) {
+            throw std::invalid_argument("invalid or duplicate intersection reservation snapshot");
+        }
+    }
+    for (const auto& [intersection, entries] : reservations) {
+        (void)intersection;
+        for (auto left = entries.begin(); left != entries.end(); ++left) {
+            for (auto right = std::next(left); right != entries.end(); ++right) {
+                const auto& a = movements.at({left->second.intersection_id, left->second.movement_id});
+                const auto& b = movements.at({right->second.intersection_id, right->second.movement_id});
+                if (conflicts(a, b))
+                    throw std::invalid_argument("snapshot contains conflicting active reservations");
+            }
+        }
+    }
+    std::map<WaitKey, std::uint64_t> waiting;
+    for (const auto& item : value.waiting) {
+        if (item.intersection_id.empty() || item.entity_id.empty()
+            || (reservations.contains(item.intersection_id)
+                && reservations.at(item.intersection_id).contains(item.entity_id))
+            || !waiting.emplace(WaitKey{item.intersection_id, item.entity_id}, item.wait_ticks).second) {
+            throw std::invalid_argument("invalid or duplicate intersection waiting snapshot");
+        }
+    }
+    lease_ticks_ = value.lease_ticks;
+    current_tick_ = value.current_tick;
+    tick_initialized_ = value.tick_initialized;
+    movements_ = std::move(movements);
+    reservations_ = std::move(reservations);
+    waiting_ = std::move(waiting);
+}
+
 } // namespace simreality
