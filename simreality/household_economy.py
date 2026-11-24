@@ -1,0 +1,472 @@
+"""Replay-safe double-entry household and action-linked economic state.
+
+Economic consequences are policy-driven. A completed NPC action changes money
+or obligations only when an explicit policy names the accounts and amounts.
+"""
+from __future__ import annotations
+
+from dataclasses import dataclass
+import json
+import math
+from typing import Iterable, Mapping
+
+
+def _amount(value: float, name: str = "amount") -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value <= 0:
+        raise ValueError(f"{name} must be finite and positive")
+    return float(value)
+
+
+@dataclass(frozen=True)
+class EconomicAccount:
+    account_id: str
+    owner_id: str
+    account_type: str
+    currency: str = "credits"
+
+    def __post_init__(self):
+        for name in ("account_id", "owner_id", "account_type", "currency"):
+            value = getattr(self, name)
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError(f"{name} must be non-empty text")
+
+
+@dataclass(frozen=True)
+class EconomicTransfer:
+    transfer_id: str
+    tick: int
+    debit_account: str
+    credit_account: str
+    amount: float
+    reference: str
+
+    def __post_init__(self):
+        for name in ("transfer_id", "debit_account", "credit_account", "reference"):
+            value = getattr(self, name)
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError(f"{name} must be non-empty text")
+        if self.debit_account == self.credit_account:
+            raise ValueError("a transfer must use two distinct accounts")
+        if isinstance(self.tick, bool) or not isinstance(self.tick, int) or self.tick < 0:
+            raise ValueError("tick must be a non-negative integer")
+        _amount(self.amount)
+
+
+class EconomicLedger:
+    """Append-only, balanced transfer journal with deterministic replay."""
+
+    def __init__(self, accounts: Iterable[EconomicAccount] = ()):
+        self._accounts: dict[str, EconomicAccount] = {}
+        self._transfers: dict[str, EconomicTransfer] = {}
+        self._balances: dict[str, float] = {}
+        for account in accounts:
+            self.add_account(account)
+
+    def add_account(self, account: EconomicAccount, opening_balance: float = 0.0):
+        if not isinstance(account, EconomicAccount):
+            raise TypeError("account must be an EconomicAccount")
+        if isinstance(opening_balance, bool) or not isinstance(opening_balance, (int, float)) or not math.isfinite(opening_balance) or opening_balance < 0:
+            raise ValueError("opening_balance must be finite and non-negative")
+        prior = self._accounts.get(account.account_id)
+        if prior is not None:
+            if prior != account or self._balances[account.account_id] != float(opening_balance):
+                raise ValueError("conflicting economic account")
+            return prior
+        self._accounts[account.account_id] = account
+        self._balances[account.account_id] = float(opening_balance)
+        return account
+
+    def balance(self, account_id: str) -> float:
+        if account_id not in self._accounts:
+            raise KeyError(account_id)
+        return self._balances[account_id]
+
+    def transfer(self, transfer: EconomicTransfer) -> EconomicTransfer:
+        """Apply one transfer using the atomic batch posting path."""
+        return self.transfer_many((transfer,))[0]
+
+    def transfer_many(self, transfers: Iterable[EconomicTransfer]) -> tuple[EconomicTransfer, ...]:
+        """Post a balanced batch atomically, including valid same-batch cash flows."""
+        values = tuple(transfers)
+        if any(not isinstance(item, EconomicTransfer) for item in values):
+            raise TypeError("transfers must contain EconomicTransfer values")
+        if len({item.transfer_id for item in values}) != len(values):
+            raise ValueError("transfer IDs must be unique within a batch")
+        result = []
+        pending = []
+        for transfer in values:
+            if transfer.debit_account not in self._accounts or transfer.credit_account not in self._accounts:
+                raise KeyError("transfer references an unknown account")
+            debit = self._accounts[transfer.debit_account]
+            credit = self._accounts[transfer.credit_account]
+            if debit.currency != credit.currency:
+                raise ValueError("cross-currency transfers require an explicit conversion transaction")
+            prior = self._transfers.get(transfer.transfer_id)
+            if prior is not None:
+                if prior != transfer:
+                    raise ValueError(f"conflicting transfer replay: {transfer.transfer_id}")
+                result.append(prior)
+            else:
+                pending.append(transfer)
+                result.append(transfer)
+
+        debit_totals = {}
+        credit_totals = {}
+        for transfer in pending:
+            debit_totals[transfer.debit_account] = (
+                debit_totals.get(transfer.debit_account, 0.0) + transfer.amount
+            )
+            credit_totals[transfer.credit_account] = (
+                credit_totals.get(transfer.credit_account, 0.0) + transfer.amount
+            )
+        final_balances = {}
+        for account_id in set(debit_totals) | set(credit_totals):
+            balance = (
+                self._balances[account_id]
+                - debit_totals.get(account_id, 0.0)
+                + credit_totals.get(account_id, 0.0)
+            )
+            if balance < -1e-12:
+                raise ValueError(f"insufficient funds in account: {account_id}")
+            final_balances[account_id] = max(0.0, balance)
+
+        self._balances.update(final_balances)
+        for transfer in pending:
+            self._transfers[transfer.transfer_id] = transfer
+        return tuple(result)
+
+    def snapshot(self) -> tuple[EconomicTransfer, ...]:
+        return tuple(sorted(self._transfers.values(), key=lambda item: (item.tick, item.transfer_id)))
+
+    def account_snapshot(self) -> tuple[tuple[EconomicAccount, float], ...]:
+        return tuple((self._accounts[key], self._balances[key]) for key in sorted(self._accounts))
+
+    def to_json(self) -> str:
+        payload = {
+            "schema_version": 1,
+            "accounts": [
+                {"account": account.__dict__, "balance": self._balances[key]}
+                for key, account in sorted(self._accounts.items())
+            ],
+            "transfers": [item.__dict__ for item in self.snapshot()],
+        }
+        return json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False)
+
+    @classmethod
+    def from_json(cls, payload: str) -> "EconomicLedger":
+        raw = json.loads(payload)
+        if set(raw) != {"schema_version", "accounts", "transfers"} or raw["schema_version"] != 1:
+            raise ValueError("unsupported economic ledger snapshot")
+        ledger = cls()
+        for item in raw["accounts"]:
+            ledger.add_account(EconomicAccount(**item["account"]), item["balance"])
+        for item in raw["transfers"]:
+            transfer = EconomicTransfer(**item)
+            # Replay validates journal consistency; opening balances in a snapshot
+            # are reconstructed by reversing transfers before applying the journal.
+            ledger._transfers[transfer.transfer_id] = transfer
+        return ledger
+
+
+@dataclass(frozen=True)
+class HouseholdObligation:
+    obligation_id: str
+    household_id: str
+    debtor_account: str
+    creditor_account: str
+    amount: float
+    due_tick: int
+    description: str
+    status: str = "open"
+
+    def __post_init__(self):
+        for name in ("obligation_id", "household_id", "debtor_account", "creditor_account", "description"):
+            value = getattr(self, name)
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError(f"{name} must be non-empty text")
+        _amount(self.amount)
+        if isinstance(self.due_tick, bool) or not isinstance(self.due_tick, int) or self.due_tick < 0:
+            raise ValueError("due_tick must be a non-negative integer")
+        if self.status not in ("open", "settled"):
+            raise ValueError("obligation status must be open or settled")
+
+
+class HouseholdLedger:
+    """Household obligations settled through the same double-entry ledger."""
+
+    def __init__(self, economics: EconomicLedger):
+        if not isinstance(economics, EconomicLedger):
+            raise TypeError("economics must be an EconomicLedger")
+        self.economics = economics
+        self._obligations: dict[str, HouseholdObligation] = {}
+
+    def add(self, obligation: HouseholdObligation) -> HouseholdObligation:
+        if not isinstance(obligation, HouseholdObligation):
+            raise TypeError("obligation must be a HouseholdObligation")
+        if obligation.debtor_account not in self.economics._accounts or obligation.creditor_account not in self.economics._accounts:
+            raise KeyError("obligation references an unknown account")
+        prior = self._obligations.get(obligation.obligation_id)
+        if prior is not None and prior != obligation:
+            raise ValueError("conflicting household obligation ID")
+        self._obligations.setdefault(obligation.obligation_id, obligation)
+        return self._obligations[obligation.obligation_id]
+
+    def settle(self, obligation_id: str, tick: int) -> HouseholdObligation:
+        """Settle one obligation through the atomic batch settlement path."""
+        return self.settle_many((obligation_id,), tick)[0]
+
+    def settle_many(self, obligation_ids: Iterable[str], tick: int) -> tuple[HouseholdObligation, ...]:
+        """Settle a due set atomically with respect to balances and obligation status."""
+        if isinstance(tick, bool) or not isinstance(tick, int) or tick < 0:
+            raise ValueError("tick must be a non-negative integer")
+        ids = tuple(obligation_ids)
+        if any(not isinstance(item, str) or not item.strip() for item in ids):
+            raise ValueError("obligation IDs must be non-empty strings")
+        if len(ids) != len(set(ids)):
+            raise ValueError("obligation IDs must be unique within a settlement batch")
+        obligations = tuple(self._obligations[item] for item in ids)
+        transfers = []
+        for item in obligations:
+            if item.status == "settled":
+                continue
+            if tick < item.due_tick:
+                raise ValueError(f"household obligation is not due: {item.obligation_id}")
+            transfers.append(EconomicTransfer(
+                f"obligation:{item.obligation_id}:settlement", tick,
+                item.debtor_account, item.creditor_account, item.amount,
+                f"household-obligation:{item.obligation_id}",
+            ))
+        # The ledger validates every account, replay ID and aggregate balance
+        # before changing any account. Obligation statuses change only after the
+        # complete payment batch has posted successfully.
+        self.economics.transfer_many(transfers)
+        for item in obligations:
+            if item.status != "settled":
+                self._obligations[item.obligation_id] = HouseholdObligation(
+                    item.obligation_id, item.household_id, item.debtor_account,
+                    item.creditor_account, item.amount, item.due_tick,
+                    item.description, "settled",
+                )
+        return tuple(self._obligations[item] for item in ids)
+
+    def snapshot(self) -> tuple[HouseholdObligation, ...]:
+        return tuple(self._obligations[key] for key in sorted(self._obligations))
+
+
+@dataclass(frozen=True)
+class ActionEconomicEffect:
+    action_id: str
+    debit_account: str
+    credit_account: str
+    amount: float
+    effect_kind: str
+    effect_id: str = "economic"
+
+    def __post_init__(self):
+        for name in ("action_id", "debit_account", "credit_account", "effect_kind", "effect_id"):
+            value = getattr(self, name)
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError(f"{name} must be non-empty text")
+        _amount(self.amount)
+        if self.debit_account == self.credit_account:
+            raise ValueError("action effect must use distinct accounts")
+
+
+class EconomicActionAdapter:
+    """Materialize one or more atomic, configured transfers for completed actions."""
+
+    def __init__(self, economics: EconomicLedger, policies: Iterable[ActionEconomicEffect]):
+        if not isinstance(economics, EconomicLedger):
+            raise TypeError("economics must be an EconomicLedger")
+        values = tuple(policies)
+        if any(not isinstance(item, ActionEconomicEffect) for item in values):
+            raise TypeError("policies must contain ActionEconomicEffect values")
+        if len({(item.action_id, item.effect_id) for item in values}) != len(values):
+            raise ValueError("action economic effect IDs must be unique per action")
+        for item in values:
+            if item.debit_account not in economics._accounts or item.credit_account not in economics._accounts:
+                raise KeyError("economic action policy references an unknown account")
+            if economics._accounts[item.debit_account].currency != economics._accounts[item.credit_account].currency:
+                raise ValueError("economic action policy cannot transfer across currencies")
+        self.economics = economics
+        grouped = {}
+        for item in values:
+            grouped.setdefault(item.action_id, []).append(item)
+        self.policies = {
+            action_id: tuple(sorted(items, key=lambda item: item.effect_id))
+            for action_id, items in grouped.items()
+        }
+        self._applied: dict[str, tuple[str, ...]] = {}
+
+    def has_applied(self, execution_id: str) -> bool:
+        """Return whether all configured effects for an execution were committed."""
+        return execution_id in self._applied
+
+    def has_policy(self, action_id: str) -> bool:
+        """Return whether an action has configured economic effects."""
+        return bool(self.policies.get(action_id))
+
+    def has_applied_at(self, execution_id: str, tick: int) -> bool:
+        """Return whether an economic effect for this execution was posted at tick."""
+        prior = self._applied.get(execution_id)
+        if isinstance(prior, EconomicTransfer):
+            return prior.tick == tick
+        return any(
+            self.economics._transfers.get(transfer_id) is not None
+            and self.economics._transfers[transfer_id].tick == tick
+            for transfer_id in (prior or ())
+            if isinstance(transfer_id, str)
+        )
+
+    def apply_all(self, execution, tick: int) -> tuple[EconomicTransfer, ...]:
+        """Apply all configured effects atomically after a completed action."""
+        from .action_execution import ActionExecution
+        if not isinstance(execution, ActionExecution):
+            raise TypeError("execution must be an ActionExecution")
+        if isinstance(tick, bool) or not isinstance(tick, int) or tick < 0:
+            raise ValueError("tick must be a non-negative integer")
+        if isinstance(execution.tick, bool) or not isinstance(execution.tick, int) or execution.tick < 0 or tick < execution.tick:
+            raise ValueError("economic effect tick cannot precede action completion")
+        if execution.status != "completed":
+            return ()
+        prior = self._applied.get(execution.execution_id)
+        if prior is not None:
+            if isinstance(prior, EconomicTransfer):
+                return (prior,)
+            if all(isinstance(item, str) for item in prior):
+                return tuple(self.economics._transfers[item] for item in prior)
+            return tuple(prior)
+        policies = self.policies.get(execution.action_id, ())
+        if not policies:
+            return ()
+
+        transfers = tuple(EconomicTransfer(
+            f"action:{execution.execution_id}:{policy.effect_id}",
+            tick, policy.debit_account, policy.credit_account,
+            policy.amount, f"action:{execution.execution_id}:{policy.effect_kind}",
+        ) for policy in policies)
+
+        applied = self.economics.transfer_many(transfers)
+        self._applied[execution.execution_id] = tuple(item.transfer_id for item in applied)
+        return applied
+
+    def apply(self, execution, tick: int) -> EconomicTransfer | None:
+        """Compatibility API returning the first transfer from apply_all."""
+        transfers = self.apply_all(execution, tick)
+        return transfers[0] if transfers else None
+
+
+@dataclass(frozen=True)
+class ActionHouseholdEffect:
+    """Explicit household obligation created by a completed action."""
+
+    action_id: str
+    effect_id: str
+    household_id: str
+    debtor_account: str
+    creditor_account: str
+    amount: float
+    due_tick_offset: int
+    description: str
+
+    def __post_init__(self):
+        for name in ("action_id", "effect_id", "household_id", "debtor_account", "creditor_account", "description"):
+            value = getattr(self, name)
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError(f"{name} must be non-empty text")
+        _amount(self.amount)
+        if self.debtor_account == self.creditor_account:
+            raise ValueError("household effect must use distinct accounts")
+        if isinstance(self.due_tick_offset, bool) or not isinstance(self.due_tick_offset, int) or self.due_tick_offset < 0:
+            raise ValueError("due_tick_offset must be a non-negative integer")
+
+
+class HouseholdActionAdapter:
+    """Create deterministic household obligations from completed action effects."""
+
+    def __init__(self, households: HouseholdLedger, policies: Iterable[ActionHouseholdEffect]):
+        if not isinstance(households, HouseholdLedger):
+            raise TypeError("households must be a HouseholdLedger")
+        values = tuple(policies)
+        if any(not isinstance(item, ActionHouseholdEffect) for item in values):
+            raise TypeError("policies must contain ActionHouseholdEffect values")
+        if len({(item.action_id, item.effect_id) for item in values}) != len(values):
+            raise ValueError("household effect IDs must be unique per action")
+        for item in values:
+            if item.debtor_account not in households.economics._accounts or item.creditor_account not in households.economics._accounts:
+                raise KeyError("household action effect references an unknown account")
+        self.households = households
+        grouped = {}
+        for item in values:
+            grouped.setdefault(item.action_id, []).append(item)
+        self.policies = {
+            action_id: tuple(sorted(items, key=lambda item: item.effect_id))
+            for action_id, items in grouped.items()
+        }
+        self._applied: dict[str, tuple[str, ...]] = {}
+
+    def has_applied(self, execution_id: str) -> bool:
+        """Return whether configured household effects were materialized."""
+        return execution_id in self._applied
+
+    def has_policy(self, action_id: str) -> bool:
+        """Return whether an action has configured household effects."""
+        return bool(self.policies.get(action_id))
+
+    def has_applied_at(self, execution_id: str, action_id: str, tick: int) -> bool:
+        """Return whether any configured obligation was created at this tick."""
+        for policy in self.policies.get(action_id, ()):
+            obligation = self.households._obligations.get(
+                f"action:{execution_id}:{policy.effect_id}"
+            )
+            if obligation is not None and obligation.due_tick == tick + policy.due_tick_offset:
+                return True
+        return False
+
+    def created_at(self, execution_id: str, action_id: str, obligation: HouseholdObligation, tick: int) -> bool:
+        """Identify action obligations materialized at a particular tick."""
+        for policy in self.policies.get(action_id, ()):
+            if obligation.obligation_id == f"action:{execution_id}:{policy.effect_id}":
+                return obligation.due_tick == tick + policy.due_tick_offset
+        return False
+
+    def apply_all(self, execution, tick: int) -> tuple[HouseholdObligation, ...]:
+        """Create all configured obligations once for a completed action."""
+        from .action_execution import ActionExecution
+        if not isinstance(execution, ActionExecution):
+            raise TypeError("execution must be an ActionExecution")
+        if isinstance(tick, bool) or not isinstance(tick, int) or tick < 0:
+            raise ValueError("tick must be a non-negative integer")
+        if isinstance(execution.tick, bool) or not isinstance(execution.tick, int) or execution.tick < 0 or tick < execution.tick:
+            raise ValueError("household effect tick cannot precede action completion")
+        if execution.status != "completed":
+            return ()
+        prior = self._applied.get(execution.execution_id)
+        if prior is not None:
+            if all(isinstance(item, str) for item in prior):
+                return tuple(self.households._obligations[item] for item in prior)
+            return tuple(prior)
+        obligations = tuple(
+            HouseholdObligation(
+                f"action:{execution.execution_id}:{policy.effect_id}",
+                policy.household_id, policy.debtor_account, policy.creditor_account,
+                policy.amount, tick + policy.due_tick_offset, policy.description,
+            )
+            for policy in self.policies.get(execution.action_id, ())
+        )
+        # Preflight every generated obligation before mutating the ledger. This
+        # keeps a multi-effect action from leaving a partially created household
+        # bill set if a later ID conflicts or an account has been removed.
+        for obligation in obligations:
+            if (
+                obligation.debtor_account not in self.households.economics._accounts
+                or obligation.creditor_account not in self.households.economics._accounts
+            ):
+                raise KeyError("household action effect references an unknown account")
+            prior_obligation = self.households._obligations.get(obligation.obligation_id)
+            if prior_obligation is not None and prior_obligation != obligation:
+                raise ValueError(f"conflicting household obligation replay: {obligation.obligation_id}")
+        result = tuple(self.households.add(item) for item in obligations)
+        if result:
+            self._applied[execution.execution_id] = tuple(item.obligation_id for item in result)
+        return result
