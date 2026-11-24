@@ -18,6 +18,7 @@ struct RouteEdgeDefinition {
     std::string movement_id{};
     double traversal_cost{1.0};
     double congestion_cost_per_occupant{0.0};
+    double conflict_pressure_cost_per_reservation{0.0};
     double hazard_penalty{0.0};
 };
 
@@ -49,10 +50,15 @@ public:
     [[nodiscard]] RoutePlan plan(
         const std::string& source_lane_id,
         const std::string& destination_lane_id,
-        const std::map<std::string, std::size_t>& lane_occupancy = {}) const;
+        const std::map<std::string, std::size_t>& lane_occupancy = {},
+        const std::map<std::pair<std::string, std::string>, std::size_t>& conflict_pressure = {}) const;
     [[nodiscard]] RoutePlan plan_live(
         const std::string& source_lane_id, const std::string& destination_lane_id,
         const LaneTrafficCoordinator& live_lanes) const;
+    [[nodiscard]] RoutePlan plan_live(
+        const std::string& source_lane_id, const std::string& destination_lane_id,
+        const LaneTrafficCoordinator& live_lanes,
+        const IntersectionTrafficCoordinator& live_intersections) const;
     [[nodiscard]] RouteLookaheadIntents reservation_lookahead(
         const RoutePlan& route, std::size_t current_step_index,
         const std::string& entity_id, std::int32_t priority,
