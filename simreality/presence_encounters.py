@@ -235,6 +235,7 @@ class PresenceSocialAdapter:
             expected_event = WorldEventLedger.make_event(
                 event_id, tick, "npc_encounter",
                 participants=tuple(sorted((first_id, second_id))),
+                witnesses=tuple(sorted((first_id, second_id))),
                 attributes={"location_id": actual_location, "conversation": conversation},
             )
             try:
@@ -253,6 +254,7 @@ class PresenceSocialAdapter:
                 events.append(WorldEventLedger.make_event(
                     f"npc_encounter:{encounter_id}", tick, "npc_encounter",
                     participants=existing.participants,
+                    witnesses=existing.participants,
                     attributes={"location_id": existing.location_id,
                                 "conversation": existing.conversation_id is not None},
                 ))
@@ -287,6 +289,7 @@ class PresenceSocialAdapter:
             events.append(WorldEventLedger.make_event(
                 f"npc_encounter:{encounter_id}", tick, "npc_encounter",
                 participants=stored.participants,
+                witnesses=stored.participants,
                 attributes={"location_id": actual_location, "conversation": conversation},
             ))
         return PresenceEncounterResult(stored, conversation_result)
