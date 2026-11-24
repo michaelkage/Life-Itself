@@ -45,12 +45,36 @@ struct WaitForEdge {
     std::string blocker_id{};
 };
 
+enum class BlockedResourceKind { Lane, Intersection };
+struct WaitForResourceEdge {
+    std::string waiter_id{};
+    std::string blocker_id{};
+    BlockedResourceKind resource_kind{BlockedResourceKind::Lane};
+    std::string resource_id{};
+};
+struct DeadlockResource {
+    BlockedResourceKind kind{BlockedResourceKind::Lane};
+    std::string resource_id{};
+    std::string current_owner_id{};
+};
+struct DeadlockResolutionProposal {
+    std::vector<std::string> participants{};
+    std::string yielding_entity_id{};
+    std::vector<DeadlockResource> blocking_resources{};
+    std::vector<LaneTrafficRequest> replacement_lane_requests{};
+    std::vector<IntersectionTrafficRequest> replacement_intersection_requests{};
+};
+
 // Reports canonical strongly connected components in the wait-for graph.
 // A component is a deadlock candidate, not permission to revoke occupancy.
 class TrafficDeadlockDetector {
 public:
     [[nodiscard]] std::vector<std::vector<std::string>> detect(
         const std::vector<WaitForEdge>& edges) const;
+    [[nodiscard]] std::vector<DeadlockResolutionProposal> propose_resolutions(
+        const std::vector<WaitForResourceEdge>& edges,
+        const std::map<std::string, std::pair<std::vector<LaneTrafficRequest>,
+            std::vector<IntersectionTrafficRequest>>>& replacement_reservations) const;
 };
 
 } // namespace simreality
