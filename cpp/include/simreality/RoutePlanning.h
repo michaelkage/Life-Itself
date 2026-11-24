@@ -18,8 +18,8 @@ struct RouteEdgeDefinition {
     std::string movement_id{};
     double traversal_cost{1.0};
     double congestion_cost_per_occupant{0.0};
-    double conflict_pressure_cost_per_reservation{0.0};
     double hazard_penalty{0.0};
+    double conflict_pressure_cost_per_reservation{0.0};
 };
 
 struct RouteStep {
