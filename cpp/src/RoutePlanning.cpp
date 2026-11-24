@@ -134,6 +134,27 @@ RouteLookaheadIntents TrafficRoutePlanner::reservation_lookahead(
         || current_step_index >= route.steps.size() || lookahead_segments == 0U) {
         throw std::invalid_argument("route look-ahead arguments are invalid");
     }
+    if (route.steps.front().lane_id != route.source_lane_id
+        || route.steps.back().lane_id != route.destination_lane_id
+        || !route.steps.front().entry_intersection_id.empty()
+        || !route.steps.front().entry_movement_id.empty()) {
+        throw std::invalid_argument("route plan endpoints or first step are inconsistent");
+    }
+    for (std::size_t i = 1U; i < route.steps.size(); ++i) {
+        const RouteStep& previous = route.steps[i - 1U];
+        const RouteStep& step = route.steps[i];
+        if (step.lane_id.empty()
+            || (step.entry_intersection_id.empty() != step.entry_movement_id.empty())) {
+            throw std::invalid_argument("route plan contains an incomplete transition");
+        }
+        const auto edge = edges_.find({previous.lane_id, step.lane_id});
+        if (edge == edges_.end()
+            || edge->second.intersection_id != step.entry_intersection_id
+            || edge->second.movement_id != step.entry_movement_id) {
+            throw std::invalid_argument("route plan is stale or does not match this graph");
+        }
+    }
+
     RouteLookaheadIntents result;
     const std::size_t remaining = route.steps.size() - current_step_index - 1U;
     const std::size_t count = std::min(lookahead_segments, remaining);
