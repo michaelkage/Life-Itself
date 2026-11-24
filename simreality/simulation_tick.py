@@ -87,9 +87,11 @@ class SimulationTickCoordinator:
 
     @staticmethod
     def _signature(
-        event_ids: tuple[str, ...], conversations: tuple[ConversationIntent, ...]
+        event_ids: tuple[str, ...],
+        memory_requests: tuple[tuple[str, str], ...],
+        conversations: tuple[ConversationIntent, ...],
     ) -> tuple[object, ...]:
-        return (event_ids, conversations)
+        return (event_ids, memory_requests, conversations)
 
     def step(
         self,
@@ -97,9 +99,16 @@ class SimulationTickCoordinator:
         npcs: Mapping[str, NPC],
         *,
         event_ids: tuple[str, ...] = (),
+        memory_requests: tuple[tuple[str, str], ...] | None = None,
         conversations: tuple[ConversationIntent, ...] = (),
     ) -> SimulationTickResult:
-        """Process a tick using explicit event IDs and conversation intents."""
+        """Process current events, due witness memories and conversations.
+
+        event_ids preserves the original all-witness, same-tick behavior.
+        memory_requests adds explicit (event, witness) pairs and permits
+        historical events, allowing population LOD to defer memory work without
+        losing the authoritative event evidence.
+        """
         if isinstance(tick, bool) or not isinstance(tick, int) or tick < 0:
             raise ValueError("tick must be a non-negative integer")
         if not isinstance(npcs, Mapping):
@@ -117,6 +126,15 @@ class SimulationTickCoordinator:
             raise ValueError("event_ids must be a tuple of non-empty strings")
         if len(event_ids) != len(set(event_ids)):
             raise ValueError("event_ids must not contain duplicates")
+        if memory_requests is not None:
+            if not isinstance(memory_requests, tuple) or any(
+                not isinstance(item, tuple) or len(item) != 2
+                or any(not isinstance(value, str) or not value.strip() for value in item)
+                for item in memory_requests
+            ):
+                raise ValueError("memory_requests must be tuples of (event_id, witness_id)")
+            if len(memory_requests) != len(set(memory_requests)):
+                raise ValueError("memory requests must be unique")
         if not isinstance(conversations, tuple) or any(
             not isinstance(item, ConversationIntent) for item in conversations
         ):
@@ -125,27 +143,36 @@ class SimulationTickCoordinator:
         if len(conversation_ids) != len(set(conversation_ids)):
             raise ValueError("conversation IDs must be unique within a tick")
 
-        ordered_events = tuple(sorted(
+        selected_events = tuple(sorted(
             (self.events.get(event_id) for event_id in event_ids),
             key=lambda event: (event.tick, event.event_id),
         ))
-        for event in ordered_events:
+        for event in selected_events:
             if event.tick != tick:
                 raise ValueError(
                     f"event {event.event_id!r} is at tick {event.tick}, not requested tick {tick}"
                 )
-            for witness_id in event.witnesses:
-                if witness_id not in npcs:
-                    raise KeyError(f"witness NPC not supplied: {witness_id}")
+        requested_pairs = set(memory_requests or ())
+        for event in selected_events:
+            requested_pairs.update((event.event_id, witness_id) for witness_id in event.witnesses)
+        ordered_pairs = tuple(sorted(requested_pairs))
+        for event_id, witness_id in ordered_pairs:
+            event = self.events.get(event_id)
+            if event.tick > tick:
+                raise ValueError(f"cannot materialize future event {event_id!r} at tick {tick}")
+            if witness_id not in event.witnesses:
+                raise ValueError(f"{witness_id!r} is not recorded as a witness to {event_id!r}")
+            if witness_id not in npcs:
+                raise KeyError(f"witness NPC not supplied: {witness_id}")
         for intent in conversations:
             if intent.listener_id not in npcs:
                 raise KeyError(f"listener NPC not supplied: {intent.listener_id}")
             if intent.speaker_id not in npcs:
                 raise KeyError(f"speaker NPC not supplied: {intent.speaker_id}")
 
-        ordered_event_ids = tuple(event.event_id for event in ordered_events)
+        ordered_event_ids = tuple(event.event_id for event in selected_events)
         ordered_conversations = tuple(sorted(conversations, key=lambda item: item.conversation_id))
-        signature = self._signature(ordered_event_ids, ordered_conversations)
+        signature = self._signature(ordered_event_ids, ordered_pairs, ordered_conversations)
         if tick in self._requests:
             if self._requests[tick] != signature:
                 raise ValueError(f"tick {tick} replayed with different request inputs")
@@ -153,15 +180,13 @@ class SimulationTickCoordinator:
         if self._last_tick is not None and tick <= self._last_tick:
             raise ValueError("new ticks must be strictly greater than the last processed tick")
 
-        # A tick is one state transition. Memory materialization and gossip both
-        # mutate NPC memory lists; conversations additionally mutate belief ledgers
-        # and adapter replay indexes. Capture only those owned state surfaces so an
-        # exception cannot leave a half-applied tick that a retry would misinterpret.
-        affected_npcs = {
-            npc_id: npc for npc_id, npc in npcs.items()
-            if any(npc_id in event.witnesses for event in ordered_events)
-            or any(npc_id in (item.listener_id, item.speaker_id) for item in ordered_conversations)
-        }
+        affected_npc_ids = {witness_id for _, witness_id in ordered_pairs}
+        affected_npc_ids.update(
+            owner_id
+            for intent in ordered_conversations
+            for owner_id in (intent.listener_id, intent.speaker_id)
+        )
+        affected_npcs = {npc_id: npcs[npc_id] for npc_id in affected_npc_ids}
         npc_memories = {npc_id: deepcopy(npc.memories) for npc_id, npc in affected_npcs.items()}
         memory_state = self.memory_adapter.transaction_snapshot()
         conversation_state = self.conversation_adapter.transaction_snapshot()
@@ -170,10 +195,9 @@ class SimulationTickCoordinator:
 
         try:
             memories: list[tuple[str, str, NPCMemory | None]] = []
-            for event in ordered_events:
-                for witness_id in sorted(event.witnesses):
-                    memory = self.memory_adapter.materialize(event.event_id, witness_id, npcs)
-                    memories.append((event.event_id, witness_id, memory))
+            for event_id, witness_id in ordered_pairs:
+                memory = self.memory_adapter.materialize(event_id, witness_id, npcs)
+                memories.append((event_id, witness_id, memory))
 
             conversation_results = tuple(
                 self.conversation_adapter.converse(
@@ -197,6 +221,17 @@ class SimulationTickCoordinator:
             self.conversation_adapter.restore_transaction_snapshot(conversation_state)
             beliefs.restore_transaction_snapshot(belief_state)
             raise
+
+    def discard_tick_cache(self, tick: int) -> None:
+        """Forget orchestration replay metadata after an enclosing transaction rolls back.
+
+        Domain mutations and adapter replay indexes are restored by transaction
+        participants. Keeping this cache would short-circuit the retry and skip
+        re-applying those restored effects.
+        """
+        self._requests.pop(tick, None)
+        self._results.pop(tick, None)
+        self._last_tick = max(self._requests) if self._requests else None
 
     def execute_routines(
         self,
