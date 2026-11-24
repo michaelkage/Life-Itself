@@ -7,6 +7,7 @@
 #include "simreality/Gossip.h"
 #include "simreality/LifeSystems.h"
 #include "simreality/LaneTraffic.h"
+#include "simreality/IntersectionTraffic.h"
 #include "simreality/Justice.h"
 #include "simreality/RandomStream.h"
 #include "simreality/Reputation.h"
@@ -126,6 +127,20 @@ public:
         const std::vector<LaneTrafficRequest>& requests);
     [[nodiscard]] bool release_lane_reservation(
         const std::string& lane_id, const EntityId& npc_id);
+
+    // Intersection movements reserve all authored conflict zones atomically.
+    void configure_intersection_movement(IntersectionMovementDefinition definition);
+    void advance_intersection_tick(std::uint64_t tick);
+    [[nodiscard]] IntersectionTrafficResolution resolve_intersection_traffic(
+        const std::vector<IntersectionTrafficRequest>& requests);
+    [[nodiscard]] bool release_intersection_reservation(
+        const std::string& intersection_id, const EntityId& npc_id);
+    [[nodiscard]] LaneFollowingResult advance_npc_on_reserved_intersection_movement(
+        const EntityId& npc_id, const std::string& intersection_id,
+        const std::string& movement_id,
+        const std::vector<SpatialPoint>& lane_centerline,
+        double elapsed_seconds, double lookahead_distance,
+        double desired_speed, double maximum_acceleration);
     [[nodiscard]] LaneFollowingResult advance_npc_on_reserved_lane(
         const EntityId& npc_id, const std::string& lane_id,
         const std::vector<SpatialPoint>& lane_centerline,
@@ -170,6 +185,7 @@ private:
     LifeCoordinator life_{};
     SpatialPartition spatial_index_{10.0};
     LaneTrafficCoordinator lane_traffic_{};
+    IntersectionTrafficCoordinator intersection_traffic_{};
     std::map<EntityId, SpatialPoint> npc_forward_{};
     std::map<EntityId, SpatialPoint> npc_velocity_{};
 };
