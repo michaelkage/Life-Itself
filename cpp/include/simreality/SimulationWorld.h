@@ -6,6 +6,7 @@
 #include "simreality/Fixers.h"
 #include "simreality/Gossip.h"
 #include "simreality/LifeSystems.h"
+#include "simreality/Information.h"
 #include "simreality/LaneTraffic.h"
 #include "simreality/IntersectionTraffic.h"
 #include "simreality/Justice.h"
@@ -40,6 +41,37 @@ struct WorldAdvanceReport {
     std::vector<DistrictDayResult> daily_results{};
     std::size_t memories_swept{0};
 };
+
+struct BeliefEvidenceClaimExplanation {
+    std::string requested_claim_id{};
+    bool resolved{false};
+    InformationClaim claim{};
+    std::vector<InformationClaim> lineage{};
+};
+struct BeliefRevisionExplanation {
+    BeliefRevision revision{};
+    double confidence_delta{0.0};
+    std::vector<BeliefEvidenceClaimExplanation> evidence_claims{};
+};
+struct BeliefAccountExplanation {
+    NPCBelief current_belief{};
+    std::vector<BeliefRevisionExplanation> revisions{};
+};
+struct NPCInvestigationView {
+    EntityId npc_id{};
+    std::vector<InvestigationGroup> received_information{};
+    std::vector<NPCBelief> current_beliefs{};
+    std::vector<BeliefAccountExplanation> belief_accounts{};
+    std::vector<BeliefRevisionExplanation> belief_history{};
+};
+struct NPCDecisionContextExplanation {
+    EntityId npc_id{};
+    SimulationHour observed_at_hour{0.0};
+    NPCInvestigationView investigation{};
+    std::map<EntityId, double> relationships{};
+    std::vector<MoralChoiceExplanation> option_explanations{};
+};
+
 
 struct RouteSegmentRequest {
     std::string source_lane_id{};
@@ -89,6 +121,16 @@ public:
     [[nodiscard]] LifeCoordinator& life_system() noexcept { return life_; }
     [[nodiscard]] const LifeCoordinator& life_system() const noexcept { return life_; }
     [[nodiscard]] std::uint64_t random_state() const noexcept { return random_.state(); }
+    [[nodiscard]] InformationLedger& information_ledger() noexcept { return information_; }
+    [[nodiscard]] const InformationLedger& information_ledger() const noexcept { return information_; }
+    [[nodiscard]] std::vector<BeliefRevision> belief_history_for(const EntityId& npc_id, const EntityId& target_id = {}) const;
+    [[nodiscard]] std::vector<BeliefRevisionExplanation> belief_explanations_for(const EntityId& npc_id, const EntityId& target_id = {}) const;
+    [[nodiscard]] std::vector<NPCBelief> beliefs_about_event(const EntityId& npc_id, const EntityId& target_id, SimulationHour event_timestamp_hour) const;
+    [[nodiscard]] std::vector<BeliefAccountExplanation> belief_account_explanations_for(const EntityId& npc_id, const EntityId& target_id, SimulationHour event_timestamp_hour) const;
+    [[nodiscard]] NPCInvestigationView investigation_view_for(const EntityId& npc_id, const EntityId& target_id = {}) const;
+    [[nodiscard]] NPCDecisionContextExplanation decision_context_for(const EntityId& npc_id, const std::vector<MoralChoiceOption>& options, const EntityId& target_id = {}) const;
+    [[nodiscard]] MoralChoiceResolution record_moral_choice(const EntityId& npc_id, const std::string& scenario_id, const std::vector<MoralChoiceOption>& options, const std::vector<MoralChoiceConsequence>& consequences);
+    [[nodiscard]] std::vector<NPCDecisionRecord> decision_history_for(const EntityId& npc_id) const;
 
     // Advances simulation time in a frame-rate-independent way. All due hourly
     // memory sweeps and daily district/NPC updates run in chronological order.
@@ -213,6 +255,7 @@ private:
     SimulationRuntime runtime_;
     RandomStream random_;
     LifeCoordinator life_{};
+    InformationLedger information_{};
     SpatialPartition spatial_index_{10.0};
     LaneTrafficCoordinator lane_traffic_{};
     IntersectionTrafficCoordinator intersection_traffic_{};
