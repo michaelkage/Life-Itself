@@ -122,6 +122,16 @@ int main() {
     assert(malformed_proposal_rejected);
     assert(malformed_proposal_bytes.str().empty());
 
+    std::stringstream trailing_data(durable_bytes + "x",
+        std::ios::in | std::ios::binary);
+    bool trailing_data_rejected = false;
+    try {
+        (void)load_traffic_recovery_checkpoint(trailing_data);
+    } catch (const std::runtime_error&) {
+        trailing_data_rejected = true;
+    }
+    assert(trailing_data_rejected);
+
     checkpoint_bytes.seekg(0);
     const auto restored_checkpoint = load_traffic_recovery_checkpoint(checkpoint_bytes);
     assert(restored_checkpoint.lanes.reservations.size() == checkpoint.lanes.reservations.size());
