@@ -34,6 +34,20 @@ struct SeparationResult {
     std::size_t contributing_neighbors{0};
 };
 
+struct MovingBody {
+    EntityId entity_id{};
+    SpatialPoint position{};
+    SpatialPoint velocity{};
+    double collision_radius{0.5};
+};
+
+struct CollisionAvoidanceResult {
+    SpatialPoint acceleration{};
+    double magnitude{0.0};
+    std::size_t predicted_conflicts{0};
+    double earliest_conflict_seconds{0.0};
+};
+
 // Deterministic uniform-grid broadphase. IDs and query results are canonicalized;
 // this class owns no entity lifetime or physical coordinates beyond its index.
 class SpatialPartition {
@@ -81,6 +95,14 @@ private:
 [[nodiscard]] SeparationResult compute_separation(
     SpatialPoint origin, const std::vector<SpatialPoint>& neighbors,
     double preferred_distance, double maximum_force);
+
+// Predicts closest approach over a finite horizon and returns a bounded
+// acceleration away from imminent overlaps. Input order cannot affect output.
+[[nodiscard]] CollisionAvoidanceResult compute_collision_avoidance(
+    const EntityId& subject_id, SpatialPoint subject_position,
+    SpatialPoint subject_velocity, double subject_radius,
+    const std::vector<MovingBody>& neighbors,
+    double prediction_horizon_seconds, double maximum_acceleration);
 
 
 struct LaneFollowingResult {
