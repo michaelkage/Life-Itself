@@ -1176,6 +1176,70 @@ LaneFollowingResult SimulationWorld::advance_npc_on_lane(
     return steering;
 }
 
+LaneFollowingResult SimulationWorld::advance_npc_on_lane_avoiding_collisions(
+    const EntityId& npc_id, const std::vector<SpatialPoint>& lane_centerline,
+    double elapsed_seconds, double lookahead_distance,
+    double desired_speed, double lane_maximum_acceleration,
+    double collision_radius, double neighbor_collision_radius,
+    double prediction_horizon_seconds, double maximum_avoidance_acceleration,
+    double broadphase_radius) {
+    (void)find_npc(npc_id);
+    if (!spatial_index_.contains(npc_id)) {
+        throw std::logic_error("NPC has no registered spatial position: " + npc_id);
+    }
+    if (!std::isfinite(elapsed_seconds) || elapsed_seconds < 0.0) {
+        throw std::invalid_argument("movement delta must be finite and non-negative");
+    }
+    if (!std::isfinite(broadphase_radius) || broadphase_radius < 0.0) {
+        throw std::invalid_argument("collision broadphase radius must be finite and non-negative");
+    }
+    const SpatialPoint position = spatial_index_.position(npc_id);
+    const SpatialPoint velocity = npc_velocity_.at(npc_id);
+    const LaneFollowingResult lane = compute_lane_following(
+        position, velocity, lane_centerline, lookahead_distance,
+        desired_speed, lane_maximum_acceleration);
+
+    std::vector<MovingBody> neighbors;
+    const auto candidates = spatial_index_.query_radius(position, broadphase_radius);
+    neighbors.reserve(candidates.size());
+    for (const EntityId& candidate : candidates) {
+        if (candidate == npc_id) continue;
+        const auto neighbor_velocity = npc_velocity_.find(candidate);
+        if (neighbor_velocity == npc_velocity_.end()) {
+            throw std::logic_error("spatial NPC is missing velocity: " + candidate);
+        }
+        neighbors.push_back({candidate, spatial_index_.position(candidate),
+            neighbor_velocity->second, neighbor_collision_radius});
+    }
+    const CollisionAvoidanceResult avoidance = compute_collision_avoidance(
+        npc_id, position, velocity, collision_radius, neighbors,
+        prediction_horizon_seconds, maximum_avoidance_acceleration);
+
+    SpatialPoint next_velocity{
+        velocity.x + (lane.steering_force.x + avoidance.acceleration.x) * elapsed_seconds,
+        velocity.y + (lane.steering_force.y + avoidance.acceleration.y) * elapsed_seconds,
+        velocity.z + (lane.steering_force.z + avoidance.acceleration.z) * elapsed_seconds};
+    const double speed = std::hypot(next_velocity.x, next_velocity.y, next_velocity.z);
+    if (!std::isfinite(speed)) {
+        throw std::overflow_error("collision-aware NPC movement speed is not representable");
+    }
+    if (speed > desired_speed && speed > 0.0) {
+        const double scale = desired_speed / speed;
+        next_velocity.x *= scale;
+        next_velocity.y *= scale;
+        next_velocity.z *= scale;
+    }
+    const SpatialPoint next_position{
+        position.x + next_velocity.x * elapsed_seconds,
+        position.y + next_velocity.y * elapsed_seconds,
+        position.z + next_velocity.z * elapsed_seconds};
+    SpatialPartition::validate_point(next_position);
+    spatial_index_.upsert(npc_id, next_position);
+    npc_velocity_[npc_id] = next_velocity;
+    if (speed > 1e-12) npc_forward_[npc_id] = next_velocity;
+    return lane;
+}
+
 void SimulationWorld::configure_traffic_lane(
     const std::string& lane_id, std::size_t capacity) {
     lane_traffic_.configure_lane(lane_id, capacity);
