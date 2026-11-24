@@ -20,6 +20,7 @@ constexpr std::array<char, 8> kMagicV8{{'S', 'R', 'E', 'C', 'O', 'R', 'E', '8'}}
 constexpr std::array<char, 8> kMagicV9{{'S', 'R', 'E', 'C', 'O', 'R', 'E', '9'}};
 constexpr std::array<char, 8> kMagicV10{{'S', 'R', 'E', 'C', 'O', 'R', 'E', 'A'}};
 constexpr std::array<char, 8> kMagicV11{{'S', 'R', 'E', 'C', 'O', 'R', 'E', 'B'}};
+constexpr std::array<char, 8> kMagicV12{{'S', 'R', 'E', 'C', 'O', 'R', 'E', 'C'}};
 constexpr std::uint32_t kMaxCollectionItems = 1'000'000;
 constexpr std::uint32_t kMaxStringBytes = 16U * 1024U * 1024U;
 static_assert(sizeof(double) == sizeof(std::uint64_t));
@@ -222,6 +223,45 @@ void write_npc(std::ostream& out, const NPC& value) {
     write_double(out, value.safety_value);
     write_double(out, value.freedom_value);
     write_double(out, value.self_interest_value);
+    write_count(out, value.belief_revision_history.size());
+    for (const BeliefRevision& revision : value.belief_revision_history) {
+        write_string(out, revision.target_entity_id);
+        write_u8(out, static_cast<std::uint8_t>(revision.action_tag));
+        write_double(out, revision.event_timestamp_hour);
+        write_double(out, revision.previous_confidence);
+        write_double(out, revision.revised_confidence);
+        write_u8(out, static_cast<std::uint8_t>(revision.reason));
+        write_string(out, revision.source_entity_id);
+        write_double(out, revision.recorded_hour);
+        write_double(out, revision.source_reliability);
+        write_double(out, revision.loyalty_factor);
+        write_double(out, revision.compassion_factor);
+        write_double(out, revision.skepticism_factor);
+        write_double(out, revision.evidence_factor);
+        write_count(out, revision.evidence_claim_ids.size());
+        for (const auto& id : revision.evidence_claim_ids) write_string(out, id);
+        write_count(out, revision.evidence_root_ids.size());
+        for (const auto& id : revision.evidence_root_ids) write_string(out, id);
+    }
+    write_count(out, value.decision_history.size());
+    for (const NPCDecisionRecord& record : value.decision_history) {
+        write_double(out, record.recorded_hour);
+        write_string(out, record.scenario_id);
+        write_string(out, record.selected_option_id);
+        write_double(out, record.selected_score);
+        write_count(out, record.option_scores.size());
+        for (const auto& item : record.option_scores) { write_string(out, item.first); write_double(out, item.second); }
+        write_count(out, record.relationship_snapshot.size());
+        for (const auto& item : record.relationship_snapshot) { write_string(out, item.first); write_double(out, item.second); }
+        write_count(out, record.evidence_claim_ids.size());
+        for (const auto& id : record.evidence_claim_ids) write_string(out, id);
+        write_count(out, record.evidence_root_ids.size());
+        for (const auto& id : record.evidence_root_ids) write_string(out, id);
+        write_double(out, record.loyalty_bias); write_double(out, record.skepticism);
+        write_double(out, record.compassion); write_double(out, record.fairness_value);
+        write_double(out, record.safety_value); write_double(out, record.freedom_value);
+        write_double(out, record.self_interest_value);
+    }
 }
 
 NPC read_npc(std::istream& in, std::uint32_t version) {
@@ -301,6 +341,63 @@ NPC read_npc(std::istream& in, std::uint32_t version) {
             || value.freedom_value < 0.0 || value.freedom_value > 1.0
             || value.self_interest_value < 0.0 || value.self_interest_value > 1.0) {
             throw std::runtime_error("invalid NPC moral value");
+        }
+    }
+    if (version >= 12U) {
+        const std::uint32_t revisions = read_count(in);
+        for (std::uint32_t i=0; i<revisions; ++i) {
+            BeliefRevision item;
+            item.target_entity_id=read_string(in);
+            item.action_tag=read_enum<ActionTag>(in, 8U, "revision action");
+            item.event_timestamp_hour=read_double(in);
+            item.previous_confidence=read_double(in);
+            item.revised_confidence=read_double(in);
+            item.reason=read_enum<BeliefRevisionReason>(in, 2U, "revision reason");
+            item.source_entity_id=read_string(in);
+            item.recorded_hour=read_double(in);
+            item.source_reliability=read_double(in);
+            item.loyalty_factor=read_double(in);
+            item.compassion_factor=read_double(in);
+            item.skepticism_factor=read_double(in);
+            item.evidence_factor=read_double(in);
+            if (item.target_entity_id.empty() || item.event_timestamp_hour < 0.0
+                || item.recorded_hour < 0.0 || item.previous_confidence < 0.0
+                || item.previous_confidence > 1.0 || item.revised_confidence < 0.0
+                || item.revised_confidence > 1.0 || item.source_reliability < 0.0
+                || item.source_reliability > 1.0)
+                throw std::runtime_error("invalid belief revision checkpoint");
+            for (double factor : {item.loyalty_factor,item.compassion_factor,item.skepticism_factor,item.evidence_factor})
+                if (factor < 0.0 || factor > 1.5) throw std::runtime_error("invalid belief revision factor");
+            for (std::uint32_t j=0,n=read_count(in); j<n; ++j) item.evidence_claim_ids.push_back(read_string(in));
+            for (std::uint32_t j=0,n=read_count(in); j<n; ++j) item.evidence_root_ids.push_back(read_string(in));
+            value.belief_revision_history.push_back(std::move(item));
+        }
+        const std::uint32_t records=read_count(in);
+        for (std::uint32_t i=0; i<records; ++i) {
+            NPCDecisionRecord item;
+            item.recorded_hour=read_double(in); item.scenario_id=read_string(in);
+            item.selected_option_id=read_string(in); item.selected_score=read_double(in);
+            if (item.recorded_hour < 0.0 || item.scenario_id.empty() || item.selected_option_id.empty())
+                throw std::runtime_error("invalid NPC decision record identity");
+            for (std::uint32_t j=0,n=read_count(in); j<n; ++j) {
+                const auto id=read_string(in); const auto score=read_double(in);
+                if (id.empty() || !item.option_scores.emplace(id,score).second)
+                    throw std::runtime_error("invalid duplicate decision option score");
+            }
+            for (std::uint32_t j=0,n=read_count(in); j<n; ++j) {
+                const auto id=read_string(in); const auto strength=read_double(in);
+                if (id.empty() || !item.relationship_snapshot.emplace(id,strength).second)
+                    throw std::runtime_error("invalid duplicate decision relationship");
+            }
+            for (std::uint32_t j=0,n=read_count(in); j<n; ++j) item.evidence_claim_ids.push_back(read_string(in));
+            for (std::uint32_t j=0,n=read_count(in); j<n; ++j) item.evidence_root_ids.push_back(read_string(in));
+            item.loyalty_bias=read_double(in); item.skepticism=read_double(in);
+            item.compassion=read_double(in); item.fairness_value=read_double(in);
+            item.safety_value=read_double(in); item.freedom_value=read_double(in);
+            item.self_interest_value=read_double(in);
+            for (double trait : {item.loyalty_bias,item.skepticism,item.compassion,item.fairness_value,item.safety_value,item.freedom_value,item.self_interest_value})
+                if (trait < 0.0 || trait > 1.0) throw std::runtime_error("invalid decision trait snapshot");
+            value.decision_history.push_back(std::move(item));
         }
     }
     return value;
