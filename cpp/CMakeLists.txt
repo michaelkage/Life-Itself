@@ -26,6 +26,7 @@ add_library(simreality_core
     src/IntersectionTraffic.cpp
     src/RoutePlanning.cpp
     src/TrafficRecovery.cpp
+    src/Information.cpp
 )
 target_include_directories(simreality_core PUBLIC include)
 target_compile_features(simreality_core PUBLIC cxx_std_20)
@@ -74,4 +75,8 @@ if(SIMREALITY_BUILD_TESTS)
     add_executable(simreality_traffic_recovery_tests tests/TrafficRecoveryTests.cpp)
     target_link_libraries(simreality_traffic_recovery_tests PRIVATE simreality_core)
     add_test(NAME simreality_traffic_recovery_tests COMMAND simreality_traffic_recovery_tests)
+
+    add_executable(simreality_information_tests tests/InformationTests.cpp)
+    target_link_libraries(simreality_information_tests PRIVATE simreality_core)
+    add_test(NAME simreality_information_tests COMMAND simreality_information_tests)
 endif()
