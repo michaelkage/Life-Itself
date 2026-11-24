@@ -1,9 +1,9 @@
-import { supabase } from './supabase';
+import { getSupabaseClient } from './supabase';
 import { Habit, DailyEntry } from '../types';
 
 // Habits
 export const getHabits = async (userId: string): Promise<Habit[] | null> => {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabaseClient()
     .from('habits')
     .select('*')
     .eq('userId', userId);
@@ -16,7 +16,7 @@ export const getHabits = async (userId: string): Promise<Habit[] | null> => {
 };
 
 export const createHabit = async (habit: Omit<Habit, 'id' | 'createdAt' | 'updatedAt'>): Promise<Habit | null> => {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabaseClient()
     .from('habits')
     .insert([habit])
     .select()
@@ -30,7 +30,7 @@ export const createHabit = async (habit: Omit<Habit, 'id' | 'createdAt' | 'updat
 };
 
 export const updateHabit = async (id: string, updates: Partial<Omit<Habit, 'id' | 'userId' | 'createdAt' | 'updatedAt'>>): Promise<Habit | null> => {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabaseClient()
     .from('habits')
     .update(updates)
     .eq('id', id)
@@ -45,7 +45,7 @@ export const updateHabit = async (id: string, updates: Partial<Omit<Habit, 'id' 
 };
 
 export const deleteHabit = async (id: string): Promise<boolean> => {
-  const { error } = await supabase
+  const { error } = await getSupabaseClient()
     .from('habits')
     .delete()
     .eq('id', id);
@@ -59,7 +59,7 @@ export const deleteHabit = async (id: string): Promise<boolean> => {
 
 // Entries
 export const getEntries = async (userId: string, date: Date): Promise<DailyEntry[] | null> => {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabaseClient()
     .from('daily_entries')
     .select('*')
     .eq('userId', userId)
@@ -73,7 +73,7 @@ export const getEntries = async (userId: string, date: Date): Promise<DailyEntry
 };
 
 export const createDailyEntry = async (entry: Omit<DailyEntry, 'id'>): Promise<DailyEntry | null> => {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabaseClient()
     .from('daily_entries')
     .insert([entry])
     .select()
@@ -87,7 +87,7 @@ export const createDailyEntry = async (entry: Omit<DailyEntry, 'id'>): Promise<D
 };
 
 export const updateDailyEntry = async (id: string, updates: Partial<Omit<DailyEntry, 'id' | 'userId'>>): Promise<DailyEntry | null> => {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabaseClient()
     .from('daily_entries')
     .update(updates)
     .eq('id', id)
@@ -102,7 +102,7 @@ export const updateDailyEntry = async (id: string, updates: Partial<Omit<DailyEn
 };
 
 export const deleteDailyEntry = async (id: string): Promise<boolean> => {
-  const { error } = await supabase
+  const { error } = await getSupabaseClient()
     .from('daily_entries')
     .delete()
     .eq('id', id);
