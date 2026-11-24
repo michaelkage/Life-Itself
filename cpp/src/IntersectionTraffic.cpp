@@ -37,6 +37,22 @@ void IntersectionTrafficCoordinator::configure_movement(
         if (zone.empty()) throw std::invalid_argument("conflict-zone ids must not be empty");
     }
     const MovementKey key{definition.intersection_id, definition.movement_id};
+    const auto existing = movements_.find(key);
+    if (existing != movements_.end()
+        && existing->second.conflict_zone_ids != definition.conflict_zone_ids) {
+        const auto intersection = reservations_.find(definition.intersection_id);
+        if (intersection != reservations_.end()) {
+            const bool occupied = std::any_of(
+                intersection->second.begin(), intersection->second.end(),
+                [&definition](const auto& entry) {
+                    return entry.second.movement_id == definition.movement_id;
+                });
+            if (occupied) {
+                throw std::logic_error(
+                    "cannot change conflict zones while the movement has active reservations");
+            }
+        }
+    }
     movements_[key] = std::move(definition);
 }
 
