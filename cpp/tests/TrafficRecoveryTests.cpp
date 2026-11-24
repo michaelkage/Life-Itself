@@ -109,6 +109,19 @@ int main() {
     }
     assert(inconsistent_rejected);
     assert(rejected_checkpoint.str().empty());
+
+    auto malformed_proposal_checkpoint = checkpoint;
+    malformed_proposal_checkpoint.pending_proposals.front().participants = {"", "b", "c"};
+    std::stringstream malformed_proposal_bytes(std::ios::in | std::ios::out | std::ios::binary);
+    bool malformed_proposal_rejected = false;
+    try {
+        save_traffic_recovery_checkpoint(malformed_proposal_checkpoint, malformed_proposal_bytes);
+    } catch (const std::invalid_argument&) {
+        malformed_proposal_rejected = true;
+    }
+    assert(malformed_proposal_rejected);
+    assert(malformed_proposal_bytes.str().empty());
+
     checkpoint_bytes.seekg(0);
     const auto restored_checkpoint = load_traffic_recovery_checkpoint(checkpoint_bytes);
     assert(restored_checkpoint.lanes.reservations.size() == checkpoint.lanes.reservations.size());
