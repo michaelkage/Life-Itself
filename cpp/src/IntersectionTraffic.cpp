@@ -233,4 +233,31 @@ std::vector<IntersectionReservation> IntersectionTrafficCoordinator::reservation
     return result;
 }
 
+std::size_t IntersectionTrafficCoordinator::conflict_pressure(
+    const std::string& intersection_id, const std::string& movement_id) const {
+    const auto target = movements_.find({intersection_id, movement_id});
+    if (target == movements_.end()) throw std::out_of_range("unknown intersection movement");
+    const auto active = reservations_.find(intersection_id);
+    if (active == reservations_.end()) return 0U;
+    std::size_t pressure = 0U;
+    for (const auto& [entity_id, reservation] : active->second) {
+        (void)entity_id;
+        const auto occupied = movements_.find({intersection_id, reservation.movement_id});
+        if (occupied == movements_.end()) throw std::logic_error("reservation references unknown movement");
+        if (conflicts(target->second, occupied->second)) ++pressure;
+    }
+    return pressure;
+}
+
+std::map<std::pair<std::string, std::string>, std::size_t>
+IntersectionTrafficCoordinator::conflict_pressure_snapshot() const {
+    std::map<std::pair<std::string, std::string>, std::size_t> result;
+    for (const auto& [key, definition] : movements_) {
+        (void)definition;
+        result.emplace(std::make_pair(key.intersection_id, key.movement_id),
+            conflict_pressure(key.intersection_id, key.movement_id));
+    }
+    return result;
+}
+
 } // namespace simreality
