@@ -72,6 +72,43 @@ struct NPCBelief {
     std::uint32_t contradictions{0};
 };
 
+enum class BeliefRevisionReason : std::uint8_t { IndependentEvidence, Contradiction, SourceReliability };
+struct BeliefRevision {
+    EntityId target_entity_id{};
+    ActionTag action_tag{ActionTag::InteractionPolite};
+    SimulationHour event_timestamp_hour{0.0};
+    double previous_confidence{0.5};
+    double revised_confidence{0.5};
+    BeliefRevisionReason reason{BeliefRevisionReason::IndependentEvidence};
+    EntityId source_entity_id{};
+    SimulationHour recorded_hour{0.0};
+    double source_reliability{0.5};
+    double loyalty_factor{1.0};
+    double compassion_factor{1.0};
+    double skepticism_factor{1.0};
+    double evidence_factor{1.0};
+    std::vector<std::string> evidence_claim_ids{};
+    std::vector<std::string> evidence_root_ids{};
+};
+
+struct NPCDecisionRecord {
+    SimulationHour recorded_hour{0.0};
+    std::string scenario_id{};
+    std::string selected_option_id{};
+    double selected_score{0.0};
+    std::map<std::string, double> option_scores{};
+    std::map<EntityId, double> relationship_snapshot{};
+    std::vector<std::string> evidence_claim_ids{};
+    std::vector<std::string> evidence_root_ids{};
+    double loyalty_bias{0.5};
+    double skepticism{0.5};
+    double compassion{0.5};
+    double fairness_value{0.5};
+    double safety_value{0.5};
+    double freedom_value{0.5};
+    double self_interest_value{0.5};
+};
+
 struct NPC {
     EntityId entity_id{};
     AgeBand age_band{AgeBand::Adult};
@@ -111,6 +148,8 @@ struct NPC {
     double safety_value{0.5};
     double freedom_value{0.5};
     double self_interest_value{0.5};
+    std::vector<BeliefRevision> belief_revision_history{};
+    std::vector<NPCDecisionRecord> decision_history{};
 };
 
 struct District {
