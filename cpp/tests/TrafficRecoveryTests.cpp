@@ -97,6 +97,18 @@ int main() {
     std::stringstream checkpoint_bytes(std::ios::in | std::ios::out | std::ios::binary);
     save_traffic_recovery_checkpoint(checkpoint, checkpoint_bytes);
     const std::string durable_bytes = checkpoint_bytes.str();
+
+    auto inconsistent_checkpoint = checkpoint;
+    inconsistent_checkpoint.lanes.reservations.clear();
+    std::stringstream rejected_checkpoint(std::ios::in | std::ios::out | std::ios::binary);
+    bool inconsistent_rejected = false;
+    try {
+        save_traffic_recovery_checkpoint(inconsistent_checkpoint, rejected_checkpoint);
+    } catch (const std::invalid_argument&) {
+        inconsistent_rejected = true;
+    }
+    assert(inconsistent_rejected);
+    assert(rejected_checkpoint.str().empty());
     checkpoint_bytes.seekg(0);
     const auto restored_checkpoint = load_traffic_recovery_checkpoint(checkpoint_bytes);
     assert(restored_checkpoint.lanes.reservations.size() == checkpoint.lanes.reservations.size());
