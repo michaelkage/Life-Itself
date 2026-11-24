@@ -24,6 +24,7 @@ add_library(simreality_core
     src/Spatial.cpp
     src/LaneTraffic.cpp
     src/IntersectionTraffic.cpp
+    src/RoutePlanning.cpp
 )
 target_include_directories(simreality_core PUBLIC include)
 target_compile_features(simreality_core PUBLIC cxx_std_20)
@@ -64,4 +65,8 @@ if(SIMREALITY_BUILD_TESTS)
     add_executable(simreality_world_intersection_tests tests/WorldIntersectionTests.cpp)
     target_link_libraries(simreality_world_intersection_tests PRIVATE simreality_core)
     add_test(NAME simreality_world_intersection_tests COMMAND simreality_world_intersection_tests)
+
+    add_executable(simreality_route_planning_tests tests/RoutePlanningTests.cpp)
+    target_link_libraries(simreality_route_planning_tests PRIVATE simreality_core)
+    add_test(NAME simreality_route_planning_tests COMMAND simreality_route_planning_tests)
 endif()
