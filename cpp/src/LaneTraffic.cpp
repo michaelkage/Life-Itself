@@ -195,4 +195,62 @@ std::map<std::string, std::size_t> LaneTrafficCoordinator::occupancy_snapshot() 
     return result;
 }
 
+LaneTrafficSnapshot LaneTrafficCoordinator::snapshot() const {
+    LaneTrafficSnapshot result;
+    result.lease_ticks = lease_ticks_;
+    result.current_tick = current_tick_;
+    result.tick_initialized = tick_initialized_;
+    result.capacities = lane_capacity_;
+    for (const auto& [lane_id, entries] : reservations_) {
+        (void)lane_id;
+        for (const auto& [entity_id, reservation] : entries) {
+            (void)entity_id; result.reservations.push_back(reservation);
+        }
+    }
+    for (const auto& [key, ticks] : waiting_)
+        result.waiting.push_back({key.lane_id, key.entity_id, ticks});
+    return result;
+}
+
+void LaneTrafficCoordinator::restore(const LaneTrafficSnapshot& value) {
+    if (value.lease_ticks == 0U || (!value.tick_initialized
+        && (!value.reservations.empty() || !value.waiting.empty()))) {
+        throw std::invalid_argument("lane traffic snapshot clock or lease is invalid");
+    }
+    std::map<std::string, std::map<std::string, LaneReservation>> reservations;
+    for (const auto& [lane, capacity] : value.capacities) {
+        if (lane.empty() || capacity == 0U) throw std::invalid_argument("invalid lane capacity snapshot");
+    }
+    for (const auto& reservation : value.reservations) {
+        const auto cap = value.capacities.find(reservation.lane_id);
+        if (reservation.lane_id.empty() || reservation.entity_id.empty()
+            || cap == value.capacities.end()
+            || (value.tick_initialized && reservation.expires_at_tick <= value.current_tick)
+            || !reservations[reservation.lane_id].emplace(
+                reservation.entity_id, reservation).second) {
+            throw std::invalid_argument("invalid or duplicate lane reservation snapshot");
+        }
+    }
+    for (const auto& [lane, entries] : reservations) {
+        if (entries.size() > value.capacities.at(lane))
+            throw std::invalid_argument("lane snapshot exceeds configured capacity");
+    }
+    std::map<WaitKey, std::uint64_t> waiting;
+    for (const auto& item : value.waiting) {
+        if (item.lane_id.empty() || item.entity_id.empty()
+            || !value.capacities.contains(item.lane_id)
+            || (reservations.contains(item.lane_id)
+                && reservations.at(item.lane_id).contains(item.entity_id))
+            || !waiting.emplace(WaitKey{item.lane_id, item.entity_id}, item.wait_ticks).second) {
+            throw std::invalid_argument("invalid or duplicate lane waiting snapshot");
+        }
+    }
+    lease_ticks_ = value.lease_ticks;
+    current_tick_ = value.current_tick;
+    tick_initialized_ = value.tick_initialized;
+    lane_capacity_ = value.capacities;
+    reservations_ = std::move(reservations);
+    waiting_ = std::move(waiting);
+}
+
 } // namespace simreality
