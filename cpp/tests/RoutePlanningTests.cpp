@@ -36,6 +36,13 @@ int main() {
     assert(intents.lane_requests[0].lane_id == "B");
     assert(intents.intersection_requests[0].movement_id == "through");
 
+    RoutePlan stale_route = shortest;
+    stale_route.steps[1].entry_movement_id = "wrong-movement";
+    bool stale_rejected = false;
+    try { (void)planner.reservation_lookahead(stale_route, 0U, "npc-1", 5, 1U); }
+    catch (const std::invalid_argument&) { stale_rejected = true; }
+    assert(stale_rejected);
+
     bool unreachable = false;
     try { (void)planner.plan("D", "A"); }
     catch (const std::runtime_error&) { unreachable = true; }
