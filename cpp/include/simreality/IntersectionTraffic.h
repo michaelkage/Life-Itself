@@ -54,6 +54,10 @@ public:
         const std::string& entity_id) const;
     [[nodiscard]] std::vector<IntersectionReservation> reservations(
         const std::string& intersection_id) const;
+    [[nodiscard]] std::size_t conflict_pressure(
+        const std::string& intersection_id, const std::string& movement_id) const;
+    [[nodiscard]] std::map<std::pair<std::string, std::string>, std::size_t>
+        conflict_pressure_snapshot() const;
     [[nodiscard]] std::uint64_t current_tick() const noexcept { return current_tick_; }
 
 private:
