@@ -81,7 +81,11 @@ LaneTrafficResolution LaneTrafficCoordinator::resolve(
         auto& lane_reservations = reservations_[request.lane_id];
         const auto existing = lane_reservations.find(request.entity_id);
         if (existing != lane_reservations.end()) {
+            if (current_tick_ > std::numeric_limits<std::uint64_t>::max() - lease_ticks_) {
+                throw std::overflow_error("reservation expiry tick overflow");
+            }
             existing->second.priority = request.priority;
+            existing->second.expires_at_tick = current_tick_ + lease_ticks_;
             result.granted_entity_ids.push_back(request.entity_id);
             waiting_.erase({request.lane_id, request.entity_id});
             continue;
