@@ -603,3 +603,15 @@ stable entity identity. Reservations renew and expire on explicit simulation
 ticks, and the world refuses intersection-entry movement without the matching
 live movement grant. Conflict-zone geometry and movement definitions remain
 host-authored. See [docs/INTERSECTION-TRAFFIC.md](docs/INTERSECTION-TRAFFIC.md).
+
+
+## Transactional route-segment handoff
+
+`SimulationWorld::advance_npc_on_reserved_route_segment` joins lane admission,
+intersection grants, and predictive collision-aware movement. The destination
+lane and any entered intersection must already be reserved. The source lane
+and any cleared intersection remain reserved during movement and are released
+only after the movement step commits. The returned result reports which
+occupancy tokens were released. This is a single-threaded world-operation
+transaction; hosts must serialize world mutation and continue renewing leases
+while entities physically occupy their lanes or conflict zones.
