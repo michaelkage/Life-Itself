@@ -54,3 +54,20 @@ restore authored route graph/geometry and spatial transforms from its own
 world/level data; those are intentionally not inferred from traffic occupancy.
 Never restore an expired lease as active. Physical occupancy should be reconciled
 against authoritative transforms before resuming movement.
+
+
+## Cross-resource renewal atomicity
+
+JourneyReservationManager renews lane and intersection leases as one logical
+transaction. It snapshots both coordinators before advancing either clock. If
+either tick advance or either batch resolution fails, both coordinators are
+restored, including lease expiries, wait credits, definitions, and clocks, and
+the original failure is propagated. This prevents a partially renewed journey
+from retaining only one side of an intersection transition.
+
+Checkpoint writing performs the same cross-resource occupancy checks as
+loading before emitting the header: every tracked lane and optional intersection
+occupancy must have a corresponding unexpired reservation. Pending resource
+edges and proposals are validated for resource kinds, unique identities,
+canonical participant ordering, owner identity, and replacement-request
+ownership. Invalid checkpoints fail before any bytes are written.
