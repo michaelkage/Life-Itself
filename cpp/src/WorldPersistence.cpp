@@ -8,6 +8,8 @@
 #include <istream>
 #include <limits>
 #include <ostream>
+#include <set>
+#include <tuple>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -837,17 +839,66 @@ void save_traffic_recovery_checkpoint(
     intersections.restore(checkpoint.intersections);
     JourneyReservationManager journeys;
     journeys.restore(checkpoint.journey_occupancy);
+    // A checkpoint that can be written must also be loadable: every declared
+    // physical occupancy must have its still-live admission token.
+    for (const auto& occupancy : checkpoint.journey_occupancy) {
+        const auto lane = std::find_if(checkpoint.lanes.reservations.begin(),
+            checkpoint.lanes.reservations.end(), [&occupancy](const LaneReservation& item) {
+                return item.entity_id == occupancy.entity_id && item.lane_id == occupancy.lane_id;
+            });
+        if (lane == checkpoint.lanes.reservations.end())
+            throw std::invalid_argument("journey occupancy has no live lane reservation");
+        if (!occupancy.intersection_id.empty()) {
+            const auto intersection = std::find_if(checkpoint.intersections.reservations.begin(),
+                checkpoint.intersections.reservations.end(), [&occupancy](const IntersectionReservation& item) {
+                    return item.entity_id == occupancy.entity_id
+                        && item.intersection_id == occupancy.intersection_id
+                        && item.movement_id == occupancy.movement_id;
+                });
+            if (intersection == checkpoint.intersections.reservations.end())
+                throw std::invalid_argument("journey occupancy has no live intersection reservation");
+        }
+    }
     RouteProgressMonitor progress(checkpoint.progress_stall_threshold);
     progress.restore(checkpoint.route_progress);
     TrafficDeadlockDetector detector;
     std::vector<WaitForEdge> graph;
+    std::set<std::tuple<std::string, std::string, BlockedResourceKind, std::string>> unique_wait_edges;
     for (const auto& edge : checkpoint.pending_wait_edges) {
         if (edge.waiter_id.empty() || edge.blocker_id.empty() || edge.waiter_id == edge.blocker_id
-            || edge.resource_id.empty())
-            throw std::invalid_argument("invalid pending resource wait edge");
+            || edge.resource_id.empty()
+            || (edge.resource_kind != BlockedResourceKind::Lane
+                && edge.resource_kind != BlockedResourceKind::Intersection)
+            || !unique_wait_edges.emplace(edge.waiter_id, edge.blocker_id,
+                edge.resource_kind, edge.resource_id).second)
+            throw std::invalid_argument("invalid or duplicate pending resource wait edge");
         graph.push_back({edge.waiter_id, edge.blocker_id});
     }
     (void)detector.detect(graph);
+    for (const auto& proposal : checkpoint.pending_proposals) {
+        if (proposal.participants.empty() || proposal.yielding_entity_id.empty()
+            || !std::is_sorted(proposal.participants.begin(), proposal.participants.end())
+            || std::adjacent_find(proposal.participants.begin(), proposal.participants.end())
+                != proposal.participants.end()
+            || !std::binary_search(proposal.participants.begin(), proposal.participants.end(),
+                proposal.yielding_entity_id))
+            throw std::invalid_argument("invalid pending deadlock proposal identity");
+        for (const auto& resource : proposal.blocking_resources) {
+            if (resource.resource_id.empty() || resource.current_owner_id.empty()
+                || (resource.kind != BlockedResourceKind::Lane
+                    && resource.kind != BlockedResourceKind::Intersection))
+                throw std::invalid_argument("invalid pending deadlock resource");
+        }
+        for (const auto& request : proposal.replacement_lane_requests) {
+            if (request.entity_id != proposal.yielding_entity_id || request.lane_id.empty())
+                throw std::invalid_argument("invalid pending replacement lane request");
+        }
+        for (const auto& request : proposal.replacement_intersection_requests) {
+            if (request.entity_id != proposal.yielding_entity_id
+                || request.intersection_id.empty() || request.movement_id.empty())
+                throw std::invalid_argument("invalid pending replacement intersection request");
+        }
+    }
 
     constexpr std::array<char, 8> magic{{'S','R','E','T','R','A','F','1'}};
     output.write(magic.data(), static_cast<std::streamsize>(magic.size()));
