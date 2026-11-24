@@ -41,7 +41,7 @@ int main() {
     assert(stationary.steering_force.x == 0.0);
 
     const std::vector<MovingBody> crossing{
-        {"pedestrian-b", {5.0, -3.0, 0.0}, {0.0, 2.0, 0.0}, 0.5},
+        {"pedestrian-b", {5.0, -5.0, 0.0}, {0.0, 2.0, 0.0}, 0.5},
         {"vehicle-a", {5.0, 3.0, 0.0}, {0.0, -2.0, 0.0}, 1.0}};
     const auto avoidance = compute_collision_avoidance(
         "subject", {0.0, 0.0, 0.0}, {2.0, 0.0, 0.0}, 0.5,
