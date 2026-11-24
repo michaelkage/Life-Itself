@@ -57,6 +57,7 @@ LaneTrafficResolution LaneTrafficCoordinator::resolve(
     }
 
     std::set<WaitKey> unique_requests;
+    std::set<std::string> requested_entities;
     for (const LaneTrafficRequest& request : requests) {
         if (request.lane_id.empty() || request.entity_id.empty()) {
             throw std::invalid_argument("traffic lane and entity ids must not be empty");
@@ -66,6 +67,9 @@ LaneTrafficResolution LaneTrafficCoordinator::resolve(
         }
         if (!unique_requests.insert({request.lane_id, request.entity_id}).second) {
             throw std::invalid_argument("duplicate entity request for the same lane");
+        }
+        if (!requested_entities.insert(request.entity_id).second) {
+            throw std::invalid_argument("an entity may request only one lane per tick");
         }
     }
 
