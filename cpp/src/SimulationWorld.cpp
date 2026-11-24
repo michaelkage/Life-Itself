@@ -902,6 +902,42 @@ Conversation SimulationWorld::talk(
             if (rumour.action_tag == "Crime.Vandalism") return ActionTag::CrimeVandalism;
             return ActionTag::InteractionPolite;
         }();
+        const std::int64_t claim_tick = static_cast<std::int64_t>(
+            std::llround(std::max(0.0, runtime_.total_hours()) * 1000.0));
+        const std::string proposition = "action:" + expected_action;
+        const std::string root_source = rumour.source_entity_id.empty()
+            ? speaker_id : rumour.source_entity_id;
+        const std::string root_evidence = "evidence:" + root_source + ":"
+            + rumour.target_entity_id + ":" + proposition + ":"
+            + std::to_string(std::llround(rumour.timestamp_hour * 1000.0));
+        std::string parent_claim_id;
+        for (const InformationClaim& received : information_.claims_received_by(speaker_id)) {
+            if (received.subject_key == rumour.target_entity_id
+                && received.proposition_key == proposition
+                && received.root_evidence_id == root_evidence) {
+                parent_claim_id = received.claim_id;
+            }
+        }
+        const std::string claim_id = "claim:" + speaker_id + ":" + listener_id + ":"
+            + root_evidence + ":" + std::to_string(claim_tick) + ":"
+            + std::to_string(information_.size());
+        if (!parent_claim_id.empty()) {
+            (void)information_.relay(parent_claim_id, claim_id, speaker_id, listener_id,
+                claim_tick, std::clamp(rumour.retention, 0.0, 1.0));
+        } else {
+            InformationClaim claim;
+            claim.claim_id = claim_id;
+            claim.subject_key = rumour.target_entity_id;
+            claim.proposition_key = proposition;
+            claim.root_evidence_id = root_evidence;
+            claim.source_entity_id = speaker_id;
+            claim.recipient_entity_id = listener_id;
+            claim.created_tick = claim_tick;
+            claim.confidence = std::clamp(rumour.retention, 0.0, 1.0);
+            claim.kind = root_source == speaker_id
+                ? InformationKind::Observation : InformationKind::Report;
+            (void)information_.record(claim);
+        }
         double source_reliability = 0.5;
         if (!speaker.beliefs.empty()) {
             double total = 0.0;
@@ -952,9 +988,27 @@ Conversation SimulationWorld::talk(
                     || prior.timestamp_hour != rumour.timestamp_hour
                     || prior.action_tag == believed_action) continue;
                 contradicted = true;
+                const double previous_confidence = prior.confidence;
                 prior.confidence = std::clamp(
                     prior.confidence - 0.20 * account_confidence, 0.0, 1.0);
                 ++prior.contradictions;
+                BeliefRevision revision;
+                revision.target_entity_id = prior.target_entity_id;
+                revision.action_tag = prior.action_tag;
+                revision.event_timestamp_hour = prior.timestamp_hour;
+                revision.previous_confidence = previous_confidence;
+                revision.revised_confidence = prior.confidence;
+                revision.reason = BeliefRevisionReason::Contradiction;
+                revision.source_entity_id = speaker_id;
+                revision.recorded_hour = runtime_.total_hours();
+                revision.source_reliability = source_reliability;
+                revision.loyalty_factor = loyalty_factor;
+                revision.compassion_factor = compassion_factor;
+                revision.skepticism_factor = skepticism_factor;
+                revision.evidence_factor = account_confidence;
+                revision.evidence_claim_ids.push_back(claim_id);
+                revision.evidence_root_ids.push_back(root_evidence);
+                listener.belief_revision_history.push_back(std::move(revision));
             }
         }
         if (belief == listener.beliefs.end()) {
@@ -965,10 +1019,28 @@ Conversation SimulationWorld::talk(
             // A first-hand belief keeps its provenance. Only a distinct source
             // can strengthen an existing second-hand account.
             if (!belief->directly_observed && !repeated_source_report) {
+                const double previous_confidence = belief->confidence;
                 belief->confidence = std::clamp(belief->confidence
                     + (1.0 - belief->confidence) * account_confidence * 0.25, 0.0, 1.0);
                 belief->source_entity_id = speaker_id;
                 ++belief->corroborations;
+                BeliefRevision revision;
+                revision.target_entity_id = belief->target_entity_id;
+                revision.action_tag = belief->action_tag;
+                revision.event_timestamp_hour = belief->timestamp_hour;
+                revision.previous_confidence = previous_confidence;
+                revision.revised_confidence = belief->confidence;
+                revision.reason = BeliefRevisionReason::IndependentEvidence;
+                revision.source_entity_id = speaker_id;
+                revision.recorded_hour = runtime_.total_hours();
+                revision.source_reliability = source_reliability;
+                revision.loyalty_factor = loyalty_factor;
+                revision.compassion_factor = compassion_factor;
+                revision.skepticism_factor = skepticism_factor;
+                revision.evidence_factor = account_confidence;
+                revision.evidence_claim_ids.push_back(claim_id);
+                revision.evidence_root_ids.push_back(root_evidence);
+                listener.belief_revision_history.push_back(std::move(revision));
             }
             if (contradicted) ++belief->contradictions;
         }
