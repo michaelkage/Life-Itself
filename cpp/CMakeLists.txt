@@ -69,4 +69,8 @@ if(SIMREALITY_BUILD_TESTS)
     add_executable(simreality_route_planning_tests tests/RoutePlanningTests.cpp)
     target_link_libraries(simreality_route_planning_tests PRIVATE simreality_core)
     add_test(NAME simreality_route_planning_tests COMMAND simreality_route_planning_tests)
+
+    add_executable(simreality_traffic_recovery_tests tests/TrafficRecoveryTests.cpp)
+    target_link_libraries(simreality_traffic_recovery_tests PRIVATE simreality_core)
+    add_test(NAME simreality_traffic_recovery_tests COMMAND simreality_traffic_recovery_tests)
 endif()
