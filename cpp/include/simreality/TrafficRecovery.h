@@ -2,6 +2,7 @@
 
 #include "simreality/IntersectionTraffic.h"
 #include "simreality/LaneTraffic.h"
+#include "simreality/RoutePlanning.h"
 
 #include <cstdint>
 #include <map>
