@@ -591,3 +591,15 @@ a reservation/admission layer, not a substitute for geometric collision or
 intersection resolution. `SimulationWorld` enforces a live reservation before
 its reserved-lane movement entry point will advance an NPC. See
 [docs/LANE-TRAFFIC.md](docs/LANE-TRAFFIC.md).
+
+
+## Deterministic intersection right-of-way
+
+The C++ runtime now includes `IntersectionTrafficCoordinator`: authored
+intersection movements claim complete sets of conflict zones atomically.
+Simultaneous non-conflicting movements can proceed together; overlapping
+movements are arbitrated by authored priority, accumulated wait credit, and
+stable entity identity. Reservations renew and expire on explicit simulation
+ticks, and the world refuses intersection-entry movement without the matching
+live movement grant. Conflict-zone geometry and movement definitions remain
+host-authored. See [docs/INTERSECTION-TRAFFIC.md](docs/INTERSECTION-TRAFFIC.md).
