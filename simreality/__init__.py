@@ -1012,3 +1012,8 @@ __all__ += [
     "PresenceEncounterIntent", "SimulationWorldTickPipeline",
     "WorldTickPipelineResult",
 ]
+
+
+# Append-only provenance for claims, relays, and recipient-local investigations.
+from .information import ClaimResult, InformationClaim, InformationKind, InformationLedger, InvestigationEntry, InvestigationGroup
+__all__ += ["ClaimResult", "InformationClaim", "InformationKind", "InformationLedger", "InvestigationEntry", "InvestigationGroup"]
