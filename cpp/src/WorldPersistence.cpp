@@ -1083,9 +1083,16 @@ TrafficRecoveryCheckpoint load_traffic_recovery_checkpoint(std::istream& input) 
     RouteProgressMonitor progress(result.progress_stall_threshold); progress.restore(result.route_progress);
     TrafficDeadlockDetector detector;
     std::vector<WaitForEdge> graph;
+    std::set<std::tuple<std::string, std::string, BlockedResourceKind, std::string>> unique_wait_edges;
     for (const auto& edge : result.pending_wait_edges) {
-        if (edge.resource_id.empty()) throw std::runtime_error("empty pending wait resource");
-        graph.push_back({edge.waiter_id,edge.blocker_id});
+        if (edge.waiter_id.empty() || edge.blocker_id.empty()
+            || edge.waiter_id == edge.blocker_id || edge.resource_id.empty()
+            || (edge.resource_kind != BlockedResourceKind::Lane
+                && edge.resource_kind != BlockedResourceKind::Intersection)
+            || !unique_wait_edges.emplace(edge.waiter_id, edge.blocker_id,
+                edge.resource_kind, edge.resource_id).second)
+            throw std::runtime_error("invalid or duplicate pending resource wait edge");
+        graph.push_back({edge.waiter_id, edge.blocker_id});
     }
     (void)detector.detect(graph);
     for (const auto& occupancy : result.journey_occupancy) {
@@ -1123,6 +1130,10 @@ TrafficRecoveryCheckpoint load_traffic_recovery_checkpoint(std::istream& input) 
                 || request.movement_id.empty())
                 throw std::runtime_error("invalid durable replacement intersection request");
     }
+    // A checkpoint is a single framed record. Reject concatenated records and
+    // trailing garbage instead of silently accepting an ambiguous prefix.
+    if (input.peek() != std::char_traits<char>::eof())
+        throw std::runtime_error("trailing data after traffic recovery checkpoint");
     return result;
 }
 
