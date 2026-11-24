@@ -4,7 +4,7 @@ Audit date: 2026-11-24
 
 ## Scope and method
 
-The GitHub remote was inventoried through the repository branches and pull-request APIs. The initial inventory contained 28 remote branches (including `main`) and four open PRs (#26–#29). The post-consolidation remote contains 31 branches (including three temporary consolidation branches) and zero open PRs.
+The GitHub remote was inventoried through the repository branches and pull-request APIs. The initial inventory contained 29 remote branches (including `main`) and four open PRs (#26–#29). The post-consolidation remote contains 32 branches (including three temporary consolidation branches) and zero open PRs.
 
 A local Git working tree was not present in this execution environment. A direct `git clone` / `git fetch --all --prune` attempt could not reach github.com because DNS/network access was unavailable. Therefore this audit covers all GitHub remote refs and PRs, but cannot certify unpushed local-only branches on a developer workstation.
 
