@@ -30,7 +30,7 @@ class TestCppPythonDomainParity(unittest.TestCase):
             "Justice.cpp", "RandomStream.cpp", "Reputation.cpp", "SimulationClock.cpp",
             "SimulationRuntime.cpp", "SimulationScheduler.cpp", "SimulationWorld.cpp",
             "Trauma.cpp", "WorldPersistence.cpp", "Campaign.cpp", "Spatial.cpp",
-            "LaneTraffic.cpp", "IntersectionTraffic.cpp",
+            "LaneTraffic.cpp", "IntersectionTraffic.cpp", "RoutePlanning.cpp", "TrafficRecovery.cpp",
         ]]
         subprocess.run(
             [COMPILER, "-std=c++20", "-O2", "-I", str(ROOT / "cpp" / "include"),
