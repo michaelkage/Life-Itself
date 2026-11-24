@@ -13,6 +13,8 @@
 #include "simreality/RandomStream.h"
 #include "simreality/Reputation.h"
 #include "simreality/SimulationClock.h"
+#include "simreality/SpscRingBuffer.h"
+#include "simreality/Spatial.h"
 #include "simreality/SimulationRuntime.h"
 #include "simreality/SimulationScheduler.h"
 #include "simreality/SimulationWorld.h"
@@ -62,6 +64,127 @@ int main() {
         rejected_zero = true;
     }
     assert(rejected_zero);
+
+    SimulationRuntime dual_runtime;
+    const auto frame_one = dual_runtime.advance_frame(0.5, 2.0);
+    assert(std::abs(frame_one.previous_real_seconds - 0.0) < 1e-9);
+    assert(std::abs(frame_one.current_real_seconds - 0.5) < 1e-9);
+    assert(std::abs(frame_one.elapsed_simulation_hours - 1.0) < 1e-9);
+    assert(frame_one.simulation_ticks.size() == 1U);
+    assert(std::abs(dual_runtime.total_hours() - 1.0) < 1e-9);
+    const auto paused_frame = dual_runtime.advance_frame(2.0, 0.0);
+    assert(paused_frame.simulation_ticks.empty());
+    assert(std::abs(dual_runtime.real_time_seconds() - 2.5) < 1e-9);
+    assert(std::abs(dual_runtime.total_hours() - 1.0) < 1e-9);
+    const auto resumed_frame = dual_runtime.advance_frame(0.5, 2.0);
+    assert(resumed_frame.simulation_ticks.size() == 1U);
+    assert(std::abs(dual_runtime.total_hours() - 2.0) < 1e-9);
+
+    bool rejected_negative_frame_delta = false;
+    try {
+        (void)dual_runtime.advance_frame(-0.1, 1.0);
+    } catch (const std::invalid_argument&) {
+        rejected_negative_frame_delta = true;
+    }
+    assert(rejected_negative_frame_delta);
+    bool rejected_invalid_simulation_rate = false;
+    try {
+        (void)dual_runtime.advance_frame(0.1, std::numeric_limits<double>::infinity());
+    } catch (const std::invalid_argument&) {
+        rejected_invalid_simulation_rate = true;
+    }
+    assert(rejected_invalid_simulation_rate);
+
+    SimulationCommandBus<std::uint32_t, 4U> command_bus;
+    std::uint32_t command = 0U;
+    assert(command_bus.empty());
+    assert(!command_bus.try_pop(command));
+    assert(command_bus.try_push(11U));
+    assert(command_bus.try_push(22U));
+    assert(command_bus.try_push(33U));
+    assert(!command_bus.try_push(44U));
+    assert(command_bus.size_approx() == 3U);
+    assert(command_bus.try_pop(command) && command == 11U);
+    assert(command_bus.try_pop(command) && command == 22U);
+    assert(command_bus.try_pop(command) && command == 33U);
+    assert(command_bus.empty());
+
+    SimulationSnapshotBus<std::uint64_t, 8U> snapshot_bus;
+    assert(snapshot_bus.capacity() == 7U);
+    assert(snapshot_bus.try_push(0x1234U));
+    std::uint64_t snapshot_value = 0U;
+    assert(snapshot_bus.try_pop(snapshot_value) && snapshot_value == 0x1234U);
+
+    SimulationWorld frame_world;
+    const auto world_frame = frame_world.advance_frame(1.0, 1.0);
+    assert(world_frame.ticks.size() == 1U);
+    assert(std::abs(frame_world.total_hours() - 1.0) < 1e-9);
+    assert(std::abs(frame_world.real_time_seconds() - 1.0) < 1e-9);
+    const auto world_pause = frame_world.advance_frame(2.0, 0.0);
+    assert(world_pause.ticks.empty());
+    assert(std::abs(frame_world.total_hours() - 1.0) < 1e-9);
+    assert(std::abs(frame_world.real_time_seconds() - 3.0) < 1e-9);
+    std::stringstream dual_clock_save(std::ios::in | std::ios::out | std::ios::binary);
+    save_world(frame_world, dual_clock_save);
+    dual_clock_save.seekg(0);
+    SimulationWorld dual_clock_restored = load_world(dual_clock_save);
+    assert(std::abs(dual_clock_restored.total_hours() - 1.0) < 1e-9);
+    assert(std::abs(dual_clock_restored.real_time_seconds() - 3.0) < 1e-9);
+    const auto restored_frame = dual_clock_restored.advance_frame(0.5, 2.0);
+    assert(restored_frame.ticks.size() == 1U);
+    assert(std::abs(dual_clock_restored.total_hours() - 2.0) < 1e-9);
+    assert(std::abs(dual_clock_restored.real_time_seconds() - 3.5) < 1e-9);
+
+    SpatialPartition spatial(10.0);
+    spatial.upsert("npc-b", {9.0, 0.0, 0.0});
+    spatial.upsert("npc-a", {0.0, 0.0, 0.0});
+    spatial.upsert("npc-c", {25.0, 0.0, 0.0});
+    assert(spatial.size() == 3U);
+    assert((spatial.query_radius({0.0, 0.0, 0.0}, 10.0)
+        == std::vector<EntityId>{"npc-a", "npc-b"}));
+    assert((spatial.query_aabb({-1.0, -1.0, -1.0}, {10.0, 1.0, 1.0})
+        == std::vector<EntityId>{"npc-a", "npc-b"}));
+    spatial.upsert("npc-b", {50.0, 0.0, 0.0});
+    assert((spatial.query_radius({0.0, 0.0, 0.0}, 10.0)
+        == std::vector<EntityId>{"npc-a"}));
+    assert(spatial.erase("npc-c"));
+    assert(!spatial.erase("npc-missing"));
+    bool rejected_bad_spatial_coordinate = false;
+    try {
+        spatial.upsert("invalid", {std::numeric_limits<double>::quiet_NaN(), 0.0, 0.0});
+    } catch (const std::invalid_argument&) {
+        rejected_bad_spatial_coordinate = true;
+    }
+    assert(rejected_bad_spatial_coordinate);
+
+    constexpr double half_pi = 1.57079632679489661923;
+    const auto visible = assess_vision(
+        {0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}, {5.0, 0.0, 0.0},
+        10.0, half_pi);
+    assert(visible.visible);
+    const auto outside_fov = assess_vision(
+        {0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}, {0.0, 5.0, 0.0},
+        10.0, half_pi);
+    assert(!outside_fov.visible);
+    const auto occluded_view = assess_vision(
+        {0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}, {5.0, 0.0, 0.0},
+        10.0, half_pi, true);
+    assert(!occluded_view.visible);
+
+    const auto audible = assess_sound(
+        {0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}, 10.0, 5.0, 1.0);
+    assert(audible.audible);
+    assert(std::abs(audible.received_intensity - 5.0) < 1e-9);
+    const auto sound_blocked = assess_sound(
+        {0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}, 10.0, 5.0, 0.0, 0.0);
+    assert(!sound_blocked.audible);
+
+    const auto separation = compute_separation(
+        {0.0, 0.0, 0.0}, {{1.0, 0.0, 0.0}, {0.0, 3.0, 0.0}},
+        2.0, 0.5);
+    assert(separation.contributing_neighbors == 1U);
+    assert(std::abs(separation.magnitude - 0.5) < 1e-9);
+    assert(separation.direction.x < 0.0);
 
     NPCMemory memory;
     memory.witness_id = "witness-1";

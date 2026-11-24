@@ -1,18 +1,25 @@
 #pragma once
 
 #include "simreality/SimulationWorld.h"
+#include "simreality/TrafficRecovery.h"
+#include "simreality/RoutePlanning.h"
 
 #include <cstdint>
 #include <iosfwd>
 
 namespace simreality {
 
-inline constexpr std::uint32_t kWorldSaveVersion = 10;
+inline constexpr std::uint32_t kWorldSaveVersion = 11;
 
 // Portable, versioned binary snapshots for deterministic continuation. The format
 // uses fixed-width little-endian integers and IEEE-754 doubles; it contains no
 // compiler-specific struct dumps or Unreal types.
 void save_world(const SimulationWorld& world, std::ostream& output);
 [[nodiscard]] SimulationWorld load_world(std::istream& input);
+
+// A deterministic companion checkpoint for traffic admission and recovery state.
+void save_traffic_recovery_checkpoint(
+    const TrafficRecoveryCheckpoint& checkpoint, std::ostream& output);
+[[nodiscard]] TrafficRecoveryCheckpoint load_traffic_recovery_checkpoint(std::istream& input);
 
 } // namespace simreality

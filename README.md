@@ -539,3 +539,104 @@ Regression coverage: tests/test_campaign_lifecycle.py and tests/test_world_check
 
 
 NPC knowledge acquisition now has an explicit bridge: `SocialBeliefSystem.learn_campaign_evidence(observer_id, campaign.shared_knowledge, claim_id)` imports a selected campaign claim into one NPC's private belief ledger, weighted by that NPC's trust in the original sources. No automatic broadcast occurs. Imported beliefs use the existing social-belief persistence codec and checkpoint pipeline.
+
+
+## Atomic world tick integration
+
+`SimulationWorldTickPipeline` now connects travel advancement, physical-presence
+synchronization, explicitly confirmed encounters, and social event processing in
+one ordered transaction. Failed phases roll back their event, movement, presence,
+encounter, memory, trust, belief, and replay mutations; identical requests replay
+idempotently. See [the world tick pipeline guide](docs/WORLD-TICK-PIPELINE.md)
+and `tests/test_world_tick_pipeline.py`.
+
+
+## Host-frame runtime and thread boundary
+
+The portable C++ runtime now exposes independent real-time and simulation-time
+clocks through `SimulationWorld::advance_frame`, including pause and time-scale
+support. A bounded lock-free SPSC command/snapshot transport is available in
+`cpp/include/simreality/SpscRingBuffer.h`. See
+[the runtime clocks and bus guide](docs/RUNTIME-CLOCKS-AND-BUS.md).
+
+
+## Spatial and sensory primitives
+
+The C++ core now includes a deterministic 3D uniform-grid broadphase, exact
+radius/AABB queries, range-and-FOV vision assessment, attenuated acoustic
+assessment, bounded crowd-separation steering, and stateless lane-centerline
+following with arc-length look-ahead and force-limited velocity correction. The
+world coordinator also exposes derived NPC position/facing registration,
+deterministic nearby queries, and range/FOV/occlusion-filtered visibility
+queries, inverse-square acoustic reach/occlusion queries, and predictive
+closest-approach collision avoidance integrated into lane-following movement. Lane-driven NPC
+movement updates velocity, facing, and indexed
+position; spatially discovered witnesses feed directly into the durable
+witness-memory/event pipeline. Spatial positions, facing, and velocity remain
+host-restored derived state, not durable NPC fields. See
+[the spatial and sensory foundation guide](docs/SPATIAL-SENSORY-FOUNDATION.md).
+
+
+World save schema v11 preserves both runtime clocks; versions 5–10 remain readable
+and initialize the new wall-clock field to zero.
+
+
+## Coordinated lane traffic
+
+The C++ core also provides `LaneTrafficCoordinator` for deterministic, tick-based
+lane-capacity admission. It resolves simultaneous pedestrian/vehicle requests by
+authored priority, accumulated wait credit, and stable entity-ID tie-breaks;
+reservations expire on simulation ticks and can be released on lane exit. This is
+a reservation/admission layer, not a substitute for geometric collision or
+intersection resolution. `SimulationWorld` enforces a live reservation before
+its reserved-lane movement entry point will advance an NPC. See
+[docs/LANE-TRAFFIC.md](docs/LANE-TRAFFIC.md).
+
+
+## Deterministic intersection right-of-way
+
+The C++ runtime now includes `IntersectionTrafficCoordinator`: authored
+intersection movements claim complete sets of conflict zones atomically.
+Simultaneous non-conflicting movements can proceed together; overlapping
+movements are arbitrated by authored priority, accumulated wait credit, and
+stable entity identity. Reservations renew and expire on explicit simulation
+ticks, and the world refuses intersection-entry movement without the matching
+live movement grant. Conflict-zone geometry and movement definitions remain
+host-authored. See [docs/INTERSECTION-TRAFFIC.md](docs/INTERSECTION-TRAFFIC.md).
+
+
+## Transactional route-segment handoff
+
+`SimulationWorld::advance_npc_on_reserved_route_segment` joins lane admission,
+intersection grants, and predictive collision-aware movement. The destination
+lane and any entered intersection must already be reserved. The source lane
+and any cleared intersection remain reserved during movement and are released
+only after the movement step commits. The returned result reports which
+occupancy tokens were released. This is a single-threaded world-operation
+transaction; hosts must serialize world mutation and continue renewing leases
+while entities physically occupy their lanes or conflict zones.
+
+## Deterministic route planning and recovery
+
+The C++ core now includes `TrafficRoutePlanner`, a directed lane-graph planner
+with deterministic shortest-path selection, lexicographic path tie-breaking,
+and caller-supplied congestion and hazard costs. Its reservation look-ahead
+method emits the next lane and intersection requests for the existing lane and
+conflict-zone coordinators; it does not grant reservations itself.
+
+`RouteProgressMonitor` detects consecutive simulation ticks without measured
+progress and emits a replan request. It never teleports an entity or releases
+its current occupancy tokens. A host must calculate a replacement route,
+acquire its next lane/intersection reservations while retaining current
+occupancy, and then use
+`SimulationWorld::advance_npc_on_reserved_route_segment` for the safe handoff.
+See [docs/ROUTE-PLANNING-AND-RECOVERY.md](docs/ROUTE-PLANNING-AND-RECOVERY.md).
+
+## Live traffic and journey recovery
+
+The route planner can now read a deterministic snapshot of active lane reservations via TrafficRoutePlanner::plan_live. JourneyReservationManager renews current lane and intersection leases across multi-segment journeys, while TrafficDeadlockDetector identifies wait-for cycles as advisory recovery candidates. Neither tracking nor deadlock detection releases physical occupancy; replacement grants and guarded route handoff are required before clearance. See [the traffic recovery guide](docs/TRAFFIC-RECOVERY.md).
+
+
+## Durable traffic planning and recovery
+
+Route planning now accounts for live intersection conflict-zone pressure as well as lane admission congestion. Resource-aware deadlock proposals identify blocked resources and candidate replacement grants without revoking current occupancy. A versioned traffic recovery checkpoint persists coordinator reservations, journey occupancy, route progress, and wait-for edges for deterministic continuation. See [docs/DURABLE-TRAFFIC-RECOVERY.md](docs/DURABLE-TRAFFIC-RECOVERY.md).

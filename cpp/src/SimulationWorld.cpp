@@ -15,9 +15,10 @@
 namespace simreality {
 
 SimulationWorld::SimulationWorld(
-    WorldState initial_state, double initial_hour, std::uint64_t random_seed)
+    WorldState initial_state, double initial_hour, std::uint64_t random_seed,
+    double initial_real_time_seconds)
     : state_(std::move(initial_state)),
-      runtime_(initial_hour),
+      runtime_(initial_hour, initial_real_time_seconds),
       random_(random_seed) {}
 
 GhostInfluenceResult SimulationWorld::attempt_ghost_influence(
@@ -134,8 +135,21 @@ GhostInfluenceResult SimulationWorld::attempt_ghost_influence(
 
 WorldAdvanceReport SimulationWorld::advance(
     double elapsed_hours, Weather visibility_weather, double weather_severity) {
+    return advance_ticks(runtime_.advance(elapsed_hours), visibility_weather, weather_severity);
+}
+
+WorldAdvanceReport SimulationWorld::advance_frame(
+    double elapsed_real_seconds, double simulation_hours_per_real_second,
+    Weather visibility_weather, double weather_severity) {
+    DualClockAdvance frame = runtime_.advance_frame(
+        elapsed_real_seconds, simulation_hours_per_real_second);
+    return advance_ticks(std::move(frame.simulation_ticks), visibility_weather, weather_severity);
+}
+
+WorldAdvanceReport SimulationWorld::advance_ticks(
+    std::vector<ScheduledTick> ticks, Weather visibility_weather, double weather_severity) {
     WorldAdvanceReport report;
-    report.ticks = runtime_.advance(elapsed_hours);
+    report.ticks = std::move(ticks);
 
     for (const ScheduledTick& tick : report.ticks) {
         const auto hour = static_cast<std::uint8_t>(
@@ -1091,6 +1105,349 @@ Negotiation SimulationWorld::approach_fixer(
     const Negotiation result = negotiate(*fixer, *district, bribe, reputation, sample);
     network->record_outcome(*fixer, result, *district);
     return result;
+}
+
+
+void SimulationWorld::set_npc_spatial_state(
+    const EntityId& npc_id, SpatialPoint position, SpatialPoint forward,
+    SpatialPoint velocity) {
+    (void)find_npc(npc_id);
+    SpatialPartition::validate_point(position);
+    SpatialPartition::validate_point(forward);
+    SpatialPartition::validate_point(velocity);
+    if (std::hypot(forward.x, forward.y, forward.z) <= 1e-12) {
+        throw std::invalid_argument("NPC forward vector must be non-zero");
+    }
+    spatial_index_.upsert(npc_id, position);
+    npc_forward_[npc_id] = forward;
+    npc_velocity_[npc_id] = velocity;
+}
+
+bool SimulationWorld::remove_npc_spatial_state(const EntityId& npc_id) {
+    npc_forward_.erase(npc_id);
+    npc_velocity_.erase(npc_id);
+    return spatial_index_.erase(npc_id);
+}
+
+std::vector<EntityId> SimulationWorld::nearby_npcs(
+    SpatialPoint center, double radius) const {
+    return spatial_index_.query_radius(center, radius);
+}
+
+LaneFollowingResult SimulationWorld::advance_npc_on_lane(
+    const EntityId& npc_id, const std::vector<SpatialPoint>& lane_centerline,
+    double elapsed_seconds, double lookahead_distance,
+    double desired_speed, double maximum_acceleration) {
+    (void)find_npc(npc_id);
+    if (!spatial_index_.contains(npc_id)) {
+        throw std::logic_error("NPC has no registered spatial position: " + npc_id);
+    }
+    if (!std::isfinite(elapsed_seconds) || elapsed_seconds < 0.0) {
+        throw std::invalid_argument("movement delta must be finite and non-negative");
+    }
+    const SpatialPoint position = spatial_index_.position(npc_id);
+    const SpatialPoint velocity = npc_velocity_.at(npc_id);
+    const LaneFollowingResult steering = compute_lane_following(
+        position, velocity, lane_centerline, lookahead_distance,
+        desired_speed, maximum_acceleration);
+    SpatialPoint next_velocity{
+        velocity.x + steering.steering_force.x * elapsed_seconds,
+        velocity.y + steering.steering_force.y * elapsed_seconds,
+        velocity.z + steering.steering_force.z * elapsed_seconds};
+    const double speed = std::hypot(
+        next_velocity.x, next_velocity.y, next_velocity.z);
+    if (!std::isfinite(speed)) {
+        throw std::overflow_error("NPC movement speed is not representable");
+    }
+    if (speed > desired_speed && speed > 0.0) {
+        const double scale = desired_speed / speed;
+        next_velocity.x *= scale;
+        next_velocity.y *= scale;
+        next_velocity.z *= scale;
+    }
+    const SpatialPoint next_position{
+        position.x + next_velocity.x * elapsed_seconds,
+        position.y + next_velocity.y * elapsed_seconds,
+        position.z + next_velocity.z * elapsed_seconds};
+    SpatialPartition::validate_point(next_position);
+    spatial_index_.upsert(npc_id, next_position);
+    npc_velocity_[npc_id] = next_velocity;
+    if (speed > 1e-12) npc_forward_[npc_id] = next_velocity;
+    return steering;
+}
+
+LaneFollowingResult SimulationWorld::advance_npc_on_lane_avoiding_collisions(
+    const EntityId& npc_id, const std::vector<SpatialPoint>& lane_centerline,
+    double elapsed_seconds, double lookahead_distance,
+    double desired_speed, double lane_maximum_acceleration,
+    double collision_radius, double neighbor_collision_radius,
+    double prediction_horizon_seconds, double maximum_avoidance_acceleration,
+    double broadphase_radius) {
+    (void)find_npc(npc_id);
+    if (!spatial_index_.contains(npc_id)) {
+        throw std::logic_error("NPC has no registered spatial position: " + npc_id);
+    }
+    if (!std::isfinite(elapsed_seconds) || elapsed_seconds < 0.0) {
+        throw std::invalid_argument("movement delta must be finite and non-negative");
+    }
+    if (!std::isfinite(broadphase_radius) || broadphase_radius < 0.0) {
+        throw std::invalid_argument("collision broadphase radius must be finite and non-negative");
+    }
+    const SpatialPoint position = spatial_index_.position(npc_id);
+    const SpatialPoint velocity = npc_velocity_.at(npc_id);
+    const LaneFollowingResult lane = compute_lane_following(
+        position, velocity, lane_centerline, lookahead_distance,
+        desired_speed, lane_maximum_acceleration);
+
+    std::vector<MovingBody> neighbors;
+    const auto candidates = spatial_index_.query_radius(position, broadphase_radius);
+    neighbors.reserve(candidates.size());
+    for (const EntityId& candidate : candidates) {
+        if (candidate == npc_id) continue;
+        const auto neighbor_velocity = npc_velocity_.find(candidate);
+        if (neighbor_velocity == npc_velocity_.end()) {
+            throw std::logic_error("spatial NPC is missing velocity: " + candidate);
+        }
+        neighbors.push_back({candidate, spatial_index_.position(candidate),
+            neighbor_velocity->second, neighbor_collision_radius});
+    }
+    const CollisionAvoidanceResult avoidance = compute_collision_avoidance(
+        npc_id, position, velocity, collision_radius, neighbors,
+        prediction_horizon_seconds, maximum_avoidance_acceleration);
+
+    SpatialPoint next_velocity{
+        velocity.x + (lane.steering_force.x + avoidance.acceleration.x) * elapsed_seconds,
+        velocity.y + (lane.steering_force.y + avoidance.acceleration.y) * elapsed_seconds,
+        velocity.z + (lane.steering_force.z + avoidance.acceleration.z) * elapsed_seconds};
+    const double speed = std::hypot(next_velocity.x, next_velocity.y, next_velocity.z);
+    if (!std::isfinite(speed)) {
+        throw std::overflow_error("collision-aware NPC movement speed is not representable");
+    }
+    if (speed > desired_speed && speed > 0.0) {
+        const double scale = desired_speed / speed;
+        next_velocity.x *= scale;
+        next_velocity.y *= scale;
+        next_velocity.z *= scale;
+    }
+    const SpatialPoint next_position{
+        position.x + next_velocity.x * elapsed_seconds,
+        position.y + next_velocity.y * elapsed_seconds,
+        position.z + next_velocity.z * elapsed_seconds};
+    SpatialPartition::validate_point(next_position);
+    spatial_index_.upsert(npc_id, next_position);
+    npc_velocity_[npc_id] = next_velocity;
+    if (speed > 1e-12) npc_forward_[npc_id] = next_velocity;
+    return lane;
+}
+
+void SimulationWorld::configure_traffic_lane(
+    const std::string& lane_id, std::size_t capacity) {
+    lane_traffic_.configure_lane(lane_id, capacity);
+}
+
+void SimulationWorld::advance_traffic_tick(std::uint64_t tick) {
+    lane_traffic_.advance_tick(tick);
+}
+
+LaneTrafficResolution SimulationWorld::resolve_lane_traffic(
+    const std::vector<LaneTrafficRequest>& requests) {
+    return lane_traffic_.resolve(requests);
+}
+
+bool SimulationWorld::release_lane_reservation(
+    const std::string& lane_id, const EntityId& npc_id) {
+    return lane_traffic_.release(lane_id, npc_id);
+}
+
+void SimulationWorld::configure_intersection_movement(
+    IntersectionMovementDefinition definition) {
+    intersection_traffic_.configure_movement(std::move(definition));
+}
+
+void SimulationWorld::advance_intersection_tick(std::uint64_t tick) {
+    intersection_traffic_.advance_tick(tick);
+}
+
+IntersectionTrafficResolution SimulationWorld::resolve_intersection_traffic(
+    const std::vector<IntersectionTrafficRequest>& requests) {
+    return intersection_traffic_.resolve(requests);
+}
+
+bool SimulationWorld::release_intersection_reservation(
+    const std::string& intersection_id, const EntityId& npc_id) {
+    return intersection_traffic_.release(intersection_id, npc_id);
+}
+
+RouteSegmentAdvanceResult SimulationWorld::advance_npc_on_reserved_route_segment(
+    const EntityId& npc_id, const RouteSegmentRequest& request) {
+    (void)find_npc(npc_id);
+    if (request.destination_lane_id.empty()) {
+        throw std::invalid_argument("route segment destination lane must not be empty");
+    }
+    if (request.source_lane_id == request.destination_lane_id
+        && !request.source_lane_id.empty()) {
+        // Retaining the same lane token is valid; it is not a handoff.
+    } else if (!request.source_lane_id.empty()
+        && !lane_traffic_.has_reservation(request.source_lane_id, npc_id)) {
+        throw std::logic_error("NPC must retain its source-lane reservation during handoff");
+    }
+    if (!lane_traffic_.has_reservation(request.destination_lane_id, npc_id)) {
+        throw std::logic_error("NPC must hold the destination-lane reservation before handoff");
+    }
+
+    const bool entering_intersection = !request.entry_intersection_id.empty()
+        || !request.entry_movement_id.empty();
+    if (entering_intersection
+        && (request.entry_intersection_id.empty() || request.entry_movement_id.empty())) {
+        throw std::invalid_argument("intersection entry requires both intersection and movement ids");
+    }
+    if (entering_intersection && !intersection_traffic_.has_reservation(
+            request.entry_intersection_id, request.entry_movement_id, npc_id)) {
+        throw std::logic_error("NPC must hold the destination intersection movement reservation");
+    }
+
+    const bool clearing_intersection = !request.cleared_intersection_id.empty()
+        || !request.cleared_movement_id.empty();
+    if (clearing_intersection
+        && (request.cleared_intersection_id.empty() || request.cleared_movement_id.empty())) {
+        throw std::invalid_argument("intersection clearance requires both intersection and movement ids");
+    }
+    if (clearing_intersection && !intersection_traffic_.has_reservation(
+            request.cleared_intersection_id, request.cleared_movement_id, npc_id)) {
+        throw std::logic_error("NPC cannot clear an intersection without its active movement reservation");
+    }
+    if (clearing_intersection && entering_intersection
+        && request.cleared_intersection_id == request.entry_intersection_id
+        && request.cleared_movement_id == request.entry_movement_id) {
+        throw std::invalid_argument("one route segment cannot enter and clear the same movement reservation");
+    }
+
+    // All admission checks happen before physical state changes. The source
+    // lane and cleared intersection remain reserved until movement commits.
+    const LaneFollowingResult movement = advance_npc_on_lane_avoiding_collisions(
+        npc_id, request.lane_centerline, request.elapsed_seconds,
+        request.lookahead_distance, request.desired_speed,
+        request.lane_maximum_acceleration, request.collision_radius,
+        request.neighbor_collision_radius, request.prediction_horizon_seconds,
+        request.maximum_avoidance_acceleration, request.broadphase_radius);
+
+    RouteSegmentAdvanceResult result;
+    result.movement = movement;
+    if (!request.source_lane_id.empty()
+        && request.source_lane_id != request.destination_lane_id) {
+        result.source_lane_released = lane_traffic_.release(request.source_lane_id, npc_id);
+    }
+    if (clearing_intersection) {
+        result.cleared_intersection_released = intersection_traffic_.release(
+            request.cleared_intersection_id, npc_id);
+    }
+    return result;
+}
+
+LaneFollowingResult SimulationWorld::advance_npc_on_reserved_intersection_movement(
+    const EntityId& npc_id, const std::string& intersection_id,
+    const std::string& movement_id,
+    const std::vector<SpatialPoint>& lane_centerline,
+    double elapsed_seconds, double lookahead_distance,
+    double desired_speed, double maximum_acceleration) {
+    (void)find_npc(npc_id);
+    if (!intersection_traffic_.has_reservation(
+            intersection_id, movement_id, npc_id)) {
+        throw std::logic_error(
+            "NPC must hold the live conflict-zone reservation before entering an intersection");
+    }
+    return advance_npc_on_lane(npc_id, lane_centerline, elapsed_seconds,
+        lookahead_distance, desired_speed, maximum_acceleration);
+}
+
+LaneFollowingResult SimulationWorld::advance_npc_on_reserved_lane(
+    const EntityId& npc_id, const std::string& lane_id,
+    const std::vector<SpatialPoint>& lane_centerline,
+    double elapsed_seconds, double lookahead_distance,
+    double desired_speed, double maximum_acceleration) {
+    (void)find_npc(npc_id);
+    if (!lane_traffic_.has_reservation(lane_id, npc_id)) {
+        throw std::logic_error("NPC must hold a live lane reservation before movement");
+    }
+    return advance_npc_on_lane(npc_id, lane_centerline, elapsed_seconds,
+        lookahead_distance, desired_speed, maximum_acceleration);
+}
+
+std::vector<EntityId> SimulationWorld::visible_npcs(
+    SpatialPoint target_position, double maximum_range,
+    double field_of_view_radians, const std::set<EntityId>& occluded_npcs) const {
+    SpatialPartition::validate_point(target_position);
+    if (!std::isfinite(maximum_range) || maximum_range < 0.0) {
+        throw std::invalid_argument("visibility range must be finite and non-negative");
+    }
+    constexpr double full_circle = 6.28318530717958647692;
+    if (!std::isfinite(field_of_view_radians) || field_of_view_radians < 0.0
+        || field_of_view_radians > full_circle) {
+        throw std::invalid_argument("field of view must be finite and in [0, 2*pi]");
+    }
+    const std::vector<EntityId> candidates = spatial_index_.query_radius(
+        target_position, maximum_range);
+    std::vector<EntityId> visible;
+    visible.reserve(candidates.size());
+    for (const EntityId& npc_id : candidates) {
+        if (occluded_npcs.contains(npc_id)) continue;
+        const auto forward = npc_forward_.find(npc_id);
+        if (forward == npc_forward_.end()) {
+            throw std::logic_error("spatial NPC is missing its forward vector: " + npc_id);
+        }
+        const VisionAssessment assessment = assess_vision(
+            spatial_index_.position(npc_id), forward->second, target_position,
+            maximum_range, field_of_view_radians, false);
+        if (assessment.visible) visible.push_back(npc_id);
+    }
+    return visible;
+}
+
+
+std::vector<EntityId> SimulationWorld::audible_npcs(
+    SpatialPoint source_position, double source_power,
+    double maximum_range, double ambient_noise,
+    const std::map<EntityId, double>& occlusion_attenuation) const {
+    SpatialPartition::validate_point(source_position);
+    if (!std::isfinite(source_power) || source_power < 0.0
+        || !std::isfinite(maximum_range) || maximum_range < 0.0
+        || !std::isfinite(ambient_noise) || ambient_noise < 0.0) {
+        throw std::invalid_argument(
+            "sound power, range, and ambient noise must be finite and non-negative");
+    }
+    const std::vector<EntityId> candidates = spatial_index_.query_radius(
+        source_position, maximum_range);
+    std::vector<EntityId> audible;
+    audible.reserve(candidates.size());
+    for (const EntityId& npc_id : candidates) {
+        const auto attenuation = occlusion_attenuation.find(npc_id);
+        const double factor = attenuation == occlusion_attenuation.end()
+            ? 1.0 : attenuation->second;
+        const AcousticAssessment assessment = assess_sound(
+            source_position, spatial_index_.position(npc_id), source_power,
+            maximum_range, ambient_noise, factor);
+        if (assessment.audible) audible.push_back(npc_id);
+    }
+    return audible;
+}
+
+
+
+std::size_t SimulationWorld::record_spatially_witnessed_action(
+    const EntityId& actor_id, ActionTag action_tag, Description description,
+    double maximum_range, double field_of_view_radians,
+    const std::set<EntityId>& occluded_npcs, const EntityId& victim_id) {
+    (void)find_npc(actor_id);
+    if (!spatial_index_.contains(actor_id)) {
+        throw std::logic_error("actor has no registered spatial position: " + actor_id);
+    }
+    std::vector<EntityId> witnesses = visible_npcs(
+        spatial_index_.position(actor_id), maximum_range,
+        field_of_view_radians, occluded_npcs);
+    witnesses.erase(std::remove(witnesses.begin(), witnesses.end(), actor_id),
+                    witnesses.end());
+    return record_witnessed_action(
+        actor_id, action_tag, std::move(description), witnesses, victim_id);
 }
 
 } // namespace simreality

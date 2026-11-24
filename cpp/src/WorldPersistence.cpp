@@ -19,6 +19,7 @@ constexpr std::array<char, 8> kMagicV7{{'S', 'R', 'E', 'C', 'O', 'R', 'E', '7'}}
 constexpr std::array<char, 8> kMagicV8{{'S', 'R', 'E', 'C', 'O', 'R', 'E', '8'}};
 constexpr std::array<char, 8> kMagicV9{{'S', 'R', 'E', 'C', 'O', 'R', 'E', '9'}};
 constexpr std::array<char, 8> kMagicV10{{'S', 'R', 'E', 'C', 'O', 'R', 'E', 'A'}};
+constexpr std::array<char, 8> kMagicV11{{'S', 'R', 'E', 'C', 'O', 'R', 'E', 'B'}};
 constexpr std::uint32_t kMaxCollectionItems = 1'000'000;
 constexpr std::uint32_t kMaxStringBytes = 16U * 1024U * 1024U;
 static_assert(sizeof(double) == sizeof(std::uint64_t));
@@ -623,10 +624,11 @@ void read_life_state(std::istream& in, LifeCoordinator& life, std::uint32_t vers
 } // namespace
 
 void save_world(const SimulationWorld& world, std::ostream& output) {
-    output.write(kMagicV10.data(), static_cast<std::streamsize>(kMagicV10.size()));
+    output.write(kMagicV11.data(), static_cast<std::streamsize>(kMagicV11.size()));
     if (!output) throw std::runtime_error("failed writing world snapshot header");
     write_u32(output, kWorldSaveVersion);
     write_double(output, world.total_hours());
+    write_double(output, world.real_time_seconds());
     write_u64(output, world.random_state());
     write_world_state(output, world.state());
     write_count(output, world.fixer_networks().size());
@@ -644,18 +646,21 @@ SimulationWorld load_world(std::istream& input) {
     const bool is_v8 = magic == kMagicV8;
     const bool is_v9 = magic == kMagicV9;
     const bool is_v10 = magic == kMagicV10;
-    if (!is_v5 && !is_v6 && !is_v7 && !is_v8 && !is_v9 && !is_v10) throw std::runtime_error("invalid world snapshot magic");
+    const bool is_v11 = magic == kMagicV11;
+    if (!is_v5 && !is_v6 && !is_v7 && !is_v8 && !is_v9 && !is_v10 && !is_v11) throw std::runtime_error("invalid world snapshot magic");
     const std::uint32_t version = read_u32(input);
     if ((version == 5U && !is_v5) || (version == 6U && !is_v6)
         || (version == 7U && !is_v7) || (version == 8U && !is_v8)
-        || (version == 9U && !is_v9) || (version == 10U && !is_v10)
+        || (version == 9U && !is_v9) || (version == 10U && !is_v10) || (version == 11U && !is_v11)
         || (version != 5U && version != 6U && version != 7U && version != 8U
-            && version != 9U && version != 10U)) {
+            && version != 9U && version != 10U && version != 11U)) {
         throw std::runtime_error("unsupported world snapshot version");
     }
 
     const double total_hours = read_double(input);
     if (total_hours < 0.0) throw std::runtime_error("snapshot has negative simulation time");
+    const double real_time_seconds = version >= 11U ? read_double(input) : 0.0;
+    if (real_time_seconds < 0.0) throw std::runtime_error("snapshot has negative real time");
     const std::uint64_t random_state = read_u64(input);
     WorldState state = read_world_state(input, version);
     const std::uint32_t networks = read_count(input);
@@ -665,10 +670,241 @@ SimulationWorld load_world(std::istream& input) {
         fixer_networks.push_back(read_network(input));
     }
 
-    SimulationWorld world(std::move(state), total_hours, random_state);
+    SimulationWorld world(std::move(state), total_hours, random_state, real_time_seconds);
     world.fixer_networks() = std::move(fixer_networks);
     if (version >= 6U) read_life_state(input, world.life_system(), version);
     return world;
+}
+
+void save_traffic_recovery_checkpoint(
+    const TrafficRecoveryCheckpoint& checkpoint, std::ostream& output) {
+    // Validate the complete checkpoint before writing any bytes.
+    LaneTrafficCoordinator lanes(checkpoint.lanes.lease_ticks);
+    lanes.restore(checkpoint.lanes);
+    IntersectionTrafficCoordinator intersections(checkpoint.intersections.lease_ticks);
+    intersections.restore(checkpoint.intersections);
+    JourneyReservationManager journeys;
+    journeys.restore(checkpoint.journey_occupancy);
+    RouteProgressMonitor progress(checkpoint.progress_stall_threshold);
+    progress.restore(checkpoint.route_progress);
+    TrafficDeadlockDetector detector;
+    std::vector<WaitForEdge> graph;
+    for (const auto& edge : checkpoint.pending_wait_edges) {
+        if (edge.waiter_id.empty() || edge.blocker_id.empty() || edge.waiter_id == edge.blocker_id
+            || edge.resource_id.empty())
+            throw std::invalid_argument("invalid pending resource wait edge");
+        graph.push_back({edge.waiter_id, edge.blocker_id});
+    }
+    (void)detector.detect(graph);
+
+    constexpr std::array<char, 8> magic{{'S','R','E','T','R','A','F','1'}};
+    output.write(magic.data(), static_cast<std::streamsize>(magic.size()));
+    if (!output) throw std::runtime_error("failed writing traffic checkpoint header");
+    write_u32(output, 1U);
+
+    write_u64(output, checkpoint.lanes.lease_ticks);
+    write_u64(output, checkpoint.lanes.current_tick);
+    write_u8(output, checkpoint.lanes.tick_initialized ? 1U : 0U);
+    write_count(output, checkpoint.lanes.capacities.size());
+    for (const auto& [lane, capacity] : checkpoint.lanes.capacities) {
+        write_string(output, lane); write_u64(output, static_cast<std::uint64_t>(capacity));
+    }
+    write_count(output, checkpoint.lanes.reservations.size());
+    for (const auto& item : checkpoint.lanes.reservations) {
+        write_string(output, item.lane_id); write_string(output, item.entity_id);
+        write_u64(output, item.expires_at_tick);
+        write_u32(output, static_cast<std::uint32_t>(item.priority));
+        write_u64(output, item.consecutive_wait_ticks);
+    }
+    write_count(output, checkpoint.lanes.waiting.size());
+    for (const auto& item : checkpoint.lanes.waiting) {
+        write_string(output, item.lane_id); write_string(output, item.entity_id);
+        write_u64(output, item.wait_ticks);
+    }
+
+    write_u64(output, checkpoint.intersections.lease_ticks);
+    write_u64(output, checkpoint.intersections.current_tick);
+    write_u8(output, checkpoint.intersections.tick_initialized ? 1U : 0U);
+    write_count(output, checkpoint.intersections.movements.size());
+    for (const auto& item : checkpoint.intersections.movements) {
+        write_string(output, item.intersection_id); write_string(output, item.movement_id);
+        write_count(output, item.conflict_zone_ids.size());
+        for (const auto& zone : item.conflict_zone_ids) write_string(output, zone);
+    }
+    write_count(output, checkpoint.intersections.reservations.size());
+    for (const auto& item : checkpoint.intersections.reservations) {
+        write_string(output, item.intersection_id); write_string(output, item.movement_id);
+        write_string(output, item.entity_id); write_u64(output, item.expires_at_tick);
+        write_u32(output, static_cast<std::uint32_t>(item.priority));
+        write_u64(output, item.consecutive_wait_ticks);
+    }
+    write_count(output, checkpoint.intersections.waiting.size());
+    for (const auto& item : checkpoint.intersections.waiting) {
+        write_string(output, item.intersection_id); write_string(output, item.entity_id);
+        write_u64(output, item.wait_ticks);
+    }
+
+    write_count(output, checkpoint.journey_occupancy.size());
+    for (const auto& item : checkpoint.journey_occupancy) {
+        write_string(output, item.entity_id); write_string(output, item.lane_id);
+        write_string(output, item.intersection_id); write_string(output, item.movement_id);
+    }
+    write_u64(output, checkpoint.progress_stall_threshold);
+    write_count(output, checkpoint.route_progress.size());
+    for (const auto& item : checkpoint.route_progress) {
+        write_string(output, item.entity_id); write_u64(output, item.last_tick);
+        write_double(output, item.last_progress); write_u64(output, item.stalled_ticks);
+    }
+    write_count(output, checkpoint.pending_wait_edges.size());
+    for (const auto& item : checkpoint.pending_wait_edges) {
+        write_string(output, item.waiter_id); write_string(output, item.blocker_id);
+        write_u8(output, static_cast<std::uint8_t>(item.resource_kind));
+        write_string(output, item.resource_id);
+    }
+    write_count(output, checkpoint.pending_proposals.size());
+    for (const auto& proposal : checkpoint.pending_proposals) {
+        write_count(output, proposal.participants.size());
+        for (const auto& participant : proposal.participants) write_string(output, participant);
+        write_string(output, proposal.yielding_entity_id);
+        write_count(output, proposal.blocking_resources.size());
+        for (const auto& resource : proposal.blocking_resources) {
+            write_u8(output, static_cast<std::uint8_t>(resource.kind));
+            write_string(output, resource.resource_id); write_string(output, resource.current_owner_id);
+        }
+        write_count(output, proposal.replacement_lane_requests.size());
+        for (const auto& request : proposal.replacement_lane_requests) {
+            write_string(output, request.lane_id); write_string(output, request.entity_id);
+            write_u32(output, static_cast<std::uint32_t>(request.priority));
+        }
+        write_count(output, proposal.replacement_intersection_requests.size());
+        for (const auto& request : proposal.replacement_intersection_requests) {
+            write_string(output, request.intersection_id); write_string(output, request.movement_id);
+            write_string(output, request.entity_id); write_u32(output, static_cast<std::uint32_t>(request.priority));
+        }
+    }
+}
+
+TrafficRecoveryCheckpoint load_traffic_recovery_checkpoint(std::istream& input) {
+    constexpr std::array<char, 8> expected{{'S','R','E','T','R','A','F','1'}};
+    std::array<char, 8> magic{};
+    input.read(magic.data(), static_cast<std::streamsize>(magic.size()));
+    if (!input || magic != expected || read_u32(input) != 1U)
+        throw std::runtime_error("invalid traffic recovery checkpoint header");
+    TrafficRecoveryCheckpoint result;
+    const auto read_flag = [&input]() {
+        const auto value = read_u8(input);
+        if (value > 1U) throw std::runtime_error("invalid traffic checkpoint boolean");
+        return value != 0U;
+    };
+    result.lanes.lease_ticks = read_u64(input);
+    result.lanes.current_tick = read_u64(input);
+    result.lanes.tick_initialized = read_flag();
+    for (std::uint32_t i=0,n=read_count(input); i<n; ++i) {
+        const auto lane=read_string(input); const auto capacity=read_u64(input);
+        if (capacity > std::numeric_limits<std::size_t>::max()
+            || !result.lanes.capacities.emplace(lane, static_cast<std::size_t>(capacity)).second)
+            throw std::runtime_error("invalid lane capacity checkpoint");
+    }
+    for (std::uint32_t i=0,n=read_count(input); i<n; ++i) {
+        LaneReservation item;
+        item.lane_id=read_string(input); item.entity_id=read_string(input);
+        item.expires_at_tick=read_u64(input); item.priority=static_cast<std::int32_t>(read_u32(input));
+        item.consecutive_wait_ticks=read_u64(input); result.lanes.reservations.push_back(std::move(item));
+    }
+    for (std::uint32_t i=0,n=read_count(input); i<n; ++i)
+        result.lanes.waiting.push_back({read_string(input),read_string(input),read_u64(input)});
+
+    result.intersections.lease_ticks=read_u64(input);
+    result.intersections.current_tick=read_u64(input);
+    result.intersections.tick_initialized=read_flag();
+    for (std::uint32_t i=0,n=read_count(input); i<n; ++i) {
+        IntersectionMovementDefinition item;
+        item.intersection_id=read_string(input); item.movement_id=read_string(input);
+        for (std::uint32_t j=0,m=read_count(input); j<m; ++j)
+            if (!item.conflict_zone_ids.insert(read_string(input)).second)
+                throw std::runtime_error("duplicate intersection conflict zone checkpoint");
+        result.intersections.movements.push_back(std::move(item));
+    }
+    for (std::uint32_t i=0,n=read_count(input); i<n; ++i) {
+        IntersectionReservation item;
+        item.intersection_id=read_string(input); item.movement_id=read_string(input);
+        item.entity_id=read_string(input); item.expires_at_tick=read_u64(input);
+        item.priority=static_cast<std::int32_t>(read_u32(input));
+        item.consecutive_wait_ticks=read_u64(input);
+        result.intersections.reservations.push_back(std::move(item));
+    }
+    for (std::uint32_t i=0,n=read_count(input); i<n; ++i)
+        result.intersections.waiting.push_back({read_string(input),read_string(input),read_u64(input)});
+
+    for (std::uint32_t i=0,n=read_count(input); i<n; ++i)
+        result.journey_occupancy.push_back({read_string(input),read_string(input),
+            read_string(input),read_string(input)});
+    result.progress_stall_threshold=read_u64(input);
+    for (std::uint32_t i=0,n=read_count(input); i<n; ++i)
+        result.route_progress.push_back({read_string(input),read_u64(input),
+            read_double(input),read_u64(input)});
+    for (std::uint32_t i=0,n=read_count(input); i<n; ++i) {
+        WaitForResourceEdge item;
+        item.waiter_id=read_string(input); item.blocker_id=read_string(input);
+        const auto kind=read_u8(input);
+        if (kind > static_cast<std::uint8_t>(BlockedResourceKind::Intersection))
+            throw std::runtime_error("invalid blocked resource kind");
+        item.resource_kind=static_cast<BlockedResourceKind>(kind);
+        item.resource_id=read_string(input);
+        result.pending_wait_edges.push_back(std::move(item));
+    }
+    for (std::uint32_t i=0,n=read_count(input); i<n; ++i) {
+        DeadlockResolutionProposal proposal;
+        for (std::uint32_t j=0,m=read_count(input); j<m; ++j)
+            proposal.participants.push_back(read_string(input));
+        proposal.yielding_entity_id=read_string(input);
+        for (std::uint32_t j=0,m=read_count(input); j<m; ++j) {
+            const auto kind=read_u8(input);
+            if (kind > static_cast<std::uint8_t>(BlockedResourceKind::Intersection))
+                throw std::runtime_error("invalid proposal resource kind");
+            proposal.blocking_resources.push_back({static_cast<BlockedResourceKind>(kind),read_string(input),read_string(input)});
+        }
+        for (std::uint32_t j=0,m=read_count(input); j<m; ++j)
+            proposal.replacement_lane_requests.push_back({read_string(input),read_string(input),static_cast<std::int32_t>(read_u32(input))});
+        for (std::uint32_t j=0,m=read_count(input); j<m; ++j)
+            proposal.replacement_intersection_requests.push_back({read_string(input),read_string(input),read_string(input),static_cast<std::int32_t>(read_u32(input))});
+        result.pending_proposals.push_back(std::move(proposal));
+    }
+
+    LaneTrafficCoordinator lanes(result.lanes.lease_ticks); lanes.restore(result.lanes);
+    IntersectionTrafficCoordinator intersections(result.intersections.lease_ticks);
+    intersections.restore(result.intersections);
+    JourneyReservationManager journeys; journeys.restore(result.journey_occupancy);
+    RouteProgressMonitor progress(result.progress_stall_threshold); progress.restore(result.route_progress);
+    TrafficDeadlockDetector detector;
+    std::vector<WaitForEdge> graph;
+    for (const auto& edge : result.pending_wait_edges) {
+        if (edge.resource_id.empty()) throw std::runtime_error("empty pending wait resource");
+        graph.push_back({edge.waiter_id,edge.blocker_id});
+    }
+    (void)detector.detect(graph);
+    for (const auto& occupancy : result.journey_occupancy) {
+        const auto lane = std::find_if(result.lanes.reservations.begin(), result.lanes.reservations.end(),
+            [&occupancy](const LaneReservation& item) { return item.entity_id == occupancy.entity_id && item.lane_id == occupancy.lane_id; });
+        if (lane == result.lanes.reservations.end()) throw std::runtime_error("journey occupancy has no live lane reservation");
+        if (!occupancy.intersection_id.empty()) {
+            const auto intersection = std::find_if(result.intersections.reservations.begin(), result.intersections.reservations.end(),
+                [&occupancy](const IntersectionReservation& item) { return item.entity_id == occupancy.entity_id
+                    && item.intersection_id == occupancy.intersection_id && item.movement_id == occupancy.movement_id; });
+            if (intersection == result.intersections.reservations.end()) throw std::runtime_error("journey occupancy has no live intersection reservation");
+        }
+    }
+    for (const auto& proposal : result.pending_proposals) {
+        if (proposal.participants.empty() || proposal.yielding_entity_id.empty()
+            || !std::is_sorted(proposal.participants.begin(), proposal.participants.end())
+            || !std::binary_search(proposal.participants.begin(), proposal.participants.end(), proposal.yielding_entity_id))
+            throw std::runtime_error("invalid durable deadlock proposal identity");
+        for (const auto& request : proposal.replacement_lane_requests)
+            if (request.entity_id != proposal.yielding_entity_id || request.lane_id.empty()) throw std::runtime_error("invalid durable replacement lane request");
+        for (const auto& request : proposal.replacement_intersection_requests)
+            if (request.entity_id != proposal.yielding_entity_id || request.intersection_id.empty() || request.movement_id.empty()) throw std::runtime_error("invalid durable replacement intersection request");
+    }
+    return result;
 }
 
 } // namespace simreality
