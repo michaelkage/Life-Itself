@@ -51,6 +51,7 @@ struct NPCMemory {
     SimulationHour timestamp_hour{0.0};
     ActionTag action_tag{ActionTag::InteractionPolite};
     Description description{};
+    std::string root_evidence_id{};
 
     [[nodiscard]] bool is_actionable(double telephone_threshold = 0.6) const noexcept {
         return !target_entity_id.empty() && retention >= telephone_threshold;
