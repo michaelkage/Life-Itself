@@ -71,3 +71,8 @@ occupancy must have a corresponding unexpired reservation. Pending resource
 edges and proposals are validated for resource kinds, unique identities,
 canonical participant ordering, owner identity, and replacement-request
 ownership. Invalid checkpoints fail before any bytes are written.
+
+Loading also rejects malformed or duplicate resource wait edges and any trailing
+bytes after the versioned checkpoint record. A valid checkpoint is therefore one
+unambiguous framed record rather than an accepted prefix of a larger or corrupted
+stream.
