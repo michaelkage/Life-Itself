@@ -46,6 +46,17 @@ int main() {
     catch (const std::invalid_argument&) { duplicate_rejected = true; }
     assert(duplicate_rejected);
 
+    const auto proposals = detector.propose_resolutions({
+        {"a", "b", BlockedResourceKind::Lane, "lane-a"},
+        {"b", "c", BlockedResourceKind::Intersection, "junction-1"},
+        {"c", "a", BlockedResourceKind::Lane, "lane-c"}},
+        {{"b", {{{"detour-b", "b", 0}}, {{"junction-2", "detour", "b", 0}}}}});
+    assert(proposals.size() == 1U);
+    assert(proposals.front().yielding_entity_id == "b");
+    assert(proposals.front().blocking_resources.size() == 3U);
+    assert(proposals.front().replacement_lane_requests.size() == 1U);
+    assert(proposals.front().replacement_intersection_requests.size() == 1U);
+
     bool malformed_rejected = false;
     try { journey.track({"npc-b", "L2", "J2", {}}); }
     catch (const std::invalid_argument&) { malformed_rejected = true; }
