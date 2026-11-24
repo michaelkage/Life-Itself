@@ -27,6 +27,9 @@ int main() {
     assert(lanes.has_reservation("L1", "npc-a"));
     assert(intersections.has_reservation("J1", "M1", "npc-a"));
 
+    // Simulate a host-side clock divergence: lane advancement would be
+    // valid, but the intersection coordinator rejects the repeated tick.
+    intersections.advance_tick(12U);
     // A failure in either coordinator must roll back both clocks and leases.
     const auto lane_before_failure = lanes.snapshot();
     const auto intersection_before_failure = intersections.snapshot();
