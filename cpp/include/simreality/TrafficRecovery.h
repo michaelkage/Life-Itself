@@ -32,6 +32,8 @@ public:
     [[nodiscard]] JourneyRenewalResult advance_and_renew(
         std::uint64_t tick, LaneTrafficCoordinator& lanes,
         IntersectionTrafficCoordinator& intersections);
+    [[nodiscard]] std::vector<JourneyOccupancy> snapshot() const;
+    void restore(const std::vector<JourneyOccupancy>& snapshot);
     [[nodiscard]] const std::map<std::string, JourneyOccupancy>& tracked() const noexcept {
         return tracked_;
     }
@@ -67,6 +69,15 @@ struct DeadlockResolutionProposal {
 
 // Reports canonical strongly connected components in the wait-for graph.
 // A component is a deadlock candidate, not permission to revoke occupancy.
+struct TrafficRecoveryCheckpoint {
+    LaneTrafficSnapshot lanes{};
+    IntersectionTrafficSnapshot intersections{};
+    std::vector<JourneyOccupancy> journey_occupancy{};
+    std::uint64_t progress_stall_threshold{3U};
+    std::vector<RouteProgressCheckpoint> route_progress{};
+    std::vector<WaitForResourceEdge> pending_wait_edges{};
+};
+
 class TrafficDeadlockDetector {
 public:
     [[nodiscard]] std::vector<std::vector<std::string>> detect(
