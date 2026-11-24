@@ -1,6 +1,8 @@
 #pragma once
 
 #include "simreality/SimulationWorld.h"
+#include "simreality/TrafficRecovery.h"
+#include "simreality/RoutePlanning.h"
 
 #include <cstdint>
 #include <iosfwd>
@@ -14,5 +16,10 @@ inline constexpr std::uint32_t kWorldSaveVersion = 11;
 // compiler-specific struct dumps or Unreal types.
 void save_world(const SimulationWorld& world, std::ostream& output);
 [[nodiscard]] SimulationWorld load_world(std::istream& input);
+
+// A deterministic companion checkpoint for traffic admission and recovery state.
+void save_traffic_recovery_checkpoint(
+    const TrafficRecoveryCheckpoint& checkpoint, std::ostream& output);
+[[nodiscard]] TrafficRecoveryCheckpoint load_traffic_recovery_checkpoint(std::istream& input);
 
 } // namespace simreality
