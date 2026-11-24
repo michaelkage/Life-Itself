@@ -84,3 +84,19 @@ cmake -S cpp -B build -DCMAKE_BUILD_TYPE=Debug
 cmake --build build --parallel 2
 ctest --test-dir build --output-on-failure
 ```
+
+
+## Predictive collision avoidance
+
+`compute_collision_avoidance` evaluates each moving neighbor's closest
+approach over a caller-supplied prediction horizon. Overlapping predicted
+trajectories produce a bounded acceleration away from the closest-approach
+point; exact stationary overlaps use a stable entity-ID-derived axis. Neighbor
+input order is canonicalized, duplicate/self identities are rejected, and the
+result reports predicted conflict count and earliest conflict time.
+
+This is a deterministic local avoidance primitive, not a global traffic or
+intersection solver. Hosts should combine it with lane reservations, right-of-way
+rules, vehicle dimensions, braking envelopes, and authoritative collision
+resolution. The caller owns broadphase selection and must provide all relevant
+moving bodies within the prediction horizon.
