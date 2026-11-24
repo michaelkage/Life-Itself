@@ -2129,5 +2129,51 @@ int main() {
     }
     assert(rejected_invalid_fluid_flag);
 
-    return 0;
+    
+    // Provenance claims and the exact decision-time context survive a world save.
+    WorldState provenance_state;
+    NPC provenance_npc;
+    provenance_npc.entity_id = "decision-maker";
+    provenance_npc.compassion = 0.8;
+    provenance_npc.relationships["witness"] = 0.6;
+    provenance_state.npcs.push_back(provenance_npc);
+    SimulationWorld provenance_world(provenance_state, 6.5, 99U, 12.0);
+    InformationClaim root_claim;
+    root_claim.claim_id = "claim-root";
+    root_claim.subject_key = "suspect-1";
+    root_claim.proposition_key = "action:theft";
+    root_claim.root_evidence_id = "camera:entry-1";
+    root_claim.source_entity_id = "witness";
+    root_claim.recipient_entity_id = "decision-maker";
+    root_claim.created_tick = 6500;
+    root_claim.confidence = 0.9;
+    assert(provenance_world.information_ledger().record(root_claim).accepted);
+    const std::vector<MoralChoiceOption> provenance_options{
+        {"help-witness", 0.9, 0.8, 0.7, 0.6, 0.4, 0.8, 0.2},
+        {"ignore-witness", 0.1, 0.0, 0.2, 0.2, 0.5, 0.1, 0.0}};
+    const auto provenance_choice = provenance_world.record_moral_choice(
+        "decision-maker", "scenario:market-theft", provenance_options,
+        {{"help-witness", 5.0, -0.02, {{"witness", 0.1}}}});
+    assert(provenance_choice.choice.option_id == "help-witness");
+    const auto decision_context = provenance_world.decision_context_for(
+        "decision-maker", provenance_options, "suspect-1");
+    assert(decision_context.investigation.received_information.size() == 1U);
+    assert(decision_context.option_explanations.size() == 2U);
+    assert(provenance_world.decision_history_for("decision-maker").size() == 1U);
+    std::stringstream provenance_bytes(std::ios::in | std::ios::out | std::ios::binary);
+    save_world(provenance_world, provenance_bytes);
+    provenance_bytes.seekg(0);
+    SimulationWorld provenance_resumed = load_world(provenance_bytes);
+    assert(provenance_resumed.total_hours() == 6.5);
+    assert(provenance_resumed.real_time_seconds() == 12.0);
+    assert(provenance_resumed.information_ledger().find("claim-root") != nullptr);
+    const auto resumed_decisions = provenance_resumed.decision_history_for("decision-maker");
+    assert(resumed_decisions.size() == 1U);
+    assert(resumed_decisions.front().scenario_id == "scenario:market-theft");
+    assert(resumed_decisions.front().evidence_claim_ids == std::vector<std::string>{"claim-root"});
+    std::stringstream provenance_resaved(std::ios::in | std::ios::out | std::ios::binary);
+    save_world(provenance_resumed, provenance_resaved);
+    assert(provenance_bytes.str() == provenance_resaved.str());
+
+return 0;
 }
