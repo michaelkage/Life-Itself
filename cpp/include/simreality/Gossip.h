@@ -21,6 +21,7 @@ struct Rumour {
     SimulationHour timestamp_hour{0.0};
     EntityId source_entity_id{};
     double source_reliability{0.5};
+    std::string root_evidence_id{};
 
     [[nodiscard]] bool is_attributable() const noexcept {
         return !target_entity_id.empty();
