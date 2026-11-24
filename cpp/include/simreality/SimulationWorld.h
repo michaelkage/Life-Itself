@@ -1,6 +1,7 @@
 #pragma once
 
 #include "simreality/CoreTypes.h"
+#include "simreality/DecisionSystem.h"
 #include "simreality/Districts.h"
 #include "simreality/Ecosystem.h"
 #include "simreality/Fixers.h"
