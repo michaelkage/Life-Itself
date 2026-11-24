@@ -2175,5 +2175,31 @@ int main() {
     save_world(provenance_resumed, provenance_resaved);
     assert(provenance_bytes.str() == provenance_resaved.str());
 
+
+    // Original evidence identity survives multiple NPC-to-NPC retellings.
+    WorldState relay_state;
+    NPC relay_actor; relay_actor.entity_id = "relay-actor"; relay_actor.district_id = "relay-district";
+    NPC relay_witness; relay_witness.entity_id = "relay-witness"; relay_witness.district_id = "relay-district";
+    NPC relay_listener; relay_listener.entity_id = "relay-listener"; relay_listener.district_id = "relay-district";
+    relay_listener.beliefs.push_back(NPCBelief{"relay-actor", ActionTag::CrimeAssault,
+        0.0, 0.8, "prior-source", false, 1U, 0U});
+    NPC relay_listener_two; relay_listener_two.entity_id = "relay-listener-two"; relay_listener_two.district_id = "relay-district";
+    relay_state.npcs = {relay_actor, relay_witness, relay_listener, relay_listener_two};
+    SimulationWorld relay_world(relay_state);
+    assert(relay_world.record_witnessed_action("relay-actor", ActionTag::CrimeTheft, {},
+        {"relay-witness"}) == 1U);
+    (void)relay_world.talk("relay-listener", "relay-witness");
+    (void)relay_world.talk("relay-listener-two", "relay-listener");
+    const auto received_claims = relay_world.information_ledger().claims_received_by("relay-listener-two");
+    assert(received_claims.size() == 1U);
+    const auto relay_lineage = relay_world.information_ledger().lineage_for_claim(received_claims.front().claim_id);
+    assert(relay_lineage.size() == 3U);
+    assert(relay_lineage.front().root_evidence_id == relay_lineage.back().root_evidence_id);
+    assert(relay_world.information_ledger().independent_evidence_count(
+        "relay-actor", "action:" + std::to_string(static_cast<unsigned int>(ActionTag::CrimeTheft))) == 1U);
+    const auto listener_revisions = relay_world.belief_history_for("relay-listener", "relay-actor");
+    assert(!listener_revisions.empty());
+    assert(!relay_world.belief_explanations_for("relay-listener", "relay-actor").front().evidence_claims.empty());
+
 return 0;
 }
