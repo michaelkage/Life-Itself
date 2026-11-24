@@ -676,4 +676,176 @@ SimulationWorld load_world(std::istream& input) {
     return world;
 }
 
+void save_traffic_recovery_checkpoint(
+    const TrafficRecoveryCheckpoint& checkpoint, std::ostream& output) {
+    // Validate the complete checkpoint before writing any bytes.
+    LaneTrafficCoordinator lanes(checkpoint.lanes.lease_ticks);
+    lanes.restore(checkpoint.lanes);
+    IntersectionTrafficCoordinator intersections(checkpoint.intersections.lease_ticks);
+    intersections.restore(checkpoint.intersections);
+    JourneyReservationManager journeys;
+    journeys.restore(checkpoint.journey_occupancy);
+    RouteProgressMonitor progress(checkpoint.progress_stall_threshold);
+    progress.restore(checkpoint.route_progress);
+    TrafficDeadlockDetector detector;
+    std::vector<WaitForEdge> graph;
+    for (const auto& edge : checkpoint.pending_wait_edges) {
+        if (edge.waiter_id.empty() || edge.blocker_id.empty() || edge.waiter_id == edge.blocker_id
+            || edge.resource_id.empty())
+            throw std::invalid_argument("invalid pending resource wait edge");
+        graph.push_back({edge.waiter_id, edge.blocker_id});
+    }
+    (void)detector.detect(graph);
+
+    constexpr std::array<char, 8> magic{{'S','R','E','T','R','A','F','1'}};
+    output.write(magic.data(), static_cast<std::streamsize>(magic.size()));
+    if (!output) throw std::runtime_error("failed writing traffic checkpoint header");
+    write_u32(output, 1U);
+
+    write_u64(output, checkpoint.lanes.lease_ticks);
+    write_u64(output, checkpoint.lanes.current_tick);
+    write_u8(output, checkpoint.lanes.tick_initialized ? 1U : 0U);
+    write_count(output, checkpoint.lanes.capacities.size());
+    for (const auto& [lane, capacity] : checkpoint.lanes.capacities) {
+        write_string(output, lane); write_u64(output, static_cast<std::uint64_t>(capacity));
+    }
+    write_count(output, checkpoint.lanes.reservations.size());
+    for (const auto& item : checkpoint.lanes.reservations) {
+        write_string(output, item.lane_id); write_string(output, item.entity_id);
+        write_u64(output, item.expires_at_tick);
+        write_u32(output, static_cast<std::uint32_t>(item.priority));
+        write_u64(output, item.consecutive_wait_ticks);
+    }
+    write_count(output, checkpoint.lanes.waiting.size());
+    for (const auto& item : checkpoint.lanes.waiting) {
+        write_string(output, item.lane_id); write_string(output, item.entity_id);
+        write_u64(output, item.wait_ticks);
+    }
+
+    write_u64(output, checkpoint.intersections.lease_ticks);
+    write_u64(output, checkpoint.intersections.current_tick);
+    write_u8(output, checkpoint.intersections.tick_initialized ? 1U : 0U);
+    write_count(output, checkpoint.intersections.movements.size());
+    for (const auto& item : checkpoint.intersections.movements) {
+        write_string(output, item.intersection_id); write_string(output, item.movement_id);
+        write_count(output, item.conflict_zone_ids.size());
+        for (const auto& zone : item.conflict_zone_ids) write_string(output, zone);
+    }
+    write_count(output, checkpoint.intersections.reservations.size());
+    for (const auto& item : checkpoint.intersections.reservations) {
+        write_string(output, item.intersection_id); write_string(output, item.movement_id);
+        write_string(output, item.entity_id); write_u64(output, item.expires_at_tick);
+        write_u32(output, static_cast<std::uint32_t>(item.priority));
+        write_u64(output, item.consecutive_wait_ticks);
+    }
+    write_count(output, checkpoint.intersections.waiting.size());
+    for (const auto& item : checkpoint.intersections.waiting) {
+        write_string(output, item.intersection_id); write_string(output, item.entity_id);
+        write_u64(output, item.wait_ticks);
+    }
+
+    write_count(output, checkpoint.journey_occupancy.size());
+    for (const auto& item : checkpoint.journey_occupancy) {
+        write_string(output, item.entity_id); write_string(output, item.lane_id);
+        write_string(output, item.intersection_id); write_string(output, item.movement_id);
+    }
+    write_u64(output, checkpoint.progress_stall_threshold);
+    write_count(output, checkpoint.route_progress.size());
+    for (const auto& item : checkpoint.route_progress) {
+        write_string(output, item.entity_id); write_u64(output, item.last_tick);
+        write_double(output, item.last_progress); write_u64(output, item.stalled_ticks);
+    }
+    write_count(output, checkpoint.pending_wait_edges.size());
+    for (const auto& item : checkpoint.pending_wait_edges) {
+        write_string(output, item.waiter_id); write_string(output, item.blocker_id);
+        write_u8(output, static_cast<std::uint8_t>(item.resource_kind));
+        write_string(output, item.resource_id);
+    }
+}
+
+TrafficRecoveryCheckpoint load_traffic_recovery_checkpoint(std::istream& input) {
+    constexpr std::array<char, 8> expected{{'S','R','E','T','R','A','F','1'}};
+    std::array<char, 8> magic{};
+    input.read(magic.data(), static_cast<std::streamsize>(magic.size()));
+    if (!input || magic != expected || read_u32(input) != 1U)
+        throw std::runtime_error("invalid traffic recovery checkpoint header");
+    TrafficRecoveryCheckpoint result;
+    const auto read_flag = [&input]() {
+        const auto value = read_u8(input);
+        if (value > 1U) throw std::runtime_error("invalid traffic checkpoint boolean");
+        return value != 0U;
+    };
+    result.lanes.lease_ticks = read_u64(input);
+    result.lanes.current_tick = read_u64(input);
+    result.lanes.tick_initialized = read_flag();
+    for (std::uint32_t i=0,n=read_count(input); i<n; ++i) {
+        const auto lane=read_string(input); const auto capacity=read_u64(input);
+        if (capacity > std::numeric_limits<std::size_t>::max()
+            || !result.lanes.capacities.emplace(lane, static_cast<std::size_t>(capacity)).second)
+            throw std::runtime_error("invalid lane capacity checkpoint");
+    }
+    for (std::uint32_t i=0,n=read_count(input); i<n; ++i) {
+        LaneReservation item;
+        item.lane_id=read_string(input); item.entity_id=read_string(input);
+        item.expires_at_tick=read_u64(input); item.priority=static_cast<std::int32_t>(read_u32(input));
+        item.consecutive_wait_ticks=read_u64(input); result.lanes.reservations.push_back(std::move(item));
+    }
+    for (std::uint32_t i=0,n=read_count(input); i<n; ++i)
+        result.lanes.waiting.push_back({read_string(input),read_string(input),read_u64(input)});
+
+    result.intersections.lease_ticks=read_u64(input);
+    result.intersections.current_tick=read_u64(input);
+    result.intersections.tick_initialized=read_flag();
+    for (std::uint32_t i=0,n=read_count(input); i<n; ++i) {
+        IntersectionMovementDefinition item;
+        item.intersection_id=read_string(input); item.movement_id=read_string(input);
+        for (std::uint32_t j=0,m=read_count(input); j<m; ++j)
+            if (!item.conflict_zone_ids.insert(read_string(input)).second)
+                throw std::runtime_error("duplicate intersection conflict zone checkpoint");
+        result.intersections.movements.push_back(std::move(item));
+    }
+    for (std::uint32_t i=0,n=read_count(input); i<n; ++i) {
+        IntersectionReservation item;
+        item.intersection_id=read_string(input); item.movement_id=read_string(input);
+        item.entity_id=read_string(input); item.expires_at_tick=read_u64(input);
+        item.priority=static_cast<std::int32_t>(read_u32(input));
+        item.consecutive_wait_ticks=read_u64(input);
+        result.intersections.reservations.push_back(std::move(item));
+    }
+    for (std::uint32_t i=0,n=read_count(input); i<n; ++i)
+        result.intersections.waiting.push_back({read_string(input),read_string(input),read_u64(input)});
+
+    for (std::uint32_t i=0,n=read_count(input); i<n; ++i)
+        result.journey_occupancy.push_back({read_string(input),read_string(input),
+            read_string(input),read_string(input)});
+    result.progress_stall_threshold=read_u64(input);
+    for (std::uint32_t i=0,n=read_count(input); i<n; ++i)
+        result.route_progress.push_back({read_string(input),read_u64(input),
+            read_double(input),read_u64(input)});
+    for (std::uint32_t i=0,n=read_count(input); i<n; ++i) {
+        WaitForResourceEdge item;
+        item.waiter_id=read_string(input); item.blocker_id=read_string(input);
+        const auto kind=read_u8(input);
+        if (kind > static_cast<std::uint8_t>(BlockedResourceKind::Intersection))
+            throw std::runtime_error("invalid blocked resource kind");
+        item.resource_kind=static_cast<BlockedResourceKind>(kind);
+        item.resource_id=read_string(input);
+        result.pending_wait_edges.push_back(std::move(item));
+    }
+
+    LaneTrafficCoordinator lanes(result.lanes.lease_ticks); lanes.restore(result.lanes);
+    IntersectionTrafficCoordinator intersections(result.intersections.lease_ticks);
+    intersections.restore(result.intersections);
+    JourneyReservationManager journeys; journeys.restore(result.journey_occupancy);
+    RouteProgressMonitor progress(result.progress_stall_threshold); progress.restore(result.route_progress);
+    TrafficDeadlockDetector detector;
+    std::vector<WaitForEdge> graph;
+    for (const auto& edge : result.pending_wait_edges) {
+        if (edge.resource_id.empty()) throw std::runtime_error("empty pending wait resource");
+        graph.push_back({edge.waiter_id,edge.blocker_id});
+    }
+    (void)detector.detect(graph);
+    return result;
+}
+
 } // namespace simreality
