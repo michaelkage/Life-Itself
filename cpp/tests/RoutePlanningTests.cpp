@@ -33,6 +33,22 @@ int main() {
     const auto live_route = planner.plan_live("A", "D", live_traffic);
     assert(live_route.steps[1].lane_id == "C");
 
+    TrafficRoutePlanner conflict_aware;
+    conflict_aware.upsert_edge({"S", "B", "JX", "through", 1.0, 0.0, 0.0, 10.0});
+    conflict_aware.upsert_edge({"B", "T", {}, {}, 1.0, 0.0, 0.0, 0.0});
+    conflict_aware.upsert_edge({"S", "C", {}, {}, 2.0, 0.0, 0.0, 0.0});
+    conflict_aware.upsert_edge({"C", "T", {}, {}, 2.0, 0.0, 0.0, 0.0});
+    IntersectionTrafficCoordinator live_intersections(3U);
+    live_intersections.configure_movement({"JX", "through", {"zone-1"}});
+    live_intersections.configure_movement({"JX", "crossing", {"zone-1"}});
+    live_intersections.advance_tick(1U);
+    assert(live_intersections.resolve({{"JX", "crossing", "blocker", 0}})
+        .granted_entity_ids.size() == 1U);
+    assert(live_intersections.conflict_pressure("JX", "through") == 1U);
+    const auto conflict_route = conflict_aware.plan_live(
+        "S", "T", live_traffic, live_intersections);
+    assert(conflict_route.steps[1].lane_id == "C");
+
     TrafficRoutePlanner ties;
     ties.upsert_edge({"S", "Z", {}, {}, 1.0, 0.0, 0.0});
     ties.upsert_edge({"Z", "T", {}, {}, 1.0, 0.0, 0.0});
