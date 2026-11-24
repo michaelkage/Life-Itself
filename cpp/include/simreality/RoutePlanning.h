@@ -79,6 +79,8 @@ enum class RouteRecoveryAction {
     ReplanRequested
 };
 
+struct RouteProgressCheckpoint { std::string entity_id{}; std::uint64_t last_tick{0}; double last_progress{0.0}; std::uint64_t stalled_ticks{0}; };
+
 struct RouteProgressObservation {
     std::string entity_id{};
     std::uint64_t tick{0};
@@ -96,6 +98,8 @@ public:
     [[nodiscard]] RouteProgressObservation observe(
         const std::string& entity_id, std::uint64_t tick, double progress);
     [[nodiscard]] bool forget(const std::string& entity_id);
+    [[nodiscard]] std::vector<RouteProgressCheckpoint> snapshot() const;
+    void restore(const std::vector<RouteProgressCheckpoint>& snapshot);
     [[nodiscard]] std::uint64_t stalled_tick_threshold() const noexcept {
         return stalled_tick_threshold_;
     }
