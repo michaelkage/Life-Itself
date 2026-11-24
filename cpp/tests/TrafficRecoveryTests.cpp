@@ -70,6 +70,7 @@ int main() {
     checkpoint.journey_occupancy = journey.snapshot();
     checkpoint.progress_stall_threshold = progress_monitor.stalled_tick_threshold();
     checkpoint.route_progress = progress_monitor.snapshot();
+    checkpoint.pending_proposals = proposals;
     checkpoint.pending_wait_edges = {
         {"npc-a", "npc-b", BlockedResourceKind::Lane, "L1"},
         {"npc-b", "npc-a", BlockedResourceKind::Intersection, "J1"}};
@@ -83,6 +84,8 @@ int main() {
     assert(restored_checkpoint.journey_occupancy.size() == 1U);
     assert(restored_checkpoint.route_progress.front().stalled_ticks == 1U);
     assert(restored_checkpoint.pending_wait_edges.size() == 2U);
+    assert(restored_checkpoint.pending_proposals.size() == 1U);
+    assert(restored_checkpoint.pending_proposals.front().yielding_entity_id == "b");
 
     LaneTrafficCoordinator restored_lanes;
     restored_lanes.restore(restored_checkpoint.lanes);
