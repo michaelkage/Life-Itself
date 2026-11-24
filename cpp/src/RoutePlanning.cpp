@@ -127,6 +127,12 @@ RoutePlan TrafficRoutePlanner::plan(
     return result;
 }
 
+RoutePlan TrafficRoutePlanner::plan_live(
+    const std::string& source_lane_id, const std::string& destination_lane_id,
+    const LaneTrafficCoordinator& live_lanes) const {
+    return plan(source_lane_id, destination_lane_id, live_lanes.occupancy_snapshot());
+}
+
 RouteLookaheadIntents TrafficRoutePlanner::reservation_lookahead(
     const RoutePlan& route, std::size_t current_step_index,
     const std::string& entity_id, std::int32_t priority,
