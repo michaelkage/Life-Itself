@@ -5,6 +5,7 @@
 #include <set>
 #include <stdexcept>
 #include <tuple>
+#include <utility>
 
 namespace simreality {
 
@@ -14,8 +15,12 @@ void JourneyReservationManager::track(JourneyOccupancy occupancy) {
         throw std::invalid_argument("journey occupancy identifiers are incomplete");
     }
     const auto found = tracked_.find(occupancy.entity_id);
-    if (found != tracked_.end() && found->second.lane_id != occupancy.lane_id) {
-        throw std::logic_error("journey lane changes require confirmed handoff before tracking");
+    if (found != tracked_.end()
+        && (found->second.lane_id != occupancy.lane_id
+            || found->second.intersection_id != occupancy.intersection_id
+            || found->second.movement_id != occupancy.movement_id)) {
+        throw std::logic_error(
+            "journey occupancy changes require confirmed clearance and explicit retracking");
     }
     tracked_[occupancy.entity_id] = std::move(occupancy);
 }
