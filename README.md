@@ -568,7 +568,8 @@ assessment, bounded crowd-separation steering, and stateless lane-centerline
 following with arc-length look-ahead and force-limited velocity correction. The
 world coordinator also exposes derived NPC position/facing registration,
 deterministic nearby queries, and range/FOV/occlusion-filtered visibility
-queries and inverse-square acoustic reach/occlusion queries. Lane-driven NPC
+queries, inverse-square acoustic reach/occlusion queries, and predictive
+closest-approach collision-avoidance acceleration for moving bodies. Lane-driven NPC
 movement updates velocity, facing, and indexed
 position; spatially discovered witnesses feed directly into the durable
 witness-memory/event pipeline. Spatial positions, facing, and velocity remain
