@@ -54,6 +54,10 @@ int main() {
     catch (const std::invalid_argument&) { threw = true; }
     assert(threw);
     threw = false;
+    try { traffic.resolve({{"main", "npc-x", 0}, {"side", "npc-x", 0}}); }
+    catch (const std::invalid_argument&) { threw = true; }
+    assert(threw);
+    threw = false;
     try { traffic.configure_lane("main", 0U); }
     catch (const std::invalid_argument&) { threw = true; }
     assert(threw);
