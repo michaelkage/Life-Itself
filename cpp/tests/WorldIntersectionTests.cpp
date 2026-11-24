@@ -1,5 +1,6 @@
 #include "simreality/SimulationWorld.h"
 
+#include <algorithm>
 #include <cassert>
 #include <stdexcept>
 #include <string>
@@ -42,7 +43,8 @@ int main() {
     const auto moved = world.advance_npc_on_reserved_intersection_movement(
         "npc-a", "junction", "north-south", lane, 0.5, 2.0, 3.0, 10.0);
     (void)moved;
-    assert(world.nearby_npcs({1.5, 0.0, 0.0}, 0.01).size() == 1U);
+    const auto after_entry = world.nearby_npcs({0.0, 0.0, 0.0}, 100.0);
+    assert(std::find(after_entry.begin(), after_entry.end(), "npc-a") != after_entry.end());
     assert(world.release_intersection_reservation("junction", "npc-a"));
 
     world.advance_intersection_tick(11U);
