@@ -2,22 +2,27 @@
 
 This codec stores the coordinator's request signatures and references to outputs
 owned by the memory and conversation adapters. Restore those adapters first.
+Schema 2 records explicit witness-memory requests, including historical events
+whose materialization was deferred by a population LOD cadence.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
 import json
-from typing import Any
 
 from .simulation_tick import (
     ConversationIntent, SimulationTickCoordinator, SimulationTickResult,
 )
 
 
+MemoryRequest = tuple[str, str]
+
+
 @dataclass(frozen=True)
 class _TickEntry:
     tick: int
     event_ids: tuple[str, ...]
+    memory_requests: tuple[MemoryRequest, ...] | None
     conversations: tuple[ConversationIntent, ...]
     memory_refs: tuple[tuple[str, str, bool], ...]
     conversation_ids: tuple[str, ...]
@@ -28,7 +33,7 @@ class SimulationTickReplaySnapshot:
     """Coordinator replay keys plus references to already-restored adapter outputs."""
 
     entries: tuple[_TickEntry, ...]
-    SCHEMA_VERSION = 1
+    SCHEMA_VERSION = 2
 
     @classmethod
     def capture(cls, coordinator: SimulationTickCoordinator) -> "SimulationTickReplaySnapshot":
@@ -37,7 +42,7 @@ class SimulationTickReplaySnapshot:
         entries = []
         for tick in sorted(coordinator._results):
             result = coordinator._results[tick]
-            event_ids, intents = coordinator._requests[tick]
+            event_ids, memory_requests, intents = coordinator._requests[tick]
             memory_refs = tuple(
                 (event_id, witness_id, memory is None)
                 for event_id, witness_id, memory in result.materialized_memories
@@ -45,6 +50,7 @@ class SimulationTickReplaySnapshot:
             entries.append(_TickEntry(
                 tick=tick,
                 event_ids=event_ids,
+                memory_requests=memory_requests,
                 conversations=intents,
                 memory_refs=memory_refs,
                 conversation_ids=tuple(item.conversation_id for item in result.conversations),
@@ -57,6 +63,10 @@ class SimulationTickReplaySnapshot:
             "entries": [{
                 "tick": entry.tick,
                 "event_ids": list(entry.event_ids),
+                "memory_requests": (
+                    None if entry.memory_requests is None
+                    else [list(item) for item in entry.memory_requests]
+                ),
                 "conversations": [{
                     "conversation_id": item.conversation_id,
                     "listener_id": item.listener_id,
@@ -73,8 +83,9 @@ class SimulationTickReplaySnapshot:
     def from_json(cls, payload: str) -> "SimulationTickReplaySnapshot":
         try:
             raw = json.loads(payload)
-            if not isinstance(raw, dict) or raw.get("schema_version") != cls.SCHEMA_VERSION:
+            if not isinstance(raw, dict) or raw.get("schema_version") not in (1, cls.SCHEMA_VERSION):
                 raise ValueError("unsupported simulation tick replay schema version")
+            schema_version = raw["schema_version"]
             entries = []
             for item in raw["entries"]:
                 intents = tuple(ConversationIntent(
@@ -84,12 +95,32 @@ class SimulationTickReplaySnapshot:
                     district_id=c["district_id"],
                 ) for c in item["conversations"])
                 refs = tuple((ref[0], ref[1], ref[2]) for ref in item["memory_refs"])
+                if schema_version == 1:
+                    # Legacy requests materialized every witness of each selected event.
+                    memory_requests = tuple((event_id, witness_id) for event_id, witness_id, _ in refs)
+                else:
+                    raw_requests = item.get("memory_requests")
+                    if raw_requests is None:
+                        memory_requests = tuple((event_id, witness_id) for event_id, witness_id, _ in refs)
+                    else:
+                        if not isinstance(raw_requests, list):
+                            raise ValueError("memory_requests must be a list or null")
+                        memory_requests = tuple(
+                            (request[0], request[1]) for request in raw_requests
+                        )
+                        if any(
+                            not isinstance(event_id, str) or not event_id.strip()
+                            or not isinstance(witness_id, str) or not witness_id.strip()
+                            for event_id, witness_id in memory_requests
+                        ):
+                            raise ValueError("invalid witness-memory request")
                 if any(not isinstance(a, str) or not isinstance(b, str) or not isinstance(n, bool)
                        for a, b, n in refs):
                     raise ValueError("invalid memory replay reference")
                 entry = _TickEntry(
                     tick=item["tick"],
                     event_ids=tuple(item["event_ids"]),
+                    memory_requests=memory_requests,
                     conversations=intents,
                     memory_refs=refs,
                     conversation_ids=tuple(item["conversation_ids"]),
@@ -104,6 +135,11 @@ class SimulationTickReplaySnapshot:
                     raise ValueError("duplicate conversation ID in tick result")
                 if tuple(sorted(entry.conversations, key=lambda c: c.conversation_id)) != entry.conversations:
                     raise ValueError("conversation intents must be sorted")
+                if entry.memory_requests is not None:
+                    if len(entry.memory_requests) != len(set(entry.memory_requests)):
+                        raise ValueError("duplicate witness-memory request")
+                    if tuple(sorted(entry.memory_requests)) != entry.memory_requests:
+                        raise ValueError("witness-memory requests must be sorted")
                 if tuple(sorted(entry.memory_refs, key=lambda x: (x[0], x[1]))) != entry.memory_refs:
                     raise ValueError("memory references must be sorted")
                 entries.append(entry)
@@ -133,19 +169,26 @@ class SimulationTickReplaySnapshot:
                 raise ValueError("saved event tick does not match coordinator request")
             if tuple(event.event_id for event in ordered_events) != entry.event_ids:
                 raise ValueError("saved event IDs are not in canonical order")
-            expected_memory_keys = tuple(
-                (event.event_id, witness_id)
-                for event in ordered_events
-                for witness_id in sorted(event.witnesses)
+
+            requested_pairs = set(entry.memory_requests or ())
+            for event in ordered_events:
+                requested_pairs.update((event.event_id, witness_id) for witness_id in event.witnesses)
+            ordered_pairs = tuple(sorted(requested_pairs))
+            if entry.memory_requests is not None and ordered_pairs != entry.memory_requests:
+                raise ValueError("saved memory requests omit selected-event witnesses or are not canonical")
+            actual_memory_keys = tuple(
+                (event_id, witness_id) for event_id, witness_id, _ in entry.memory_refs
             )
-            actual_memory_keys = tuple((event_id, witness_id) for event_id, witness_id, _ in entry.memory_refs)
-            if actual_memory_keys != expected_memory_keys:
-                raise ValueError("saved memory references do not match the tick's event witnesses")
+            if actual_memory_keys != ordered_pairs:
+                raise ValueError("saved memory references do not match the requested witness memories")
             if tuple(item.conversation_id for item in entry.conversations) != entry.conversation_ids:
                 raise ValueError("saved conversation IDs do not match the tick request")
+
             memories = []
             for event_id, witness_id, was_none in entry.memory_refs:
                 event = coordinator.events.get(event_id)
+                if event.tick > entry.tick:
+                    raise ValueError("saved memory request references a future event")
                 if witness_id not in event.witnesses:
                     raise ValueError("saved memory reference is not a recorded witness")
                 memory = coordinator.memory_adapter._processed.get((event_id, witness_id))
@@ -157,6 +200,7 @@ class SimulationTickReplaySnapshot:
                 memories.append((event_id, witness_id, memory))
             if len({(e, w) for e, w, _ in memories}) != len(memories):
                 raise ValueError("duplicate memory reference")
+
             conversations = []
             for conversation_id in entry.conversation_ids:
                 result = coordinator.conversation_adapter._results.get(conversation_id)
@@ -170,7 +214,8 @@ class SimulationTickReplaySnapshot:
                 ):
                     raise ValueError("restored conversation result conflicts with tick request")
                 conversations.append(result)
-            signature = (entry.event_ids, entry.conversations)
+
+            signature = (entry.event_ids, ordered_pairs, entry.conversations)
             result = SimulationTickResult(entry.tick, tuple(memories), tuple(conversations))
             restored.append((entry.tick, signature, result))
         if restored and any(restored[i][0] >= restored[i + 1][0] for i in range(len(restored) - 1)):

@@ -1012,3 +1012,41 @@ __all__ += [
     "PresenceEncounterIntent", "SimulationWorldTickPipeline",
     "WorldTickPipelineResult",
 ]
+
+# Production population execution, budgeting, and household economy APIs.
+# Population-level deterministic orchestration of event, social and routine phases.
+from .population_execution import NPCDecisionContext, PopulationExecutionLoop, PopulationTickResult
+__all__ += ["NPCDecisionContext", "PopulationExecutionLoop", "PopulationTickResult"]
+# Deterministic spatial partitioning and budgeted population simulation detail.
+from .population_spatial import PopulationLOD, PopulationSchedule, PopulationSlice, PopulationSpatialScheduler, PopulationSubsystemSlice
+__all__ += ["PopulationLOD", "PopulationSchedule", "PopulationSlice", "PopulationSpatialScheduler", "PopulationSubsystemSlice"]
+from .population_budget import PopulationBudgetAllocation, PopulationBudgetController
+__all__ += ["PopulationBudgetAllocation", "PopulationBudgetController"]
+# Live-state validation bridge from NPC proposals into replay-safe execution.
+from .population_actions import NPCActionDispatch, NPCActionDispatchAdapter
+__all__ += ["NPCActionDispatch", "NPCActionDispatchAdapter"]
+# Checkpointable owner-scoped facts and resources used by action execution.
+from .action_world_state import ActionWorldState
+__all__ += ["ActionWorldState"]
+# Owner-scoped stock, transfers, consumption and action-linked inventory effects.
+from .inventory import ActionInventoryAdapter, ActionInventoryEffect, InventoryLedger, InventoryTransfer
+__all__ += ["ActionInventoryAdapter", "ActionInventoryEffect", "InventoryLedger", "InventoryTransfer"]
+from .household_economy import (
+    ActionEconomicEffect, ActionHouseholdEffect, EconomicAccount, EconomicActionAdapter,
+    EconomicLedger, EconomicTransfer, HouseholdActionAdapter, HouseholdLedger,
+    HouseholdObligation,
+)
+__all__ += [
+    "ActionEconomicEffect", "ActionHouseholdEffect", "EconomicAccount",
+    "EconomicActionAdapter", "EconomicLedger", "EconomicTransfer",
+    "HouseholdActionAdapter", "HouseholdLedger", "HouseholdObligation",
+]
+from .population_lod_policy import (
+    PopulationLODPolicy, SubsystemLODPolicy, default_population_lod_policy,
+)
+__all__ += ["PopulationLODPolicy", "SubsystemLODPolicy", "default_population_lod_policy"]
+# Durable cross-subsystem atomicity for population tick execution.
+from .population_transaction import PopulationTickTransactionCoordinator, TransactionParticipant
+__all__ += ["PopulationTickTransactionCoordinator", "TransactionParticipant"]
+from .population_checkpoint_participants import build_population_transaction_participants
+__all__ += ["build_population_transaction_participants"]
