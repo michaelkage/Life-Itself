@@ -38,6 +38,10 @@ struct MoralChoiceEvaluation {
     double score{0.0};
 };
 
+struct MoralChoiceFactorExplanation { std::string factor{}; double npc_value{0.0}; double option_value{0.0}; double contribution{0.0}; };
+struct MoralChoiceExplanation { std::string option_id{}; std::vector<MoralChoiceFactorExplanation> factors{}; double total_score{0.0}; };
+[[nodiscard]] MoralChoiceExplanation explain_moral_choice(const NPC& npc, const MoralChoiceOption& option);
+
 // Deterministic value-weighted evaluation. It scores options but does not
 // dictate a universal good/bad answer or mutate the NPC/world.
 [[nodiscard]] MoralChoiceEvaluation evaluate_moral_choice(
