@@ -50,6 +50,9 @@ public:
         const std::string& source_lane_id,
         const std::string& destination_lane_id,
         const std::map<std::string, std::size_t>& lane_occupancy = {}) const;
+    [[nodiscard]] RoutePlan plan_live(
+        const std::string& source_lane_id, const std::string& destination_lane_id,
+        const LaneTrafficCoordinator& live_lanes) const;
     [[nodiscard]] RouteLookaheadIntents reservation_lookahead(
         const RoutePlan& route, std::size_t current_step_index,
         const std::string& entity_id, std::int32_t priority,
