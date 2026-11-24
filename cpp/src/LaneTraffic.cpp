@@ -69,6 +69,15 @@ LaneTrafficResolution LaneTrafficCoordinator::resolve(
         }
     }
 
+    if (!requests.empty()
+        && current_tick_ > std::numeric_limits<std::uint64_t>::max() - lease_ticks_) {
+        throw std::overflow_error("reservation expiry tick overflow");
+    }
+    for (auto wait = waiting_.begin(); wait != waiting_.end();) {
+        if (!unique_requests.contains(wait->first)) wait = waiting_.erase(wait);
+        else ++wait;
+    }
+
     struct Candidate {
         LaneTrafficRequest request{};
         std::uint64_t wait_ticks{0U};
@@ -81,9 +90,6 @@ LaneTrafficResolution LaneTrafficCoordinator::resolve(
         auto& lane_reservations = reservations_[request.lane_id];
         const auto existing = lane_reservations.find(request.entity_id);
         if (existing != lane_reservations.end()) {
-            if (current_tick_ > std::numeric_limits<std::uint64_t>::max() - lease_ticks_) {
-                throw std::overflow_error("reservation expiry tick overflow");
-            }
             existing->second.priority = request.priority;
             existing->second.expires_at_tick = current_tick_ + lease_ticks_;
             result.granted_entity_ids.push_back(request.entity_id);
@@ -116,9 +122,6 @@ LaneTrafficResolution LaneTrafficCoordinator::resolve(
             const Candidate& candidate = candidates[i];
             const WaitKey key{lane_id, candidate.request.entity_id};
             if (i < free_slots) {
-                if (current_tick_ > std::numeric_limits<std::uint64_t>::max() - lease_ticks_) {
-                    throw std::overflow_error("reservation expiry tick overflow");
-                }
                 active.emplace(candidate.request.entity_id, LaneReservation{
                     lane_id, candidate.request.entity_id,
                     current_tick_ + lease_ticks_, candidate.request.priority,
