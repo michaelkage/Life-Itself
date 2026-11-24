@@ -1278,6 +1278,72 @@ bool SimulationWorld::release_intersection_reservation(
     return intersection_traffic_.release(intersection_id, npc_id);
 }
 
+RouteSegmentAdvanceResult SimulationWorld::advance_npc_on_reserved_route_segment(
+    const EntityId& npc_id, const RouteSegmentRequest& request) {
+    (void)find_npc(npc_id);
+    if (request.destination_lane_id.empty()) {
+        throw std::invalid_argument("route segment destination lane must not be empty");
+    }
+    if (request.source_lane_id == request.destination_lane_id
+        && !request.source_lane_id.empty()) {
+        // Retaining the same lane token is valid; it is not a handoff.
+    } else if (!request.source_lane_id.empty()
+        && !lane_traffic_.has_reservation(request.source_lane_id, npc_id)) {
+        throw std::logic_error("NPC must retain its source-lane reservation during handoff");
+    }
+    if (!lane_traffic_.has_reservation(request.destination_lane_id, npc_id)) {
+        throw std::logic_error("NPC must hold the destination-lane reservation before handoff");
+    }
+
+    const bool entering_intersection = !request.entry_intersection_id.empty()
+        || !request.entry_movement_id.empty();
+    if (entering_intersection
+        && (request.entry_intersection_id.empty() || request.entry_movement_id.empty())) {
+        throw std::invalid_argument("intersection entry requires both intersection and movement ids");
+    }
+    if (entering_intersection && !intersection_traffic_.has_reservation(
+            request.entry_intersection_id, request.entry_movement_id, npc_id)) {
+        throw std::logic_error("NPC must hold the destination intersection movement reservation");
+    }
+
+    const bool clearing_intersection = !request.cleared_intersection_id.empty()
+        || !request.cleared_movement_id.empty();
+    if (clearing_intersection
+        && (request.cleared_intersection_id.empty() || request.cleared_movement_id.empty())) {
+        throw std::invalid_argument("intersection clearance requires both intersection and movement ids");
+    }
+    if (clearing_intersection && !intersection_traffic_.has_reservation(
+            request.cleared_intersection_id, request.cleared_movement_id, npc_id)) {
+        throw std::logic_error("NPC cannot clear an intersection without its active movement reservation");
+    }
+    if (clearing_intersection && entering_intersection
+        && request.cleared_intersection_id == request.entry_intersection_id
+        && request.cleared_movement_id == request.entry_movement_id) {
+        throw std::invalid_argument("one route segment cannot enter and clear the same movement reservation");
+    }
+
+    // All admission checks happen before physical state changes. The source
+    // lane and cleared intersection remain reserved until movement commits.
+    const LaneFollowingResult movement = advance_npc_on_lane_avoiding_collisions(
+        npc_id, request.lane_centerline, request.elapsed_seconds,
+        request.lookahead_distance, request.desired_speed,
+        request.lane_maximum_acceleration, request.collision_radius,
+        request.neighbor_collision_radius, request.prediction_horizon_seconds,
+        request.maximum_avoidance_acceleration, request.broadphase_radius);
+
+    RouteSegmentAdvanceResult result;
+    result.movement = movement;
+    if (!request.source_lane_id.empty()
+        && request.source_lane_id != request.destination_lane_id) {
+        result.source_lane_released = lane_traffic_.release(request.source_lane_id, npc_id);
+    }
+    if (clearing_intersection) {
+        result.cleared_intersection_released = intersection_traffic_.release(
+            request.cleared_intersection_id, npc_id);
+    }
+    return result;
+}
+
 LaneFollowingResult SimulationWorld::advance_npc_on_reserved_intersection_movement(
     const EntityId& npc_id, const std::string& intersection_id,
     const std::string& movement_id,
