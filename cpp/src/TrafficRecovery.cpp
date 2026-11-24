@@ -109,4 +109,69 @@ std::vector<std::vector<std::string>> TrafficDeadlockDetector::detect(
     return cycles;
 }
 
+std::vector<DeadlockResolutionProposal> TrafficDeadlockDetector::propose_resolutions(
+    const std::vector<WaitForResourceEdge>& edges,
+    const std::map<std::string, std::pair<std::vector<LaneTrafficRequest>,
+        std::vector<IntersectionTrafficRequest>>>& replacement_reservations) const {
+    std::vector<WaitForEdge> graph_edges;
+    graph_edges.reserve(edges.size());
+    std::set<std::tuple<std::string, std::string, BlockedResourceKind, std::string>> unique;
+    for (const auto& edge : edges) {
+        if (edge.waiter_id.empty() || edge.blocker_id.empty()
+            || edge.waiter_id == edge.blocker_id || edge.resource_id.empty()
+            || (edge.resource_kind != BlockedResourceKind::Lane
+                && edge.resource_kind != BlockedResourceKind::Intersection)) {
+            throw std::invalid_argument("resource wait edge is malformed");
+        }
+        if (!unique.emplace(edge.waiter_id, edge.blocker_id,
+                edge.resource_kind, edge.resource_id).second) {
+            throw std::invalid_argument("duplicate resource wait edge");
+        }
+        graph_edges.push_back({edge.waiter_id, edge.blocker_id});
+    }
+    const auto cycles = detect(graph_edges);
+    std::vector<DeadlockResolutionProposal> proposals;
+    for (const auto& cycle : cycles) {
+        const std::set<std::string> members(cycle.begin(), cycle.end());
+        const std::string* yielding = nullptr;
+        for (const std::string& participant : cycle) {
+            const auto candidate = replacement_reservations.find(participant);
+            if (candidate == replacement_reservations.end()) continue;
+            const bool has_alternative = !candidate->second.first.empty()
+                || !candidate->second.second.empty();
+            if (has_alternative) { yielding = &participant; break; }
+        }
+        if (yielding == nullptr) continue;
+
+        DeadlockResolutionProposal proposal;
+        proposal.participants = cycle;
+        proposal.yielding_entity_id = *yielding;
+        std::set<std::tuple<BlockedResourceKind, std::string, std::string>> resources;
+        for (const auto& edge : edges) {
+            if (members.contains(edge.waiter_id) && members.contains(edge.blocker_id)) {
+                resources.emplace(edge.resource_kind, edge.resource_id, edge.blocker_id);
+            }
+        }
+        for (const auto& [kind, resource_id, owner] : resources) {
+            proposal.blocking_resources.push_back({kind, resource_id, owner});
+        }
+        const auto& replacements = replacement_reservations.at(*yielding);
+        for (const auto& request : replacements.first) {
+            if (request.entity_id != *yielding || request.lane_id.empty()) {
+                throw std::invalid_argument("replacement lane reservation belongs to another entity");
+            }
+        }
+        for (const auto& request : replacements.second) {
+            if (request.entity_id != *yielding || request.intersection_id.empty()
+                || request.movement_id.empty()) {
+                throw std::invalid_argument("replacement intersection reservation belongs to another entity");
+            }
+        }
+        proposal.replacement_lane_requests = replacements.first;
+        proposal.replacement_intersection_requests = replacements.second;
+        proposals.push_back(std::move(proposal));
+    }
+    return proposals;
+}
+
 } // namespace simreality
