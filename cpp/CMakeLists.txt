@@ -22,6 +22,7 @@ add_library(simreality_core
     src/Campaign.cpp
     src/Fluid.cpp
     src/Spatial.cpp
+    src/LaneTraffic.cpp
 )
 target_include_directories(simreality_core PUBLIC include)
 target_compile_features(simreality_core PUBLIC cxx_std_20)
@@ -50,4 +51,8 @@ if(SIMREALITY_BUILD_TESTS)
     add_executable(simreality_world_spatial_tests tests/WorldSpatialTests.cpp)
     target_link_libraries(simreality_world_spatial_tests PRIVATE simreality_core)
     add_test(NAME simreality_world_spatial_tests COMMAND simreality_world_spatial_tests)
+
+    add_executable(simreality_lane_traffic_tests tests/LaneTrafficTests.cpp)
+    target_link_libraries(simreality_lane_traffic_tests PRIVATE simreality_core)
+    add_test(NAME simreality_lane_traffic_tests COMMAND simreality_lane_traffic_tests)
 endif()
