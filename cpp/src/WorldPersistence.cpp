@@ -761,6 +761,27 @@ void save_traffic_recovery_checkpoint(
         write_u8(output, static_cast<std::uint8_t>(item.resource_kind));
         write_string(output, item.resource_id);
     }
+    write_count(output, checkpoint.pending_proposals.size());
+    for (const auto& proposal : checkpoint.pending_proposals) {
+        write_count(output, proposal.participants.size());
+        for (const auto& participant : proposal.participants) write_string(output, participant);
+        write_string(output, proposal.yielding_entity_id);
+        write_count(output, proposal.blocking_resources.size());
+        for (const auto& resource : proposal.blocking_resources) {
+            write_u8(output, static_cast<std::uint8_t>(resource.kind));
+            write_string(output, resource.resource_id); write_string(output, resource.current_owner_id);
+        }
+        write_count(output, proposal.replacement_lane_requests.size());
+        for (const auto& request : proposal.replacement_lane_requests) {
+            write_string(output, request.lane_id); write_string(output, request.entity_id);
+            write_u32(output, static_cast<std::uint32_t>(request.priority));
+        }
+        write_count(output, proposal.replacement_intersection_requests.size());
+        for (const auto& request : proposal.replacement_intersection_requests) {
+            write_string(output, request.intersection_id); write_string(output, request.movement_id);
+            write_string(output, request.entity_id); write_u32(output, static_cast<std::uint32_t>(request.priority));
+        }
+    }
 }
 
 TrafficRecoveryCheckpoint load_traffic_recovery_checkpoint(std::istream& input) {
@@ -832,6 +853,23 @@ TrafficRecoveryCheckpoint load_traffic_recovery_checkpoint(std::istream& input) 
         item.resource_id=read_string(input);
         result.pending_wait_edges.push_back(std::move(item));
     }
+    for (std::uint32_t i=0,n=read_count(input); i<n; ++i) {
+        DeadlockResolutionProposal proposal;
+        for (std::uint32_t j=0,m=read_count(input); j<m; ++j)
+            proposal.participants.push_back(read_string(input));
+        proposal.yielding_entity_id=read_string(input);
+        for (std::uint32_t j=0,m=read_count(input); j<m; ++j) {
+            const auto kind=read_u8(input);
+            if (kind > static_cast<std::uint8_t>(BlockedResourceKind::Intersection))
+                throw std::runtime_error("invalid proposal resource kind");
+            proposal.blocking_resources.push_back({static_cast<BlockedResourceKind>(kind),read_string(input),read_string(input)});
+        }
+        for (std::uint32_t j=0,m=read_count(input); j<m; ++j)
+            proposal.replacement_lane_requests.push_back({read_string(input),read_string(input),static_cast<std::int32_t>(read_u32(input))});
+        for (std::uint32_t j=0,m=read_count(input); j<m; ++j)
+            proposal.replacement_intersection_requests.push_back({read_string(input),read_string(input),read_string(input),static_cast<std::int32_t>(read_u32(input))});
+        result.pending_proposals.push_back(std::move(proposal));
+    }
 
     LaneTrafficCoordinator lanes(result.lanes.lease_ticks); lanes.restore(result.lanes);
     IntersectionTrafficCoordinator intersections(result.intersections.lease_ticks);
@@ -845,6 +883,27 @@ TrafficRecoveryCheckpoint load_traffic_recovery_checkpoint(std::istream& input) 
         graph.push_back({edge.waiter_id,edge.blocker_id});
     }
     (void)detector.detect(graph);
+    for (const auto& occupancy : result.journey_occupancy) {
+        const auto lane = std::find_if(result.lanes.reservations.begin(), result.lanes.reservations.end(),
+            [&occupancy](const LaneReservation& item) { return item.entity_id == occupancy.entity_id && item.lane_id == occupancy.lane_id; });
+        if (lane == result.lanes.reservations.end()) throw std::runtime_error("journey occupancy has no live lane reservation");
+        if (!occupancy.intersection_id.empty()) {
+            const auto intersection = std::find_if(result.intersections.reservations.begin(), result.intersections.reservations.end(),
+                [&occupancy](const IntersectionReservation& item) { return item.entity_id == occupancy.entity_id
+                    && item.intersection_id == occupancy.intersection_id && item.movement_id == occupancy.movement_id; });
+            if (intersection == result.intersections.reservations.end()) throw std::runtime_error("journey occupancy has no live intersection reservation");
+        }
+    }
+    for (const auto& proposal : result.pending_proposals) {
+        if (proposal.participants.empty() || proposal.yielding_entity_id.empty()
+            || !std::is_sorted(proposal.participants.begin(), proposal.participants.end())
+            || !std::binary_search(proposal.participants.begin(), proposal.participants.end(), proposal.yielding_entity_id))
+            throw std::runtime_error("invalid durable deadlock proposal identity");
+        for (const auto& request : proposal.replacement_lane_requests)
+            if (request.entity_id != proposal.yielding_entity_id || request.lane_id.empty()) throw std::runtime_error("invalid durable replacement lane request");
+        for (const auto& request : proposal.replacement_intersection_requests)
+            if (request.entity_id != proposal.yielding_entity_id || request.intersection_id.empty() || request.movement_id.empty()) throw std::runtime_error("invalid durable replacement intersection request");
+    }
     return result;
 }
 
