@@ -29,6 +29,15 @@ struct LaneReservation {
     std::uint64_t consecutive_wait_ticks{0};
 };
 
+struct LaneTrafficWaitRecord { std::string lane_id{}; std::string entity_id{}; std::uint64_t wait_ticks{0}; };
+struct LaneTrafficSnapshot {
+    std::uint64_t lease_ticks{2U}, current_tick{0U};
+    bool tick_initialized{false};
+    std::map<std::string, std::size_t> capacities{};
+    std::vector<LaneReservation> reservations{};
+    std::vector<LaneTrafficWaitRecord> waiting{};
+};
+
 // Deterministic, tick-driven lane admission control. It models exclusive lane
 // slots, not geometric collision detection; callers retain physical occupancy
 // and must release a reservation when an agent leaves or changes lanes.
@@ -47,6 +56,8 @@ public:
         const std::string& lane_id) const;
     [[nodiscard]] std::size_t available_capacity(const std::string& lane_id) const;
     [[nodiscard]] std::map<std::string, std::size_t> occupancy_snapshot() const;
+    [[nodiscard]] LaneTrafficSnapshot snapshot() const;
+    void restore(const LaneTrafficSnapshot& snapshot);
     [[nodiscard]] std::uint64_t current_tick() const noexcept { return current_tick_; }
 
 private:
