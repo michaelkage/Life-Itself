@@ -27,16 +27,15 @@ int main() {
     assert(lanes.has_reservation("L1", "npc-a"));
     assert(intersections.has_reservation("J1", "M1", "npc-a"));
 
-    // Simulate a host-side clock divergence: lane advancement would be
-    // valid, but the intersection coordinator rejects the repeated tick.
-    intersections.advance_tick(12U);
-    // A failure in either coordinator must roll back both clocks and leases.
+    // An unknown intersection movement fails after lane renewal has run.
+    // The manager must roll back both coordinators, including lane expiry.
+    journey.track({"npc-b", "L1", "missing-junction", "missing-movement"});
     const auto lane_before_failure = lanes.snapshot();
     const auto intersection_before_failure = intersections.snapshot();
     bool renewal_failed = false;
     try {
         (void)journey.advance_and_renew(12U, lanes, intersections);
-    } catch (const std::invalid_argument&) {
+    } catch (const std::out_of_range&) {
         renewal_failed = true;
     }
     assert(renewal_failed);
@@ -46,6 +45,7 @@ int main() {
         == lane_before_failure.reservations.front().expires_at_tick);
     assert(intersections.reservations("J1").front().expires_at_tick
         == intersection_before_failure.reservations.front().expires_at_tick);
+    assert(journey.forget_after_clearance("npc-b"));
 
     assert(journey.forget_after_clearance("npc-a"));
     // Forgetting tracking is deliberately not a release operation.
