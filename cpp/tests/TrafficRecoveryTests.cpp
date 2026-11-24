@@ -27,6 +27,23 @@ int main() {
     assert(lanes.has_reservation("L1", "npc-a"));
     assert(intersections.has_reservation("J1", "M1", "npc-a"));
 
+    // A failure in either coordinator must roll back both clocks and leases.
+    const auto lane_before_failure = lanes.snapshot();
+    const auto intersection_before_failure = intersections.snapshot();
+    bool renewal_failed = false;
+    try {
+        (void)journey.advance_and_renew(12U, lanes, intersections);
+    } catch (const std::invalid_argument&) {
+        renewal_failed = true;
+    }
+    assert(renewal_failed);
+    assert(lanes.current_tick() == lane_before_failure.current_tick);
+    assert(intersections.current_tick() == intersection_before_failure.current_tick);
+    assert(lanes.reservations("L1").front().expires_at_tick
+        == lane_before_failure.reservations.front().expires_at_tick);
+    assert(intersections.reservations("J1").front().expires_at_tick
+        == intersection_before_failure.reservations.front().expires_at_tick);
+
     assert(journey.forget_after_clearance("npc-a"));
     // Forgetting tracking is deliberately not a release operation.
     assert(lanes.has_reservation("L1", "npc-a"));
