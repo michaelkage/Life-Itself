@@ -37,6 +37,15 @@ struct IntersectionReservation {
     std::uint64_t consecutive_wait_ticks{0};
 };
 
+struct IntersectionWaitRecord { std::string intersection_id{}; std::string entity_id{}; std::uint64_t wait_ticks{0}; };
+struct IntersectionTrafficSnapshot {
+    std::uint64_t lease_ticks{2U}, current_tick{0U};
+    bool tick_initialized{false};
+    std::vector<IntersectionMovementDefinition> movements{};
+    std::vector<IntersectionReservation> reservations{};
+    std::vector<IntersectionWaitRecord> waiting{};
+};
+
 // Atomically reserves every authored conflict zone for a movement. Movements
 // with disjoint zones may proceed concurrently; geometry remains host-authored.
 class IntersectionTrafficCoordinator {
@@ -58,6 +67,8 @@ public:
         const std::string& intersection_id, const std::string& movement_id) const;
     [[nodiscard]] std::map<std::pair<std::string, std::string>, std::size_t>
         conflict_pressure_snapshot() const;
+    [[nodiscard]] IntersectionTrafficSnapshot snapshot() const;
+    void restore(const IntersectionTrafficSnapshot& snapshot);
     [[nodiscard]] std::uint64_t current_tick() const noexcept { return current_tick_; }
 
 private:
