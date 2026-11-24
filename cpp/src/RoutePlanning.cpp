@@ -237,6 +237,26 @@ RouteProgressObservation RouteProgressMonitor::observe(
     return {entity_id, tick, progress, state.stalled_ticks, action};
 }
 
+std::vector<RouteProgressCheckpoint> RouteProgressMonitor::snapshot() const {
+    std::vector<RouteProgressCheckpoint> result;
+    result.reserve(progress_.size());
+    for (const auto& [entity_id, state] : progress_)
+        result.push_back({entity_id, state.last_tick, state.last_progress, state.stalled_ticks});
+    return result;
+}
+
+void RouteProgressMonitor::restore(const std::vector<RouteProgressCheckpoint>& value) {
+    std::map<std::string, ProgressState> restored;
+    for (const auto& item : value) {
+        if (item.entity_id.empty() || !std::isfinite(item.last_progress)
+            || !restored.emplace(item.entity_id,
+                ProgressState{item.last_tick, item.last_progress, item.stalled_ticks}).second) {
+            throw std::invalid_argument("invalid or duplicate route progress checkpoint");
+        }
+    }
+    progress_ = std::move(restored);
+}
+
 bool RouteProgressMonitor::forget(const std::string& entity_id) {
     return progress_.erase(entity_id) != 0U;
 }
