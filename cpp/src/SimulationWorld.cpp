@@ -1192,6 +1192,25 @@ std::size_t SimulationWorld::record_witnessed_action(
         memory.action_tag = action_tag;
         memory.description = description;
         witness->memories.push_back(memory);
+        const auto observed_tick = static_cast<std::int64_t>(
+            std::llround(std::max(0.0, runtime_.total_hours()) * 1000.0));
+        const std::string observed_proposition = "action:" + std::to_string(static_cast<unsigned int>(action_tag));
+        const std::string observed_root = "witnessed:" + witness->entity_id + ":"
+            + actor_id + ":" + observed_proposition + ":"
+            + std::to_string(std::llround(runtime_.total_hours() * 1000.0));
+        const std::string observed_claim_id = "observation:" + observed_root + ":"
+            + std::to_string(information_.size());
+        InformationClaim observed_claim;
+        observed_claim.claim_id = observed_claim_id;
+        observed_claim.subject_key = actor_id;
+        observed_claim.proposition_key = observed_proposition;
+        observed_claim.root_evidence_id = observed_root;
+        observed_claim.source_entity_id = witness->entity_id;
+        observed_claim.recipient_entity_id = witness->entity_id;
+        observed_claim.created_tick = observed_tick;
+        observed_claim.confidence = 1.0;
+        observed_claim.kind = InformationKind::Observation;
+        (void)information_.record(observed_claim);
         // A first-hand observation is strong counter-evidence to a different
         // account about the same target and event hour. Preserve both interpretations,
         // but weaken the conflicting hearsay and record that it was challenged.
@@ -1201,8 +1220,23 @@ std::size_t SimulationWorld::record_witnessed_action(
                 || prior.action_tag == action_tag) {
                 continue;
             }
+            const double previous_confidence = prior.confidence;
             prior.confidence = std::clamp(prior.confidence * 0.75, 0.0, 1.0);
             ++prior.contradictions;
+            BeliefRevision revision;
+            revision.target_entity_id = prior.target_entity_id;
+            revision.action_tag = prior.action_tag;
+            revision.event_timestamp_hour = prior.timestamp_hour;
+            revision.previous_confidence = previous_confidence;
+            revision.revised_confidence = prior.confidence;
+            revision.reason = BeliefRevisionReason::Contradiction;
+            revision.source_entity_id = witness->entity_id;
+            revision.recorded_hour = runtime_.total_hours();
+            revision.source_reliability = 1.0;
+            revision.evidence_factor = 1.0;
+            revision.evidence_claim_ids.push_back(observed_claim_id);
+            revision.evidence_root_ids.push_back(observed_root);
+            witness->belief_revision_history.push_back(std::move(revision));
         }
         const auto existing_belief = std::find_if(witness->beliefs.begin(), witness->beliefs.end(),
             [&actor_id, action_tag, this](const NPCBelief& belief) {
@@ -1213,9 +1247,24 @@ std::size_t SimulationWorld::record_witnessed_action(
             witness->beliefs.push_back(NPCBelief{actor_id, action_tag, runtime_.total_hours(),
                 1.0, witness->entity_id, true, 1U, 0U});
         } else {
+            const double previous_confidence = existing_belief->confidence;
             existing_belief->confidence = 1.0;
             existing_belief->directly_observed = true;
             ++existing_belief->corroborations;
+            BeliefRevision revision;
+            revision.target_entity_id = existing_belief->target_entity_id;
+            revision.action_tag = existing_belief->action_tag;
+            revision.event_timestamp_hour = existing_belief->timestamp_hour;
+            revision.previous_confidence = previous_confidence;
+            revision.revised_confidence = 1.0;
+            revision.reason = BeliefRevisionReason::IndependentEvidence;
+            revision.source_entity_id = witness->entity_id;
+            revision.recorded_hour = runtime_.total_hours();
+            revision.source_reliability = 1.0;
+            revision.evidence_factor = 1.0;
+            revision.evidence_claim_ids.push_back(observed_claim_id);
+            revision.evidence_root_ids.push_back(observed_root);
+            witness->belief_revision_history.push_back(std::move(revision));
         }
         (void)absorb(*witness, action_tag, witness->entity_id == victim_id);
     }
