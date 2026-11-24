@@ -187,4 +187,12 @@ std::size_t LaneTrafficCoordinator::available_capacity(const std::string& lane_i
     return capacity->second > occupied ? capacity->second - occupied : 0U;
 }
 
+std::map<std::string, std::size_t> LaneTrafficCoordinator::occupancy_snapshot() const {
+    std::map<std::string, std::size_t> result;
+    for (const auto& [lane_id, entities] : reservations_) {
+        result.emplace(lane_id, entities.size());
+    }
+    return result;
+}
+
 } // namespace simreality
