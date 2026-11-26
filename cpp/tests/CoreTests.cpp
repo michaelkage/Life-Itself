@@ -2232,10 +2232,10 @@ int main() {
     NPCMemory independent_report = original_report;
     independent_report.witness_id = "independent-witness";
     independent_report.root_evidence_id = "incident-1:independent-witness";
-    const CriminalFile independent_root_file = file_from_memories(
+    const CriminalFile independent_roots_corroborated_file = file_from_memories(
         "suspect", {original_report, relayed_report, independent_report});
-    assert(independent_root_file.charges.size() == 1U);
-    assert(independent_root_file.charges.front().evidence == EvidenceKind::Corroborated);
+    assert(independent_roots_corroborated_file.charges.size() == 1U);
+    assert(independent_roots_corroborated_file.charges.front().evidence == EvidenceKind::Corroborated);
     
 return 0;
 }
