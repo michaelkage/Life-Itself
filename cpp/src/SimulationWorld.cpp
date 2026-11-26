@@ -1487,6 +1487,27 @@ Consequence SimulationWorld::resolve_offence(
         district->local_corruption, random_.unit_interval());
 }
 
+Consequence SimulationWorld::resolve_criminal_incident(
+    const std::string& incident_id, const EntityId& officer_id) {
+    const auto incident = std::find_if(state_.ongoing_events.begin(), state_.ongoing_events.end(),
+        [&incident_id](const OngoingEvent& event) { return event.event_id == incident_id; });
+    if (incident == state_.ongoing_events.end()) {
+        throw std::out_of_range("incident id not found: " + incident_id);
+    }
+    switch (incident->action_tag) {
+        case ActionTag::CrimeTheft:
+        case ActionTag::CrimeAssault:
+        case ActionTag::CrimeArmedAssault:
+        case ActionTag::CrimeVandalism:
+            break;
+        default:
+            throw std::invalid_argument("incident is not a criminal offence: " + incident_id);
+    }
+    CriminalFile incident_file = build_criminal_file(incident->actor_id, incident_id);
+    return resolve_offence(incident->district_id, incident->actor_id,
+        incident->action_tag, officer_id, incident_file);
+}
+
 Negotiation SimulationWorld::approach_fixer(
     const DistrictId& district_id, const EntityId& player_id,
     const EntityId& fixer_id, double bribe, const CriminalFile* criminal_file) {
