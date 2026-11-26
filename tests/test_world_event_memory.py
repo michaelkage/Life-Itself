@@ -33,6 +33,7 @@ class WorldEventMemoryAdapterTests(unittest.TestCase):
         memory = self.adapter.materialize("theft-1", "guard", self.npcs)
         self.assertEqual(memory.action_tag, ActionTag.CRIME_THEFT)
         self.assertEqual(memory.target_entity_id, "suspect")
+        self.assertEqual(memory.root_evidence_id, "theft-1:guard")
         self.assertAlmostEqual(memory.timestamp_hour, 4.0)
         self.assertAlmostEqual(memory.retention, 0.8)
         self.assertTrue(memory.description.masked)
