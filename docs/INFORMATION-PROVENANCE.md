@@ -42,6 +42,7 @@ The proposition key is a stable domain key, not free-form dialogue. Generated di
 9. Corrections are new claims. They do not erase or rewrite the claim being corrected.
 10. Independent evidence is counted by distinct root evidence IDs, not by the number of retellings.
 11. The evidence-strength query combines distinct roots with a bounded noisy-OR estimate; each root contributes only its strongest recorded confidence, so retelling cannot amplify it.
+12. Criminal-file corroboration follows the same root-evidence rule: multiple recipient memories carrying one root remain one witness account. Legacy memories without root IDs fall back to distinct witness IDs; anonymous legacy memories cannot corroborate.
 
 `InformationLedger::lineage_for_claim(claim_id)` returns a copied, source-to-recipient chain in oldest-first order; an unknown claim or incomplete chain returns an empty result. This is for investigation and explanation: it exposes how a claim travelled, but does not declare the claim true or make repeated relays independent evidence.
 
