@@ -865,6 +865,7 @@ void save_traffic_recovery_checkpoint(
     TrafficDeadlockDetector detector;
     std::vector<WaitForEdge> graph;
     std::set<std::tuple<std::string, std::string, BlockedResourceKind, std::string>> unique_wait_edges;
+    std::set<std::pair<std::string, std::string>> unique_graph_edges;
     for (const auto& edge : checkpoint.pending_wait_edges) {
         if (edge.waiter_id.empty() || edge.blocker_id.empty() || edge.waiter_id == edge.blocker_id
             || edge.resource_id.empty()
@@ -873,7 +874,9 @@ void save_traffic_recovery_checkpoint(
             || !unique_wait_edges.emplace(edge.waiter_id, edge.blocker_id,
                 edge.resource_kind, edge.resource_id).second)
             throw std::invalid_argument("invalid or duplicate pending resource wait edge");
-        graph.push_back({edge.waiter_id, edge.blocker_id});
+        if (unique_graph_edges.emplace(edge.waiter_id, edge.blocker_id).second)
+            if (unique_graph_edges.emplace(edge.waiter_id, edge.blocker_id).second)
+            graph.push_back({edge.waiter_id, edge.blocker_id});
     }
     (void)detector.detect(graph);
     for (const auto& proposal : checkpoint.pending_proposals) {
@@ -1092,6 +1095,7 @@ TrafficRecoveryCheckpoint load_traffic_recovery_checkpoint(std::istream& input) 
     TrafficDeadlockDetector detector;
     std::vector<WaitForEdge> graph;
     std::set<std::tuple<std::string, std::string, BlockedResourceKind, std::string>> unique_wait_edges;
+    std::set<std::pair<std::string, std::string>> unique_graph_edges;
     for (const auto& edge : result.pending_wait_edges) {
         if (edge.waiter_id.empty() || edge.blocker_id.empty()
             || edge.waiter_id == edge.blocker_id || edge.resource_id.empty()
