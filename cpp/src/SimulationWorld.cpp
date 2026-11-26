@@ -535,6 +535,7 @@ WorldAdvanceReport SimulationWorld::advance_ticks(
                         [&event](const NPCMemory& memory) {
                             return memory.target_entity_id == event.actor_id
                                 && memory.action_tag == event.action_tag
+                                && memory.timestamp_hour == event.created_hour
                                 && memory.is_actionable();
                         });
                     if (has_actionable_memory) ++actionable_witnesses;
@@ -1405,6 +1406,55 @@ CriminalFile SimulationWorld::build_criminal_file(const EntityId& player_id) con
         memories.insert(memories.end(), npc.memories.begin(), npc.memories.end());
     }
     return file_from_memories(player_id, memories);
+}
+
+CriminalFile SimulationWorld::build_criminal_file(
+    const EntityId& player_id, const std::string& incident_id) const {
+    const auto incident = std::find_if(state_.ongoing_events.begin(), state_.ongoing_events.end(),
+        [&incident_id](const OngoingEvent& event) { return event.event_id == incident_id; });
+    if (incident == state_.ongoing_events.end()) {
+        throw std::out_of_range("incident id not found: " + incident_id);
+    }
+    if (incident->actor_id != player_id) {
+        throw std::invalid_argument("incident belongs to a different actor");
+    }
+
+    // Establish the incident's independent evidence roots from its original
+    // witnesses, then include every relay carrying one of those roots. Matching
+    // only by action tag would combine separate offences committed at different
+    // times and create a legally misleading file.
+    std::set<std::string> incident_roots;
+    for (const EntityId& witness_id : incident->witness_ids) {
+        const auto witness = std::find_if(state_.npcs.begin(), state_.npcs.end(),
+            [&witness_id](const NPC& npc) { return npc.entity_id == witness_id; });
+        if (witness == state_.npcs.end()) continue;
+        for (const NPCMemory& memory : witness->memories) {
+            if (memory.target_entity_id == incident->actor_id
+                && memory.action_tag == incident->action_tag
+                && memory.timestamp_hour == incident->created_hour
+                && !memory.root_evidence_id.empty()) {
+                incident_roots.insert(memory.root_evidence_id);
+            }
+        }
+    }
+
+    std::vector<NPCMemory> incident_memories;
+    for (const NPC& npc : state_.npcs) {
+        for (const NPCMemory& memory : npc.memories) {
+            if (memory.target_entity_id != incident->actor_id
+                || memory.action_tag != incident->action_tag
+                || memory.timestamp_hour != incident->created_hour) {
+                continue;
+            }
+            const bool original_legacy_witness = memory.root_evidence_id.empty()
+                && std::find(incident->witness_ids.begin(), incident->witness_ids.end(),
+                    memory.witness_id) != incident->witness_ids.end();
+            if (original_legacy_witness || incident_roots.contains(memory.root_evidence_id)) {
+                incident_memories.push_back(memory);
+            }
+        }
+    }
+    return file_from_memories(player_id, incident_memories);
 }
 
 ReputationProfile SimulationWorld::reputation_in_district(
