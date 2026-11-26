@@ -110,6 +110,20 @@ int main() {
     assert(inconsistent_rejected);
     assert(rejected_checkpoint.str().empty());
 
+    // Encoding limits are also checked before the caller's stream is touched.
+    auto oversized_checkpoint = checkpoint;
+    oversized_checkpoint.lanes.capacities.emplace(
+        std::string(16U * 1024U * 1024U + 1U, 'x'), 1U);
+    std::stringstream oversized_bytes(std::ios::in | std::ios::out | std::ios::binary);
+    bool oversized_rejected = false;
+    try {
+        save_traffic_recovery_checkpoint(oversized_checkpoint, oversized_bytes);
+    } catch (const std::length_error&) {
+        oversized_rejected = true;
+    }
+    assert(oversized_rejected);
+    assert(oversized_bytes.str().empty());
+
     auto malformed_proposal_checkpoint = checkpoint;
     malformed_proposal_checkpoint.pending_proposals.front().participants = {"", "b", "c"};
     std::stringstream malformed_proposal_bytes(std::ios::in | std::ios::out | std::ios::binary);
