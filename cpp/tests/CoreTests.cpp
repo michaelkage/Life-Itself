@@ -2214,5 +2214,28 @@ int main() {
     assert(relay_resumed.information_ledger().lineage_for_claim(
         received_claims.front().claim_id).size() == 3U);
 
+    // Retelling one witness account into several NPC memories must not turn
+    // one observation into corroborated legal evidence.
+    NPCMemory original_report;
+    original_report.witness_id = "root-witness";
+    original_report.target_entity_id = "suspect";
+    original_report.retention = 0.95;
+    original_report.action_tag = ActionTag::CrimeTheft;
+    original_report.root_evidence_id = "incident-1:root-witness";
+    NPCMemory relayed_report = original_report;
+    relayed_report.witness_id = "relay-recipient";
+    const CriminalFile relayed_only_file = file_from_memories(
+        "suspect", {original_report, relayed_report});
+    assert(relayed_only_file.charges.size() == 1U);
+    assert(relayed_only_file.charges.front().evidence == EvidenceKind::SingleWitness);
+
+    NPCMemory independent_report = original_report;
+    independent_report.witness_id = "independent-witness";
+    independent_report.root_evidence_id = "incident-1:independent-witness";
+    const CriminalFile corroborated_file = file_from_memories(
+        "suspect", {original_report, relayed_report, independent_report});
+    assert(corroborated_file.charges.size() == 1U);
+    assert(corroborated_file.charges.front().evidence == EvidenceKind::Corroborated);
+    
 return 0;
 }
