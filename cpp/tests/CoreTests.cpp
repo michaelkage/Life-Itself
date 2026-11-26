@@ -793,6 +793,13 @@ int main() {
         missing_incident_rejected = true;
     }
     assert(missing_incident_rejected);
+    bool wrong_incident_actor_rejected = false;
+    try {
+        (void)world.build_criminal_file("another-actor", "event-1");
+    } catch (const std::invalid_argument&) {
+        wrong_incident_actor_rejected = true;
+    }
+    assert(wrong_incident_actor_rejected);
 
     // A witness to an earlier theft cannot advance an unrelated later
     // investigation merely because the actor and action tag happen to match.
