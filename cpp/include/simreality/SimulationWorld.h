@@ -177,6 +177,8 @@ public:
     [[nodiscard]] Consequence resolve_offence(
         const DistrictId& district_id, const EntityId& player_id,
         ActionTag action_tag, const EntityId& officer_id, CriminalFile& criminal_file);
+    [[nodiscard]] Consequence resolve_criminal_incident(
+        const std::string& incident_id, const EntityId& officer_id);
     [[nodiscard]] Negotiation approach_fixer(
         const DistrictId& district_id, const EntityId& player_id,
         const EntityId& fixer_id, double bribe, const CriminalFile* criminal_file = nullptr);
