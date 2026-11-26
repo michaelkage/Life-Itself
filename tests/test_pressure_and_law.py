@@ -245,8 +245,8 @@ class TestCityScars(unittest.TestCase):
 # ==========================================================================
 
 
-def witness_memory(target="player", retention=0.9, tag=ActionTag.CRIME_THEFT):
-    return NPCMemory("w", target, 1.0, retention, 12.0, tag,
+def witness_memory(target="player", retention=0.9, tag=ActionTag.CRIME_THEFT, witness_id="w"):
+    return NPCMemory(witness_id, target, 1.0, retention, 12.0, tag,
                      Description(1.8, 0.2, {"black": 0.8}, False, 0.9))
 
 
@@ -274,7 +274,10 @@ class TestEvidence(unittest.TestCase):
     def test_corroboration_strengthens_rather_than_stacks(self):
         """Two witnesses to one act must not become two charges."""
         single = ju.file_from_memories("player", [witness_memory()])
-        pair = ju.file_from_memories("player", [witness_memory(), witness_memory()])
+        pair = ju.file_from_memories("player", [
+            witness_memory(witness_id="witness-1"),
+            witness_memory(witness_id="witness-2"),
+        ])
         self.assertEqual(len(pair.charges), 1)
         self.assertEqual(pair.charges[0].evidence, "corroborated")
         self.assertGreater(pair.charges[0].strength, single.charges[0].strength)
