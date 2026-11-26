@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <cmath>
 #include <stdexcept>
+#include <set>
 #include <utility>
 
 namespace simreality {
