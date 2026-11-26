@@ -991,11 +991,11 @@ void save_traffic_recovery_checkpoint(
             write_string(staged_output, request.entity_id); write_u32(staged_output, static_cast<std::uint32_t>(request.priority));
         }
     }
-}
 
     const std::string encoded = staged_output.str();
     output.write(encoded.data(), static_cast<std::streamsize>(encoded.size()));
     if (!output) throw std::runtime_error("failed writing traffic recovery checkpoint");
+}
 
 TrafficRecoveryCheckpoint load_traffic_recovery_checkpoint(std::istream& input) {
     constexpr std::array<char, 8> expected{{'S','R','E','T','R','A','F','1'}};
