@@ -76,3 +76,8 @@ Loading also rejects malformed or duplicate resource wait edges and any trailing
 bytes after the versioned checkpoint record. A valid checkpoint is therefore one
 unambiguous framed record rather than an accepted prefix of a larger or corrupted
 stream.
+
+Checkpoint encoding is staged in memory after structural validation and before
+writing to the destination stream. This ensures encoding-limit failures (such as
+an oversized identifier) leave the destination untouched; only the final stream
+write can fail after output begins.
