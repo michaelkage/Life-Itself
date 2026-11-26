@@ -794,6 +794,39 @@ int main() {
     }
     assert(missing_incident_rejected);
 
+    // A witness to an earlier theft cannot advance an unrelated later
+    // investigation merely because the actor and action tag happen to match.
+    WorldState stale_evidence_state;
+    District stale_evidence_district;
+    stale_evidence_district.district_id = "stale-district";
+    stale_evidence_district.security_presence = 1.0;
+    stale_evidence_state.districts.push_back(stale_evidence_district);
+    NPC stale_actor;
+    stale_actor.entity_id = "stale-actor";
+    stale_actor.district_id = "stale-district";
+    NPC stale_witness;
+    stale_witness.entity_id = "stale-witness";
+    stale_witness.district_id = "stale-district";
+    NPCMemory prior_theft;
+    prior_theft.witness_id = "stale-witness";
+    prior_theft.target_entity_id = "stale-actor";
+    prior_theft.action_tag = ActionTag::CrimeTheft;
+    prior_theft.timestamp_hour = 0.0;
+    prior_theft.retention = 1.0;
+    stale_witness.memories.push_back(prior_theft);
+    stale_evidence_state.npcs = {stale_actor, stale_witness};
+    OngoingEvent later_theft;
+    later_theft.event_id = "later-theft";
+    later_theft.district_id = "stale-district";
+    later_theft.actor_id = "stale-actor";
+    later_theft.action_tag = ActionTag::CrimeTheft;
+    later_theft.created_hour = 24.0;
+    later_theft.witness_ids = {"stale-witness"};
+    stale_evidence_state.ongoing_events.push_back(later_theft);
+    SimulationWorld stale_evidence_world(std::move(stale_evidence_state), 24.0, 7U);
+    (void)stale_evidence_world.advance(24.0);
+    assert(stale_evidence_world.state().ongoing_events.front().investigation_progress == 0.0);
+
     FixerNetwork world_network;
     world_network.district_id = "D1";
     world_network.members.push_back(FixerProfile{"world-fixer", "D1", 0.5, 0.1});
