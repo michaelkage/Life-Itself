@@ -279,6 +279,29 @@ class TestEvidence(unittest.TestCase):
         self.assertEqual(pair.charges[0].evidence, "corroborated")
         self.assertGreater(pair.charges[0].strength, single.charges[0].strength)
 
+    def test_relayed_copies_of_one_root_do_not_corroborate(self):
+        first = witness_memory()
+        first.witness_id = "first-witness"
+        first.root_evidence_id = "event-17:witness:first"
+        relay_copy = witness_memory()
+        relay_copy.witness_id = "second-recipient"
+        relay_copy.root_evidence_id = first.root_evidence_id
+
+        criminal_file = ju.file_from_memories("player", [first, relay_copy])
+        self.assertEqual(len(criminal_file.charges), 1)
+        self.assertEqual(criminal_file.charges[0].evidence, "single_witness")
+
+    def test_distinct_root_evidence_corroborates_even_after_relay(self):
+        first = witness_memory()
+        first.witness_id = "first-witness"
+        first.root_evidence_id = "event-17:witness:first"
+        second = witness_memory()
+        second.witness_id = "second-witness"
+        second.root_evidence_id = "event-17:witness:second"
+
+        criminal_file = ju.file_from_memories("player", [first, second])
+        self.assertEqual(criminal_file.charges[0].evidence, "corroborated")
+
     def test_memories_about_other_people_are_ignored(self):
         criminal_file = ju.file_from_memories("player", [witness_memory(target="someone-else")])
         self.assertFalse(criminal_file.is_prosecutable())
