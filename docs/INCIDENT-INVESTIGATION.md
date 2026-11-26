@@ -8,7 +8,7 @@ An offence is an event, not an action category. Two thefts committed by the same
 
 The event's creation hour, actor, and action tag are checked alongside root identity. This prevents memories from a different event with the same action tag from entering the file. Legacy memories without root IDs are accepted only from the event's recorded original witnesses.
 
-The existing `build_criminal_file(player_id)` aggregate API remains available for reputation and broad character-history queries. Legal decisions that concern one incident should use the incident-scoped overload.
+The existing `build_criminal_file(player_id)` aggregate API remains available for reputation and broad character-history queries. Legal decisions that concern one incident should use the incident-scoped overload. The `resolve_criminal_incident(incident_id, officer_id)` entry point validates that the event is a criminal offence, builds its incident-scoped file, and passes that file through the existing district enforcement rules. This removes the need for a caller to accidentally supply an aggregate file from unrelated events.
 
 ## Investigation advancement
 
