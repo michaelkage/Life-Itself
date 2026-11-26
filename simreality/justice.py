@@ -218,7 +218,23 @@ def file_from_memories(
     for action, witnesses in by_action.items():
         best = max(witnesses, key=lambda m: m.retention)
         charge = charge_from_memory(best)
-        if len(witnesses) >= 2 and charge.provable:
+
+        # A rumour relay can create several recipient memories without creating
+        # several independent observations. Preserve corroboration by root
+        # evidence identity; use witness identity only for legacy memories that
+        # predate root IDs. A memory with neither identity cannot corroborate.
+        independent_evidence: set[str] = set()
+        for memory in witnesses:
+            root_id = getattr(memory, "root_evidence_id", "")
+            if isinstance(root_id, str) and root_id:
+                independent_evidence.add(
+                    root_id if root_id.startswith("legacy-witness:")
+                    else f"root:{root_id}"
+                )
+            elif memory.witness_id:
+                independent_evidence.add(f"legacy-witness:{memory.witness_id}")
+
+        if len(independent_evidence) >= 2 and charge.provable:
             charge = Charge(action, "corroborated", CHARGE_STACKING["corroborated"])
         criminal_file.charges.append(charge)
     return criminal_file

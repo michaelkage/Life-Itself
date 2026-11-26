@@ -42,6 +42,7 @@ The proposition key is a stable domain key, not free-form dialogue. Generated di
 9. Corrections are new claims. They do not erase or rewrite the claim being corrected.
 10. Independent evidence is counted by distinct root evidence IDs, not by the number of retellings.
 11. The evidence-strength query combines distinct roots with a bounded noisy-OR estimate; each root contributes only its strongest recorded confidence, so retelling cannot amplify it.
+12. Criminal-file corroboration follows the same root-evidence rule: multiple recipient memories carrying one root remain one witness account. Legacy memories without root IDs fall back to distinct witness IDs; anonymous legacy memories cannot corroborate.
 
 `InformationLedger::lineage_for_claim(claim_id)` returns a copied, source-to-recipient chain in oldest-first order; an unknown claim or incomplete chain returns an empty result. This is for investigation and explanation: it exposes how a claim travelled, but does not declare the claim true or make repeated relays independent evidence.
 
@@ -89,7 +90,7 @@ ctest --test-dir build --output-on-failure
 
 ## World integration and replay
 
-The world owns the append-only ledger. Directly witnessed actions create recipient-local observation claims. NPC conversations relay claims while preserving the original `root_evidence_id`; a retelling therefore adds lineage but never creates independent corroboration. NPC memories persist that root ID so a chain survives subsequent conversations and save/load.
+The world owns the append-only ledger. Directly witnessed actions create recipient-local observation claims. NPC conversations relay claims while preserving the original `root_evidence_id`; a retelling therefore adds lineage but never creates independent corroboration. NPC memories persist that root ID so a chain survives subsequent conversations and save/load. The Python `WorldEventMemoryAdapter` assigns a deterministic `<event_id>:<witness_id>` root to each direct observation; gossip copies that root unchanged into recipient memories, and the NPC JSON codec reads older snapshots without a root as the empty legacy value. Legal-file corroboration uses the same identity in both language implementations, so recipient count and relay depth cannot manufacture a second witness.
 
 Belief confidence changes caused by contradiction or distinct-source corroboration append `BeliefRevision` records with the previous/new confidence, interpretation factors, and the exact claim/root IDs available at the time. `investigation_view_for` joins only claims delivered to the selected NPC with current beliefs and revision histories. `record_moral_choice` captures the selected and competing scores, relationship/value snapshots, and delivered evidence IDs before/while applying authored consequences.
 

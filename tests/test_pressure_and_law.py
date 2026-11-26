@@ -245,8 +245,8 @@ class TestCityScars(unittest.TestCase):
 # ==========================================================================
 
 
-def witness_memory(target="player", retention=0.9, tag=ActionTag.CRIME_THEFT):
-    return NPCMemory("w", target, 1.0, retention, 12.0, tag,
+def witness_memory(target="player", retention=0.9, tag=ActionTag.CRIME_THEFT, witness_id="w"):
+    return NPCMemory(witness_id, target, 1.0, retention, 12.0, tag,
                      Description(1.8, 0.2, {"black": 0.8}, False, 0.9))
 
 
@@ -274,10 +274,36 @@ class TestEvidence(unittest.TestCase):
     def test_corroboration_strengthens_rather_than_stacks(self):
         """Two witnesses to one act must not become two charges."""
         single = ju.file_from_memories("player", [witness_memory()])
-        pair = ju.file_from_memories("player", [witness_memory(), witness_memory()])
+        pair = ju.file_from_memories("player", [
+            witness_memory(witness_id="witness-1"),
+            witness_memory(witness_id="witness-2"),
+        ])
         self.assertEqual(len(pair.charges), 1)
         self.assertEqual(pair.charges[0].evidence, "corroborated")
         self.assertGreater(pair.charges[0].strength, single.charges[0].strength)
+
+    def test_relayed_copies_of_one_root_do_not_corroborate(self):
+        first = witness_memory()
+        first.witness_id = "first-witness"
+        first.root_evidence_id = "event-17:witness:first"
+        relay_copy = witness_memory()
+        relay_copy.witness_id = "second-recipient"
+        relay_copy.root_evidence_id = first.root_evidence_id
+
+        criminal_file = ju.file_from_memories("player", [first, relay_copy])
+        self.assertEqual(len(criminal_file.charges), 1)
+        self.assertEqual(criminal_file.charges[0].evidence, "single_witness")
+
+    def test_distinct_root_evidence_corroborates_even_after_relay(self):
+        first = witness_memory()
+        first.witness_id = "first-witness"
+        first.root_evidence_id = "event-17:witness:first"
+        second = witness_memory()
+        second.witness_id = "second-witness"
+        second.root_evidence_id = "event-17:witness:second"
+
+        criminal_file = ju.file_from_memories("player", [first, second])
+        self.assertEqual(criminal_file.charges[0].evidence, "corroborated")
 
     def test_memories_about_other_people_are_ignored(self):
         criminal_file = ju.file_from_memories("player", [witness_memory(target="someone-else")])

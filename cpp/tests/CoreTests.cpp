@@ -423,24 +423,24 @@ int main() {
     witness_one.retention = 0.9;
     NPCMemory witness_two = witness_one;
     witness_two.witness_id = "witness-2";
-    const CriminalFile corroborated_file =
+    const CriminalFile independent_root_file =
         file_from_memories("player", {witness_one, witness_two});
-    assert(corroborated_file.charges.size() == 1);
-    assert(corroborated_file.charges[0].evidence == EvidenceKind::Corroborated);
-    assert(corroborated_file.charges[0].provable());
-    assert(corroborated_file.charges[0].sentence() == 10.0); // Python round(10.5) == 10.
+    assert(independent_root_file.charges.size() == 1);
+    assert(independent_root_file.charges[0].evidence == EvidenceKind::Corroborated);
+    assert(independent_root_file.charges[0].provable());
+    assert(independent_root_file.charges[0].sentence() == 10.0); // Python round(10.5) == 10.
     const Consequence arrest_result = consequence_for(
-        ActionTag::CrimeTheft, corroborated_file, pressured, "officer", 0.0, 0.0);
+        ActionTag::CrimeTheft, independent_root_file, pressured, "officer", 0.0, 0.0);
     assert(std::holds_alternative<Arrest>(arrest_result));
     const CriminalFile empty_file{"player"};
     const Consequence stop_result = consequence_for(
         ActionTag::CrimeTheft, empty_file, pressured, "officer", 0.0, 0.0);
     assert(std::holds_alternative<Stop>(stop_result));
     const Consequence ignored_result = consequence_for(
-        ActionTag::CrimeTheft, corroborated_file, pressured, "officer", 1.0, 0.5);
+        ActionTag::CrimeTheft, independent_root_file, pressured, "officer", 1.0, 0.5);
     assert(std::holds_alternative<std::monostate>(ignored_result));
 
-    CriminalFile plea_file = corroborated_file;
+    CriminalFile plea_file = independent_root_file;
     plea_file.charges.push_back(
         {ActionTag::CrimeAssault, EvidenceKind::SingleWitness, 0.7});
     const auto offer = plea_offer(plea_file);
@@ -552,9 +552,13 @@ int main() {
     assert(world.state().ongoing_events[0].severity == 0.4);
     assert(world.state().npcs[0].personal_stress > 0.0);
     assert(world.state().npcs[1].personal_stress > world.state().npcs[0].personal_stress);
+    assert(world.state().npcs[0].memories.front().root_evidence_id
+        != world.state().npcs[1].memories.front().root_evidence_id);
     const Conversation world_conversation = world.talk("listener", "speaker");
     assert(world_conversation.transferred.size() == 1);
-    assert(world.state().npcs[1].memories.size() == 1);
+    assert(world.state().npcs[1].memories.size() == 2);
+    assert(world.state().npcs[1].memories[0].root_evidence_id
+        != world.state().npcs[1].memories[1].root_evidence_id);
     assert(world.state().npcs[0].beliefs.size() == 1);
     assert(world.state().npcs[0].beliefs[0].directly_observed);
     // The listener was also present at the event, so their belief is first-hand.
@@ -2214,5 +2218,28 @@ int main() {
     assert(relay_resumed.information_ledger().lineage_for_claim(
         received_claims.front().claim_id).size() == 3U);
 
+    // Retelling one witness account into several NPC memories must not turn
+    // one observation into corroborated legal evidence.
+    NPCMemory original_report;
+    original_report.witness_id = "root-witness";
+    original_report.target_entity_id = "suspect";
+    original_report.retention = 0.95;
+    original_report.action_tag = ActionTag::CrimeTheft;
+    original_report.root_evidence_id = "incident-1:root-witness";
+    NPCMemory relayed_report = original_report;
+    relayed_report.witness_id = "relay-recipient";
+    const CriminalFile root_relay_only_file = file_from_memories(
+        "suspect", {original_report, relayed_report});
+    assert(root_relay_only_file.charges.size() == 1U);
+    assert(root_relay_only_file.charges.front().evidence == EvidenceKind::SingleWitness);
+
+    NPCMemory independent_report = original_report;
+    independent_report.witness_id = "independent-witness";
+    independent_report.root_evidence_id = "incident-1:independent-witness";
+    const CriminalFile independent_roots_corroborated_file = file_from_memories(
+        "suspect", {original_report, relayed_report, independent_report});
+    assert(independent_roots_corroborated_file.charges.size() == 1U);
+    assert(independent_roots_corroborated_file.charges.front().evidence == EvidenceKind::Corroborated);
+    
 return 0;
 }

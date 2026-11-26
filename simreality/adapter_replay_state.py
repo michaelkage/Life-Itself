@@ -36,6 +36,7 @@ def _memory_dict(memory: NPCMemory) -> dict[str, Any]:
         "retention": memory.retention,
         "timestamp_hour": memory.timestamp_hour,
         "action_tag": memory.action_tag.value,
+        "root_evidence_id": memory.root_evidence_id,
         "description": {
             "height_m": memory.description.height_m,
             "height_uncertainty_m": memory.description.height_uncertainty_m,
@@ -68,6 +69,7 @@ def _memory_from(raw: dict[str, Any]) -> NPCMemory:
             retention=_unit("retention", raw["retention"]),
             timestamp_hour=_number("timestamp_hour", raw["timestamp_hour"]),
             action_tag=ActionTag(raw["action_tag"]),
+            root_evidence_id=raw.get("root_evidence_id", ""),
             description=Description(
                 height_m=_number("height_m", desc["height_m"]),
                 height_uncertainty_m=_number("height_uncertainty_m", desc["height_uncertainty_m"]),
@@ -145,6 +147,7 @@ class WorldEventMemoryReplaySnapshot:
                 if (item.witness_id == memory.witness_id
                     and item.target_entity_id == memory.target_entity_id
                     and item.action_tag == memory.action_tag
+                    and item.root_evidence_id == memory.root_evidence_id
                     and math.isclose(item.timestamp_hour, memory.timestamp_hour,
                                      rel_tol=0.0, abs_tol=1e-9))
             ]

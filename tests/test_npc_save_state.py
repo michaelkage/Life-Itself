@@ -23,6 +23,7 @@ class NPCStateSnapshotTests(unittest.TestCase):
             retention=0.61,
             timestamp_hour=17.5,
             action_tag=ActionTag.CRIME_THEFT,
+            root_evidence_id="incident-9:witness-1",
             description=Description(
                 height_m=1.81,
                 height_uncertainty_m=0.2,
@@ -40,6 +41,7 @@ class NPCStateSnapshotTests(unittest.TestCase):
         payload = snapshot.to_json()
         restored = NPCStateSnapshot.from_json(payload).restore()
         self.assertEqual(restored, npc)
+        self.assertEqual(restored.memories[0].root_evidence_id, "incident-9:witness-1")
         self.assertEqual(NPCStateSnapshot.capture(restored).to_json(), payload)
 
     def test_collection_is_canonical_and_restores_by_id(self):
