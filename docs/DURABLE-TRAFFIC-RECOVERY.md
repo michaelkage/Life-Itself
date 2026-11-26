@@ -86,3 +86,9 @@ Multiple resource waits between the same pair of entities are retained as
 separate resource edges while the deadlock graph collapses them to one directed
 entity-to-entity edge. This preserves resource-level recovery evidence without
 feeding duplicate graph edges into strongly connected component detection.
+
+A reservation denial is treated as a failed renewal, not a partial success. If
+any tracked journey cannot renew its lane token or required intersection token,
+both coordinators are restored and the denial is propagated to the caller. This
+prevents a lane grant from committing without its intersection admission, or
+vice versa.
