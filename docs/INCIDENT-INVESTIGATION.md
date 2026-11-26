@@ -16,7 +16,7 @@ Daily investigation progress is based only on actionable memories whose target, 
 
 ## Determinism and persistence
 
-Incident identity is the durable `OngoingEvent.event_id`. Evidence identity remains the root ID already persisted on NPC memories. No new random draws or time-dependent ordering are introduced. Existing world snapshots retain their current schema because this change adds no persisted fields.
+Incident identity is the durable `OngoingEvent.event_id`. Evidence identity remains the root ID already persisted on NPC memories. No new random draws or time-dependent ordering are introduced. Existing world snapshots retain their current schema because this change adds no persisted fields. Event and memory timestamps are compared using the same authoritative simulation-hour value captured by `record_witnessed_action`; wall-clock time is not consulted.
 
 ## Caller contract
 
