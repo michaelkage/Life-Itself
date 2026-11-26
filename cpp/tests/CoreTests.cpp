@@ -785,6 +785,10 @@ int main() {
     const CriminalFile second_incident_file = world.build_criminal_file("player", "event-2");
     assert(second_incident_file.charges.size() == 1U);
     assert(second_incident_file.charges.front().evidence == EvidenceKind::SingleWitness);
+    const Consequence incident_police_response =
+        world.resolve_criminal_incident("event-2", "incident-officer");
+    assert(std::holds_alternative<Arrest>(incident_police_response));
+    assert(std::get<Arrest>(incident_police_response).charge.action_tag == ActionTag::CrimeTheft);
 
     bool missing_incident_rejected = false;
     try {
