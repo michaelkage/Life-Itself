@@ -552,6 +552,8 @@ int main() {
     assert(world.state().ongoing_events[0].severity == 0.4);
     assert(world.state().npcs[0].personal_stress > 0.0);
     assert(world.state().npcs[1].personal_stress > world.state().npcs[0].personal_stress);
+    assert(world.state().npcs[0].memories.front().root_evidence_id
+        != world.state().npcs[1].memories.front().root_evidence_id);
     const Conversation world_conversation = world.talk("listener", "speaker");
     assert(world_conversation.transferred.size() == 1);
     assert(world.state().npcs[1].memories.size() == 1);
