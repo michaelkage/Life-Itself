@@ -4,6 +4,7 @@
 #include <cmath>
 #include <map>
 #include <sstream>
+#include <set>
 #include <utility>
 
 namespace simreality {
@@ -133,7 +134,19 @@ CriminalFile file_from_memories(
         const auto best = std::max_element(witnesses.begin(), witnesses.end(),
             [](const NPCMemory& a, const NPCMemory& b) { return a.retention < b.retention; });
         Charge charge = charge_from_memory(*best);
-        if (witnesses.size() >= 2 && charge.provable()) {
+
+        // A relayed memory is not a second observation. Count distinct root
+        // evidence IDs, falling back to witness identity only for legacy saves
+        // that predate root IDs. Anonymous legacy memories cannot corroborate.
+        std::set<std::string> independent_evidence;
+        for (const NPCMemory& memory : witnesses) {
+            if (!memory.root_evidence_id.empty()) {
+                independent_evidence.insert("root:" + memory.root_evidence_id);
+            } else if (!memory.witness_id.empty()) {
+                independent_evidence.insert("legacy-witness:" + memory.witness_id);
+            }
+        }
+        if (independent_evidence.size() >= 2U && charge.provable()) {
             charge = {action, EvidenceKind::Corroborated,
                 stacking_strength(EvidenceKind::Corroborated)};
         }

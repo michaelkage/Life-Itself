@@ -169,12 +169,16 @@ public:
         const EntityId& actor_id, ActionTag action_tag, Description description,
         const std::vector<EntityId>& witness_ids, const EntityId& victim_id = {});
     [[nodiscard]] CriminalFile build_criminal_file(const EntityId& player_id) const;
+    [[nodiscard]] CriminalFile build_criminal_file(
+        const EntityId& player_id, const std::string& incident_id) const;
     [[nodiscard]] ReputationProfile reputation_in_district(
         const DistrictId& district_id, const EntityId& player_id,
         const CriminalFile* criminal_file = nullptr) const;
     [[nodiscard]] Consequence resolve_offence(
         const DistrictId& district_id, const EntityId& player_id,
         ActionTag action_tag, const EntityId& officer_id, CriminalFile& criminal_file);
+    [[nodiscard]] Consequence resolve_criminal_incident(
+        const std::string& incident_id, const EntityId& officer_id);
     [[nodiscard]] Negotiation approach_fixer(
         const DistrictId& district_id, const EntityId& player_id,
         const EntityId& fixer_id, double bribe, const CriminalFile* criminal_file = nullptr);

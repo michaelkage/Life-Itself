@@ -423,24 +423,24 @@ int main() {
     witness_one.retention = 0.9;
     NPCMemory witness_two = witness_one;
     witness_two.witness_id = "witness-2";
-    const CriminalFile corroborated_file =
+    const CriminalFile independent_root_file =
         file_from_memories("player", {witness_one, witness_two});
-    assert(corroborated_file.charges.size() == 1);
-    assert(corroborated_file.charges[0].evidence == EvidenceKind::Corroborated);
-    assert(corroborated_file.charges[0].provable());
-    assert(corroborated_file.charges[0].sentence() == 10.0); // Python round(10.5) == 10.
+    assert(independent_root_file.charges.size() == 1);
+    assert(independent_root_file.charges[0].evidence == EvidenceKind::Corroborated);
+    assert(independent_root_file.charges[0].provable());
+    assert(independent_root_file.charges[0].sentence() == 10.0); // Python round(10.5) == 10.
     const Consequence arrest_result = consequence_for(
-        ActionTag::CrimeTheft, corroborated_file, pressured, "officer", 0.0, 0.0);
+        ActionTag::CrimeTheft, independent_root_file, pressured, "officer", 0.0, 0.0);
     assert(std::holds_alternative<Arrest>(arrest_result));
     const CriminalFile empty_file{"player"};
     const Consequence stop_result = consequence_for(
         ActionTag::CrimeTheft, empty_file, pressured, "officer", 0.0, 0.0);
     assert(std::holds_alternative<Stop>(stop_result));
     const Consequence ignored_result = consequence_for(
-        ActionTag::CrimeTheft, corroborated_file, pressured, "officer", 1.0, 0.5);
+        ActionTag::CrimeTheft, independent_root_file, pressured, "officer", 1.0, 0.5);
     assert(std::holds_alternative<std::monostate>(ignored_result));
 
-    CriminalFile plea_file = corroborated_file;
+    CriminalFile plea_file = independent_root_file;
     plea_file.charges.push_back(
         {ActionTag::CrimeAssault, EvidenceKind::SingleWitness, 0.7});
     const auto offer = plea_offer(plea_file);
@@ -552,9 +552,13 @@ int main() {
     assert(world.state().ongoing_events[0].severity == 0.4);
     assert(world.state().npcs[0].personal_stress > 0.0);
     assert(world.state().npcs[1].personal_stress > world.state().npcs[0].personal_stress);
+    assert(world.state().npcs[0].memories.front().root_evidence_id
+        != world.state().npcs[1].memories.front().root_evidence_id);
     const Conversation world_conversation = world.talk("listener", "speaker");
     assert(world_conversation.transferred.size() == 1);
-    assert(world.state().npcs[1].memories.size() == 1);
+    assert(world.state().npcs[1].memories.size() == 2);
+    assert(world.state().npcs[1].memories[0].root_evidence_id
+        != world.state().npcs[1].memories[1].root_evidence_id);
     assert(world.state().npcs[0].beliefs.size() == 1);
     assert(world.state().npcs[0].beliefs[0].directly_observed);
     // The listener was also present at the event, so their belief is first-hand.
@@ -768,6 +772,71 @@ int main() {
     const Consequence world_arrest =
         world.resolve_offence("D1", "player", ActionTag::CrimeTheft, "officer", world_file);
     assert(std::holds_alternative<Arrest>(world_arrest));
+    const CriminalFile first_incident_file = world.build_criminal_file("player", "event-1");
+    assert(first_incident_file.charges.size() == 1U);
+    assert(first_incident_file.charges.front().action_tag == ActionTag::CrimeTheft);
+    assert(first_incident_file.charges.front().evidence == EvidenceKind::Corroborated);
+
+    // A later offence with the same actor and action is a separate case. Its
+    // file must not inherit the first incident's two independent witnesses.
+    (void)world.advance(1.0);
+    assert(world.record_witnessed_action(
+        "player", ActionTag::CrimeTheft, scene_description, {"speaker"}) == 1U);
+    const CriminalFile second_incident_file = world.build_criminal_file("player", "event-2");
+    assert(second_incident_file.charges.size() == 1U);
+    assert(second_incident_file.charges.front().evidence == EvidenceKind::SingleWitness);
+    const Consequence incident_police_response =
+        world.resolve_criminal_incident("event-2", "incident-officer");
+    assert(std::holds_alternative<Arrest>(incident_police_response));
+    assert(std::get<Arrest>(incident_police_response).charge.action_tag == ActionTag::CrimeTheft);
+
+    bool missing_incident_rejected = false;
+    try {
+        (void)world.build_criminal_file("player", "event-missing");
+    } catch (const std::out_of_range&) {
+        missing_incident_rejected = true;
+    }
+    assert(missing_incident_rejected);
+    bool wrong_incident_actor_rejected = false;
+    try {
+        (void)world.build_criminal_file("another-actor", "event-1");
+    } catch (const std::invalid_argument&) {
+        wrong_incident_actor_rejected = true;
+    }
+    assert(wrong_incident_actor_rejected);
+
+    // A witness to an earlier theft cannot advance an unrelated later
+    // investigation merely because the actor and action tag happen to match.
+    WorldState stale_evidence_state;
+    District stale_evidence_district;
+    stale_evidence_district.district_id = "stale-district";
+    stale_evidence_district.security_presence = 1.0;
+    stale_evidence_state.districts.push_back(stale_evidence_district);
+    NPC stale_actor;
+    stale_actor.entity_id = "stale-actor";
+    stale_actor.district_id = "stale-district";
+    NPC stale_witness;
+    stale_witness.entity_id = "stale-witness";
+    stale_witness.district_id = "stale-district";
+    NPCMemory prior_theft;
+    prior_theft.witness_id = "stale-witness";
+    prior_theft.target_entity_id = "stale-actor";
+    prior_theft.action_tag = ActionTag::CrimeTheft;
+    prior_theft.timestamp_hour = 0.0;
+    prior_theft.retention = 1.0;
+    stale_witness.memories.push_back(prior_theft);
+    stale_evidence_state.npcs = {stale_actor, stale_witness};
+    OngoingEvent later_theft;
+    later_theft.event_id = "later-theft";
+    later_theft.district_id = "stale-district";
+    later_theft.actor_id = "stale-actor";
+    later_theft.action_tag = ActionTag::CrimeTheft;
+    later_theft.created_hour = 24.0;
+    later_theft.witness_ids = {"stale-witness"};
+    stale_evidence_state.ongoing_events.push_back(later_theft);
+    SimulationWorld stale_evidence_world(std::move(stale_evidence_state), 24.0, 7U);
+    (void)stale_evidence_world.advance(24.0);
+    assert(stale_evidence_world.state().ongoing_events.front().investigation_progress == 0.0);
 
     FixerNetwork world_network;
     world_network.district_id = "D1";
@@ -2214,5 +2283,28 @@ int main() {
     assert(relay_resumed.information_ledger().lineage_for_claim(
         received_claims.front().claim_id).size() == 3U);
 
+    // Retelling one witness account into several NPC memories must not turn
+    // one observation into corroborated legal evidence.
+    NPCMemory original_report;
+    original_report.witness_id = "root-witness";
+    original_report.target_entity_id = "suspect";
+    original_report.retention = 0.95;
+    original_report.action_tag = ActionTag::CrimeTheft;
+    original_report.root_evidence_id = "incident-1:root-witness";
+    NPCMemory relayed_report = original_report;
+    relayed_report.witness_id = "relay-recipient";
+    const CriminalFile root_relay_only_file = file_from_memories(
+        "suspect", {original_report, relayed_report});
+    assert(root_relay_only_file.charges.size() == 1U);
+    assert(root_relay_only_file.charges.front().evidence == EvidenceKind::SingleWitness);
+
+    NPCMemory independent_report = original_report;
+    independent_report.witness_id = "independent-witness";
+    independent_report.root_evidence_id = "incident-1:independent-witness";
+    const CriminalFile independent_roots_corroborated_file = file_from_memories(
+        "suspect", {original_report, relayed_report, independent_report});
+    assert(independent_roots_corroborated_file.charges.size() == 1U);
+    assert(independent_roots_corroborated_file.charges.front().evidence == EvidenceKind::Corroborated);
+    
 return 0;
 }

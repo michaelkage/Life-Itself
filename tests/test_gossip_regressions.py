@@ -5,7 +5,7 @@ import unittest
 from simreality import ActionTag, Description, NPC, NPCMemory, Rumour, converse
 
 
-def memory(target, retention=0.9):
+def memory(target, retention=0.9, root_evidence_id=""):
     return NPCMemory(
         witness_id="witness",
         target_entity_id=target,
@@ -13,6 +13,7 @@ def memory(target, retention=0.9):
         retention=retention,
         timestamp_hour=12.0,
         action_tag=ActionTag.CRIME_THEFT,
+        root_evidence_id=root_evidence_id,
         description=Description(
             height_m=1.8,
             jacket_colour_weights={"black": 0.8},
@@ -21,6 +22,30 @@ def memory(target, retention=0.9):
 
 
 class TestGossipMemoryTargeting(unittest.TestCase):
+    def test_relay_preserves_root_evidence_identity(self):
+        listener = NPC(entity_id="listener")
+        speaker = NPC(entity_id="speaker")
+        speaker.memories = [memory("suspect", root_evidence_id="incident-4:witness-1")]
+
+        converse(listener, speaker, "D1")
+
+        self.assertEqual(len(listener.memories), 1)
+        self.assertEqual(listener.memories[0].root_evidence_id, "incident-4:witness-1")
+
+    def test_distinct_witness_root_does_not_overwrite_first_hand_memory(self):
+        listener = NPC(entity_id="listener")
+        listener.memories = [memory("suspect", root_evidence_id="incident-4:witness-listener")]
+        speaker = NPC(entity_id="speaker")
+        speaker.memories = [memory("suspect", root_evidence_id="incident-4:witness-speaker")]
+
+        converse(listener, speaker, "D1")
+
+        self.assertEqual(len(listener.memories), 2)
+        self.assertEqual(
+            {item.root_evidence_id for item in listener.memories},
+            {"incident-4:witness-listener", "incident-4:witness-speaker"},
+        )
+
     def test_conflicting_identity_reports_remove_attribution(self):
         first = Rumour(
             action_tag=ActionTag.CRIME_THEFT.value,

@@ -134,6 +134,7 @@ def converse(listener: NPC, speaker: NPC, district_id: str | None = None) -> Con
         if rumour is None:
             continue
         rumour.district_id = district_id
+        source_root = memory.root_evidence_id or f"legacy-witness:{memory.witness_id}"
 
         match_index = None
         if memory.target_entity_id:
@@ -145,6 +146,23 @@ def converse(listener: NPC, speaker: NPC, district_id: str | None = None) -> Con
             # Corroborate the matching event without overwriting an unrelated memory.
             existing = listener.memories_of(memory.target_entity_id)
             prior_memory = listener.memories[match_index]
+            prior_root = prior_memory.root_evidence_id or f"legacy-witness:{prior_memory.witness_id}"
+            if source_root != prior_root:
+                # Preserve the first-hand account as a separate evidence root.
+                # Combining descriptions is useful, but replacing the memory would
+                # erase the listener's independent observation.
+                listener.remember(NPCMemory(
+                    witness_id=listener.entity_id,
+                    target_entity_id=rumour.target_entity_id,
+                    initial_impact=rumour.retention,
+                    retention=rumour.retention,
+                    timestamp_hour=memory.timestamp_hour,
+                    action_tag=memory.action_tag,
+                    description=rumour.description,
+                    root_evidence_id=source_root,
+                ))
+                conversation.transferred.append(rumour)
+                continue
             prior = Rumour(
                 action_tag=prior_memory.action_tag.value,
                 target_entity_id=prior_memory.target_entity_id,
@@ -162,6 +180,7 @@ def converse(listener: NPC, speaker: NPC, district_id: str | None = None) -> Con
                 timestamp_hour=memory.timestamp_hour,
                 action_tag=memory.action_tag,
                 description=rumour.description,
+                root_evidence_id=source_root,
             )
         else:
             listener.remember(
@@ -173,6 +192,7 @@ def converse(listener: NPC, speaker: NPC, district_id: str | None = None) -> Con
                     timestamp_hour=memory.timestamp_hour,
                     action_tag=memory.action_tag,
                     description=rumour.description,
+                    root_evidence_id=source_root,
                 )
             )
 

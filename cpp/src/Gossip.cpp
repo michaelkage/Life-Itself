@@ -166,6 +166,23 @@ Conversation converse(NPC& listener, const NPC& speaker, const DistrictId& distr
 
         if (match) {
             const NPCMemory& existing = listener.memories[*match];
+            const auto prior_report = retell(existing);
+            if (prior_report && prior_report->root_evidence_id != rumour.root_evidence_id) {
+                // Keep independent first-hand observations as separate records.
+                // A merged description must never overwrite the listener's root.
+                NPCMemory received;
+                received.witness_id = listener.entity_id;
+                received.target_entity_id = rumour.target_entity_id;
+                received.initial_impact = rumour.retention;
+                received.retention = rumour.retention;
+                received.timestamp_hour = memory.timestamp_hour;
+                received.action_tag = memory.action_tag;
+                received.description = rumour.description;
+                received.root_evidence_id = rumour.root_evidence_id;
+                listener.memories.push_back(std::move(received));
+                conversation.transferred.push_back(rumour);
+                continue;
+            }
             std::uint32_t matching_count = 0;
             for (const auto& candidate_memory : listener.memories) {
                 if (candidate_memory.target_entity_id == memory.target_entity_id) ++matching_count;
