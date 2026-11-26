@@ -125,6 +125,19 @@ int main() {
     assert(oversized_rejected);
     assert(oversized_bytes.str().empty());
 
+    auto duplicate_wait_checkpoint = checkpoint;
+    duplicate_wait_checkpoint.pending_wait_edges.push_back(
+        duplicate_wait_checkpoint.pending_wait_edges.front());
+    std::stringstream duplicate_wait_bytes(std::ios::in | std::ios::out | std::ios::binary);
+    bool duplicate_wait_rejected = false;
+    try {
+        save_traffic_recovery_checkpoint(duplicate_wait_checkpoint, duplicate_wait_bytes);
+    } catch (const std::invalid_argument&) {
+        duplicate_wait_rejected = true;
+    }
+    assert(duplicate_wait_rejected);
+    assert(duplicate_wait_bytes.str().empty());
+
     auto malformed_proposal_checkpoint = checkpoint;
     malformed_proposal_checkpoint.pending_proposals.front().participants = {"", "b", "c"};
     std::stringstream malformed_proposal_bytes(std::ios::in | std::ios::out | std::ios::binary);
