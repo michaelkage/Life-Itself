@@ -169,6 +169,8 @@ public:
         const EntityId& actor_id, ActionTag action_tag, Description description,
         const std::vector<EntityId>& witness_ids, const EntityId& victim_id = {});
     [[nodiscard]] CriminalFile build_criminal_file(const EntityId& player_id) const;
+    [[nodiscard]] CriminalFile build_criminal_file(
+        const EntityId& player_id, const std::string& incident_id) const;
     [[nodiscard]] ReputationProfile reputation_in_district(
         const DistrictId& district_id, const EntityId& player_id,
         const CriminalFile* criminal_file = nullptr) const;
