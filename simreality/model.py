@@ -262,6 +262,8 @@ class NPCMemory:
     timestamp_hour: float
     action_tag: ActionTag
     description: Description
+    # Stable origin shared by every retelling of this observation.
+    root_evidence_id: str = ""
 
     @property
     def is_actionable(self) -> bool:
