@@ -100,6 +100,7 @@ class NPCStateSnapshot:
                     "retention": memory.retention,
                     "timestamp_hour": memory.timestamp_hour,
                     "action_tag": memory.action_tag.value,
+                    "root_evidence_id": memory.root_evidence_id,
                     "description": {
                         "height_m": memory.description.height_m,
                         "height_uncertainty_m": memory.description.height_uncertainty_m,
@@ -142,6 +143,7 @@ class NPCStateSnapshot:
                     timestamp_hour=_finite_number("timestamp_hour", item["timestamp_hour"]),
                     action_tag=ActionTag(item["action_tag"]),
                     description=description,
+                    root_evidence_id=item.get("root_evidence_id", ""),
                 ))
             return cls(
                 entity_id=raw["entity_id"],
