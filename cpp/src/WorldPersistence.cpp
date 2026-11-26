@@ -908,7 +908,7 @@ void save_traffic_recovery_checkpoint(
     std::ostringstream staged_output(std::ios::out | std::ios::binary);
     constexpr std::array<char, 8> magic{{'S','R','E','T','R','A','F','1'}};
     staged_output.write(magic.data(), static_cast<std::streamsize>(magic.size()));
-    if (!output) throw std::runtime_error("failed writing traffic checkpoint header");
+    if (!staged_output) throw std::runtime_error("failed staging traffic checkpoint header");
     write_u32(staged_output, 1U);
 
     write_u64(staged_output, checkpoint.lanes.lease_ticks);
