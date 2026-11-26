@@ -47,6 +47,63 @@ int main() {
         == intersection_before_failure.reservations.front().expires_at_tick);
     assert(journey.forget_after_clearance("npc-b"));
 
+    // A denial is also a failed transaction: a lane grant must not commit
+    // when the tracked entity cannot renew its intersection occupancy.
+    LaneTrafficCoordinator contested_lanes(3U);
+    contested_lanes.configure_lane("L1", 1U);
+    contested_lanes.advance_tick(20U);
+    assert(contested_lanes.resolve({{"L1", "lane-blocker", 0}}).granted_entity_ids.size() == 1U);
+    IntersectionTrafficCoordinator free_intersections(3U);
+    free_intersections.configure_movement({"J1", "M1", {"Z1"}});
+    free_intersections.advance_tick(20U);
+    assert(free_intersections.resolve({{"J1", "M1", "npc-c", 0}}).granted_entity_ids.size() == 1U);
+    JourneyReservationManager denied_lane_journey;
+    denied_lane_journey.track({"npc-c", "L1", "J1", "M1"});
+    const auto contested_lane_before = contested_lanes.snapshot();
+    const auto free_intersection_before = free_intersections.snapshot();
+    bool partial_lane_grant_rejected = false;
+    try {
+        (void)denied_lane_journey.advance_and_renew(21U, contested_lanes, free_intersections);
+    } catch (const std::runtime_error&) {
+        partial_lane_grant_rejected = true;
+    }
+    assert(partial_lane_grant_rejected);
+    assert(contested_lanes.snapshot().current_tick == contested_lane_before.current_tick);
+    assert(free_intersections.snapshot().current_tick == free_intersection_before.current_tick);
+    assert(free_intersections.reservations("J1").front().expires_at_tick
+        == free_intersection_before.reservations.front().expires_at_tick);
+    assert(contested_lanes.snapshot().waiting.empty());
+
+    // Conversely, an intersection denial must roll back a successful lane
+    // grant and its fairness/lease state.
+    LaneTrafficCoordinator free_lanes(3U);
+    free_lanes.configure_lane("L2", 1U);
+    free_lanes.advance_tick(30U);
+    IntersectionTrafficCoordinator contested_intersections(3U);
+    contested_intersections.configure_movement({"J2", "M1", {"Z2"}});
+    contested_intersections.configure_movement({"J2", "M2", {"Z2"}});
+    contested_intersections.advance_tick(30U);
+    assert(contested_intersections.resolve({{"J2", "M2", "intersection-blocker", 0}})
+        .granted_entity_ids.size() == 1U);
+    JourneyReservationManager denied_intersection_journey;
+    denied_intersection_journey.track({"npc-d", "L2", "J2", "M1"});
+    const auto free_lane_before = free_lanes.snapshot();
+    const auto contested_intersection_before = contested_intersections.snapshot();
+    bool partial_intersection_grant_rejected = false;
+    try {
+        (void)denied_intersection_journey.advance_and_renew(
+            31U, free_lanes, contested_intersections);
+    } catch (const std::runtime_error&) {
+        partial_intersection_grant_rejected = true;
+    }
+    assert(partial_intersection_grant_rejected);
+    assert(free_lanes.snapshot().current_tick == free_lane_before.current_tick);
+    assert(free_lanes.snapshot().reservations.empty());
+    assert(free_lanes.snapshot().waiting.empty());
+    assert(contested_intersections.snapshot().current_tick
+        == contested_intersection_before.current_tick);
+    assert(contested_intersections.snapshot().waiting.empty());
+
     assert(journey.forget_after_clearance("npc-a"));
     // Forgetting tracking is deliberately not a release operation.
     assert(lanes.has_reservation("L1", "npc-a"));
