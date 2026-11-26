@@ -81,3 +81,8 @@ Checkpoint encoding is staged in memory after structural validation and before
 writing to the destination stream. This ensures encoding-limit failures (such as
 an oversized identifier) leave the destination untouched; only the final stream
 write can fail after output begins.
+
+Multiple resource waits between the same pair of entities are retained as
+separate resource edges while the deadlock graph collapses them to one directed
+entity-to-entity edge. This preserves resource-level recovery evidence without
+feeding duplicate graph edges into strongly connected component detection.
