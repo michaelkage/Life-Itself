@@ -162,6 +162,7 @@ def converse(listener: NPC, speaker: NPC, district_id: str | None = None) -> Con
                 timestamp_hour=memory.timestamp_hour,
                 action_tag=memory.action_tag,
                 description=rumour.description,
+                root_evidence_id=memory.root_evidence_id,
             )
         else:
             listener.remember(
@@ -173,6 +174,7 @@ def converse(listener: NPC, speaker: NPC, district_id: str | None = None) -> Con
                     timestamp_hour=memory.timestamp_hour,
                     action_tag=memory.action_tag,
                     description=rumour.description,
+                    root_evidence_id=memory.root_evidence_id,
                 )
             )
 
