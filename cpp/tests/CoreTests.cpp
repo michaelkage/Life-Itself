@@ -772,6 +772,27 @@ int main() {
     const Consequence world_arrest =
         world.resolve_offence("D1", "player", ActionTag::CrimeTheft, "officer", world_file);
     assert(std::holds_alternative<Arrest>(world_arrest));
+    const CriminalFile first_incident_file = world.build_criminal_file("player", "event-1");
+    assert(first_incident_file.charges.size() == 1U);
+    assert(first_incident_file.charges.front().action_tag == ActionTag::CrimeTheft);
+    assert(first_incident_file.charges.front().evidence == EvidenceKind::Corroborated);
+
+    // A later offence with the same actor and action is a separate case. Its
+    // file must not inherit the first incident's two independent witnesses.
+    (void)world.advance(1.0);
+    assert(world.record_witnessed_action(
+        "player", ActionTag::CrimeTheft, scene_description, {"speaker"}) == 1U);
+    const CriminalFile second_incident_file = world.build_criminal_file("player", "event-2");
+    assert(second_incident_file.charges.size() == 1U);
+    assert(second_incident_file.charges.front().evidence == EvidenceKind::SingleWitness);
+
+    bool missing_incident_rejected = false;
+    try {
+        (void)world.build_criminal_file("player", "event-missing");
+    } catch (const std::out_of_range&) {
+        missing_incident_rejected = true;
+    }
+    assert(missing_incident_rejected);
 
     FixerNetwork world_network;
     world_network.district_id = "D1";
