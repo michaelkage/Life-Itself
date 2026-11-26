@@ -18,6 +18,17 @@ Daily investigation progress is based only on actionable memories whose target, 
 
 Incident identity is the durable `OngoingEvent.event_id`. Evidence identity remains the root ID already persisted on NPC memories. No new random draws or time-dependent ordering are introduced. Existing world snapshots retain their current schema because this change adds no persisted fields.
 
+## Caller contract
+
+Use the incident overload when handling a concrete police report:
+
+```cpp
+const Consequence response =
+    world.resolve_criminal_incident(incident_id, officer_id);
+```
+
+The method rejects unknown IDs and non-criminal events. It derives the actor, district, action, and evidence set from the authoritative event record; callers cannot substitute an unrelated action tag or aggregate evidence file.
+
 ## Regression coverage
 
 C++ core tests cover:
