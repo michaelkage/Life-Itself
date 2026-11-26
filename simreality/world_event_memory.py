@@ -147,6 +147,7 @@ class WorldEventMemoryAdapter:
             timestamp_hour=event.tick / self.ticks_per_hour,
             action_tag=action_tag,
             description=description,
+            root_evidence_id=f"{event.event_id}:{witness_id}",
         )
         npcs[witness_id].remember(memory)
         self._processed[key] = memory
