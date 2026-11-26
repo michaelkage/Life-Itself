@@ -54,3 +54,41 @@ restore authored route graph/geometry and spatial transforms from its own
 world/level data; those are intentionally not inferred from traffic occupancy.
 Never restore an expired lease as active. Physical occupancy should be reconciled
 against authoritative transforms before resuming movement.
+
+
+## Cross-resource renewal atomicity
+
+JourneyReservationManager renews lane and intersection leases as one logical
+transaction. It snapshots both coordinators before advancing either clock. If
+either tick advance or either batch resolution fails, both coordinators are
+restored, including lease expiries, wait credits, definitions, and clocks, and
+the original failure is propagated. This prevents a partially renewed journey
+from retaining only one side of an intersection transition.
+
+Checkpoint writing performs the same cross-resource occupancy checks as
+loading before emitting the header: every tracked lane and optional intersection
+occupancy must have a corresponding unexpired reservation. Pending resource
+edges and proposals are validated for resource kinds, unique identities,
+canonical participant ordering, owner identity, and replacement-request
+ownership. Invalid checkpoints fail before any bytes are written.
+
+Loading also rejects malformed or duplicate resource wait edges and any trailing
+bytes after the versioned checkpoint record. A valid checkpoint is therefore one
+unambiguous framed record rather than an accepted prefix of a larger or corrupted
+stream.
+
+Checkpoint encoding is staged in memory after structural validation and before
+writing to the destination stream. This ensures encoding-limit failures (such as
+an oversized identifier) leave the destination untouched; only the final stream
+write can fail after output begins.
+
+Multiple resource waits between the same pair of entities are retained as
+separate resource edges while the deadlock graph collapses them to one directed
+entity-to-entity edge. This preserves resource-level recovery evidence without
+feeding duplicate graph edges into strongly connected component detection.
+
+A reservation denial is treated as a failed renewal, not a partial success. If
+any tracked journey cannot renew its lane token or required intersection token,
+both coordinators are restored and the denial is propagated to the caller. This
+prevents a lane grant from committing without its intersection admission, or
+vice versa.

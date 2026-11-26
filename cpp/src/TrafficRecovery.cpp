@@ -55,24 +55,53 @@ bool JourneyReservationManager::forget_after_clearance(const std::string& entity
 JourneyRenewalResult JourneyReservationManager::advance_and_renew(
     std::uint64_t tick, LaneTrafficCoordinator& lanes,
     IntersectionTrafficCoordinator& intersections) {
-    // Advance both clocks before constructing any renewal batch. The
-    // coordinators expire leases first; resolve() then renews surviving grants.
-    lanes.advance_tick(tick);
-    intersections.advance_tick(tick);
-    std::vector<LaneTrafficRequest> lane_requests;
-    std::vector<IntersectionTrafficRequest> intersection_requests;
-    lane_requests.reserve(tracked_.size());
-    for (const auto& [entity_id, occupancy] : tracked_) {
-        lane_requests.push_back({occupancy.lane_id, entity_id, 0});
-        if (!occupancy.intersection_id.empty()) {
-            intersection_requests.push_back({
-                occupancy.intersection_id, occupancy.movement_id, entity_id, 0});
+    // A journey renewal is one logical transaction across two independent
+    // admission coordinators. Preserve both pre-tick snapshots so a stale
+    // clock, invalid movement, or resolution failure cannot advance one side
+    // or renew only a subset of the entity's occupied resources.
+    const LaneTrafficSnapshot lane_before = lanes.snapshot();
+    const IntersectionTrafficSnapshot intersection_before = intersections.snapshot();
+    try {
+        lanes.advance_tick(tick);
+        intersections.advance_tick(tick);
+        std::vector<LaneTrafficRequest> lane_requests;
+        std::vector<IntersectionTrafficRequest> intersection_requests;
+        lane_requests.reserve(tracked_.size());
+        intersection_requests.reserve(tracked_.size());
+        for (const auto& [entity_id, occupancy] : tracked_) {
+            lane_requests.push_back({occupancy.lane_id, entity_id, 0});
+            if (!occupancy.intersection_id.empty()) {
+                intersection_requests.push_back({
+                    occupancy.intersection_id, occupancy.movement_id, entity_id, 0});
+            }
         }
+        JourneyRenewalResult result;
+        result.lanes = lanes.resolve(lane_requests);
+        result.intersections = intersections.resolve(intersection_requests);
+
+        // A tracked physical journey must retain every admission token it
+        // currently occupies. A denial is a failed cross-resource renewal,
+        // not a successful partial commit.
+        for (const auto& [entity_id, occupancy] : tracked_) {
+            if (!std::binary_search(result.lanes.granted_entity_ids.begin(),
+                    result.lanes.granted_entity_ids.end(), entity_id)) {
+                throw std::runtime_error("journey lane reservation renewal was denied");
+            }
+            if (!occupancy.intersection_id.empty()
+                && !std::binary_search(result.intersections.granted_entity_ids.begin(),
+                    result.intersections.granted_entity_ids.end(), entity_id)) {
+                throw std::runtime_error("journey intersection reservation renewal was denied");
+            }
+        }
+        return result;
+    } catch (...) {
+        // Restoring snapshots also restores lease expiries, fairness credits,
+        // resource definitions, and both clocks. The original exception is
+        // preserved; restore inputs originate from valid live coordinators.
+        lanes.restore(lane_before);
+        intersections.restore(intersection_before);
+        throw;
     }
-    JourneyRenewalResult result;
-    result.lanes = lanes.resolve(lane_requests);
-    result.intersections = intersections.resolve(intersection_requests);
-    return result;
 }
 
 std::vector<std::vector<std::string>> TrafficDeadlockDetector::detect(

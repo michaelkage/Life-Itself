@@ -8,6 +8,9 @@
 #include <istream>
 #include <limits>
 #include <ostream>
+#include <set>
+#include <sstream>
+#include <tuple>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -837,103 +840,163 @@ void save_traffic_recovery_checkpoint(
     intersections.restore(checkpoint.intersections);
     JourneyReservationManager journeys;
     journeys.restore(checkpoint.journey_occupancy);
+    // A checkpoint that can be written must also be loadable: every declared
+    // physical occupancy must have its still-live admission token.
+    for (const auto& occupancy : checkpoint.journey_occupancy) {
+        const auto lane = std::find_if(checkpoint.lanes.reservations.begin(),
+            checkpoint.lanes.reservations.end(), [&occupancy](const LaneReservation& item) {
+                return item.entity_id == occupancy.entity_id && item.lane_id == occupancy.lane_id;
+            });
+        if (lane == checkpoint.lanes.reservations.end())
+            throw std::invalid_argument("journey occupancy has no live lane reservation");
+        if (!occupancy.intersection_id.empty()) {
+            const auto intersection = std::find_if(checkpoint.intersections.reservations.begin(),
+                checkpoint.intersections.reservations.end(), [&occupancy](const IntersectionReservation& item) {
+                    return item.entity_id == occupancy.entity_id
+                        && item.intersection_id == occupancy.intersection_id
+                        && item.movement_id == occupancy.movement_id;
+                });
+            if (intersection == checkpoint.intersections.reservations.end())
+                throw std::invalid_argument("journey occupancy has no live intersection reservation");
+        }
+    }
     RouteProgressMonitor progress(checkpoint.progress_stall_threshold);
     progress.restore(checkpoint.route_progress);
     TrafficDeadlockDetector detector;
     std::vector<WaitForEdge> graph;
+    std::set<std::tuple<std::string, std::string, BlockedResourceKind, std::string>> unique_wait_edges;
+    std::set<std::pair<std::string, std::string>> unique_graph_edges;
     for (const auto& edge : checkpoint.pending_wait_edges) {
         if (edge.waiter_id.empty() || edge.blocker_id.empty() || edge.waiter_id == edge.blocker_id
-            || edge.resource_id.empty())
-            throw std::invalid_argument("invalid pending resource wait edge");
-        graph.push_back({edge.waiter_id, edge.blocker_id});
+            || edge.resource_id.empty()
+            || (edge.resource_kind != BlockedResourceKind::Lane
+                && edge.resource_kind != BlockedResourceKind::Intersection)
+            || !unique_wait_edges.emplace(edge.waiter_id, edge.blocker_id,
+                edge.resource_kind, edge.resource_id).second)
+            throw std::invalid_argument("invalid or duplicate pending resource wait edge");
+        if (unique_graph_edges.emplace(edge.waiter_id, edge.blocker_id).second)
+            graph.push_back({edge.waiter_id, edge.blocker_id});
     }
     (void)detector.detect(graph);
-
-    constexpr std::array<char, 8> magic{{'S','R','E','T','R','A','F','1'}};
-    output.write(magic.data(), static_cast<std::streamsize>(magic.size()));
-    if (!output) throw std::runtime_error("failed writing traffic checkpoint header");
-    write_u32(output, 1U);
-
-    write_u64(output, checkpoint.lanes.lease_ticks);
-    write_u64(output, checkpoint.lanes.current_tick);
-    write_u8(output, checkpoint.lanes.tick_initialized ? 1U : 0U);
-    write_count(output, checkpoint.lanes.capacities.size());
-    for (const auto& [lane, capacity] : checkpoint.lanes.capacities) {
-        write_string(output, lane); write_u64(output, static_cast<std::uint64_t>(capacity));
-    }
-    write_count(output, checkpoint.lanes.reservations.size());
-    for (const auto& item : checkpoint.lanes.reservations) {
-        write_string(output, item.lane_id); write_string(output, item.entity_id);
-        write_u64(output, item.expires_at_tick);
-        write_u32(output, static_cast<std::uint32_t>(item.priority));
-        write_u64(output, item.consecutive_wait_ticks);
-    }
-    write_count(output, checkpoint.lanes.waiting.size());
-    for (const auto& item : checkpoint.lanes.waiting) {
-        write_string(output, item.lane_id); write_string(output, item.entity_id);
-        write_u64(output, item.wait_ticks);
-    }
-
-    write_u64(output, checkpoint.intersections.lease_ticks);
-    write_u64(output, checkpoint.intersections.current_tick);
-    write_u8(output, checkpoint.intersections.tick_initialized ? 1U : 0U);
-    write_count(output, checkpoint.intersections.movements.size());
-    for (const auto& item : checkpoint.intersections.movements) {
-        write_string(output, item.intersection_id); write_string(output, item.movement_id);
-        write_count(output, item.conflict_zone_ids.size());
-        for (const auto& zone : item.conflict_zone_ids) write_string(output, zone);
-    }
-    write_count(output, checkpoint.intersections.reservations.size());
-    for (const auto& item : checkpoint.intersections.reservations) {
-        write_string(output, item.intersection_id); write_string(output, item.movement_id);
-        write_string(output, item.entity_id); write_u64(output, item.expires_at_tick);
-        write_u32(output, static_cast<std::uint32_t>(item.priority));
-        write_u64(output, item.consecutive_wait_ticks);
-    }
-    write_count(output, checkpoint.intersections.waiting.size());
-    for (const auto& item : checkpoint.intersections.waiting) {
-        write_string(output, item.intersection_id); write_string(output, item.entity_id);
-        write_u64(output, item.wait_ticks);
-    }
-
-    write_count(output, checkpoint.journey_occupancy.size());
-    for (const auto& item : checkpoint.journey_occupancy) {
-        write_string(output, item.entity_id); write_string(output, item.lane_id);
-        write_string(output, item.intersection_id); write_string(output, item.movement_id);
-    }
-    write_u64(output, checkpoint.progress_stall_threshold);
-    write_count(output, checkpoint.route_progress.size());
-    for (const auto& item : checkpoint.route_progress) {
-        write_string(output, item.entity_id); write_u64(output, item.last_tick);
-        write_double(output, item.last_progress); write_u64(output, item.stalled_ticks);
-    }
-    write_count(output, checkpoint.pending_wait_edges.size());
-    for (const auto& item : checkpoint.pending_wait_edges) {
-        write_string(output, item.waiter_id); write_string(output, item.blocker_id);
-        write_u8(output, static_cast<std::uint8_t>(item.resource_kind));
-        write_string(output, item.resource_id);
-    }
-    write_count(output, checkpoint.pending_proposals.size());
     for (const auto& proposal : checkpoint.pending_proposals) {
-        write_count(output, proposal.participants.size());
-        for (const auto& participant : proposal.participants) write_string(output, participant);
-        write_string(output, proposal.yielding_entity_id);
-        write_count(output, proposal.blocking_resources.size());
+        if (proposal.participants.empty() || proposal.yielding_entity_id.empty()
+            || !std::is_sorted(proposal.participants.begin(), proposal.participants.end())
+            || std::adjacent_find(proposal.participants.begin(), proposal.participants.end())
+                != proposal.participants.end()
+            || std::any_of(proposal.participants.begin(), proposal.participants.end(),
+                [](const std::string& participant) { return participant.empty(); })
+            || !std::binary_search(proposal.participants.begin(), proposal.participants.end(),
+                proposal.yielding_entity_id))
+            throw std::invalid_argument("invalid pending deadlock proposal identity");
         for (const auto& resource : proposal.blocking_resources) {
-            write_u8(output, static_cast<std::uint8_t>(resource.kind));
-            write_string(output, resource.resource_id); write_string(output, resource.current_owner_id);
+            if (resource.resource_id.empty() || resource.current_owner_id.empty()
+                || (resource.kind != BlockedResourceKind::Lane
+                    && resource.kind != BlockedResourceKind::Intersection))
+                throw std::invalid_argument("invalid pending deadlock resource");
         }
-        write_count(output, proposal.replacement_lane_requests.size());
         for (const auto& request : proposal.replacement_lane_requests) {
-            write_string(output, request.lane_id); write_string(output, request.entity_id);
-            write_u32(output, static_cast<std::uint32_t>(request.priority));
+            if (request.entity_id != proposal.yielding_entity_id || request.lane_id.empty())
+                throw std::invalid_argument("invalid pending replacement lane request");
         }
-        write_count(output, proposal.replacement_intersection_requests.size());
         for (const auto& request : proposal.replacement_intersection_requests) {
-            write_string(output, request.intersection_id); write_string(output, request.movement_id);
-            write_string(output, request.entity_id); write_u32(output, static_cast<std::uint32_t>(request.priority));
+            if (request.entity_id != proposal.yielding_entity_id
+                || request.intersection_id.empty() || request.movement_id.empty())
+                throw std::invalid_argument("invalid pending replacement intersection request");
         }
     }
+
+    // Stage the complete record so validation and encoding failures never
+    // leave a partially written checkpoint in the caller's stream.
+    std::ostringstream staged_output(std::ios::out | std::ios::binary);
+    constexpr std::array<char, 8> magic{{'S','R','E','T','R','A','F','1'}};
+    staged_output.write(magic.data(), static_cast<std::streamsize>(magic.size()));
+    if (!staged_output) throw std::runtime_error("failed staging traffic checkpoint header");
+    write_u32(staged_output, 1U);
+
+    write_u64(staged_output, checkpoint.lanes.lease_ticks);
+    write_u64(staged_output, checkpoint.lanes.current_tick);
+    write_u8(staged_output, checkpoint.lanes.tick_initialized ? 1U : 0U);
+    write_count(staged_output, checkpoint.lanes.capacities.size());
+    for (const auto& [lane, capacity] : checkpoint.lanes.capacities) {
+        write_string(staged_output, lane); write_u64(staged_output, static_cast<std::uint64_t>(capacity));
+    }
+    write_count(staged_output, checkpoint.lanes.reservations.size());
+    for (const auto& item : checkpoint.lanes.reservations) {
+        write_string(staged_output, item.lane_id); write_string(staged_output, item.entity_id);
+        write_u64(staged_output, item.expires_at_tick);
+        write_u32(staged_output, static_cast<std::uint32_t>(item.priority));
+        write_u64(staged_output, item.consecutive_wait_ticks);
+    }
+    write_count(staged_output, checkpoint.lanes.waiting.size());
+    for (const auto& item : checkpoint.lanes.waiting) {
+        write_string(staged_output, item.lane_id); write_string(staged_output, item.entity_id);
+        write_u64(staged_output, item.wait_ticks);
+    }
+
+    write_u64(staged_output, checkpoint.intersections.lease_ticks);
+    write_u64(staged_output, checkpoint.intersections.current_tick);
+    write_u8(staged_output, checkpoint.intersections.tick_initialized ? 1U : 0U);
+    write_count(staged_output, checkpoint.intersections.movements.size());
+    for (const auto& item : checkpoint.intersections.movements) {
+        write_string(staged_output, item.intersection_id); write_string(staged_output, item.movement_id);
+        write_count(staged_output, item.conflict_zone_ids.size());
+        for (const auto& zone : item.conflict_zone_ids) write_string(staged_output, zone);
+    }
+    write_count(staged_output, checkpoint.intersections.reservations.size());
+    for (const auto& item : checkpoint.intersections.reservations) {
+        write_string(staged_output, item.intersection_id); write_string(staged_output, item.movement_id);
+        write_string(staged_output, item.entity_id); write_u64(staged_output, item.expires_at_tick);
+        write_u32(staged_output, static_cast<std::uint32_t>(item.priority));
+        write_u64(staged_output, item.consecutive_wait_ticks);
+    }
+    write_count(staged_output, checkpoint.intersections.waiting.size());
+    for (const auto& item : checkpoint.intersections.waiting) {
+        write_string(staged_output, item.intersection_id); write_string(staged_output, item.entity_id);
+        write_u64(staged_output, item.wait_ticks);
+    }
+
+    write_count(staged_output, checkpoint.journey_occupancy.size());
+    for (const auto& item : checkpoint.journey_occupancy) {
+        write_string(staged_output, item.entity_id); write_string(staged_output, item.lane_id);
+        write_string(staged_output, item.intersection_id); write_string(staged_output, item.movement_id);
+    }
+    write_u64(staged_output, checkpoint.progress_stall_threshold);
+    write_count(staged_output, checkpoint.route_progress.size());
+    for (const auto& item : checkpoint.route_progress) {
+        write_string(staged_output, item.entity_id); write_u64(staged_output, item.last_tick);
+        write_double(staged_output, item.last_progress); write_u64(staged_output, item.stalled_ticks);
+    }
+    write_count(staged_output, checkpoint.pending_wait_edges.size());
+    for (const auto& item : checkpoint.pending_wait_edges) {
+        write_string(staged_output, item.waiter_id); write_string(staged_output, item.blocker_id);
+        write_u8(staged_output, static_cast<std::uint8_t>(item.resource_kind));
+        write_string(staged_output, item.resource_id);
+    }
+    write_count(staged_output, checkpoint.pending_proposals.size());
+    for (const auto& proposal : checkpoint.pending_proposals) {
+        write_count(staged_output, proposal.participants.size());
+        for (const auto& participant : proposal.participants) write_string(staged_output, participant);
+        write_string(staged_output, proposal.yielding_entity_id);
+        write_count(staged_output, proposal.blocking_resources.size());
+        for (const auto& resource : proposal.blocking_resources) {
+            write_u8(staged_output, static_cast<std::uint8_t>(resource.kind));
+            write_string(staged_output, resource.resource_id); write_string(staged_output, resource.current_owner_id);
+        }
+        write_count(staged_output, proposal.replacement_lane_requests.size());
+        for (const auto& request : proposal.replacement_lane_requests) {
+            write_string(staged_output, request.lane_id); write_string(staged_output, request.entity_id);
+            write_u32(staged_output, static_cast<std::uint32_t>(request.priority));
+        }
+        write_count(staged_output, proposal.replacement_intersection_requests.size());
+        for (const auto& request : proposal.replacement_intersection_requests) {
+            write_string(staged_output, request.intersection_id); write_string(staged_output, request.movement_id);
+            write_string(staged_output, request.entity_id); write_u32(staged_output, static_cast<std::uint32_t>(request.priority));
+        }
+    }
+
+    const std::string encoded = staged_output.str();
+    output.write(encoded.data(), static_cast<std::streamsize>(encoded.size()));
+    if (!output) throw std::runtime_error("failed writing traffic recovery checkpoint");
 }
 
 TrafficRecoveryCheckpoint load_traffic_recovery_checkpoint(std::istream& input) {
@@ -1030,9 +1093,18 @@ TrafficRecoveryCheckpoint load_traffic_recovery_checkpoint(std::istream& input) 
     RouteProgressMonitor progress(result.progress_stall_threshold); progress.restore(result.route_progress);
     TrafficDeadlockDetector detector;
     std::vector<WaitForEdge> graph;
+    std::set<std::tuple<std::string, std::string, BlockedResourceKind, std::string>> unique_wait_edges;
+    std::set<std::pair<std::string, std::string>> unique_graph_edges;
     for (const auto& edge : result.pending_wait_edges) {
-        if (edge.resource_id.empty()) throw std::runtime_error("empty pending wait resource");
-        graph.push_back({edge.waiter_id,edge.blocker_id});
+        if (edge.waiter_id.empty() || edge.blocker_id.empty()
+            || edge.waiter_id == edge.blocker_id || edge.resource_id.empty()
+            || (edge.resource_kind != BlockedResourceKind::Lane
+                && edge.resource_kind != BlockedResourceKind::Intersection)
+            || !unique_wait_edges.emplace(edge.waiter_id, edge.blocker_id,
+                edge.resource_kind, edge.resource_id).second)
+            throw std::runtime_error("invalid or duplicate pending resource wait edge");
+        if (unique_graph_edges.emplace(edge.waiter_id, edge.blocker_id).second)
+            graph.push_back({edge.waiter_id, edge.blocker_id});
     }
     (void)detector.detect(graph);
     for (const auto& occupancy : result.journey_occupancy) {
@@ -1049,13 +1121,31 @@ TrafficRecoveryCheckpoint load_traffic_recovery_checkpoint(std::istream& input) 
     for (const auto& proposal : result.pending_proposals) {
         if (proposal.participants.empty() || proposal.yielding_entity_id.empty()
             || !std::is_sorted(proposal.participants.begin(), proposal.participants.end())
-            || !std::binary_search(proposal.participants.begin(), proposal.participants.end(), proposal.yielding_entity_id))
+            || std::adjacent_find(proposal.participants.begin(), proposal.participants.end())
+                != proposal.participants.end()
+            || std::any_of(proposal.participants.begin(), proposal.participants.end(),
+                [](const std::string& participant) { return participant.empty(); })
+            || !std::binary_search(proposal.participants.begin(), proposal.participants.end(),
+                proposal.yielding_entity_id))
             throw std::runtime_error("invalid durable deadlock proposal identity");
+        for (const auto& resource : proposal.blocking_resources) {
+            if (resource.resource_id.empty() || resource.current_owner_id.empty()
+                || (resource.kind != BlockedResourceKind::Lane
+                    && resource.kind != BlockedResourceKind::Intersection))
+                throw std::runtime_error("invalid durable deadlock blocking resource");
+        }
         for (const auto& request : proposal.replacement_lane_requests)
-            if (request.entity_id != proposal.yielding_entity_id || request.lane_id.empty()) throw std::runtime_error("invalid durable replacement lane request");
+            if (request.entity_id != proposal.yielding_entity_id || request.lane_id.empty())
+                throw std::runtime_error("invalid durable replacement lane request");
         for (const auto& request : proposal.replacement_intersection_requests)
-            if (request.entity_id != proposal.yielding_entity_id || request.intersection_id.empty() || request.movement_id.empty()) throw std::runtime_error("invalid durable replacement intersection request");
+            if (request.entity_id != proposal.yielding_entity_id || request.intersection_id.empty()
+                || request.movement_id.empty())
+                throw std::runtime_error("invalid durable replacement intersection request");
     }
+    // A checkpoint is a single framed record. Reject concatenated records and
+    // trailing garbage instead of silently accepting an ambiguous prefix.
+    if (input.peek() != std::char_traits<char>::eof())
+        throw std::runtime_error("trailing data after traffic recovery checkpoint");
     return result;
 }
 
