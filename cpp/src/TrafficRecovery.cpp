@@ -78,6 +78,21 @@ JourneyRenewalResult JourneyReservationManager::advance_and_renew(
         JourneyRenewalResult result;
         result.lanes = lanes.resolve(lane_requests);
         result.intersections = intersections.resolve(intersection_requests);
+
+        // A tracked physical journey must retain every admission token it
+        // currently occupies. A denial is a failed cross-resource renewal,
+        // not a successful partial commit.
+        for (const auto& [entity_id, occupancy] : tracked_) {
+            if (!std::binary_search(result.lanes.granted_entity_ids.begin(),
+                    result.lanes.granted_entity_ids.end(), entity_id)) {
+                throw std::runtime_error("journey lane reservation renewal was denied");
+            }
+            if (!occupancy.intersection_id.empty()
+                && !std::binary_search(result.intersections.granted_entity_ids.begin(),
+                    result.intersections.granted_entity_ids.end(), entity_id)) {
+                throw std::runtime_error("journey intersection reservation renewal was denied");
+            }
+        }
         return result;
     } catch (...) {
         // Restoring snapshots also restores lease expiries, fairness credits,
