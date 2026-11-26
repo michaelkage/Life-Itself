@@ -9,6 +9,7 @@
 #include <limits>
 #include <ostream>
 #include <set>
+#include <sstream>
 #include <tuple>
 #include <stdexcept>
 #include <string>
@@ -902,92 +903,99 @@ void save_traffic_recovery_checkpoint(
         }
     }
 
+    // Stage the complete record so validation and encoding failures never
+    // leave a partially written checkpoint in the caller's stream.
+    std::ostringstream staged_output(std::ios::out | std::ios::binary);
     constexpr std::array<char, 8> magic{{'S','R','E','T','R','A','F','1'}};
-    output.write(magic.data(), static_cast<std::streamsize>(magic.size()));
+    staged_output.write(magic.data(), static_cast<std::streamsize>(magic.size()));
     if (!output) throw std::runtime_error("failed writing traffic checkpoint header");
-    write_u32(output, 1U);
+    write_u32(staged_output, 1U);
 
-    write_u64(output, checkpoint.lanes.lease_ticks);
-    write_u64(output, checkpoint.lanes.current_tick);
-    write_u8(output, checkpoint.lanes.tick_initialized ? 1U : 0U);
-    write_count(output, checkpoint.lanes.capacities.size());
+    write_u64(staged_output, checkpoint.lanes.lease_ticks);
+    write_u64(staged_output, checkpoint.lanes.current_tick);
+    write_u8(staged_output, checkpoint.lanes.tick_initialized ? 1U : 0U);
+    write_count(staged_output, checkpoint.lanes.capacities.size());
     for (const auto& [lane, capacity] : checkpoint.lanes.capacities) {
-        write_string(output, lane); write_u64(output, static_cast<std::uint64_t>(capacity));
+        write_string(staged_output, lane); write_u64(staged_output, static_cast<std::uint64_t>(capacity));
     }
-    write_count(output, checkpoint.lanes.reservations.size());
+    write_count(staged_output, checkpoint.lanes.reservations.size());
     for (const auto& item : checkpoint.lanes.reservations) {
-        write_string(output, item.lane_id); write_string(output, item.entity_id);
-        write_u64(output, item.expires_at_tick);
-        write_u32(output, static_cast<std::uint32_t>(item.priority));
-        write_u64(output, item.consecutive_wait_ticks);
+        write_string(staged_output, item.lane_id); write_string(staged_output, item.entity_id);
+        write_u64(staged_output, item.expires_at_tick);
+        write_u32(staged_output, static_cast<std::uint32_t>(item.priority));
+        write_u64(staged_output, item.consecutive_wait_ticks);
     }
-    write_count(output, checkpoint.lanes.waiting.size());
+    write_count(staged_output, checkpoint.lanes.waiting.size());
     for (const auto& item : checkpoint.lanes.waiting) {
-        write_string(output, item.lane_id); write_string(output, item.entity_id);
-        write_u64(output, item.wait_ticks);
+        write_string(staged_output, item.lane_id); write_string(staged_output, item.entity_id);
+        write_u64(staged_output, item.wait_ticks);
     }
 
-    write_u64(output, checkpoint.intersections.lease_ticks);
-    write_u64(output, checkpoint.intersections.current_tick);
-    write_u8(output, checkpoint.intersections.tick_initialized ? 1U : 0U);
-    write_count(output, checkpoint.intersections.movements.size());
+    write_u64(staged_output, checkpoint.intersections.lease_ticks);
+    write_u64(staged_output, checkpoint.intersections.current_tick);
+    write_u8(staged_output, checkpoint.intersections.tick_initialized ? 1U : 0U);
+    write_count(staged_output, checkpoint.intersections.movements.size());
     for (const auto& item : checkpoint.intersections.movements) {
-        write_string(output, item.intersection_id); write_string(output, item.movement_id);
-        write_count(output, item.conflict_zone_ids.size());
-        for (const auto& zone : item.conflict_zone_ids) write_string(output, zone);
+        write_string(staged_output, item.intersection_id); write_string(staged_output, item.movement_id);
+        write_count(staged_output, item.conflict_zone_ids.size());
+        for (const auto& zone : item.conflict_zone_ids) write_string(staged_output, zone);
     }
-    write_count(output, checkpoint.intersections.reservations.size());
+    write_count(staged_output, checkpoint.intersections.reservations.size());
     for (const auto& item : checkpoint.intersections.reservations) {
-        write_string(output, item.intersection_id); write_string(output, item.movement_id);
-        write_string(output, item.entity_id); write_u64(output, item.expires_at_tick);
-        write_u32(output, static_cast<std::uint32_t>(item.priority));
-        write_u64(output, item.consecutive_wait_ticks);
+        write_string(staged_output, item.intersection_id); write_string(staged_output, item.movement_id);
+        write_string(staged_output, item.entity_id); write_u64(staged_output, item.expires_at_tick);
+        write_u32(staged_output, static_cast<std::uint32_t>(item.priority));
+        write_u64(staged_output, item.consecutive_wait_ticks);
     }
-    write_count(output, checkpoint.intersections.waiting.size());
+    write_count(staged_output, checkpoint.intersections.waiting.size());
     for (const auto& item : checkpoint.intersections.waiting) {
-        write_string(output, item.intersection_id); write_string(output, item.entity_id);
-        write_u64(output, item.wait_ticks);
+        write_string(staged_output, item.intersection_id); write_string(staged_output, item.entity_id);
+        write_u64(staged_output, item.wait_ticks);
     }
 
-    write_count(output, checkpoint.journey_occupancy.size());
+    write_count(staged_output, checkpoint.journey_occupancy.size());
     for (const auto& item : checkpoint.journey_occupancy) {
-        write_string(output, item.entity_id); write_string(output, item.lane_id);
-        write_string(output, item.intersection_id); write_string(output, item.movement_id);
+        write_string(staged_output, item.entity_id); write_string(staged_output, item.lane_id);
+        write_string(staged_output, item.intersection_id); write_string(staged_output, item.movement_id);
     }
-    write_u64(output, checkpoint.progress_stall_threshold);
-    write_count(output, checkpoint.route_progress.size());
+    write_u64(staged_output, checkpoint.progress_stall_threshold);
+    write_count(staged_output, checkpoint.route_progress.size());
     for (const auto& item : checkpoint.route_progress) {
-        write_string(output, item.entity_id); write_u64(output, item.last_tick);
-        write_double(output, item.last_progress); write_u64(output, item.stalled_ticks);
+        write_string(staged_output, item.entity_id); write_u64(staged_output, item.last_tick);
+        write_double(staged_output, item.last_progress); write_u64(staged_output, item.stalled_ticks);
     }
-    write_count(output, checkpoint.pending_wait_edges.size());
+    write_count(staged_output, checkpoint.pending_wait_edges.size());
     for (const auto& item : checkpoint.pending_wait_edges) {
-        write_string(output, item.waiter_id); write_string(output, item.blocker_id);
-        write_u8(output, static_cast<std::uint8_t>(item.resource_kind));
-        write_string(output, item.resource_id);
+        write_string(staged_output, item.waiter_id); write_string(staged_output, item.blocker_id);
+        write_u8(staged_output, static_cast<std::uint8_t>(item.resource_kind));
+        write_string(staged_output, item.resource_id);
     }
-    write_count(output, checkpoint.pending_proposals.size());
+    write_count(staged_output, checkpoint.pending_proposals.size());
     for (const auto& proposal : checkpoint.pending_proposals) {
-        write_count(output, proposal.participants.size());
-        for (const auto& participant : proposal.participants) write_string(output, participant);
-        write_string(output, proposal.yielding_entity_id);
-        write_count(output, proposal.blocking_resources.size());
+        write_count(staged_output, proposal.participants.size());
+        for (const auto& participant : proposal.participants) write_string(staged_output, participant);
+        write_string(staged_output, proposal.yielding_entity_id);
+        write_count(staged_output, proposal.blocking_resources.size());
         for (const auto& resource : proposal.blocking_resources) {
-            write_u8(output, static_cast<std::uint8_t>(resource.kind));
-            write_string(output, resource.resource_id); write_string(output, resource.current_owner_id);
+            write_u8(staged_output, static_cast<std::uint8_t>(resource.kind));
+            write_string(staged_output, resource.resource_id); write_string(staged_output, resource.current_owner_id);
         }
-        write_count(output, proposal.replacement_lane_requests.size());
+        write_count(staged_output, proposal.replacement_lane_requests.size());
         for (const auto& request : proposal.replacement_lane_requests) {
-            write_string(output, request.lane_id); write_string(output, request.entity_id);
-            write_u32(output, static_cast<std::uint32_t>(request.priority));
+            write_string(staged_output, request.lane_id); write_string(staged_output, request.entity_id);
+            write_u32(staged_output, static_cast<std::uint32_t>(request.priority));
         }
-        write_count(output, proposal.replacement_intersection_requests.size());
+        write_count(staged_output, proposal.replacement_intersection_requests.size());
         for (const auto& request : proposal.replacement_intersection_requests) {
-            write_string(output, request.intersection_id); write_string(output, request.movement_id);
-            write_string(output, request.entity_id); write_u32(output, static_cast<std::uint32_t>(request.priority));
+            write_string(staged_output, request.intersection_id); write_string(staged_output, request.movement_id);
+            write_string(staged_output, request.entity_id); write_u32(staged_output, static_cast<std::uint32_t>(request.priority));
         }
     }
 }
+
+    const std::string encoded = staged_output.str();
+    output.write(encoded.data(), static_cast<std::streamsize>(encoded.size()));
+    if (!output) throw std::runtime_error("failed writing traffic recovery checkpoint");
 
 TrafficRecoveryCheckpoint load_traffic_recovery_checkpoint(std::istream& input) {
     constexpr std::array<char, 8> expected{{'S','R','E','T','R','A','F','1'}};
