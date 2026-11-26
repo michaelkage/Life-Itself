@@ -875,7 +875,6 @@ void save_traffic_recovery_checkpoint(
                 edge.resource_kind, edge.resource_id).second)
             throw std::invalid_argument("invalid or duplicate pending resource wait edge");
         if (unique_graph_edges.emplace(edge.waiter_id, edge.blocker_id).second)
-            if (unique_graph_edges.emplace(edge.waiter_id, edge.blocker_id).second)
             graph.push_back({edge.waiter_id, edge.blocker_id});
     }
     (void)detector.detect(graph);
@@ -1104,7 +1103,8 @@ TrafficRecoveryCheckpoint load_traffic_recovery_checkpoint(std::istream& input) 
             || !unique_wait_edges.emplace(edge.waiter_id, edge.blocker_id,
                 edge.resource_kind, edge.resource_id).second)
             throw std::runtime_error("invalid or duplicate pending resource wait edge");
-        graph.push_back({edge.waiter_id, edge.blocker_id});
+        if (unique_graph_edges.emplace(edge.waiter_id, edge.blocker_id).second)
+            graph.push_back({edge.waiter_id, edge.blocker_id});
     }
     (void)detector.detect(graph);
     for (const auto& occupancy : result.journey_occupancy) {
