@@ -227,7 +227,10 @@ def file_from_memories(
         for memory in witnesses:
             root_id = getattr(memory, "root_evidence_id", "")
             if isinstance(root_id, str) and root_id:
-                independent_evidence.add(f"root:{root_id}")
+                independent_evidence.add(
+                    root_id if root_id.startswith("legacy-witness:")
+                    else f"root:{root_id}"
+                )
             elif memory.witness_id:
                 independent_evidence.add(f"legacy-witness:{memory.witness_id}")
 
