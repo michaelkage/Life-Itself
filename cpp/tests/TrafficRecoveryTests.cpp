@@ -93,6 +93,7 @@ int main() {
     checkpoint.pending_proposals = proposals;
     checkpoint.pending_wait_edges = {
         {"npc-a", "npc-b", BlockedResourceKind::Lane, "L1"},
+        {"npc-a", "npc-b", BlockedResourceKind::Intersection, "J1"},
         {"npc-b", "npc-a", BlockedResourceKind::Intersection, "J1"}};
     std::stringstream checkpoint_bytes(std::ios::in | std::ios::out | std::ios::binary);
     save_traffic_recovery_checkpoint(checkpoint, checkpoint_bytes);
@@ -152,7 +153,7 @@ int main() {
     assert(restored_checkpoint.intersections.reservations.size() == checkpoint.intersections.reservations.size());
     assert(restored_checkpoint.journey_occupancy.size() == 1U);
     assert(restored_checkpoint.route_progress.front().stalled_ticks == 1U);
-    assert(restored_checkpoint.pending_wait_edges.size() == 2U);
+    assert(restored_checkpoint.pending_wait_edges.size() == 3U);
     assert(restored_checkpoint.pending_proposals.size() == 1U);
     assert(restored_checkpoint.pending_proposals.front().yielding_entity_id == "b");
 
