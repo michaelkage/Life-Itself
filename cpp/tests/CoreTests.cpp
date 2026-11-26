@@ -556,7 +556,9 @@ int main() {
         != world.state().npcs[1].memories.front().root_evidence_id);
     const Conversation world_conversation = world.talk("listener", "speaker");
     assert(world_conversation.transferred.size() == 1);
-    assert(world.state().npcs[1].memories.size() == 1);
+    assert(world.state().npcs[1].memories.size() == 2);
+    assert(world.state().npcs[1].memories[0].root_evidence_id
+        != world.state().npcs[1].memories[1].root_evidence_id);
     assert(world.state().npcs[0].beliefs.size() == 1);
     assert(world.state().npcs[0].beliefs[0].directly_observed);
     // The listener was also present at the event, so their belief is first-hand.
